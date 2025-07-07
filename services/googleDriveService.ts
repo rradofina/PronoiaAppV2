@@ -146,6 +146,8 @@ class GoogleDriveService {
         });
 
         for (const file of filesResponse.result.files || []) {
+          console.log(`Found file: ${file.name}, mimeType: ${file.mimeType}, thumbnailLink: ${file.thumbnailLink}`);
+          
           if (file.mimeType === 'application/vnd.google-apps.folder') {
             folders.push({
               id: file.id || '',
@@ -154,6 +156,7 @@ class GoogleDriveService {
               folders: [],
             });
           } else if (this.isImageFile(file.mimeType || '')) {
+            console.log(`✅ Added as image: ${file.name}`);
             files.push({
               id: file.id || '',
               name: file.name || '',
@@ -166,6 +169,8 @@ class GoogleDriveService {
               modifiedTime: file.modifiedTime || '',
               parents: file.parents || [],
             });
+          } else {
+            console.log(`❌ Skipped (not image): ${file.name}, mimeType: ${file.mimeType}`);
           }
         }
         pageToken = filesResponse.result.nextPageToken;
@@ -188,15 +193,27 @@ class GoogleDriveService {
       const folder = await this.getFolderContents(folderId);
       console.log(`Found ${folder.files.length} files in folder`);
       
-      // First try with thumbnails (simpler approach)
+      // Simple approach - just use thumbnail URLs directly
       const photos = folder.files.map((file) => {
-        const thumbnailUrl = file.thumbnailLink || this.getThumbnailUrl(file.id);
-        console.log(`Photo: ${file.name}, thumbnailUrl: ${thumbnailUrl}`);
+        let photoUrl = '';
+        
+        // Try different URL approaches
+        if (file.thumbnailLink) {
+          // Use Google's thumbnail with larger size
+          photoUrl = file.thumbnailLink.replace('=s220', '=s800');
+          console.log(`Using thumbnailLink: ${photoUrl}`);
+        } else {
+          // Fallback to authenticated API endpoint
+          photoUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&access_token=${this.accessToken}`;
+          console.log(`Using API endpoint: ${photoUrl}`);
+        }
+        
+        console.log(`Photo: ${file.name}, URL: ${photoUrl}`);
         
         return {
           id: file.id,
-          url: thumbnailUrl, // Use thumbnail URL for now
-          thumbnailUrl: thumbnailUrl,
+          url: photoUrl,
+          thumbnailUrl: file.thumbnailLink || '',
           name: file.name,
           mimeType: file.mimeType,
           size: parseInt(file.size) || 0,
@@ -208,7 +225,7 @@ class GoogleDriveService {
         };
       });
 
-      console.log(`Returning ${photos.length} photos`);
+      console.log(`Returning ${photos.length} photos with URLs:`, photos.map(p => ({ name: p.name, url: p.url })));
       return photos;
     } catch (error) {
       console.error('Failed to get photos from folder:', error);
@@ -388,7 +405,9 @@ class GoogleDriveService {
   }
 
   private isImageFile(mimeType: string): boolean {
-    return SUPPORTED_IMAGE_TYPES.indexOf(mimeType) !== -1;
+    const isImage = SUPPORTED_IMAGE_TYPES.indexOf(mimeType) !== -1;
+    console.log(`Checking if ${mimeType} is image: ${isImage}, supported types:`, SUPPORTED_IMAGE_TYPES);
+    return isImage;
   }
 
   async searchFiles(query: string, folderId?: string): Promise<GoogleDriveFile[]> {
