@@ -211,6 +211,8 @@ export default function Home() {
   }, []);
 
   const handleDemoMode = () => {
+    console.log('Demo mode activated!');
+    
     // Create mock folders for demo
     const mockMainFolders: DriveFolder[] = [
       { id: 'demo1', name: 'Photo Sessions 2024', createdTime: '2024-01-01T00:00:00.000Z' },
@@ -218,8 +220,12 @@ export default function Home() {
       { id: 'demo3', name: 'Portrait Sessions', createdTime: '2024-03-01T00:00:00.000Z' },
     ];
     
+    // Set demo state
     setDriveFolders(mockMainFolders);
     setGoogleAuth({ isSignedIn: true, userEmail: 'demo@example.com' });
+    setIsGapiLoaded(true);
+    
+    console.log('Demo mode setup complete - should see folder grid now');
   };
 
   const handleDemoFolderSelect = (folder: DriveFolder) => {
