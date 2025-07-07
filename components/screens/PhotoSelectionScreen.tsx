@@ -9,6 +9,8 @@ interface PhotoSelectionScreenProps {
   photos: Photo[];
   getTotalTemplateCount: () => number;
   handlePhotoContinue: () => void;
+  handlePhotoSelect: (photo: Photo) => void;
+  handleSlotSelect: (slot: TemplateSlot) => void;
   TemplateVisual: React.FC<any>; // Using any for now to avoid circular dependencies
 }
 
@@ -21,6 +23,8 @@ export default function PhotoSelectionScreen({
   photos,
   getTotalTemplateCount,
   handlePhotoContinue,
+  handlePhotoSelect,
+  handleSlotSelect,
   TemplateVisual,
 }: PhotoSelectionScreenProps) {
   return (
@@ -60,9 +64,7 @@ export default function PhotoSelectionScreen({
           {photos.map((photo) => (
             <div
               key={photo.id}
-              onClick={() => {
-                // handlePhotoSelect(photo)
-              }}
+              onClick={() => handlePhotoSelect(photo)}
               className="bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer transform hover:scale-105 transition-transform duration-200"
             >
               <img src={photo.url} alt={photo.name} className="w-full h-32 object-cover" />
@@ -96,7 +98,7 @@ export default function PhotoSelectionScreen({
                 <TemplateVisual
                   template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
                   slots={slots}
-                  onSlotClick={() => {}}
+                  onSlotClick={handleSlotSelect}
                   photos={photos}
                 />
               </div>
