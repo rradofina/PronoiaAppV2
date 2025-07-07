@@ -664,10 +664,6 @@ export default function Home() {
 
   // Google Drive Setup Screen
   if (currentScreen === 'drive-setup') {
-    const hasApiCredentials = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && 
-                             process.env.NEXT_PUBLIC_GOOGLE_API_KEY && 
-                             process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID !== 'your_google_client_id_here';
-
     return (
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-4xl mx-auto">
@@ -676,11 +672,11 @@ export default function Home() {
               Pronoia Photo Studio
             </h1>
             <p className="text-gray-600 text-lg mb-8">
-              Connect to Google Drive to access your photo sessions
+              Welcome to the Photo Selection App
             </p>
           </div>
 
-          {!hasApiCredentials ? (
+          {!googleAuth.isSignedIn ? (
             <div className="space-y-6">
               {/* Demo Mode Option */}
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
@@ -700,80 +696,16 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-
-              {/* Setup Instructions */}
-              <div className="bg-white rounded-lg p-6 shadow-sm">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                  🔧 Setup Google Drive Integration
-                </h3>
-                <div className="space-y-3 text-sm text-gray-600">
-                  <p><strong>Step 1:</strong> Go to <a href="https://console.cloud.google.com/" target="_blank" className="text-blue-600 hover:underline">Google Cloud Console</a></p>
-                  <p><strong>Step 2:</strong> Create a new project or select existing one</p>
-                  <p><strong>Step 3:</strong> Enable "Google Drive API"</p>
-                  <p><strong>Step 4:</strong> Create credentials (OAuth 2.0 Client ID + API Key)</p>
-                  <p><strong>Step 5:</strong> Add <code className="bg-gray-100 px-1 rounded">http://localhost:3000</code> to authorized origins</p>
-                  <p><strong>Step 6:</strong> Create <code className="bg-gray-100 px-1 rounded">.env.local</code> file with:</p>
-                  <div className="bg-gray-100 p-3 rounded mt-2 font-mono text-xs">
-                    NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_client_id<br/>
-                    NEXT_PUBLIC_GOOGLE_API_KEY=your_api_key
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : !isGapiLoaded ? (
-            <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-              <p className="mt-4 text-gray-600">Loading Google Drive...</p>
-            </div>
-          ) : !googleAuth.isSignedIn ? (
-            <div className="space-y-6">
-              {/* Google Sign In */}
-              <div className="bg-white rounded-lg p-8 shadow-sm text-center">
-                <div className="mb-6">
-                  <div className="text-6xl mb-4">📁</div>
-                  <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-                    Connect Google Drive
-                  </h2>
-                  <p className="text-gray-600">
-                    Sign in to access your photo folders and client sessions
-                  </p>
-                </div>
-                <button
-                  onClick={handleGoogleSignIn}
-                  className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium text-lg hover:bg-blue-700 transition-all duration-200 shadow-md"
-                >
-                  Sign in with Google
-                </button>
-              </div>
-
-              {/* Alternative: Demo Mode for OAuth Issues */}
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
-                <div className="text-center">
-                  <div className="text-3xl mb-3">⚠️</div>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    Having Google Sign-In Issues?
-                  </h3>
-                  <p className="text-gray-600 mb-4 text-sm">
-                    If you're getting authentication errors, try demo mode while we fix the OAuth setup
-                  </p>
-                  <button
-                    onClick={handleDemoMode}
-                    className="bg-orange-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-orange-700 transition-all duration-200"
-                  >
-                    Use Demo Mode Instead
-                  </button>
-                </div>
-              </div>
             </div>
           ) : (
             <div className="bg-white rounded-lg p-8 shadow-sm">
               <div className="text-center mb-6">
                 <div className="text-4xl mb-4">✅</div>
                 <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-                  Connected to Google Drive
+                  Ready to Start
                 </h2>
                 <p className="text-gray-600">
-                  Signed in as: <span className="font-medium">{googleAuth.userEmail}</span>
+                  Demo mode active: <span className="font-medium">{googleAuth.userEmail}</span>
                 </p>
               </div>
 
@@ -789,7 +721,7 @@ export default function Home() {
                   {driveFolders.map((folder) => (
                     <div
                       key={folder.id}
-                      onClick={() => googleAuth.userEmail === 'demo@example.com' ? handleDemoFolderSelect(folder) : handleMainFolderSelect(folder)}
+                      onClick={() => handleDemoFolderSelect(folder)}
                       className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200"
                     >
                       <div className="flex items-center">
