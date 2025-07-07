@@ -1,4 +1,5 @@
 import { DriveFolder, GoogleAuth } from '../../types';
+import { useState } from 'react';
 
 interface DriveSetupScreenProps {
   isGapiLoaded: boolean;
@@ -27,6 +28,7 @@ export default function DriveSetupScreen({
   handleSignOut,
   isConnecting,
 }: DriveSetupScreenProps) {
+  const [isSelectingFolder, setIsSelectingFolder] = useState(false);
   
   if (!isGapiLoaded) {
     return (
@@ -121,72 +123,94 @@ export default function DriveSetupScreen({
               </button>
             </div>
             
-            {mainSessionsFolder ? (
-                 <div className="mb-6">
-                 <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                   Main Photo Folder
-                 </h3>
-                 <div className="flex items-center justify-between bg-gray-50 rounded-lg p-4">
-                   <div className="flex items-center">
-                     <div className="text-2xl mr-3">📁</div>
-                     <div>
-                       <p className="font-medium text-gray-800">{mainSessionsFolder.name}</p>
-                     </div>
-                   </div>
-                   <button
-                     onClick={() => alert("Changing folder is not implemented yet.")} // Or trigger a re-selection flow
-                     className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-medium text-sm hover:bg-blue-200 transition-all duration-200"
-                   >
-                     Change
-                   </button>
-                 </div>
-               </div>
-            ) : (
-                <div className="mb-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                    Select Your Main Photo Folder
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                    This is the top-level folder in your Google Drive where all your client galleries are stored.
-                    </p>
-                    
-                    {driveFolders.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-                        {driveFolders.map((folder) => (
-                            <div
-                            key={folder.id}
-                            onClick={() => googleAuth.userEmail === 'demo@example.com' ? handleDemoFolderSelect(folder) : handleMainFolderSelect(folder)}
-                            className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200"
-                            >
-                            <div className="flex items-center">
-                                <div className="text-2xl mr-3">📁</div>
-                                <div>
-                                <p className="font-medium text-gray-800">{folder.name}</p>
-                                <p className="text-xs text-gray-500">
-                                    {new Date(folder.createdTime).toLocaleDateString()}
-                                </p>
-                                </div>
-                            </div>
-                            </div>
-                        ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-8">
-                            <div className="text-3xl mb-4">📂</div>
-                            <p className="text-gray-600">No folders found in your Google Drive root.</p>
-                            <p className="text-gray-600 text-sm mt-2">Please create a folder in your Drive and refresh this page.</p>
-                        </div>
-                    )}
+            {mainSessionsFolder && !isSelectingFolder ? (
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                  Main Photo Folder
+                </h3>
+                <div className="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="text-2xl mr-3">📁</div>
+                    <div>
+                      <p className="font-medium text-gray-800">{mainSessionsFolder.name}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsSelectingFolder(true)}
+                    className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-medium text-sm hover:bg-blue-200 transition-all duration-200"
+                  >
+                    Change
+                  </button>
                 </div>
+                <div className="text-center mt-4">
+                  <button
+                    onClick={() => handleMainFolderSelect({ id: mainSessionsFolder.id, name: mainSessionsFolder.name, createdTime: '' })}
+                    className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-all duration-200"
+                  >
+                    Continue with "{mainSessionsFolder.name}"
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                  {isSelectingFolder ? 'Change Main Photo Folder' : 'Select Your Main Photo Folder'}
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  This is the top-level folder in your Google Drive where all your client galleries are stored.
+                </p>
+                
+                {driveFolders.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+                    {driveFolders.map((folder) => (
+                      <div
+                        key={folder.id}
+                        onClick={() => {
+                          googleAuth.userEmail === 'demo@example.com' ? handleDemoFolderSelect(folder) : handleMainFolderSelect(folder);
+                          setIsSelectingFolder(false);
+                        }}
+                        className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200"
+                      >
+                        <div className="flex items-center">
+                          <div className="text-2xl mr-3">📁</div>
+                          <div>
+                            <p className="font-medium text-gray-800">{folder.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(folder.createdTime).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="text-3xl mb-4">📂</div>
+                    <p className="text-gray-600">No folders found in your Google Drive root.</p>
+                    <p className="text-gray-600 text-sm mt-2">Please create a folder in your Drive and refresh this page.</p>
+                  </div>
+                )}
+
+                {isSelectingFolder && (
+                  <div className="text-center mt-4">
+                    <button
+                      onClick={() => setIsSelectingFolder(false)}
+                      className="px-6 py-3 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="mt-6 text-center">
-                <button
-                    onClick={showDebugInfo}
-                    className="text-sm text-blue-600 hover:underline"
-                >
-                    Show Debug Info
-                </button>
+              <button
+                onClick={showDebugInfo}
+                className="text-sm text-blue-600 hover:underline"
+              >
+                Show Debug Info
+              </button>
             </div>
           </div>
         )}
