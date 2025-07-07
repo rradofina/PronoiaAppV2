@@ -11,11 +11,49 @@ import {
   TemplateType,
   UIState,
   LoadingState,
-  ErrorInfo
+  ErrorInfo,
+  Screen,
+  GoogleAuth,
+  DriveFolder,
+  TemplateSlot,
+  Package,
+  TemplateTypeInfo
 } from '../types';
 import { STORAGE_KEYS, PACKAGES } from '../utils/constants';
 
 interface AppStore extends AppState {
+  // New state properties
+  currentScreen: Screen;
+  googleAuth: GoogleAuth;
+  isGapiLoaded: boolean;
+  driveFolders: DriveFolder[];
+  selectedMainFolder: DriveFolder | null;
+  clientFolders: DriveFolder[];
+  selectedClientFolder: DriveFolder | null;
+  templateSlots: TemplateSlot[];
+  selectedSlot: TemplateSlot | null;
+  selectedPackage: Package | null;
+  clientName: string;
+  templateCounts: Record<string, number>;
+  packages: Package[];
+  templateTypes: TemplateTypeInfo[];
+
+  // Actions for new state
+  setCurrentScreen: (screen: Screen) => void;
+  setGoogleAuth: (auth: GoogleAuth) => void;
+  setIsGapiLoaded: (loaded: boolean) => void;
+  setDriveFolders: (folders: DriveFolder[]) => void;
+  setSelectedMainFolder: (folder: DriveFolder | null) => void;
+  setClientFolders: (folders: DriveFolder[]) => void;
+  setSelectedClientFolder: (folder: DriveFolder | null) => void;
+  setTemplateSlots: (slots: TemplateSlot[]) => void;
+  setSelectedSlot: (slot: TemplateSlot | null) => void;
+  setSelectedPackage: (pkg: Package | null) => void;
+  setClientName: (name: string) => void;
+  setTemplateCounts: (counts: Record<string, number>) => void;
+  handleTemplateCountChange: (templateId: string, change: number) => void;
+  getTotalTemplateCount: () => number;
+
   // UI State
   uiState: UIState;
   loadingState: LoadingState;
@@ -139,6 +177,121 @@ const useAppStore = create<AppStore>()(
         uiState: initialUIState,
         loadingState: initialLoadingState,
         mainSessionsFolder: null,
+        
+        // New state initial values
+        currentScreen: 'drive-setup',
+        googleAuth: { isSignedIn: false, userEmail: null },
+        isGapiLoaded: false,
+        driveFolders: [],
+        selectedMainFolder: null,
+        clientFolders: [],
+        selectedClientFolder: null,
+        templateSlots: [],
+        selectedSlot: null,
+        selectedPackage: null,
+        clientName: '',
+        templateCounts: {
+          solo: 0,
+          collage: 0,
+          photocard: 0,
+          photostrip: 0,
+        },
+        packages: [
+          { 
+            id: 'A', 
+            name: 'Package A', 
+            templateCount: 1, 
+            price: 249,
+            description: 'Perfect for a single memorable print'
+          },
+          { 
+            id: 'B', 
+            name: 'Package B', 
+            templateCount: 2, 
+            price: 549,
+            description: 'Great for couples or small groups'
+          },
+          { 
+            id: 'C', 
+            name: 'Package C', 
+            templateCount: 5, 
+            price: 999,
+            description: 'Ideal for families and events'
+          },
+          { 
+            id: 'D', 
+            name: 'Package D', 
+            templateCount: 10, 
+            price: 1999,
+            description: 'Complete collection for special occasions'
+          },
+        ],
+        templateTypes: [
+          {
+            id: 'solo',
+            name: 'Solo Print',
+            description: 'Single photo with white border',
+            icon: '🖼️',
+            preview: 'One large photo with elegant white border',
+            slots: 1
+          },
+          {
+            id: 'collage',
+            name: 'Collage Print',
+            description: '4 photos in 2x2 grid layout',
+            icon: '🏁',
+            preview: 'Four photos arranged in a perfect grid',
+            slots: 4
+          },
+          {
+            id: 'photocard',
+            name: 'Photocard Print',
+            description: '4 photos edge-to-edge, no borders',
+            icon: '🎴',
+            preview: 'Four photos seamlessly connected without borders',
+            slots: 4
+          },
+          {
+            id: 'photostrip',
+            name: 'Photo Strip Print',
+            description: '6 photos in 3 rows of 2',
+            icon: '📸',
+            preview: 'Six photos arranged in three horizontal rows',
+            slots: 6
+          }
+        ],
+
+        // Actions for new state
+        setCurrentScreen: (screen) => set({ currentScreen: screen }),
+        setGoogleAuth: (auth) => set({ googleAuth: auth }),
+        setIsGapiLoaded: (loaded) => set({ isGapiLoaded: loaded }),
+        setDriveFolders: (folders) => set({ driveFolders: folders }),
+        setSelectedMainFolder: (folder) => set({ selectedMainFolder: folder }),
+        setClientFolders: (folders) => set({ clientFolders: folders }),
+        setSelectedClientFolder: (folder) => set({ selectedClientFolder: folder }),
+        setTemplateSlots: (slots) => set({ templateSlots: slots }),
+        setSelectedSlot: (slot) => set({ selectedSlot: slot }),
+        setSelectedPackage: (pkg) => set({ selectedPackage: pkg }),
+        setClientName: (name) => set({ clientName: name }),
+        setTemplateCounts: (counts) => set({ templateCounts: counts }),
+        handleTemplateCountChange: (templateId, change) => {
+          const state = get();
+          const currentCount = state.templateCounts[templateId] || 0;
+          const newCount = Math.max(0, currentCount + change);
+          const totalCount = Object.values(state.templateCounts).reduce((sum, count) => sum + count, 0) - currentCount + newCount;
+          if (totalCount <= (state.selectedPackage?.templateCount || 0)) {
+            set({
+              templateCounts: {
+                ...state.templateCounts,
+                [templateId]: newCount,
+              },
+            });
+          }
+        },
+        getTotalTemplateCount: () => {
+          const state = get();
+          return Object.values(state.templateCounts).reduce((sum, count) => sum + count, 0);
+        },
 
         // Session actions
         setSession: (session) => set({ session }),

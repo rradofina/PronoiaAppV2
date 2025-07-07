@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
+import clsx from 'clsx';
 
 // Store and Utils
 import useAppStore from '../stores/useAppStore';
@@ -63,23 +64,26 @@ export default function TemplateSelection() {
 
     return (
       <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
-        <div className={`grid gap-1 ${
-          templateType === 'solo' || templateType === 'photocard' 
-            ? 'grid-cols-1' 
-            : templateType === 'collage' 
-              ? 'grid-cols-2' 
-              : 'grid-cols-1'
-        }`}>
+        <div className={clsx(
+          'grid',
+          'gap-1',
+          {
+            'grid-cols-1': templateType === 'solo' || templateType === 'photocard' || templateType === 'photostrip',
+            'grid-cols-2': templateType === 'collage',
+          }
+        )}>
           {Array.from({ length: Math.min(count, 6) }, (_, i) => (
             <div
               key={i}
-              className={`bg-gray-300 rounded ${
-                templateType === 'photostrip' 
-                  ? 'w-8 h-4' 
-                  : templateType === 'collage' 
-                    ? 'w-6 h-6' 
-                    : 'w-12 h-16'
-              }`}
+              className={clsx(
+                'bg-gray-300',
+                'rounded',
+                {
+                  'w-8 h-4': templateType === 'photostrip',
+                  'w-6 h-6': templateType === 'collage',
+                  'w-12 h-16': templateType !== 'photostrip' && templateType !== 'collage',
+                }
+              )}
             />
           ))}
         </div>
@@ -132,15 +136,22 @@ export default function TemplateSelection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              className={`
-                relative bg-white rounded-xl shadow-lg overflow-hidden border-2 transition-all duration-200 cursor-pointer
-                ${isSelected 
-                  ? 'border-blue-500 ring-2 ring-blue-200' 
-                  : isDisabled 
-                    ? 'border-gray-200 opacity-50 cursor-not-allowed' 
-                    : 'border-gray-200 hover:border-gray-300 hover:shadow-xl'
+              className={clsx(
+                'relative',
+                'bg-white',
+                'rounded-xl',
+                'shadow-lg',
+                'overflow-hidden',
+                'border-2',
+                'transition-all',
+                'duration-200',
+                'cursor-pointer',
+                {
+                  'border-blue-500 ring-2 ring-blue-200': isSelected,
+                  'border-gray-200 opacity-50 cursor-not-allowed': isDisabled,
+                  'border-gray-200 hover:border-gray-300 hover:shadow-xl': !isSelected && !isDisabled,
                 }
-              `}
+              )}
               onClick={() => !isDisabled && handleTemplateToggle(templateType)}
               whileHover={!isDisabled ? { scale: 1.02 } : {}}
               whileTap={!isDisabled ? { scale: 0.98 } : {}}
@@ -181,15 +192,20 @@ export default function TemplateSelection() {
               {/* Action Button */}
               <div className="px-6 pb-6">
                 <button
-                  className={`
-                    w-full py-2 px-4 rounded-lg font-medium transition-all duration-200
-                    ${isSelected 
-                      ? 'bg-red-100 text-red-700 hover:bg-red-200' 
-                      : isDisabled 
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                  className={clsx(
+                    'w-full',
+                    'py-2',
+                    'px-4',
+                    'rounded-lg',
+                    'font-medium',
+                    'transition-all',
+                    'duration-200',
+                    {
+                      'bg-red-100 text-red-700 hover:bg-red-200': isSelected,
+                      'bg-gray-100 text-gray-400 cursor-not-allowed': isDisabled,
+                      'bg-blue-100 text-blue-700 hover:bg-blue-200': !isSelected && !isDisabled,
                     }
-                  `}
+                  )}
                   disabled={isDisabled}
                 >
                   {isSelected ? 'Remove Template' : isDisabled ? 'Limit Reached' : 'Add Template'}

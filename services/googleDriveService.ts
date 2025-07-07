@@ -1,3 +1,5 @@
+/// <reference types="gapi" />
+/// <reference types="gapi.client.drive-v3" />
 // Updated: Google Drive service.
 import { GoogleDriveFile, GoogleDriveFolder, Photo } from '../types';
 import { GOOGLE_DRIVE_CONFIG, SUPPORTED_IMAGE_TYPES, ERROR_MESSAGES } from '../utils/constants';
@@ -112,41 +114,52 @@ class GoogleDriveService {
         fields: 'id,name',
       });
 
-      // Get folder contents
-      const filesResponse = await window.gapi.client.drive.files.list({
-        q: `'${folderId}' in parents and trashed=false`,
-        fields: 'files(id,name,mimeType,size,webContentLink,webViewLink,thumbnailLink,createdTime,modifiedTime,parents)',
-        pageSize: 1000,
-        orderBy: 'name',
-      });
-
+      // Get folder contents with pagination
       const files: GoogleDriveFile[] = [];
       const folders: GoogleDriveFolder[] = [];
-
-      for (const file of filesResponse.result.files || []) {
-        if (file.mimeType === 'application/vnd.google-apps.folder') {
-          // Recursively get subfolder contents if needed
-          folders.push({
-            id: file.id,
-            name: file.name,
-            files: [],
-            folders: [],
-          });
-        } else if (this.isImageFile(file.mimeType)) {
-          files.push({
-            id: file.id,
-            name: file.name,
-            mimeType: file.mimeType,
-            size: file.size || '0',
-            webContentLink: file.webContentLink || '',
-            webViewLink: file.webViewLink || '',
-            thumbnailLink: file.thumbnailLink,
-            createdTime: file.createdTime || '',
-            modifiedTime: file.modifiedTime || '',
-            parents: file.parents || [],
-          });
+      let pageToken;
+      
+      interface DriveFilesListResponse {
+        result: {
+          nextPageToken?: string;
+          files: gapi.client.drive.File[];
         }
       }
+
+      do {
+        const filesResponse: DriveFilesListResponse = await window.gapi.client.drive.files.list({
+          q: `'${folderId}' in parents and trashed=false`,
+          fields: 'nextPageToken, files(id,name,mimeType,size,webContentLink,webViewLink,thumbnailLink,createdTime,modifiedTime,parents)',
+          pageSize: 1000,
+          orderBy: 'name',
+          pageToken: pageToken,
+        });
+
+        for (const file of filesResponse.result.files || []) {
+          if (file.mimeType === 'application/vnd.google-apps.folder') {
+            folders.push({
+              id: file.id || '',
+              name: file.name || '',
+              files: [],
+              folders: [],
+            });
+          } else if (this.isImageFile(file.mimeType || '')) {
+            files.push({
+              id: file.id || '',
+              name: file.name || '',
+              mimeType: file.mimeType || '',
+              size: file.size || '0',
+              webContentLink: file.webContentLink || '',
+              webViewLink: file.webViewLink || '',
+              thumbnailLink: file.thumbnailLink || '',
+              createdTime: file.createdTime || '',
+              modifiedTime: file.modifiedTime || '',
+              parents: file.parents || [],
+            });
+          }
+        }
+        pageToken = filesResponse.result.nextPageToken;
+      } while (pageToken);
 
       return {
         id: folderResponse.result.id,

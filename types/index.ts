@@ -18,11 +18,13 @@ export interface Package {
   id: string;
   name: string;
   templateCount: number;
+  price: number;
   description?: string;
 }
 
 export interface TemplateSlot {
   id: string;
+  templateId: string;
   templateName: string;
   templateType: TemplateType;
   slotIndex: number;
@@ -90,6 +92,15 @@ export interface Photo {
 }
 
 export type TemplateType = 'solo' | 'collage' | 'photocard' | 'photostrip';
+
+export interface TemplateTypeInfo {
+  id: TemplateType;
+  name: string;
+  description: string;
+  icon: string;
+  preview: string;
+  slots: number;
+}
 
 export interface TemplateLayout {
   type: TemplateType;

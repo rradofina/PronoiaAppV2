@@ -10,20 +10,6 @@ declare namespace JSX {
 // Remove the conflicting React module declaration since @types/react is now installed
 // The real React types will be used instead.
 
-declare module 'react-hot-toast' {
-  export const toast: any;
-  export const Toaster: any;
-}
-
-declare module 'framer-motion' {
-  export const motion: any;
-  export const AnimatePresence: any;
-}
-
-declare module 'clsx' {
-  export default function clsx(...inputs: any[]): string;
-}
-
 declare module 'file-saver' {
   export function saveAs(data: Blob, filename: string): void;
 }
