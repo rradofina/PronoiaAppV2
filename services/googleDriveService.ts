@@ -236,38 +236,36 @@ class GoogleDriveService {
     mimeType: string = 'image/jpeg'
   ): Promise<string> {
     try {
-      if (!this.isSignedIn()) {
+      if (!this.isSignedIn() || !this.accessToken) {
         throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
       }
-
-      const boundary = '-------314159265358979323846';
-      const delimiter = '\r\n--' + boundary + '\r\n';
-      const close_delim = '\r\n--' + boundary + '--';
 
       const metadata = {
         name: fileName,
         parents: [parentFolderId],
+        mimeType,
       };
 
-      const multipartRequestBody =
-        delimiter +
-        'Content-Type: application/json\r\n\r\n' +
-        JSON.stringify(metadata) +
-        delimiter +
-        `Content-Type: ${mimeType}\r\n\r\n`;
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', file);
 
-      const request = window.gapi.client.request({
-        path: 'https://www.googleapis.com/upload/drive/v3/files',
+      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
-        params: { uploadType: 'multipart' },
-        headers: {
-          'Content-Type': `multipart/related; boundary="${boundary}"`,
-        },
-        body: multipartRequestBody + file + close_delim,
+        headers: new Headers({
+          'Authorization': `Bearer ${this.accessToken}`
+        }),
+        body: form,
       });
 
-      const response = await request;
-      return response.result.id;
+      if (!response.ok) {
+        const errorBody = await response.json();
+        console.error('Failed to upload file:', errorBody);
+        throw new Error(`Upload failed: ${errorBody.error.message}`);
+      }
+
+      const result = await response.json();
+      return result.id;
     } catch (error) {
       console.error('Failed to upload file:', error);
       throw new Error(ERROR_MESSAGES.EXPORT_FAILED);

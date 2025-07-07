@@ -12,6 +12,7 @@ interface DriveSetupScreenProps {
   showDebugInfo: () => void;
   debugInfo: string;
   setDebugInfo: (info: string) => void;
+  mainSessionsFolder: { id: string; name: string } | null;
 }
 
 export default function DriveSetupScreen({
@@ -25,7 +26,23 @@ export default function DriveSetupScreen({
   showDebugInfo,
   debugInfo,
   setDebugInfo,
+  mainSessionsFolder,
 }: DriveSetupScreenProps) {
+  const [isSelectingFolder, setIsSelectingFolder] = useState(false);
+
+  const handleSelectFolder = () => {
+    setIsSelectingFolder(true);
+  };
+
+  const handleCancelSelectFolder = () => {
+    setIsSelectingFolder(false);
+  };
+
+  const handleFolderSelected = (folder: DriveFolder) => {
+    handleMainFolderSelect(folder);
+    setIsSelectingFolder(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-4xl mx-auto">
@@ -121,34 +138,66 @@ export default function DriveSetupScreen({
               </p>
             </div>
 
-            <div className="mb-6">
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                Select Main Photo Folder
-              </h3>
-              <p className="text-gray-600 mb-4">
-                Choose the main folder that contains all your client photo sessions
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-                {driveFolders.map((folder) => (
-                  <div
-                    key={folder.id}
-                    onClick={() => googleAuth.userEmail === 'demo@example.com' ? handleDemoFolderSelect(folder) : handleMainFolderSelect(folder)}
-                    className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200"
-                  >
-                    <div className="flex items-center">
-                      <div className="text-2xl mr-3">📁</div>
-                      <div>
-                        <p className="font-medium text-gray-800">{folder.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(folder.createdTime).toLocaleDateString()}
-                        </p>
-                      </div>
+            {mainSessionsFolder && !isSelectingFolder ? (
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                  Main Photo Folder
+                </h3>
+                <div className="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="text-2xl mr-3">📁</div>
+                    <div>
+                      <p className="font-medium text-gray-800">{mainSessionsFolder.name}</p>
                     </div>
                   </div>
-                ))}
+                  <button
+                    onClick={handleSelectFolder}
+                    className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-medium text-sm hover:bg-blue-200 transition-all duration-200"
+                  >
+                    Change
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                  Select Main Photo Folder
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Choose the main folder that contains all your client photo sessions
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+                  {driveFolders.map((folder) => (
+                    <div
+                      key={folder.id}
+                      onClick={() => googleAuth.userEmail === 'demo@example.com' ? handleDemoFolderSelect(folder) : handleFolderSelected(folder)}
+                      className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200"
+                    >
+                      <div className="flex items-center">
+                        <div className="text-2xl mr-3">📁</div>
+                        <div>
+                          <p className="font-medium text-gray-800">{folder.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(folder.createdTime).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {isSelectingFolder && (
+                  <div className="text-center mt-4">
+                    <button
+                      onClick={handleCancelSelectFolder}
+                      className="px-6 py-3 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

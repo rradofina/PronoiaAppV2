@@ -58,6 +58,8 @@ export default function Home() {
     setTemplateCounts,
     handleTemplateCountChange,
     getTotalTemplateCount,
+    mainSessionsFolder,
+    setMainSessionsFolder,
   } = useAppStore();
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [tokenClient, setTokenClient] = useState<any>(null);
@@ -67,6 +69,13 @@ export default function Home() {
     slots: TemplateSlot[];
     templateIndex: number;
   } | null>(null);
+
+  useEffect(() => {
+    const savedFolder = localStorage.getItem('mainSessionsFolder');
+    if (savedFolder) {
+      setMainSessionsFolder(JSON.parse(savedFolder));
+    }
+  }, []);
 
   // Load Google API
   useEffect(() => {
@@ -367,40 +376,6 @@ export default function Home() {
     } catch (error: any) {
       console.error('❌ Failed to create print output folder:', error);
       throw new Error(`Failed to create folder: ${error.message}`);
-    }
-  };
-
-  const uploadFileToFolder = async (folderId: string, fileName: string, fileBlob: Blob, mimeType: string) => {
-    try {
-      console.log('📤 Uploading file to folder:', fileName);
-      
-      const metadata = {
-        name: fileName,
-        parents: [folderId]
-      };
-
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
-      form.append('file', fileBlob);
-
-      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method: 'POST',
-        headers: new Headers({
-          'Authorization': `Bearer ${window.gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().access_token}`
-        }),
-        body: form
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('✅ File uploaded successfully:', result);
-      return result;
-    } catch (error: any) {
-      console.error('❌ Failed to upload file:', error);
-      throw new Error(`Failed to upload file: ${error.message}`);
     }
   };
 
@@ -722,6 +697,7 @@ export default function Home() {
             showDebugInfo={showDebugInfo}
             debugInfo={debugInfo}
             setDebugInfo={setDebugInfo}
+            mainSessionsFolder={mainSessionsFolder}
           />
         );
       case 'folder-selection':
