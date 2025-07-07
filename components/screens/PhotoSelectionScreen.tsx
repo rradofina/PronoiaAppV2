@@ -72,7 +72,21 @@ export default function PhotoSelectionScreen({
                   src={photo.url} 
                   alt={photo.name} 
                   className="w-full h-full object-cover"
+                  onLoad={() => console.log(`Image loaded: ${photo.name}`)}
+                  onError={(e) => {
+                    console.error(`Failed to load image: ${photo.name}, URL: ${photo.url}`);
+                    // Show a placeholder or fallback
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
                 />
+                {/* Fallback placeholder if image fails */}
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-100 text-gray-400">
+                  <div className="text-center">
+                    <div className="text-2xl mb-1">📷</div>
+                    <div className="text-xs">{photo.name}</div>
+                  </div>
+                </div>
               </div>
               <p className="text-xs text-center p-2 truncate text-gray-600">{photo.name}</p>
             </div>

@@ -1,12 +1,12 @@
 // Updated: Latest version with template modals and tablet optimization..
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import useAppStore from '../stores/useAppStore';
+import { DriveFolder, TemplateSlot, Photo, TemplateTypeInfo, Package } from '../types';
 import DriveSetupScreen from '../components/screens/DriveSetupScreen';
 import FolderSelectionScreen from '../components/screens/FolderSelectionScreen';
 import PackageSelectionScreen from '../components/screens/PackageSelectionScreen';
 import TemplateSelectionScreen from '../components/screens/TemplateSelectionScreen';
 import PhotoSelectionScreen from '../components/screens/PhotoSelectionScreen';
-import { Package, TemplateTypeInfo, Photo, TemplateSlot, DriveFolder, GoogleAuth, Screen } from '../types';
 import googleDriveService from '../services/googleDriveService';
 
 declare global {
@@ -217,9 +217,7 @@ export default function Home() {
         if (accessToken) {
           addEvent('OAuth redirect successful, setting access token');
           window.gapi.client.setToken({ access_token: accessToken });
-          if ((window as any).googleDriveService) {
-              (window as any).googleDriveService.setAccessToken(accessToken);
-          }
+          googleDriveService.setAccessToken(accessToken);
           sessionStorage.removeItem('oauth_state');
           setGoogleAuth({ isSignedIn: true, userEmail: 'Authenticated' });
           loadDriveFolders();
@@ -254,29 +252,18 @@ export default function Home() {
     setSelectedClientFolder(folder);
     setClientName(folder.name);
     try {
-      const response = await window.gapi.client.drive.files.list({
-        q: `'${folder.id}' in parents and (mimeType contains 'image/')`,
-        fields: 'files(id, name, thumbnailLink, webViewLink)',
-        orderBy: 'name'
-      });
-      const drivePhotos = response.result.files?.map((file: any) => ({
-        id: file.id,
-        url: file.thumbnailLink?.replace('=s220', '=s800') || file.webViewLink,
-        name: file.name,
-        thumbnailUrl: file.thumbnailLink,
-        mimeType: 'image/jpeg',
-        size: 1000,
-        googleDriveId: file.id,
-        webContentLink: file.webViewLink,
-        webViewLink: file.webViewLink,
-        createdTime: new Date().toISOString(),
-        modifiedTime: new Date().toISOString(),
-      })) || [];
+      console.log(`Loading photos from folder: ${folder.name} (${folder.id})`);
+      
+      // Use our Google Drive service instead of raw API
+      const drivePhotos = await googleDriveService.getPhotosFromFolder(folder.id);
+      console.log(`Loaded ${drivePhotos.length} photos:`, drivePhotos);
+      
       setLocalPhotos(drivePhotos);
       setPhotos(drivePhotos);
       setCurrentScreen('package');
     } catch (error) {
-      alert('Failed to load photos.');
+      console.error('Failed to load photos:', error);
+      alert('Failed to load photos from the selected folder.');
     }
   };
 
@@ -343,10 +330,10 @@ export default function Home() {
       
       // Create slots based on template counts
       Object.entries(templateCounts).forEach(([templateId, count]) => {
-        if (count > 0) {
-          const template = templateTypes.find(t => t.id === templateId);
+        if ((count as number) > 0) {
+          const template = templateTypes.find((t: TemplateTypeInfo) => t.id === templateId);
           if (template) {
-            for (let templateIndex = 0; templateIndex < count; templateIndex++) {
+            for (let templateIndex = 0; templateIndex < (count as number); templateIndex++) {
               for (let slotIndex = 0; slotIndex < template.slots; slotIndex++) {
                 slots.push({
                   id: `${templateId}_${templateIndex}_${slotIndex}`,
@@ -374,14 +361,14 @@ export default function Home() {
   const handlePhotoSelect = (photo: Photo) => {
     if (selectedSlot) {
       setTemplateSlots(
-        templateSlots.map(slot =>
+        templateSlots.map((slot: TemplateSlot) =>
           slot === selectedSlot
             ? { ...slot, photoId: photo.id }
             : slot
         )
       );
-      const currentSlotIndex = templateSlots.findIndex(s => s === selectedSlot);
-      const nextEmptySlot = templateSlots.slice(currentSlotIndex + 1).find(s => !s.photoId);
+      const currentSlotIndex = templateSlots.findIndex((s: TemplateSlot) => s === selectedSlot);
+      const nextEmptySlot = templateSlots.slice(currentSlotIndex + 1).find((s: TemplateSlot) => !s.photoId);
       setSelectedSlot(nextEmptySlot || null);
     }
   };

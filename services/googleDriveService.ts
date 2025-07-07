@@ -186,46 +186,29 @@ class GoogleDriveService {
   async getPhotosFromFolder(folderId: string): Promise<Photo[]> {
     try {
       const folder = await this.getFolderContents(folderId);
+      console.log(`Found ${folder.files.length} files in folder`);
       
-      // Convert files to photos and create blob URLs for display
-      const photosPromises = folder.files.map(async (file) => {
-        try {
-          // Create a blob URL for immediate display
-          const blobUrl = await this.createBlobUrlForImage(file.id);
-          
-          return {
-            id: file.id,
-            url: blobUrl, // Use blob URL for display
-            thumbnailUrl: file.thumbnailLink || this.getThumbnailUrl(file.id),
-            name: file.name,
-            mimeType: file.mimeType,
-            size: parseInt(file.size) || 0,
-            googleDriveId: file.id,
-            webContentLink: file.webContentLink,
-            webViewLink: file.webViewLink,
-            createdTime: file.createdTime,
-            modifiedTime: file.modifiedTime,
-          };
-        } catch (error) {
-          console.warn(`Failed to create blob URL for ${file.name}:`, error);
-          // Fallback to thumbnail if blob creation fails
-          return {
-            id: file.id,
-            url: file.thumbnailLink || this.getThumbnailUrl(file.id),
-            thumbnailUrl: file.thumbnailLink || this.getThumbnailUrl(file.id),
-            name: file.name,
-            mimeType: file.mimeType,
-            size: parseInt(file.size) || 0,
-            googleDriveId: file.id,
-            webContentLink: file.webContentLink,
-            webViewLink: file.webViewLink,
-            createdTime: file.createdTime,
-            modifiedTime: file.modifiedTime,
-          };
-        }
+      // First try with thumbnails (simpler approach)
+      const photos = folder.files.map((file) => {
+        const thumbnailUrl = file.thumbnailLink || this.getThumbnailUrl(file.id);
+        console.log(`Photo: ${file.name}, thumbnailUrl: ${thumbnailUrl}`);
+        
+        return {
+          id: file.id,
+          url: thumbnailUrl, // Use thumbnail URL for now
+          thumbnailUrl: thumbnailUrl,
+          name: file.name,
+          mimeType: file.mimeType,
+          size: parseInt(file.size) || 0,
+          googleDriveId: file.id,
+          webContentLink: file.webContentLink,
+          webViewLink: file.webViewLink,
+          createdTime: file.createdTime,
+          modifiedTime: file.modifiedTime,
+        };
       });
 
-      const photos = await Promise.all(photosPromises);
+      console.log(`Returning ${photos.length} photos`);
       return photos;
     } catch (error) {
       console.error('Failed to get photos from folder:', error);
@@ -287,6 +270,11 @@ class GoogleDriveService {
   }
 
   private getThumbnailUrl(fileId: string, size: number = 400): string {
+    // Use Drive API v3 thumbnail endpoint with access token
+    if (this.accessToken) {
+      return `https://drive.google.com/thumbnail?id=${fileId}&sz=s${size}&access_token=${this.accessToken}`;
+    }
+    // Fallback to public thumbnail (may not work for private files)
     return `https://drive.google.com/thumbnail?id=${fileId}&sz=s${size}`;
   }
 
