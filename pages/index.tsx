@@ -672,12 +672,36 @@ export default function Home() {
               Pronoia Photo Studio
             </h1>
             <p className="text-gray-600 text-lg mb-8">
-              Welcome to the Photo Selection App
+              Connect to Google Drive to access your photo sessions
             </p>
           </div>
 
-          {!googleAuth.isSignedIn ? (
+          {!isGapiLoaded ? (
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <p className="mt-4 text-gray-600">Loading Google Drive...</p>
+            </div>
+          ) : !googleAuth.isSignedIn ? (
             <div className="space-y-6">
+              {/* Google Sign In */}
+              <div className="bg-white rounded-lg p-8 shadow-sm text-center">
+                <div className="mb-6">
+                  <div className="text-6xl mb-4">📁</div>
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-2">
+                    Connect Google Drive
+                  </h2>
+                  <p className="text-gray-600">
+                    Sign in to access your photo folders and client sessions
+                  </p>
+                </div>
+                <button
+                  onClick={handleGoogleSignIn}
+                  className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium text-lg hover:bg-blue-700 transition-all duration-200 shadow-md"
+                >
+                  Sign in with Google
+                </button>
+              </div>
+
               {/* Demo Mode Option */}
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
                 <div className="text-center">
@@ -702,10 +726,10 @@ export default function Home() {
               <div className="text-center mb-6">
                 <div className="text-4xl mb-4">✅</div>
                 <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-                  Ready to Start
+                  Connected to Google Drive
                 </h2>
                 <p className="text-gray-600">
-                  Demo mode active: <span className="font-medium">{googleAuth.userEmail}</span>
+                  Signed in as: <span className="font-medium">{googleAuth.userEmail}</span>
                 </p>
               </div>
 
@@ -721,7 +745,7 @@ export default function Home() {
                   {driveFolders.map((folder) => (
                     <div
                       key={folder.id}
-                      onClick={() => handleDemoFolderSelect(folder)}
+                      onClick={() => googleAuth.userEmail === 'demo@example.com' ? handleDemoFolderSelect(folder) : handleMainFolderSelect(folder)}
                       className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200"
                     >
                       <div className="flex items-center">
