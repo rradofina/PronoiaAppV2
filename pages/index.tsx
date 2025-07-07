@@ -165,7 +165,10 @@ export default function Home() {
         clientIdLength: clientId?.length || 0,
         apiKeyLength: apiKey?.length || 0,
         clientIdPreview: clientId?.substring(0, 20) + '...',
-        isDefaultValue: clientId === 'your_google_client_id_here'
+        apiKeyPreview: apiKey?.substring(0, 15) + '...',
+        isDefaultValue: clientId === 'your_google_client_id_here',
+        clientIdFormat: clientId?.includes('.apps.googleusercontent.com') ? 'Valid' : 'Invalid',
+        apiKeyFormat: apiKey?.startsWith('AIza') ? 'Valid' : 'Invalid'
       });
       
       if (!clientId || !apiKey || clientId === 'your_google_client_id_here') {
@@ -225,6 +228,16 @@ export default function Home() {
         });
 
         console.log('✅ Google API initialized successfully');
+        
+        // Test if Google Drive API is accessible
+        try {
+          console.log('🔍 Testing Google Drive API access...');
+          await window.gapi.client.load('drive', 'v3');
+          console.log('✅ Google Drive API loaded successfully');
+        } catch (driveError) {
+          console.error('❌ Google Drive API not accessible:', driveError);
+          console.log('💡 Make sure Google Drive API is enabled in Google Cloud Console');
+        }
 
         const authInstance = window.gapi.auth2.getAuthInstance();
         const isSignedIn = authInstance.isSignedIn.get();
@@ -627,20 +640,52 @@ export default function Home() {
   };
 
   const showDebugInfo = () => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+    
     const info = {
-      gapiLoaded: !!window.gapi,
-      auth2Loaded: !!(window.gapi && window.gapi.auth2),
-      authInstance: !!(window.gapi && window.gapi.auth2 && window.gapi.auth2.getAuthInstance()),
-      hasClientId: !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-      hasApiKey: !!process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
-      clientIdLength: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.length || 0,
-      apiKeyLength: process.env.NEXT_PUBLIC_GOOGLE_API_KEY?.length || 0,
-      isGapiLoaded: isGapiLoaded,
-      googleAuthStatus: googleAuth.isSignedIn
+      // Environment Variables
+      environment: {
+        hasClientId: !!clientId,
+        hasApiKey: !!apiKey,
+        clientIdLength: clientId?.length || 0,
+        apiKeyLength: apiKey?.length || 0,
+        clientIdFormat: clientId?.includes('.apps.googleusercontent.com') ? 'Valid ✅' : 'Invalid ❌',
+        apiKeyFormat: apiKey?.startsWith('AIza') ? 'Valid ✅' : 'Invalid ❌',
+        clientIdPreview: clientId?.substring(0, 30) + '...',
+        apiKeyPreview: apiKey?.substring(0, 20) + '...'
+      },
+      
+      // Google API Status
+      googleAPI: {
+        gapiLoaded: !!window.gapi,
+        auth2Loaded: !!(window.gapi && window.gapi.auth2),
+        authInstance: !!(window.gapi && window.gapi.auth2 && window.gapi.auth2.getAuthInstance()),
+        driveAPIAvailable: !!(window.gapi && window.gapi.client && window.gapi.client.drive),
+        isGapiLoaded: isGapiLoaded
+      },
+      
+      // Authentication Status
+      authentication: {
+        isSignedIn: googleAuth.isSignedIn,
+        userEmail: googleAuth.userEmail,
+        hasGoogleIdentityServices: !!(window.google && window.google.accounts)
+      },
+      
+      // Current URL
+      currentURL: window.location.href,
+      
+      // Troubleshooting Tips
+      tips: [
+        '1. Make sure Google Drive API is enabled in Google Cloud Console',
+        '2. Check that your domain is in authorized origins',
+        '3. Verify API Key and Client ID formats are correct',
+        '4. Try refreshing the page if APIs are not loaded'
+      ]
     };
     
     setDebugInfo(JSON.stringify(info, null, 2));
-    console.log('=== GOOGLE API DEBUG INFO ===', info);
+    console.log('=== COMPREHENSIVE GOOGLE API DEBUG INFO ===', info);
   };
 
   // Template Visual Components
