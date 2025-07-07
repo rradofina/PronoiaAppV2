@@ -159,8 +159,8 @@ export default function Home() {
 
   // Load Google API
   useEffect(() => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
     console.log('🔍 Environment Check:', {
       hasClientId: !!clientId,
@@ -173,12 +173,12 @@ export default function Home() {
       clientIdFormat: clientId?.includes('.apps.googleusercontent.com') ? 'Valid ✅' : 'Invalid ❌',
       apiKeyFormat: apiKey?.startsWith('AIza') ? 'Valid ✅' : 'Invalid ❌'
     });
-
-    if (!clientId || !apiKey || clientId === 'your_google_client_id_here') {
+      
+      if (!clientId || !apiKey || clientId === 'your_google_client_id_here') {
       console.log('⚠️ Google API credentials not configured - running in demo mode');
-      setIsGapiLoaded(true);
-      return;
-    }
+        setIsGapiLoaded(true);
+        return;
+      }
 
     // Load GAPI for Drive API calls
     const gapiScript = document.createElement('script');
@@ -217,6 +217,10 @@ export default function Home() {
           if (tokenResponse.access_token) {
             console.log('✅ OAuth2 token received, loading folders...');
             window.gapi.client.setToken({ access_token: tokenResponse.access_token });
+            // Also set token in GoogleDriveService if it exists
+            if (typeof window !== 'undefined' && (window as any).googleDriveService) {
+              (window as any).googleDriveService.setAccessToken(tokenResponse.access_token);
+            }
             loadDriveFolders();
           }
         },
@@ -312,7 +316,7 @@ export default function Home() {
 
       const userInfo = JSON.parse(jsonPayload);
       console.log('✅ User info extracted:', userInfo);
-
+      
       setGoogleAuth({
         isSignedIn: true,
         userEmail: userInfo.email
@@ -342,7 +346,7 @@ export default function Home() {
       window.google.accounts.id.prompt((notification: any) => {
         console.log('📍 Prompt notification:', notification);
       });
-    } else {
+      } else {
       console.error('❌ Google Sign-In is not ready');
       alert('Google Sign-In is not ready. Please refresh the page and try again.');
     }
@@ -650,9 +654,9 @@ export default function Home() {
       
       // Google API Status
       googleAPI: {
-        gapiLoaded: !!window.gapi,
-        auth2Loaded: !!(window.gapi && window.gapi.auth2),
-        authInstance: !!(window.gapi && window.gapi.auth2 && window.gapi.auth2.getAuthInstance()),
+      gapiLoaded: !!window.gapi,
+      auth2Loaded: !!(window.gapi && window.gapi.auth2),
+      authInstance: !!(window.gapi && window.gapi.auth2 && window.gapi.auth2.getAuthInstance()),
         driveAPIAvailable: !!(window.gapi && window.gapi.client && window.gapi.client.drive),
         isGapiLoaded: isGapiLoaded
       },
@@ -850,12 +854,12 @@ export default function Home() {
                   </p>
                 </div>
                   <div className="flex justify-center">
-                    <button
-                      onClick={handleGoogleSignIn}
-                      className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium text-lg hover:bg-blue-700 transition-all duration-200 shadow-md"
-                    >
-                      Sign in with Google
-                    </button>
+                <button
+                  onClick={handleGoogleSignIn}
+                  className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium text-lg hover:bg-blue-700 transition-all duration-200 shadow-md"
+                >
+                  Sign in with Google
+                </button>
                   </div>
                   <div className="mt-4">
                     <button

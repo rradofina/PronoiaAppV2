@@ -1,5 +1,34 @@
 // Updated: Types for the app.
 
+// Core types used throughout the application
+export type Screen = 'drive-setup' | 'folder-selection' | 'package' | 'template' | 'photos' | 'preview' | 'complete';
+
+export interface DriveFolder {
+  id: string;
+  name: string;
+  createdTime: string;
+}
+
+export interface GoogleAuth {
+  isSignedIn: boolean;
+  userEmail: string | null;
+}
+
+export interface Package {
+  id: string;
+  name: string;
+  templateCount: number;
+  description?: string;
+}
+
+export interface TemplateSlot {
+  id: string;
+  templateName: string;
+  templateType: TemplateType;
+  slotIndex: number;
+  photoId?: string;
+}
+
 export interface PhotoStudioPackage {
   id: 'A' | 'B' | 'C' | 'D';
   name: string;

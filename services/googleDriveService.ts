@@ -17,23 +17,21 @@ class GoogleDriveService {
     try {
       if (typeof window === 'undefined') return false;
 
-      // Load Google API
+      // Load Google API for client calls only
       await this.loadGoogleAPI();
       
-      // Initialize gapi
+      // Initialize gapi client only (no auth2)
       await new Promise((resolve, reject) => {
-        window.gapi.load('auth2:client', {
+        window.gapi.load('client', {
           callback: resolve,
           onerror: reject,
         });
       });
 
-      // Initialize the client
+      // Initialize the client without auth
       await window.gapi.client.init({
         apiKey: GOOGLE_DRIVE_CONFIG.apiKey,
-        clientId: GOOGLE_DRIVE_CONFIG.clientId,
         discoveryDocs: GOOGLE_DRIVE_CONFIG.discoveryDocs,
-        scope: GOOGLE_DRIVE_CONFIG.scopes.join(' '),
       });
 
       this.isInitialized = true;
@@ -59,47 +57,23 @@ class GoogleDriveService {
     });
   }
 
-  async signIn(): Promise<boolean> {
-    try {
-      if (!this.isInitialized) {
-        await this.initialize();
-      }
-
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      const user = await authInstance.signIn();
-      
-      if (user.isSignedIn()) {
-        this.accessToken = user.getAuthResponse().access_token;
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Google Drive sign-in failed:', error);
-      throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
+  // Set access token from external auth (Google Identity Services)
+  setAccessToken(token: string): void {
+    this.accessToken = token;
+    if (window.gapi && window.gapi.client) {
+      window.gapi.client.setToken({ access_token: token });
     }
   }
 
-  async signOut(): Promise<void> {
-    try {
-      if (!this.isInitialized) return;
-
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      await authInstance.signOut();
-      this.accessToken = null;
-    } catch (error) {
-      console.error('Google Drive sign-out failed:', error);
-    }
-  }
-
+  // Remove old auth2-based methods and replace with token-based authentication
   isSignedIn(): boolean {
-    if (!this.isInitialized) return false;
-    
-    try {
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      return authInstance.isSignedIn.get();
-    } catch {
-      return false;
+    return !!this.accessToken;
+  }
+
+  signOut(): void {
+    this.accessToken = null;
+    if (window.gapi && window.gapi.client) {
+      window.gapi.client.setToken(null);
     }
   }
 
@@ -401,42 +375,21 @@ class GoogleDriveService {
     }
   }
 
-  getAuthStatus(): { isSignedIn: boolean; userEmail?: string } {
-    if (!this.isInitialized) {
-      return { isSignedIn: false };
-    }
-
-    try {
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      const isSignedIn = authInstance.isSignedIn.get();
-      
-      if (isSignedIn) {
-        const currentUser = authInstance.currentUser.get();
-        const profile = currentUser.getBasicProfile();
-        return {
-          isSignedIn: true,
-          userEmail: profile.getEmail(),
-        };
-      }
-      
-      return { isSignedIn: false };
-    } catch {
-      return { isSignedIn: false };
-    }
+    getAuthStatus(): { isSignedIn: boolean; userEmail?: string } {
+    return {
+      isSignedIn: this.isSignedIn(),
+      userEmail: undefined, // Email will be managed by the main app's Google Identity Services
+    };
   }
 
   async refreshToken(): Promise<boolean> {
     try {
       if (!this.isInitialized) return false;
 
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      const currentUser = authInstance.currentUser.get();
+      const isSignedIn = this.isSignedIn();
       
-      if (!currentUser.isSignedIn()) return false;
+      if (!isSignedIn) return false;
 
-      const authResponse = await currentUser.reloadAuthResponse();
-      this.accessToken = authResponse.access_token;
-      
       return true;
     } catch (error) {
       console.error('Failed to refresh token:', error);

@@ -18,7 +18,7 @@ interface Transform {
   offsetY: number;
 }
 
-export default function PhotoCropper({ photos, selectedSlot, onPhotoSelect, onClose }: PhotoCropperProps) {
+function PhotoCropper({ photos, selectedSlot, onPhotoSelect, onClose }: PhotoCropperProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [transform, setTransform] = useState<Transform>({
     scale: 1,
@@ -334,4 +334,5 @@ export default function PhotoCropper({ photos, selectedSlot, onPhotoSelect, onCl
   );
 }
 
+export default PhotoCropper;
 export { PhotoCropper }; 
