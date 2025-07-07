@@ -221,14 +221,14 @@ export default function Home() {
         console.log('🔑 Using credentials:', {
           clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.substring(0, 20) + '...',
           apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY?.substring(0, 10) + '...',
-          scope: 'https://www.googleapis.com/auth/drive.readonly'
+          scope: 'https://www.googleapis.com/auth/drive'
         });
 
         await window.gapi.client.init({
           apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
           clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
           discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-          scope: 'https://www.googleapis.com/auth/drive.readonly'
+          scope: 'https://www.googleapis.com/auth/drive'
         });
 
         console.log('✅ Google API initialized successfully');
@@ -393,7 +393,7 @@ export default function Home() {
             console.log('🔐 Initializing OAuth2 for Drive access...');
             window.google.accounts.oauth2.initTokenClient({
               client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-              scope: 'https://www.googleapis.com/auth/drive.readonly',
+              scope: 'https://www.googleapis.com/auth/drive',
               callback: (response: any) => {
                 console.log('✅ OAuth2 token received:', response);
               }
@@ -561,6 +561,63 @@ export default function Home() {
     }
   };
 
+  const createPrintOutputFolder = async (clientFolderId: string, folderName: string) => {
+    try {
+      console.log('📁 Creating print output folder:', folderName);
+      
+      const fileMetadata = {
+        name: folderName,
+        parents: [clientFolderId],
+        mimeType: 'application/vnd.google-apps.folder'
+      };
+
+      const response = await window.gapi.client.drive.files.create({
+        resource: fileMetadata,
+        fields: 'id, name'
+      });
+
+      console.log('✅ Print output folder created:', response.result);
+      return response.result;
+    } catch (error: any) {
+      console.error('❌ Failed to create print output folder:', error);
+      throw new Error(`Failed to create folder: ${error.message}`);
+    }
+  };
+
+  const uploadFileToFolder = async (folderId: string, fileName: string, fileBlob: Blob, mimeType: string) => {
+    try {
+      console.log('📤 Uploading file to folder:', fileName);
+      
+      const metadata = {
+        name: fileName,
+        parents: [folderId]
+      };
+
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+      form.append('file', fileBlob);
+
+      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: new Headers({
+          'Authorization': `Bearer ${window.gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().access_token}`
+        }),
+        body: form
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ File uploaded successfully:', result);
+      return result;
+    } catch (error: any) {
+      console.error('❌ Failed to upload file:', error);
+      throw new Error(`Failed to upload file: ${error.message}`);
+    }
+  };
+
   const handlePackageContinue = () => {
     if (selectedPackage && clientName.trim()) {
       setCurrentScreen('template');
@@ -670,9 +727,43 @@ export default function Home() {
     }
   };
 
-  const handlePhotoContinue = () => {
+  const handlePhotoContinue = async () => {
     const filledSlots = templateSlots.filter(slot => slot.photoId).length;
-    alert(`Photo selection complete! ${filledSlots}/${templateSlots.length} slots filled. Next: Preview & Export!`);
+    
+    if (filledSlots < templateSlots.length) {
+      const shouldContinue = confirm(`You have ${filledSlots}/${templateSlots.length} slots filled. Some slots are empty. Continue anyway?`);
+      if (!shouldContinue) return;
+    }
+
+    if (googleAuth.userEmail === 'demo@example.com') {
+      alert(`Demo Mode: Photo selection complete! ${filledSlots}/${templateSlots.length} slots filled. In real mode, prints would be generated and saved to Google Drive.`);
+      return;
+    }
+
+    try {
+      // Create print output folder
+      const outputFolderName = `${clientName}_Prints_${new Date().toISOString().split('T')[0]}`;
+      console.log('📁 Creating print output folder for:', clientName);
+      
+      if (selectedClientFolder) {
+        const printFolder = await createPrintOutputFolder(selectedClientFolder.id, outputFolderName);
+        
+        // Here you would generate the actual print templates and upload them
+        // For now, we'll just show a success message
+        alert(`✅ Print output folder created: "${outputFolderName}"\n\nNext steps:\n1. Generate print templates\n2. Upload prints to the folder\n3. Notify client`);
+        
+        console.log('🎯 Print workflow ready:', {
+          clientName,
+          outputFolder: printFolder,
+          filledSlots,
+          totalSlots: templateSlots.length,
+          selectedPackage: selectedPackage?.name
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to create print output folder:', error);
+      alert(`Failed to create print output folder: ${error.message}`);
+    }
   };
 
   const showDebugInfo = () => {
