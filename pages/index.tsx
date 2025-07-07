@@ -155,17 +155,33 @@ export default function Home() {
             addEvent(`OAuth error in token response: ${tokenResponse.error}`);
             
             let errorMessage = 'Failed to get Drive permissions. ';
+            let shouldShowRetry = false;
+            
             if (tokenResponse.error === 'popup_closed_by_user') {
-              errorMessage += 'Permission popup was closed. Please try again and complete the permission flow.';
+              errorMessage = 'Permission popup was closed before completing. Please try again and complete the permission flow.';
+              shouldShowRetry = true;
             } else if (tokenResponse.error === 'popup_blocked_by_browser') {
-              errorMessage += 'Permission popup was blocked by your browser. Please disable popup blockers for this site and try again.';
+              errorMessage = 'Permission popup was blocked by your browser. Please disable popup blockers for this site and try again.';
             } else if (tokenResponse.error === 'access_denied') {
-              errorMessage += 'You denied access to Google Drive. Please try again and grant the necessary permissions.';
+              errorMessage = 'You denied access to Google Drive. Please try again and grant the necessary permissions.';
+              shouldShowRetry = true;
             } else {
               errorMessage += `Error: ${tokenResponse.error}. Please try again.`;
+              shouldShowRetry = true;
             }
             
-            alert(errorMessage);
+            if (shouldShowRetry) {
+              const retry = confirm(errorMessage + '\n\nWould you like to try again now?');
+              if (retry) {
+                setTimeout(() => {
+                  console.log('🔄 Retrying permission request...');
+                  addEvent('Retrying permission request after user confirmation');
+                  tokenClient.requestAccessToken({ prompt: 'consent' });
+                }, 500);
+              }
+            } else {
+              alert(errorMessage);
+            }
             return;
           }
           

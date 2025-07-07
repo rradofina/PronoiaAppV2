@@ -33,6 +33,7 @@ export default function DriveSetupScreen({
   const [isSelectingFolder, setIsSelectingFolder] = useState(false);
   const [isRequestingPermissions, setIsRequestingPermissions] = useState(false);
   const [showTroubleshooting, setShowTroubleshooting] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
 
   const handleSelectFolder = () => {
     setIsSelectingFolder(true);
@@ -50,14 +51,18 @@ export default function DriveSetupScreen({
   const handleRequestDrivePermissions = () => {
     setIsRequestingPermissions(true);
     setShowTroubleshooting(false);
+    setIsPopupOpen(true);
+    
     // This will be called from the parent component
     if ((window as any).requestDrivePermissions) {
       (window as any).requestDrivePermissions();
     }
-    // Reset the requesting state after a delay
+    
+    // Reset the popup state after a reasonable timeout
     setTimeout(() => {
+      setIsPopupOpen(false);
       setIsRequestingPermissions(false);
-    }, 10000);
+    }, 30000); // 30 seconds timeout
   };
 
   return (
@@ -207,6 +212,19 @@ export default function DriveSetupScreen({
                         Grant Drive Access
                       </button>
                       
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
+                        <p className="text-blue-800 font-medium mb-2">📋 What to expect:</p>
+                        <ol className="text-blue-700 space-y-1 list-decimal list-inside">
+                          <li>A Google popup window will open</li>
+                          <li>You'll see your Google account</li>
+                          <li>Click <strong>"Continue"</strong> or <strong>"Allow"</strong> when prompted</li>
+                          <li><strong>Don't close the popup</strong> - let it finish automatically</li>
+                        </ol>
+                        <p className="text-blue-600 text-xs mt-2">
+                          ⚠️ If the popup closes early, just click "Grant Drive Access" again
+                        </p>
+                      </div>
+                      
                       <div className="flex justify-center space-x-4 text-sm">
                         <button
                           onClick={() => setShowTroubleshooting(!showTroubleshooting)}
@@ -227,16 +245,18 @@ export default function DriveSetupScreen({
                       <div className="mt-6 text-left bg-white border border-gray-200 rounded-lg p-4">
                         <h5 className="font-semibold text-gray-800 mb-3">🛠️ Troubleshooting Steps:</h5>
                         <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
-                          <li><strong>Check popup blockers:</strong> Look for a popup blocker icon in your browser's address bar and allow popups for this site</li>
+                          <li><strong>Keep popup open:</strong> Don't close the permission popup manually - let it complete the flow</li>
+                          <li><strong>Click "Allow":</strong> When Google asks for Drive permissions, click "Continue" or "Allow"</li>
+                          <li><strong>Wait for completion:</strong> The popup should close automatically when done</li>
+                          <li><strong>Check popup blockers:</strong> Look for a popup blocker icon in your browser's address bar</li>
                           <li><strong>Browser extensions:</strong> Temporarily disable ad blockers or privacy extensions</li>
-                          <li><strong>Incognito mode:</strong> Try opening the app in an incognito/private window</li>
+                          <li><strong>Try incognito mode:</strong> Open the app in an incognito/private window</li>
                           <li><strong>Different browser:</strong> Try Chrome, Firefox, or Safari</li>
-                          <li><strong>Complete the flow:</strong> When the popup appears, make sure to click "Allow" or "Continue"</li>
                           <li><strong>Clear cookies:</strong> Clear your browser's cookies for Google.com and try again</li>
                         </ol>
-                        <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
-                          <p className="text-xs text-blue-700">
-                            <strong>💡 Tip:</strong> The permission popup should ask for access to "See, edit, create, and delete all of your Google Drive files". If you don't see this popup, it's likely being blocked.
+                        <div className="mt-3 p-3 bg-amber-50 rounded border border-amber-200">
+                          <p className="text-xs text-amber-800">
+                            <strong>🎯 Common Issue:</strong> If you see "Permission popup was closed before completing", it means the popup window closed before you finished granting permissions. Just try again and make sure to complete the entire flow.
                           </p>
                         </div>
                       </div>
@@ -244,8 +264,31 @@ export default function DriveSetupScreen({
                   </div>
                 ) : isRequestingPermissions ? (
                   <div className="text-center py-8">
-                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                    <p className="mt-4 text-gray-600">Requesting permissions...</p>
+                    {isPopupOpen ? (
+                      <div className="space-y-4">
+                        <div className="text-4xl">🪟</div>
+                        <div className="space-y-2">
+                          <h4 className="text-lg font-semibold text-gray-800">
+                            Permission Popup Open
+                          </h4>
+                          <p className="text-gray-600">
+                            Please check for the Google permission popup window
+                          </p>
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
+                            <p className="text-yellow-800">
+                              <strong>👀 Look for:</strong> A popup asking for Google Drive permissions<br/>
+                              <strong>✅ Action:</strong> Click "Continue" or "Allow" to grant access<br/>
+                              <strong>⚠️ Don't:</strong> Close the popup manually
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                        <p className="text-gray-600">Requesting permissions...</p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
