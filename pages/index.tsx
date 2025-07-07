@@ -120,6 +120,9 @@ declare global {
           prompt: () => void;
           revoke: (hint: string, callback: () => void) => void;
         };
+        oauth2?: {
+          initTokenClient: (config: any) => any;
+        };
       };
     };
   }
@@ -217,14 +220,15 @@ export default function Home() {
         console.log('🔐 Initializing Google Auth...');
         console.log('🔑 Using credentials:', {
           clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.substring(0, 20) + '...',
-          apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY?.substring(0, 10) + '...'
+          apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY?.substring(0, 10) + '...',
+          scope: 'https://www.googleapis.com/auth/drive.readonly'
         });
 
         await window.gapi.client.init({
           apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
           clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
           discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-          scope: 'https://www.googleapis.com/auth/drive.metadata.readonly'
+          scope: 'https://www.googleapis.com/auth/drive.readonly'
         });
 
         console.log('✅ Google API initialized successfully');
@@ -383,6 +387,18 @@ export default function Home() {
               handleGoogleCredentialResponse(response);
             }
           });
+          
+          // Also initialize OAuth2 for Drive access
+          if (window.google.accounts.oauth2) {
+            console.log('🔐 Initializing OAuth2 for Drive access...');
+            window.google.accounts.oauth2.initTokenClient({
+              client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+              scope: 'https://www.googleapis.com/auth/drive.readonly',
+              callback: (response: any) => {
+                console.log('✅ OAuth2 token received:', response);
+              }
+            });
+          }
           
           // Prompt for sign-in
           window.google.accounts.id.prompt();
