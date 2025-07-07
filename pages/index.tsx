@@ -51,6 +51,8 @@ export default function Home() {
     setSelectedSlot,
     setPhotos,
     addEvent,
+    handleTemplateCountChange,
+    getTotalTemplateCount,
   } = useAppStore();
 
   const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
@@ -334,6 +336,37 @@ export default function Home() {
     }
   };
 
+  const handleTemplateContinue = () => {
+    const totalCount = getTotalTemplateCount();
+    if (totalCount > 0) {
+      const slots: TemplateSlot[] = [];
+      
+      // Create slots based on template counts
+      Object.entries(templateCounts).forEach(([templateId, count]) => {
+        if (count > 0) {
+          const template = templateTypes.find(t => t.id === templateId);
+          if (template) {
+            for (let templateIndex = 0; templateIndex < count; templateIndex++) {
+              for (let slotIndex = 0; slotIndex < template.slots; slotIndex++) {
+                slots.push({
+                  id: `${templateId}_${templateIndex}_${slotIndex}`,
+                  templateId: `${templateId}_${templateIndex}`,
+                  templateName: `${template.name} ${templateIndex + 1}`,
+                  templateType: template.id,
+                  slotIndex,
+                  photoId: undefined
+                });
+              }
+            }
+          }
+        }
+      });
+      
+      setTemplateSlots(slots);
+      setCurrentScreen('photos');
+    }
+  };
+
   const renderScreen = () => {
     switch (currentScreen) {
       case 'drive-setup':
@@ -384,10 +417,10 @@ export default function Home() {
             googleAuth={googleAuth}
             templateTypes={templateTypes}
             templateCounts={templateCounts}
-            getTotalTemplateCount={() => Object.values(templateCounts).reduce((sum, count) => sum + count, 0)}
-            handleTemplateCountChange={() => {}}
+            getTotalTemplateCount={getTotalTemplateCount}
+            handleTemplateCountChange={handleTemplateCountChange}
             handleBack={handleBack}
-            handleTemplateContinue={() => setCurrentScreen('photos')}
+            handleTemplateContinue={handleTemplateContinue}
           />
         );
       case 'photos':
@@ -399,7 +432,7 @@ export default function Home() {
             templateSlots={templateSlots}
             selectedSlot={selectedSlot}
             photos={localPhotos}
-            getTotalTemplateCount={() => Object.values(templateCounts).reduce((sum, count) => sum + count, 0)}
+            getTotalTemplateCount={getTotalTemplateCount}
             handlePhotoContinue={() => alert('Photo selection complete!')}
             TemplateVisual={() => <div>Template Visual</div>}
           />
