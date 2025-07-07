@@ -87,9 +87,7 @@ export const TEMPLATE_DESCRIPTIONS: Record<TemplateType, string> = {
 // Google Drive configuration
 export const GOOGLE_DRIVE_CONFIG = {
   scopes: [
-    'https://www.googleapis.com/auth/drive.readonly',
-    'https://www.googleapis.com/auth/drive.file',
-    'https://www.googleapis.com/auth/drive.photos.readonly',
+    'https://www.googleapis.com/auth/drive',
   ],
   discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
   clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '',
