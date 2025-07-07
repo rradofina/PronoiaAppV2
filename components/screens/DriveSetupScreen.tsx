@@ -13,6 +13,7 @@ interface DriveSetupScreenProps {
   debugInfo: string;
   setDebugInfo: (info: string) => void;
   mainSessionsFolder: { id: string; name: string } | null;
+  handleSignOut: () => void;
 }
 
 export default function DriveSetupScreen({
@@ -27,6 +28,7 @@ export default function DriveSetupScreen({
   debugInfo,
   setDebugInfo,
   mainSessionsFolder,
+  handleSignOut,
 }: DriveSetupScreenProps) {
   const [isSelectingFolder, setIsSelectingFolder] = useState(false);
 
@@ -136,6 +138,12 @@ export default function DriveSetupScreen({
               <p className="text-gray-600">
                 Signed in as: <span className="font-medium">{googleAuth.userEmail}</span>
               </p>
+              <button
+                onClick={handleSignOut}
+                className="mt-4 bg-red-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-600 transition-all duration-200"
+              >
+                Sign Out
+              </button>
             </div>
 
             {mainSessionsFolder && !isSelectingFolder ? (

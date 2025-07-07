@@ -7,6 +7,7 @@ import PackageSelectionScreen from '../components/screens/PackageSelectionScreen
 import TemplateSelectionScreen from '../components/screens/TemplateSelectionScreen';
 import PhotoSelectionScreen from '../components/screens/PhotoSelectionScreen';
 import { Package, TemplateTypeInfo, Photo, TemplateSlot, DriveFolder, GoogleAuth, Screen } from '../types';
+import googleDriveService from '../services/googleDriveService';
 
 declare global {
   interface Window {
@@ -545,6 +546,29 @@ export default function Home() {
     console.log('=== COMPREHENSIVE GOOGLE API DEBUG INFO ===', info);
   };
 
+  const handleSignOut = () => {
+    if (googleAuth.userEmail) {
+      googleDriveService.signOut();
+      window.google.accounts.id.revoke(googleAuth.userEmail, () => {
+        console.log('Consent revoked.');
+        setGoogleAuth({ isSignedIn: false, userEmail: null });
+        setDriveFolders([]);
+        setSelectedMainFolder(null);
+        setClientFolders([]);
+        setSelectedClientFolder(null);
+        setPhotos([]);
+        setSelectedPackage(null);
+        setClientName('');
+        setTemplateSlots([]);
+        setSelectedSlot(null);
+        setCurrentScreen('drive-setup');
+        localStorage.removeItem('mainSessionsFolder');
+        setMainSessionsFolder(null);
+        console.log('App state reset.');
+      });
+    }
+  };
+
   // Template Visual Components
   const TemplateVisual = ({ template, slots, onSlotClick, photos }: {
     template: { id: string, name: string, slots: number },
@@ -698,6 +722,7 @@ export default function Home() {
             debugInfo={debugInfo}
             setDebugInfo={setDebugInfo}
             mainSessionsFolder={mainSessionsFolder}
+            handleSignOut={handleSignOut}
           />
         );
       case 'folder-selection':
