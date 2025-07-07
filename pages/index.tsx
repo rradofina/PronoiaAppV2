@@ -47,28 +47,28 @@ const packages: Package[] = [
     id: 'A', 
     name: 'Package A', 
     templateCount: 1, 
-    price: 50,
-    description: 'Perfect for a single memorable photo'
+    price: 249,
+    description: 'Perfect for a single memorable print'
   },
   { 
     id: 'B', 
     name: 'Package B', 
     templateCount: 2, 
-    price: 80,
+    price: 549,
     description: 'Great for couples or small groups'
   },
   { 
     id: 'C', 
     name: 'Package C', 
     templateCount: 5, 
-    price: 150,
+    price: 999,
     description: 'Ideal for families and events'
   },
   { 
     id: 'D', 
     name: 'Package D', 
     templateCount: 10, 
-    price: 250,
+    price: 1999,
     description: 'Complete collection for special occasions'
   },
 ];
@@ -76,7 +76,7 @@ const packages: Package[] = [
 const templateTypes: TemplateType[] = [
   {
     id: 'solo',
-    name: 'Solo Template',
+    name: 'Solo Print',
     description: 'Single photo with white border',
     icon: '🖼️',
     preview: 'One large photo with elegant white border',
@@ -84,7 +84,7 @@ const templateTypes: TemplateType[] = [
   },
   {
     id: 'collage',
-    name: 'Collage Template',
+    name: 'Collage Print',
     description: '4 photos in 2x2 grid layout',
     icon: '🏁',
     preview: 'Four photos arranged in a perfect grid',
@@ -92,7 +92,7 @@ const templateTypes: TemplateType[] = [
   },
   {
     id: 'photocard',
-    name: 'Photocard Template',
+    name: 'Photocard Print',
     description: '4 photos edge-to-edge, no borders',
     icon: '🎴',
     preview: 'Four photos seamlessly connected without borders',
@@ -100,7 +100,7 @@ const templateTypes: TemplateType[] = [
   },
   {
     id: 'photostrip',
-    name: 'Photo Strip Template',
+    name: 'Photo Strip Print',
     description: '6 photos in 3 rows of 2',
     icon: '📸',
     preview: 'Six photos arranged in three horizontal rows',
@@ -247,10 +247,55 @@ export default function Home() {
     setSelectedClientFolder(folder);
     setClientName(folder.name.replace(/_/g, ' '));
     
-    // Create mock photos
-    const mockPhotos: Photo[] = Array.from({ length: 12 }, (_, i) => ({
+    // Sample Shutterstock photo URLs - replace these with your actual Shutterstock links
+    const samplePhotoUrls = [
+      'https://www.shutterstock.com/shutterstock/photos/2584803111/display_1500/stock-photo-a-beautiful-young-woman-poses-gracefully-highlighting-her-stunning-earrings-in-soft-light-2584803111.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2520106327/display_1500/stock-photo-studio-portrait-and-asian-man-with-chopstick-for-eating-nutrition-and-laughing-with-confidence-2520106327.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2352115081/display_1500/stock-photo-fitness-sports-and-portrait-of-women-in-studio-for-yoga-training-and-exercise-on-pink-background-2352115081.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2600955651/display_1500/stock-photo-cheerful-sisters-sharing-loving-moment-in-professional-studio-with-white-isolated-background-2600955651.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2516150727/display_1500/stock-photo-man-glasses-and-beanie-for-style-in-studio-portrait-with-color-mock-up-and-space-by-background-2516150727.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
+      'https://image.shutterstock.com/image-photo/sample-19.jpg', // Replace with your Shutterstock URL
+      'https://image.shutterstock.com/image-photo/sample-20.jpg', // Replace with your Shutterstock URL
+    ];
+    
+    // Create mock photos from the sample URLs
+    const mockPhotos: Photo[] = samplePhotoUrls.map((url, i) => ({
       id: `demo_${i + 1}`,
-      url: `https://picsum.photos/400/400?random=${i + 1}`,
+      url: url,
       name: `Photo_${i + 1}.jpg`
     }));
     
@@ -865,10 +910,10 @@ export default function Home() {
                     {pkg.name}
                   </h3>
                   <div className="text-2xl font-bold text-gray-900 mb-2">
-                    ${pkg.price}
+                    ₱{pkg.price}
                   </div>
                   <div className="text-lg text-blue-600 font-medium mb-3">
-                    {pkg.templateCount} {pkg.templateCount === 1 ? 'Template' : 'Templates'}
+                    {pkg.templateCount} {pkg.templateCount === 1 ? 'Print' : 'Prints'}
                   </div>
                   <p className="text-sm text-gray-600">
                     {pkg.description}
@@ -894,7 +939,7 @@ export default function Home() {
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
-              Continue to Template Selection
+              Continue to Print Selection
             </button>
           </div>
 
@@ -902,7 +947,7 @@ export default function Home() {
             <div className="mt-6 text-center">
               <p className="text-gray-600">
                 Selected: <span className="font-medium text-gray-800">{selectedPackage.name}</span> 
-                {' '}• {selectedPackage.templateCount} template(s) • ${selectedPackage.price}
+                {' '}• {selectedPackage.templateCount} print(s) • ₱{selectedPackage.price}
               </p>
             </div>
           )}
@@ -912,20 +957,20 @@ export default function Home() {
   }
 
   if (currentScreen === 'template') {
-    // Template Selection Screen
+    // Print Selection Screen
     return (
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-gray-800 mb-2">
-              Template Selection
+              Print Selection
             </h1>
             <p className="text-gray-600 text-lg">
-              Choose up to {selectedPackage?.templateCount} template types for {clientName}
+              Choose up to {selectedPackage?.templateCount} print types for {clientName}
             </p>
             <div className="mt-2 text-sm text-blue-600">
-              {selectedPackage?.name} • ${selectedPackage?.price}
+              {selectedPackage?.name} • ₱{selectedPackage?.price}
               {googleAuth.userEmail === 'demo@example.com' && <span className="ml-2 bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">DEMO MODE</span>}
             </div>
           </div>
@@ -934,7 +979,7 @@ export default function Home() {
           <div className="bg-white rounded-lg p-4 mb-6 shadow-sm">
             <div className="flex justify-between items-center">
               <span className="text-gray-600">
-                Templates Selected: {getTotalTemplateCount()} / {selectedPackage?.templateCount}
+                Prints Selected: {getTotalTemplateCount()} / {selectedPackage?.templateCount}
               </span>
               <div className="w-48 bg-gray-200 rounded-full h-2">
                 <div 
@@ -945,7 +990,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Template Types */}
+          {/* Print Types */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             {templateTypes.map((template) => {
               const count = templateCounts[template.id] || 0;
@@ -991,7 +1036,7 @@ export default function Home() {
                       
                       <div className="min-w-[60px] text-center">
                         <div className="text-2xl font-bold text-gray-800">{count}</div>
-                        <div className="text-xs text-gray-500">templates</div>
+                        <div className="text-xs text-gray-500">prints</div>
                       </div>
                       
                       <button
@@ -1039,11 +1084,11 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Selected Templates Info */}
+          {/* Selected Prints Info */}
           {getTotalTemplateCount() > 0 && (
             <div className="mt-6 text-center">
               <p className="text-gray-600 mb-2">
-                <span className="font-medium text-gray-800">Selected Templates Summary:</span>
+                <span className="font-medium text-gray-800">Selected Prints Summary:</span>
               </p>
               <div className="flex flex-wrap justify-center gap-4">
                 {Object.entries(templateCounts).map(([templateId, count]) => {
@@ -1076,10 +1121,10 @@ export default function Home() {
               Photo Selection
             </h1>
             <p className="text-gray-600">
-              Assign photos to your template slots for {clientName}
+              Assign photos to your print slots for {clientName}
             </p>
             <div className="mt-1 text-sm text-blue-600">
-              {selectedPackage?.name} • {getTotalTemplateCount()} template(s)
+              {selectedPackage?.name} • {getTotalTemplateCount()} print(s)
               {googleAuth.userEmail === 'demo@example.com' && <span className="ml-2 bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">DEMO MODE</span>}
             </div>
             {selectedSlot && (
@@ -1095,7 +1140,7 @@ export default function Home() {
           {!selectedSlot && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
               <p className="text-yellow-800 text-center font-medium">
-                👇 Select a template slot below to start choosing photos
+                👇 Select a print slot below to start choosing photos
               </p>
             </div>
           )}
@@ -1135,17 +1180,17 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Template Section - Fixed at bottom with proper height */}
+        {/* Print Section - Fixed at bottom with proper height */}
         <div className="bg-white border-t-2 border-gray-200 flex-shrink-0" style={{ height: '320px' }}>
           <div className="h-full flex flex-col p-4">
             <div className="flex justify-between items-center mb-4 flex-shrink-0">
-              <h3 className="text-lg font-semibold text-gray-800">Your Templates</h3>
+              <h3 className="text-lg font-semibold text-gray-800">Your Prints</h3>
               <div className="text-sm text-gray-600">
                 {templateSlots.filter(slot => slot.photoId).length} / {templateSlots.length} slots filled
               </div>
             </div>
             
-            {/* Horizontal Scrollable Templates with proper sizing */}
+            {/* Horizontal Scrollable Prints with proper sizing */}
             <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
               <div className="flex space-x-6 h-full items-start" style={{ width: 'max-content', minHeight: '240px' }}>
                 {Object.entries(templateCounts).map(([templateId, count]) => {
