@@ -372,12 +372,43 @@ export default function Home() {
       try {
         console.log('🚀 Calling requestAccessToken...');
         addEvent('Calling requestAccessToken with consent prompt');
-        tokenClient.requestAccessToken({ prompt: 'consent' });
+        tokenClient.requestAccessToken({ 
+          prompt: 'consent',
+          hint: googleAuth.userEmail || '',
+          enable_granular_consent: true
+        });
         console.log('✅ requestAccessToken called successfully');
       } catch (error) {
         console.error('❌ Error calling requestAccessToken:', error);
         addEvent(`Error calling requestAccessToken: ${error}`);
-        alert(`Error requesting permissions: ${error}`);
+        
+        // Fallback: Try redirect-based OAuth flow
+        console.log('🔄 Attempting redirect-based OAuth flow as fallback...');
+        addEvent('Attempting redirect-based OAuth flow as fallback');
+        
+        const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+        if (!clientId) {
+          alert('Google Client ID not configured. Please check your environment variables.');
+          return;
+        }
+        
+        const redirectUri = window.location.origin;
+        const scope = 'https://www.googleapis.com/auth/drive';
+        const state = Math.random().toString(36).substring(2, 15);
+        
+        // Store state for validation when redirected back
+        sessionStorage.setItem('oauth_state', state);
+        
+        const authUrl = `https://accounts.google.com/oauth/authorize?` +
+          `client_id=${encodeURIComponent(clientId)}` +
+          `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+          `&scope=${encodeURIComponent(scope)}` +
+          `&response_type=token` +
+          `&state=${encodeURIComponent(state)}` +
+          `&prompt=consent`;
+        
+        console.log('🔗 Redirecting to OAuth URL:', authUrl);
+        window.location.href = authUrl;
       }
     } else {
       console.error('❌ Token client not initialized');
@@ -386,11 +417,91 @@ export default function Home() {
     }
   };
 
-  // Make the function globally available
+  const requestDrivePermissionsRedirect = () => {
+    addEvent('Using redirect-based OAuth flow');
+    console.log('🔄 Starting redirect-based OAuth flow...');
+    
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      alert('Google Client ID not configured. Please check your environment variables.');
+      return;
+    }
+    
+    const redirectUri = window.location.origin;
+    const scope = 'https://www.googleapis.com/auth/drive';
+    const state = Math.random().toString(36).substring(2, 15);
+    
+    // Store state for validation when redirected back
+    sessionStorage.setItem('oauth_state', state);
+    sessionStorage.setItem('oauth_method', 'redirect');
+    
+    const authUrl = `https://accounts.google.com/oauth/authorize?` +
+      `client_id=${encodeURIComponent(clientId)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&scope=${encodeURIComponent(scope)}` +
+      `&response_type=token` +
+      `&state=${encodeURIComponent(state)}` +
+      `&prompt=consent`;
+    
+    console.log('🔗 Redirecting to OAuth URL for permissions...');
+    addEvent('Redirecting to Google OAuth for Drive permissions');
+    
+    // Show a confirmation before redirecting
+    const confirmed = confirm(
+      'This will redirect you to Google to grant Drive permissions.\n\n' +
+      'After granting permissions, you will be redirected back to this app.\n\n' +
+      'Click OK to continue.'
+    );
+    
+    if (confirmed) {
+      window.location.href = authUrl;
+    }
+  };
+
+  // Handle OAuth redirect callback
+  useEffect(() => {
+    const handleOAuthRedirect = () => {
+      const hash = window.location.hash;
+      if (hash.includes('access_token')) {
+        console.log('🔙 OAuth redirect detected:', hash);
+        addEvent('OAuth redirect callback detected');
+        
+        const params = new URLSearchParams(hash.substring(1));
+        const accessToken = params.get('access_token');
+        const state = params.get('state');
+        const storedState = sessionStorage.getItem('oauth_state');
+        
+        if (state === storedState && accessToken) {
+          console.log('✅ OAuth redirect successful, setting token...');
+          addEvent('OAuth redirect successful, setting access token');
+          
+          window.gapi.client.setToken({ access_token: accessToken });
+          
+          // Clear the hash and state
+          window.location.hash = '';
+          sessionStorage.removeItem('oauth_state');
+          
+          // Load folders
+          loadDriveFolders();
+        } else {
+          console.error('❌ OAuth state mismatch or missing token');
+          addEvent('OAuth state mismatch or missing token in redirect');
+        }
+      }
+    };
+    
+    if (isGapiLoaded && window.location.hash.includes('access_token')) {
+      handleOAuthRedirect();
+    }
+  }, [isGapiLoaded]);
+
+  // Make both functions globally available
   useEffect(() => {
     (window as any).requestDrivePermissions = requestDrivePermissions;
+    (window as any).requestDrivePermissionsRedirect = requestDrivePermissionsRedirect;
     return () => {
       delete (window as any).requestDrivePermissions;
+      delete (window as any).requestDrivePermissionsRedirect;
     };
   }, [tokenClient]);
 

@@ -65,6 +65,12 @@ export default function DriveSetupScreen({
     }, 30000); // 30 seconds timeout
   };
 
+  const handleTryRedirectMethod = () => {
+    if ((window as any).requestDrivePermissionsRedirect) {
+      (window as any).requestDrivePermissionsRedirect();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-4xl mx-auto">
@@ -222,6 +228,22 @@ export default function DriveSetupScreen({
                         </ol>
                         <p className="text-blue-600 text-xs mt-2">
                           ⚠️ If the popup closes early, just click "Grant Drive Access" again
+                        </p>
+                      </div>
+                      
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <p className="text-amber-800 text-sm font-medium mb-2">🔄 Alternative Method:</p>
+                        <p className="text-amber-700 text-xs mb-3">
+                          If the popup keeps closing, try the redirect method instead:
+                        </p>
+                        <button
+                          onClick={handleTryRedirectMethod}
+                          className="bg-amber-600 text-white px-4 py-2 rounded text-sm hover:bg-amber-700 transition-all duration-200"
+                        >
+                          Try Redirect Method
+                        </button>
+                        <p className="text-amber-600 text-xs mt-2">
+                          This will redirect you to Google, then back to the app
                         </p>
                       </div>
                       
