@@ -14,6 +14,7 @@ declare global {
 class GoogleDriveService {
   private isInitialized = false;
   private accessToken: string | null = null;
+  private blobUrls: Set<string> = new Set(); // Track blob URLs for cleanup
 
   async initialize(): Promise<boolean> {
     try {
@@ -72,8 +73,17 @@ class GoogleDriveService {
     return !!this.accessToken;
   }
 
+  // Cleanup method to revoke blob URLs and prevent memory leaks
+  cleanupBlobUrls(): void {
+    this.blobUrls.forEach(url => {
+      URL.revokeObjectURL(url);
+    });
+    this.blobUrls.clear();
+  }
+
   signOut(): void {
     this.accessToken = null;
+    this.cleanupBlobUrls();
     if (window.gapi && window.gapi.client) {
       window.gapi.client.setToken(null);
     }
@@ -176,9 +186,78 @@ class GoogleDriveService {
   async getPhotosFromFolder(folderId: string): Promise<Photo[]> {
     try {
       const folder = await this.getFolderContents(folderId);
-      return this.convertFilesToPhotos(folder.files);
+      
+      // Convert files to photos and create blob URLs for display
+      const photosPromises = folder.files.map(async (file) => {
+        try {
+          // Create a blob URL for immediate display
+          const blobUrl = await this.createBlobUrlForImage(file.id);
+          
+          return {
+            id: file.id,
+            url: blobUrl, // Use blob URL for display
+            thumbnailUrl: file.thumbnailLink || this.getThumbnailUrl(file.id),
+            name: file.name,
+            mimeType: file.mimeType,
+            size: parseInt(file.size) || 0,
+            googleDriveId: file.id,
+            webContentLink: file.webContentLink,
+            webViewLink: file.webViewLink,
+            createdTime: file.createdTime,
+            modifiedTime: file.modifiedTime,
+          };
+        } catch (error) {
+          console.warn(`Failed to create blob URL for ${file.name}:`, error);
+          // Fallback to thumbnail if blob creation fails
+          return {
+            id: file.id,
+            url: file.thumbnailLink || this.getThumbnailUrl(file.id),
+            thumbnailUrl: file.thumbnailLink || this.getThumbnailUrl(file.id),
+            name: file.name,
+            mimeType: file.mimeType,
+            size: parseInt(file.size) || 0,
+            googleDriveId: file.id,
+            webContentLink: file.webContentLink,
+            webViewLink: file.webViewLink,
+            createdTime: file.createdTime,
+            modifiedTime: file.modifiedTime,
+          };
+        }
+      });
+
+      const photos = await Promise.all(photosPromises);
+      return photos;
     } catch (error) {
       console.error('Failed to get photos from folder:', error);
+      throw error;
+    }
+  }
+
+  private async createBlobUrlForImage(fileId: string): Promise<string> {
+    try {
+      if (!this.accessToken) {
+        throw new Error('No access token available');
+      }
+
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      this.blobUrls.add(blobUrl);
+      return blobUrl;
+    } catch (error) {
+      console.error('Failed to create blob URL:', error);
       throw error;
     }
   }
@@ -186,7 +265,7 @@ class GoogleDriveService {
   private convertFilesToPhotos(files: GoogleDriveFile[]): Photo[] {
     return files.map(file => ({
       id: file.id,
-      url: this.getDirectImageUrl(file.id),
+      url: this.getViewableImageUrl(file.id), // Use viewable URL instead of direct download
       thumbnailUrl: file.thumbnailLink || this.getThumbnailUrl(file.id),
       name: file.name,
       mimeType: file.mimeType,
@@ -201,6 +280,10 @@ class GoogleDriveService {
 
   private getDirectImageUrl(fileId: string): string {
     return `https://drive.google.com/uc?id=${fileId}&export=download`;
+  }
+
+  private getViewableImageUrl(fileId: string): string {
+    return `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&access_token=${this.accessToken}`;
   }
 
   private getThumbnailUrl(fileId: string, size: number = 400): string {
