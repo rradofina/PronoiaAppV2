@@ -67,8 +67,14 @@ export default function PhotoSelectionScreen({
               onClick={() => handlePhotoSelect(photo)}
               className="bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer transform hover:scale-105 transition-transform duration-200"
             >
-              <img src={photo.url} alt={photo.name} className="w-full h-32 object-cover" />
-              <p className="text-xs text-center p-1 truncate">{photo.name}</p>
+              <div className="w-full relative" style={{ aspectRatio: '2/3' }}>
+                <img 
+                  src={photo.url} 
+                  alt={photo.name} 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <p className="text-xs text-center p-2 truncate text-gray-600">{photo.name}</p>
             </div>
           ))}
         </div>

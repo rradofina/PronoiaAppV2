@@ -398,10 +398,13 @@ export default function Home() {
       return photos.find(p => p.id === photoId)?.url || null;
     };
 
+    // 4R print format (4x6 inches) - width:height ratio of 2:3 (or 4:6)
+    const printAspectRatio = '2/3'; // CSS aspect-ratio for 4x6 print
+
     if (template.id === 'solo') {
-      // Solo Template - Single large photo with border
+      // Solo Template - Single large photo with border for 4R print
       return (
-        <div className="bg-white p-3 rounded-lg shadow-md w-full h-full">
+        <div className="bg-white p-3 rounded-lg shadow-md w-full" style={{ aspectRatio: printAspectRatio }}>
           <div 
             className={`w-full h-full border-2 border-dashed border-gray-300 rounded cursor-pointer transition-all duration-200 ${
               selectedSlot === slots[0] ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'
@@ -427,10 +430,10 @@ export default function Home() {
     }
 
     if (template.id === 'collage') {
-      // Collage Template - 2x2 grid
+      // Collage Template - 2x2 grid with borders and gaps
       return (
-        <div className="bg-white p-3 rounded-lg shadow-md w-full h-full">
-          <div className="grid grid-cols-2 gap-1 h-full">
+        <div className="bg-white p-3 rounded-lg shadow-md w-full" style={{ aspectRatio: printAspectRatio }}>
+          <div className="grid grid-cols-2 gap-2 h-full">
             {slots.slice(0, 4).map((slot, index) => (
               <div
                 key={index}
@@ -457,9 +460,9 @@ export default function Home() {
     }
 
     if (template.id === 'photocard') {
-      // Photocard Template - 2x2 grid like collage but no borders/padding
+      // Photocard Template - 2x2 grid like collage but NO borders/gaps (edge-to-edge)
       return (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden w-full h-full">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden w-full" style={{ aspectRatio: printAspectRatio }}>
           <div className="grid grid-cols-2 gap-0 h-full">
             {slots.slice(0, 4).map((slot, index) => (
               <div
@@ -487,9 +490,9 @@ export default function Home() {
     }
 
     if (template.id === 'photostrip') {
-      // Photo Strip Template - 3 rows of 2 photos each (6 total)
+      // Photo Strip Template - 3 rows of 2 photos each (6 total) like collage but 3 rows
       return (
-        <div className="bg-white p-3 rounded-lg shadow-md w-full h-full">
+        <div className="bg-white p-3 rounded-lg shadow-md w-full" style={{ aspectRatio: printAspectRatio }}>
           <div className="grid grid-rows-3 gap-1 h-full">
             {[0, 1, 2].map((row) => (
               <div key={row} className="grid grid-cols-2 gap-1 h-full">
