@@ -150,6 +150,7 @@ export default function Home() {
   const [selectedSlot, setSelectedSlot] = useState<TemplateSlot | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [tokenClient, setTokenClient] = useState<any>(null);
+
   const [viewingTemplate, setViewingTemplate] = useState<{
     template: TemplateType;
     slots: TemplateSlot[];
@@ -204,6 +205,8 @@ export default function Home() {
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: handleGoogleCredentialResponse, // This will handle the sign-in
+        auto_select: false,
+        cancel_on_tap_outside: false,
       });
 
       // Initialize the OAuth Token Client
@@ -334,9 +337,11 @@ export default function Home() {
     console.log('🔐 Starting Google sign-in process...');
     
     if (window.google && window.google.accounts) {
-      // This will display the "Sign in with Google" pop-up
+      // Trigger the sign-in popup
       console.log('✅ Prompting for Google sign-in...');
-      window.google.accounts.id.prompt();
+      window.google.accounts.id.prompt((notification: any) => {
+        console.log('📍 Prompt notification:', notification);
+      });
     } else {
       console.error('❌ Google Sign-In is not ready');
       alert('Google Sign-In is not ready. Please refresh the page and try again.');
@@ -844,12 +849,14 @@ export default function Home() {
                     Sign in to access your photo folders and client sessions
                   </p>
                 </div>
-                                  <button
-                    onClick={handleGoogleSignIn}
-                    className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium text-lg hover:bg-blue-700 transition-all duration-200 shadow-md"
-                  >
-                    Sign in with Google
-                  </button>
+                  <div className="flex justify-center">
+                    <button
+                      onClick={handleGoogleSignIn}
+                      className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium text-lg hover:bg-blue-700 transition-all duration-200 shadow-md"
+                    >
+                      Sign in with Google
+                    </button>
+                  </div>
                   <div className="mt-4">
                     <button
                       onClick={showDebugInfo}
