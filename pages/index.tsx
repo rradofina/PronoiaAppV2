@@ -246,7 +246,7 @@ export default function Home() {
       // This will trigger the permission pop-up if needed.
       if (tokenClient) {
         console.log('🔐 Requesting Drive API permissions...');
-        tokenClient.requestAccessToken();
+        tokenClient.requestAccessToken({ prompt: 'consent' });
       } else {
         console.error('❌ Token client not initialized');
       }
