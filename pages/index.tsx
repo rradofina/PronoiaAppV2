@@ -149,6 +149,7 @@ export default function Home() {
   const [templateSlots, setTemplateSlots] = useState<TemplateSlot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<TemplateSlot | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [tokenClient, setTokenClient] = useState<any>(null);
   const [viewingTemplate, setViewingTemplate] = useState<{
     template: TemplateType;
     slots: TemplateSlot[];
@@ -157,119 +158,70 @@ export default function Home() {
 
   // Load Google API
   useEffect(() => {
-    const initGoogleAPI = async () => {
-      // Check if API credentials are available
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
-      
-      console.log('🔍 Environment Check:', {
-        hasClientId: !!clientId,
-        hasApiKey: !!apiKey,
-        clientIdLength: clientId?.length || 0,
-        apiKeyLength: apiKey?.length || 0,
-        clientIdPreview: clientId?.substring(0, 20) + '...',
-        apiKeyPreview: apiKey?.substring(0, 15) + '...',
-        isDefaultValue: clientId === 'your_google_client_id_here',
-        clientIdFormat: clientId?.includes('.apps.googleusercontent.com') ? 'Valid' : 'Invalid',
-        apiKeyFormat: apiKey?.startsWith('AIza') ? 'Valid' : 'Invalid'
-      });
-      
-      if (!clientId || !apiKey || clientId === 'your_google_client_id_here') {
-        console.log('⚠️ Google API credentials not configured - running in demo mode');
-        setIsGapiLoaded(true);
-        return;
-      }
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
-      try {
-        // Load both Google API and Google Identity Services
-        if (!window.gapi) {
-          console.log('📦 Loading Google API script...');
-          const script = document.createElement('script');
-          script.src = 'https://apis.google.com/js/api.js';
-          script.onload = () => {
-            console.log('✅ Google API script loaded');
-            window.gapi.load('auth2:client', initAuth);
-          };
-          script.onerror = () => {
-            console.error('❌ Failed to load Google API script');
-            setIsGapiLoaded(true);
-          };
-          document.head.appendChild(script);
-        } else {
-          console.log('✅ Google API already available');
-          initAuth();
-        }
+    console.log('🔍 Environment Check:', {
+      hasClientId: !!clientId,
+      hasApiKey: !!apiKey,
+      clientIdLength: clientId?.length || 0,
+      apiKeyLength: apiKey?.length || 0,
+      clientIdPreview: clientId?.substring(0, 20) + '...',
+      apiKeyPreview: apiKey?.substring(0, 15) + '...',
+      isDefaultValue: clientId === 'your_google_client_id_here',
+      clientIdFormat: clientId?.includes('.apps.googleusercontent.com') ? 'Valid ✅' : 'Invalid ❌',
+      apiKeyFormat: apiKey?.startsWith('AIza') ? 'Valid ✅' : 'Invalid ❌'
+    });
 
-        // Also load Google Identity Services (newer method)
-        if (!document.querySelector('script[src*="gsi/client"]')) {
-          console.log('📦 Loading Google Identity Services...');
-          const gsiScript = document.createElement('script');
-          gsiScript.src = 'https://accounts.google.com/gsi/client';
-          gsiScript.async = true;
-          gsiScript.defer = true;
-          document.head.appendChild(gsiScript);
-        }
-      } catch (error) {
-        console.error('❌ Error in initGoogleAPI:', error);
-        setIsGapiLoaded(true);
-      }
-    };
+    if (!clientId || !apiKey || clientId === 'your_google_client_id_here') {
+      console.log('⚠️ Google API credentials not configured - running in demo mode');
+      setIsGapiLoaded(true);
+      return;
+    }
 
-    const initAuth = async () => {
-      try {
-        console.log('🔐 Initializing Google Auth...');
-        console.log('🔑 Using credentials:', {
-          clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.substring(0, 20) + '...',
-          apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY?.substring(0, 10) + '...',
-          scope: 'https://www.googleapis.com/auth/drive'
-        });
-
+    // Load GAPI for Drive API calls
+    const gapiScript = document.createElement('script');
+    gapiScript.src = 'https://apis.google.com/js/api.js';
+    gapiScript.onload = () => {
+      window.gapi.load('client', async () => {
         await window.gapi.client.init({
-          apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
-          clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+          apiKey: apiKey,
           discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-          scope: 'https://www.googleapis.com/auth/drive'
-        });
-
-        console.log('✅ Google API initialized successfully');
-        
-        // Test if Google Drive API is accessible
-        try {
-          console.log('🔍 Testing Google Drive API access...');
-          await window.gapi.client.load('drive', 'v3');
-          console.log('✅ Google Drive API loaded successfully');
-        } catch (driveError) {
-          console.error('❌ Google Drive API not accessible:', driveError);
-          console.log('💡 Make sure Google Drive API is enabled in Google Cloud Console');
-        }
-
-        const authInstance = window.gapi.auth2.getAuthInstance();
-        const isSignedIn = authInstance.isSignedIn.get();
-        
-        console.log('🔍 Current sign-in status:', isSignedIn);
-        
-        if (isSignedIn) {
-          const user = authInstance.currentUser.get();
-          setGoogleAuth({
-            isSignedIn: true,
-            userEmail: user.getBasicProfile().getEmail()
-          });
-          console.log('✅ User already signed in:', user.getBasicProfile().getEmail());
-        }
-        
-        setIsGapiLoaded(true);
-      } catch (error: any) {
-        console.error('❌ Failed to initialize Google API:', error);
-        console.error('Error details:', {
-          name: error.name,
-          message: error.message,
-          details: error.details || 'No additional details'
         });
         setIsGapiLoaded(true);
-      }
+        console.log('✅ GAPI client initialized');
+      });
     };
+    document.head.appendChild(gapiScript);
 
-    initGoogleAPI();
+    // Load GIS for Sign-In and OAuth
+    const gsiScript = document.createElement('script');
+    gsiScript.src = 'https://accounts.google.com/gsi/client';
+    gsiScript.async = true;
+    gsiScript.defer = true;
+    gsiScript.onload = () => {
+      // Initialize the Sign-In client
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleGoogleCredentialResponse, // This will handle the sign-in
+      });
+
+      // Initialize the OAuth Token Client
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'https://www.googleapis.com/auth/drive',
+        callback: (tokenResponse: any) => {
+          if (tokenResponse.access_token) {
+            console.log('✅ OAuth2 token received, loading folders...');
+            window.gapi.client.setToken({ access_token: tokenResponse.access_token });
+            loadDriveFolders();
+          }
+        },
+      });
+      setTokenClient(client);
+      console.log('✅ Google Identity Services initialized');
+    };
+    document.head.appendChild(gsiScript);
   }, []);
 
   const handleDemoMode = () => {
@@ -347,139 +299,47 @@ export default function Home() {
   const handleGoogleCredentialResponse = (response: any) => {
     console.log('🔑 Processing Google credential response...');
     try {
-      // Decode the JWT token to get user info
+      // Decode the JWT to get user info
       const credential = response.credential;
       const base64Url = credential.split('.')[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
         return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
       }).join(''));
-      
+
       const userInfo = JSON.parse(jsonPayload);
       console.log('✅ User info extracted:', userInfo);
-      
+
       setGoogleAuth({
         isSignedIn: true,
         userEmail: userInfo.email
       });
-      
-      // Load root folders
-      loadDriveFolders();
+
+      // ---- THIS IS THE CRITICAL CHANGE ----
+      // Now that the user is signed in, request the Drive API token.
+      // This will trigger the permission pop-up if needed.
+      if (tokenClient) {
+        console.log('🔐 Requesting Drive API permissions...');
+        tokenClient.requestAccessToken();
+      } else {
+        console.error('❌ Token client not initialized');
+      }
+
     } catch (error) {
       console.error('❌ Failed to process credential response:', error);
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    try {
-      console.log('🔐 Starting Google sign-in process...');
-      
-      // Try newer Google Identity Services first
-      if (window.google && window.google.accounts) {
-        console.log('🔄 Trying Google Identity Services...');
-        try {
-          // Initialize Google Identity Services
-          window.google.accounts.id.initialize({
-            client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-            callback: (response: any) => {
-              console.log('✅ Google Identity Services sign-in successful');
-              // Handle the credential response
-              handleGoogleCredentialResponse(response);
-            }
-          });
-          
-          // Also initialize OAuth2 for Drive access
-          if (window.google.accounts.oauth2) {
-            console.log('🔐 Initializing OAuth2 for Drive access...');
-            window.google.accounts.oauth2.initTokenClient({
-              client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-              scope: 'https://www.googleapis.com/auth/drive',
-              callback: (response: any) => {
-                console.log('✅ OAuth2 token received:', response);
-              }
-            });
-          }
-          
-          // Prompt for sign-in
-          window.google.accounts.id.prompt();
-          return;
-        } catch (gsiError) {
-          console.log('🔄 Google Identity Services failed, trying legacy method...');
-        }
-      }
-      
-      // Fallback to legacy method
-      if (!window.gapi || !window.gapi.auth2) {
-        console.error('❌ Google API not loaded properly');
-        alert('Google API not loaded. Please refresh the page and try again.');
-        return;
-      }
-
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      console.log('🔍 Auth instance:', authInstance);
-      
-      if (!authInstance) {
-        console.error('❌ Google Auth instance not available');
-        alert('Google Auth not initialized. Please refresh the page and try again.');
-        return;
-      }
-
-      console.log('🚀 Attempting legacy sign in...');
-      
-      // Try the simpler signIn method without options first
-      const user = await authInstance.signIn();
-      
-      console.log('✅ Legacy sign in successful:', user);
-      
-      setGoogleAuth({
-        isSignedIn: true,
-        userEmail: user.getBasicProfile().getEmail()
-      });
-      
-      // Load root folders
-      await loadDriveFolders();
-    } catch (error: any) {
-      console.error('Sign in failed:', error);
-      console.error('Error details:', {
-        error: error.error,
-        details: error.details
-      });
-      
-      // Try alternative approach for token errors
-      if (error.error === 'idpiframe_initialization_failed' || 
-          (typeof error.error === 'string' && error.error.includes('token'))) {
-        console.log('Trying alternative sign-in method...');
-        try {
-          // Force a fresh sign-in
-          const authInstance = window.gapi.auth2.getAuthInstance();
-          await authInstance.signOut();
-          const user = await authInstance.signIn({
-            prompt: 'consent'
-          });
-          
-          setGoogleAuth({
-            isSignedIn: true,
-            userEmail: user.getBasicProfile().getEmail()
-          });
-          
-          await loadDriveFolders();
-          return;
-        } catch (retryError: any) {
-          console.error('Retry also failed:', retryError);
-        }
-      }
-      
-      // More specific error messages
-      if (error.error === 'popup_closed_by_user') {
-        alert('Sign-in was cancelled. Please try again.');
-      } else if (error.error === 'access_denied') {
-        alert('Access was denied. Please check your Google account permissions.');
-      } else if ((typeof error.error === 'string' && error.error.includes('token')) || 
-                 (typeof error.error === 'string' && error.error.includes('IdentityCredential'))) {
-        alert('There\'s an authentication issue. Please try:\n1. Clear your browser cache\n2. Try incognito mode\n3. Check that your Google account has access to Drive');
-      } else {
-        alert(`Failed to sign in to Google Drive: ${error.error || 'Unknown error'}. Please try again.`);
-      }
+  const handleGoogleSignIn = () => {
+    console.log('🔐 Starting Google sign-in process...');
+    
+    if (window.google && window.google.accounts) {
+      // This will display the "Sign in with Google" pop-up
+      console.log('✅ Prompting for Google sign-in...');
+      window.google.accounts.id.prompt();
+    } else {
+      console.error('❌ Google Sign-In is not ready');
+      alert('Google Sign-In is not ready. Please refresh the page and try again.');
     }
   };
 
