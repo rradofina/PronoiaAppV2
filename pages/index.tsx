@@ -469,16 +469,36 @@ export default function Home() {
 
   const loadDriveFolders = async () => {
     try {
+      console.log('📁 Loading Google Drive folders...');
+      
       const response = await window.gapi.client.drive.files.list({
         q: "mimeType='application/vnd.google-apps.folder'",
         fields: 'files(id, name, createdTime)',
         orderBy: 'name'
       });
       
+      console.log('✅ Drive API response:', response);
+      console.log('📂 Found folders:', response.result.files?.length || 0);
+      
       setDriveFolders(response.result.files || []);
-    } catch (error) {
-      console.error('Failed to load folders:', error);
-      alert('Failed to load Google Drive folders.');
+    } catch (error: any) {
+      console.error('❌ Failed to load folders:', error);
+      console.error('🔍 Error details:', {
+        status: error.status,
+        statusText: error.statusText,
+        message: error.message,
+        details: error.body ? JSON.parse(error.body) : 'No additional details'
+      });
+      
+      // More specific error message
+      let errorMessage = 'Failed to load Google Drive folders.';
+      if (error.status === 403) {
+        errorMessage = 'Permission denied. Please check that Google Drive API is enabled and you have the correct permissions.';
+      } else if (error.status === 401) {
+        errorMessage = 'Authentication expired. Please refresh the page and sign in again.';
+      }
+      
+      alert(errorMessage);
     }
   };
 
