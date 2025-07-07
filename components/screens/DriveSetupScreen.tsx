@@ -32,6 +32,7 @@ export default function DriveSetupScreen({
 }: DriveSetupScreenProps) {
   const [isSelectingFolder, setIsSelectingFolder] = useState(false);
   const [isRequestingPermissions, setIsRequestingPermissions] = useState(false);
+  const [showTroubleshooting, setShowTroubleshooting] = useState(false);
 
   const handleSelectFolder = () => {
     setIsSelectingFolder(true);
@@ -48,10 +49,15 @@ export default function DriveSetupScreen({
 
   const handleRequestDrivePermissions = () => {
     setIsRequestingPermissions(true);
+    setShowTroubleshooting(false);
     // This will be called from the parent component
     if ((window as any).requestDrivePermissions) {
       (window as any).requestDrivePermissions();
     }
+    // Reset the requesting state after a delay
+    setTimeout(() => {
+      setIsRequestingPermissions(false);
+    }, 10000);
   };
 
   return (
@@ -193,20 +199,48 @@ export default function DriveSetupScreen({
                     <p className="text-gray-600 mb-4">
                       We need permission to access your Google Drive folders.
                     </p>
-                    <button
-                      onClick={handleRequestDrivePermissions}
-                      className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200"
-                    >
-                      Grant Drive Access
-                    </button>
-                    <div className="mt-4">
+                    <div className="space-y-3">
                       <button
-                        onClick={showDebugInfo}
-                        className="text-sm text-blue-600 hover:underline"
+                        onClick={handleRequestDrivePermissions}
+                        className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200"
                       >
-                        Show Debug Info
+                        Grant Drive Access
                       </button>
+                      
+                      <div className="flex justify-center space-x-4 text-sm">
+                        <button
+                          onClick={() => setShowTroubleshooting(!showTroubleshooting)}
+                          className="text-blue-600 hover:underline"
+                        >
+                          Troubleshooting Tips
+                        </button>
+                        <button
+                          onClick={showDebugInfo}
+                          className="text-blue-600 hover:underline"
+                        >
+                          Show Debug Info
+                        </button>
+                      </div>
                     </div>
+                    
+                    {showTroubleshooting && (
+                      <div className="mt-6 text-left bg-white border border-gray-200 rounded-lg p-4">
+                        <h5 className="font-semibold text-gray-800 mb-3">🛠️ Troubleshooting Steps:</h5>
+                        <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+                          <li><strong>Check popup blockers:</strong> Look for a popup blocker icon in your browser's address bar and allow popups for this site</li>
+                          <li><strong>Browser extensions:</strong> Temporarily disable ad blockers or privacy extensions</li>
+                          <li><strong>Incognito mode:</strong> Try opening the app in an incognito/private window</li>
+                          <li><strong>Different browser:</strong> Try Chrome, Firefox, or Safari</li>
+                          <li><strong>Complete the flow:</strong> When the popup appears, make sure to click "Allow" or "Continue"</li>
+                          <li><strong>Clear cookies:</strong> Clear your browser's cookies for Google.com and try again</li>
+                        </ol>
+                        <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
+                          <p className="text-xs text-blue-700">
+                            <strong>💡 Tip:</strong> The permission popup should ask for access to "See, edit, create, and delete all of your Google Drive files". If you don't see this popup, it's likely being blocked.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : isRequestingPermissions ? (
                   <div className="text-center py-8">

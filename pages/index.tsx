@@ -148,6 +148,27 @@ export default function Home() {
         scope: 'https://www.googleapis.com/auth/drive',
         callback: (tokenResponse: any) => {
           addEvent('OAuth token response received');
+          console.log('🎯 Full token response:', tokenResponse);
+          
+          if (tokenResponse.error) {
+            console.error('❌ OAuth error in token response:', tokenResponse.error);
+            addEvent(`OAuth error in token response: ${tokenResponse.error}`);
+            
+            let errorMessage = 'Failed to get Drive permissions. ';
+            if (tokenResponse.error === 'popup_closed_by_user') {
+              errorMessage += 'Permission popup was closed. Please try again and complete the permission flow.';
+            } else if (tokenResponse.error === 'popup_blocked_by_browser') {
+              errorMessage += 'Permission popup was blocked by your browser. Please disable popup blockers for this site and try again.';
+            } else if (tokenResponse.error === 'access_denied') {
+              errorMessage += 'You denied access to Google Drive. Please try again and grant the necessary permissions.';
+            } else {
+              errorMessage += `Error: ${tokenResponse.error}. Please try again.`;
+            }
+            
+            alert(errorMessage);
+            return;
+          }
+          
           if (tokenResponse.access_token) {
             console.log('✅ OAuth2 token received, loading folders...');
             addEvent('OAuth2 token received, loading folders');
@@ -165,14 +186,24 @@ export default function Home() {
             loadDriveFolders();
           } else {
             addEvent('OAuth2 token response did not contain access_token');
-            console.error('❌ No access token in response');
-            alert('Failed to get Drive permissions. Please try again.');
+            console.error('❌ No access token in response:', tokenResponse);
+            alert('Failed to get Drive permissions. No access token received. Please try again.');
           }
         },
         error_callback: (error: any) => {
-          addEvent(`OAuth error: ${JSON.stringify(error)}`);
-          console.error('❌ OAuth error:', error);
-          alert('Failed to get Drive permissions. Please check your popup blocker and try again.');
+          addEvent(`OAuth error callback: ${JSON.stringify(error)}`);
+          console.error('❌ OAuth error callback:', error);
+          
+          let errorMessage = 'Failed to get Drive permissions. ';
+          if (error.type === 'popup_failed_to_open') {
+            errorMessage += 'Unable to open permission popup. Please check your popup blocker settings and try again.';
+          } else if (error.type === 'popup_closed') {
+            errorMessage += 'Permission popup was closed before completing. Please try again and complete the permission flow.';
+          } else {
+            errorMessage += `Error: ${error.type || 'Unknown error'}. Please check your popup blocker and try again.`;
+          }
+          
+          alert(errorMessage);
         }
       });
       setTokenClient(client);
@@ -315,9 +346,23 @@ export default function Home() {
   const requestDrivePermissions = () => {
     addEvent('Manually requesting Drive permissions');
     console.log('🔐 Manually requesting Drive permissions...');
+    console.log('🔍 Token client state:', {
+      exists: !!tokenClient,
+      type: typeof tokenClient,
+      hasRequestAccessToken: tokenClient && typeof tokenClient.requestAccessToken === 'function'
+    });
     
     if (tokenClient) {
-      tokenClient.requestAccessToken({ prompt: 'consent' });
+      try {
+        console.log('🚀 Calling requestAccessToken...');
+        addEvent('Calling requestAccessToken with consent prompt');
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+        console.log('✅ requestAccessToken called successfully');
+      } catch (error) {
+        console.error('❌ Error calling requestAccessToken:', error);
+        addEvent(`Error calling requestAccessToken: ${error}`);
+        alert(`Error requesting permissions: ${error}`);
+      }
     } else {
       console.error('❌ Token client not initialized');
       addEvent('Token client not initialized - cannot request permissions');
@@ -566,6 +611,7 @@ export default function Home() {
   const showDebugInfo = () => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+    const currentDomain = window.location.origin;
     
     const info = {
       // Environment Variables
@@ -580,20 +626,37 @@ export default function Home() {
         apiKeyPreview: apiKey?.substring(0, 20) + '...'
       },
       
+      // Domain Configuration
+      domain: {
+        currentOrigin: currentDomain,
+        isLocalhost: currentDomain.includes('localhost'),
+        isVercel: currentDomain.includes('vercel.app'),
+        isDevelopment: process.env.NODE_ENV === 'development',
+        authorizedDomains: [
+          'http://localhost:3000',
+          'http://localhost:3001', 
+          'https://pronoia-app.vercel.app'
+        ],
+        domainNote: 'Make sure this current origin is added to Authorized JavaScript origins in Google Cloud Console'
+      },
+      
       // Google API Status
       googleAPI: {
       gapiLoaded: !!window.gapi,
       auth2Loaded: !!(window.gapi && window.gapi.auth2),
       authInstance: !!(window.gapi && window.gapi.auth2 && window.gapi.auth2.getAuthInstance()),
         driveAPIAvailable: !!(window.gapi && window.gapi.client && window.gapi.client.drive),
-        isGapiLoaded: isGapiLoaded
+        isGapiLoaded: isGapiLoaded,
+        tokenClientExists: !!tokenClient,
+        googleIdentityServicesLoaded: !!(window.google && window.google.accounts && window.google.accounts.oauth2)
       },
       
       // Authentication Status
       authentication: {
         isSignedIn: googleAuth.isSignedIn,
         userEmail: googleAuth.userEmail,
-        hasGoogleIdentityServices: !!(window.google && window.google.accounts)
+        hasGoogleIdentityServices: !!(window.google && window.google.accounts),
+        driveFoldersCount: driveFolders.length
       },
       
       // Current URL
@@ -607,7 +670,10 @@ export default function Home() {
         '1. Make sure Google Drive API is enabled in Google Cloud Console',
         '2. Check that your domain is in authorized origins',
         '3. Verify API Key and Client ID formats are correct',
-        '4. Try refreshing the page if APIs are not loaded'
+        '4. Try refreshing the page if APIs are not loaded',
+        '5. Make sure you complete the permission popup flow',
+        '6. Check browser console for specific error messages',
+        '7. Try in incognito mode to rule out extensions'
       ]
     };
     
