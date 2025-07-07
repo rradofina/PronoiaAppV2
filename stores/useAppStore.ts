@@ -22,6 +22,10 @@ import {
 import { STORAGE_KEYS, PACKAGES } from '../utils/constants';
 
 interface AppStore extends AppState {
+  // Event Log for debugging
+  eventLog: string[];
+  addEvent: (event: string) => void;
+
   // New state properties
   currentScreen: Screen;
   googleAuth: GoogleAuth;
@@ -178,6 +182,10 @@ const useAppStore = create<AppStore>()(
         loadingState: initialLoadingState,
         mainSessionsFolder: null,
         
+        // Event Log
+        eventLog: [],
+        addEvent: (event) => set((state) => ({ eventLog: [...state.eventLog, `${new Date().toISOString()}: ${event}`] })),
+
         // New state initial values
         currentScreen: 'drive-setup',
         googleAuth: { isSignedIn: false, userEmail: null },

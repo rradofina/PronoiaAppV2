@@ -61,6 +61,7 @@ export default function Home() {
     getTotalTemplateCount,
     mainSessionsFolder,
     setMainSessionsFolder,
+    addEvent,
   } = useAppStore();
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [tokenClient, setTokenClient] = useState<any>(null);
@@ -72,14 +73,17 @@ export default function Home() {
   } | null>(null);
 
   useEffect(() => {
+    addEvent('App component mounted');
     const savedFolder = localStorage.getItem('mainSessionsFolder');
     if (savedFolder) {
+      addEvent('Found saved main folder in localStorage');
       setMainSessionsFolder(JSON.parse(savedFolder));
     }
   }, []);
 
   // Load Google API
   useEffect(() => {
+    addEvent('useEffect for Google API loading triggered');
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
@@ -97,31 +101,38 @@ export default function Home() {
       
       if (!clientId || !apiKey || clientId === 'your_google_client_id_here') {
       console.log('⚠️ Google API credentials not configured - running in demo mode');
+      addEvent('Google API credentials not configured, running in demo mode');
         setIsGapiLoaded(true);
         return;
       }
 
     // Load GAPI for Drive API calls
+    addEvent('Loading GAPI script');
     const gapiScript = document.createElement('script');
     gapiScript.src = 'https://apis.google.com/js/api.js';
     gapiScript.onload = () => {
+      addEvent('GAPI script loaded');
       window.gapi.load('client', async () => {
+        addEvent('GAPI client loading');
         await window.gapi.client.init({
           apiKey: apiKey,
           discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
         });
         setIsGapiLoaded(true);
         console.log('✅ GAPI client initialized');
+        addEvent('GAPI client initialized');
       });
     };
     document.head.appendChild(gapiScript);
 
     // Load GIS for Sign-In and OAuth
+    addEvent('Loading GIS script');
     const gsiScript = document.createElement('script');
     gsiScript.src = 'https://accounts.google.com/gsi/client';
     gsiScript.async = true;
     gsiScript.defer = true;
     gsiScript.onload = () => {
+      addEvent('GIS script loaded');
       // Initialize the Sign-In client
       window.google.accounts.id.initialize({
         client_id: clientId,
@@ -129,30 +140,38 @@ export default function Home() {
         auto_select: false,
         cancel_on_tap_outside: false,
       });
+      addEvent('Google Accounts ID initialized');
 
       // Initialize the OAuth Token Client
       const client = window.google.accounts.oauth2.initTokenClient({
         client_id: clientId,
         scope: 'https://www.googleapis.com/auth/drive',
         callback: (tokenResponse: any) => {
+          addEvent('OAuth token response received');
           if (tokenResponse.access_token) {
             console.log('✅ OAuth2 token received, loading folders...');
+            addEvent('OAuth2 token received, loading folders');
             window.gapi.client.setToken({ access_token: tokenResponse.access_token });
             // Also set token in GoogleDriveService if it exists
             if (typeof window !== 'undefined' && (window as any).googleDriveService) {
               (window as any).googleDriveService.setAccessToken(tokenResponse.access_token);
+              addEvent('Access token set in googleDriveService');
             }
             loadDriveFolders();
+          } else {
+            addEvent('OAuth2 token response did not contain access_token');
           }
         },
       });
       setTokenClient(client);
       console.log('✅ Google Identity Services initialized');
+      addEvent('Google Identity Services initialized');
     };
     document.head.appendChild(gsiScript);
   }, []);
 
   const handleDemoMode = () => {
+    addEvent('Demo mode activated');
     console.log('Demo mode activated!');
     
     // Create mock folders for demo
@@ -223,6 +242,7 @@ export default function Home() {
   };
 
   const handleGoogleCredentialResponse = (response: any) => {
+    addEvent('Processing Google credential response');
     console.log('🔑 Processing Google credential response...');
     try {
       // Decode the JWT to get user info
@@ -235,6 +255,7 @@ export default function Home() {
 
       const userInfo = JSON.parse(jsonPayload);
       console.log('✅ User info extracted:', userInfo);
+      addEvent(`User info extracted for ${userInfo.email}`);
       
       setGoogleAuth({
         isSignedIn: true,
@@ -246,32 +267,40 @@ export default function Home() {
       // This will trigger the permission pop-up if needed.
       if (tokenClient) {
         console.log('🔐 Requesting Drive API permissions...');
+        addEvent('Requesting Drive API permissions');
         tokenClient.requestAccessToken({ prompt: 'consent' });
       } else {
         console.error('❌ Token client not initialized');
+        addEvent('Token client not initialized');
       }
 
     } catch (error) {
       console.error('❌ Failed to process credential response:', error);
+      addEvent(`Failed to process credential response: ${error}`);
     }
   };
 
   const handleGoogleSignIn = () => {
+    addEvent('Starting Google sign-in process');
     console.log('🔐 Starting Google sign-in process...');
     
     if (window.google && window.google.accounts) {
       // Trigger the sign-in popup
       console.log('✅ Prompting for Google sign-in...');
+      addEvent('Prompting for Google sign-in');
       window.google.accounts.id.prompt((notification: any) => {
         console.log('📍 Prompt notification:', notification);
+        addEvent(`Google sign-in prompt notification: ${JSON.stringify(notification)}`);
       });
       } else {
       console.error('❌ Google Sign-In is not ready');
+      addEvent('Google Sign-In is not ready');
       alert('Google Sign-In is not ready. Please refresh the page and try again.');
     }
   };
 
   const loadDriveFolders = async () => {
+    addEvent('Loading Google Drive folders');
     try {
       console.log('📁 Loading Google Drive folders...');
       
@@ -283,10 +312,12 @@ export default function Home() {
       
       console.log('✅ Drive API response:', response);
       console.log('📂 Found folders:', response.result.files?.length || 0);
+      addEvent(`Found ${response.result.files?.length || 0} folders`);
       
       setDriveFolders(response.result.files || []);
     } catch (error: any) {
       console.error('❌ Failed to load folders:', error);
+      addEvent(`Failed to load folders: ${error.message}`);
       console.error('🔍 Error details:', {
         status: error.status,
         statusText: error.statusText,
@@ -307,6 +338,7 @@ export default function Home() {
   };
 
   const handleMainFolderSelect = async (folder: DriveFolder) => {
+    addEvent(`Main folder selected: ${folder.name}`);
     setSelectedMainFolder(folder);
     
     try {
@@ -533,6 +565,9 @@ export default function Home() {
       // Current URL
       currentURL: window.location.href,
       
+      // Event Log
+      eventLog: useAppStore().eventLog.join('\n'),
+      
       // Troubleshooting Tips
       tips: [
         '1. Make sure Google Drive API is enabled in Google Cloud Console',
@@ -547,10 +582,12 @@ export default function Home() {
   };
 
   const handleSignOut = () => {
+    addEvent('Signing out');
     if (googleAuth.userEmail) {
       googleDriveService.signOut();
       window.google.accounts.id.revoke(googleAuth.userEmail, () => {
         console.log('Consent revoked.');
+        addEvent('Consent revoked');
         setGoogleAuth({ isSignedIn: false, userEmail: null });
         setDriveFolders([]);
         setSelectedMainFolder(null);
@@ -565,6 +602,7 @@ export default function Home() {
         localStorage.removeItem('mainSessionsFolder');
         setMainSessionsFolder(null);
         console.log('App state reset.');
+        addEvent('App state reset');
       });
     }
   };
@@ -783,4 +821,4 @@ export default function Home() {
   };
 
   return <div>{renderScreen()}</div>;
-} 
+}
