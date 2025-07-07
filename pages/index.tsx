@@ -157,11 +157,23 @@ export default function Home() {
               (window as any).googleDriveService.setAccessToken(tokenResponse.access_token);
               addEvent('Access token set in googleDriveService');
             }
+            // Reset requesting permissions state if it exists
+            const driveSetupElement = document.querySelector('[data-requesting-permissions="true"]');
+            if (driveSetupElement) {
+              driveSetupElement.setAttribute('data-requesting-permissions', 'false');
+            }
             loadDriveFolders();
           } else {
             addEvent('OAuth2 token response did not contain access_token');
+            console.error('❌ No access token in response');
+            alert('Failed to get Drive permissions. Please try again.');
           }
         },
+        error_callback: (error: any) => {
+          addEvent(`OAuth error: ${JSON.stringify(error)}`);
+          console.error('❌ OAuth error:', error);
+          alert('Failed to get Drive permissions. Please check your popup blocker and try again.');
+        }
       });
       setTokenClient(client);
       console.log('✅ Google Identity Services initialized');
@@ -262,17 +274,18 @@ export default function Home() {
         userEmail: userInfo.email
       });
 
-      // ---- THIS IS THE CRITICAL CHANGE ----
-      // Now that the user is signed in, request the Drive API token.
-      // This will trigger the permission pop-up if needed.
-      if (tokenClient) {
-        console.log('🔐 Requesting Drive API permissions...');
-        addEvent('Requesting Drive API permissions');
-        tokenClient.requestAccessToken({ prompt: 'consent' });
-      } else {
-        console.error('❌ Token client not initialized');
-        addEvent('Token client not initialized');
-      }
+      // Add a small delay to ensure state updates are processed
+      setTimeout(() => {
+        if (tokenClient) {
+          console.log('🔐 Requesting Drive API permissions...');
+          addEvent('Requesting Drive API permissions');
+          // Force the consent prompt to always show
+          tokenClient.requestAccessToken({ prompt: 'consent' });
+        } else {
+          console.error('❌ Token client not initialized');
+          addEvent('Token client not initialized');
+        }
+      }, 100);
 
     } catch (error) {
       console.error('❌ Failed to process credential response:', error);
@@ -298,6 +311,27 @@ export default function Home() {
       alert('Google Sign-In is not ready. Please refresh the page and try again.');
     }
   };
+
+  const requestDrivePermissions = () => {
+    addEvent('Manually requesting Drive permissions');
+    console.log('🔐 Manually requesting Drive permissions...');
+    
+    if (tokenClient) {
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+    } else {
+      console.error('❌ Token client not initialized');
+      addEvent('Token client not initialized - cannot request permissions');
+      alert('Unable to request permissions. Please refresh the page and try again.');
+    }
+  };
+
+  // Make the function globally available
+  useEffect(() => {
+    (window as any).requestDrivePermissions = requestDrivePermissions;
+    return () => {
+      delete (window as any).requestDrivePermissions;
+    };
+  }, [tokenClient]);
 
   const loadDriveFolders = async () => {
     addEvent('Loading Google Drive folders');

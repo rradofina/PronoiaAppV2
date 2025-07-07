@@ -31,6 +31,7 @@ export default function DriveSetupScreen({
   handleSignOut,
 }: DriveSetupScreenProps) {
   const [isSelectingFolder, setIsSelectingFolder] = useState(false);
+  const [isRequestingPermissions, setIsRequestingPermissions] = useState(false);
 
   const handleSelectFolder = () => {
     setIsSelectingFolder(true);
@@ -43,6 +44,14 @@ export default function DriveSetupScreen({
   const handleFolderSelected = (folder: DriveFolder) => {
     handleMainFolderSelect(folder);
     setIsSelectingFolder(false);
+  };
+
+  const handleRequestDrivePermissions = () => {
+    setIsRequestingPermissions(true);
+    // This will be called from the parent component
+    if ((window as any).requestDrivePermissions) {
+      (window as any).requestDrivePermissions();
+    }
   };
 
   return (
@@ -175,25 +184,56 @@ export default function DriveSetupScreen({
                   Choose the main folder that contains all your client photo sessions
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-                  {driveFolders.map((folder) => (
-                    <div
-                      key={folder.id}
-                      onClick={() => googleAuth.userEmail === 'demo@example.com' ? handleDemoFolderSelect(folder) : handleFolderSelected(folder)}
-                      className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200"
+                {driveFolders.length === 0 && !isRequestingPermissions ? (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                    <div className="text-3xl mb-4">⚠️</div>
+                    <h4 className="text-lg font-semibold text-gray-800 mb-2">
+                      No folders found
+                    </h4>
+                    <p className="text-gray-600 mb-4">
+                      We need permission to access your Google Drive folders.
+                    </p>
+                    <button
+                      onClick={handleRequestDrivePermissions}
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200"
                     >
-                      <div className="flex items-center">
-                        <div className="text-2xl mr-3">📁</div>
-                        <div>
-                          <p className="font-medium text-gray-800">{folder.name}</p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(folder.createdTime).toLocaleDateString()}
-                          </p>
+                      Grant Drive Access
+                    </button>
+                    <div className="mt-4">
+                      <button
+                        onClick={showDebugInfo}
+                        className="text-sm text-blue-600 hover:underline"
+                      >
+                        Show Debug Info
+                      </button>
+                    </div>
+                  </div>
+                ) : isRequestingPermissions ? (
+                  <div className="text-center py-8">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    <p className="mt-4 text-gray-600">Requesting permissions...</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+                    {driveFolders.map((folder) => (
+                      <div
+                        key={folder.id}
+                        onClick={() => googleAuth.userEmail === 'demo@example.com' ? handleDemoFolderSelect(folder) : handleFolderSelected(folder)}
+                        className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200"
+                      >
+                        <div className="flex items-center">
+                          <div className="text-2xl mr-3">📁</div>
+                          <div>
+                            <p className="font-medium text-gray-800">{folder.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(folder.createdTime).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
                 {isSelectingFolder && (
                   <div className="text-center mt-4">
                     <button
