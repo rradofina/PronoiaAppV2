@@ -113,7 +113,15 @@ type Screen = 'drive-setup' | 'folder-selection' | 'package' | 'template' | 'pho
 declare global {
   interface Window {
     gapi: any;
-    google: any;
+    google: any & {
+      accounts?: {
+        id: {
+          initialize: (config: any) => void;
+          prompt: () => void;
+          revoke: (hint: string, callback: () => void) => void;
+        };
+      };
+    };
   }
 }
 
@@ -151,28 +159,60 @@ export default function Home() {
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
       
+      console.log('🔍 Environment Check:', {
+        hasClientId: !!clientId,
+        hasApiKey: !!apiKey,
+        clientIdLength: clientId?.length || 0,
+        apiKeyLength: apiKey?.length || 0,
+        clientIdPreview: clientId?.substring(0, 20) + '...',
+        isDefaultValue: clientId === 'your_google_client_id_here'
+      });
+      
       if (!clientId || !apiKey || clientId === 'your_google_client_id_here') {
-        console.log('Google API credentials not configured - running in demo mode');
+        console.log('⚠️ Google API credentials not configured - running in demo mode');
         setIsGapiLoaded(true);
         return;
       }
 
-      // Load the Google API script
-      if (!window.gapi) {
-        const script = document.createElement('script');
-        script.src = 'https://apis.google.com/js/api.js';
-        script.onload = () => {
-          window.gapi.load('auth2:client', initAuth);
-        };
-        document.head.appendChild(script);
-      } else {
-        initAuth();
+      try {
+        // Load both Google API and Google Identity Services
+        if (!window.gapi) {
+          console.log('📦 Loading Google API script...');
+          const script = document.createElement('script');
+          script.src = 'https://apis.google.com/js/api.js';
+          script.onload = () => {
+            console.log('✅ Google API script loaded');
+            window.gapi.load('auth2:client', initAuth);
+          };
+          script.onerror = () => {
+            console.error('❌ Failed to load Google API script');
+            setIsGapiLoaded(true);
+          };
+          document.head.appendChild(script);
+        } else {
+          console.log('✅ Google API already available');
+          initAuth();
+        }
+
+        // Also load Google Identity Services (newer method)
+        if (!document.querySelector('script[src*="gsi/client"]')) {
+          console.log('📦 Loading Google Identity Services...');
+          const gsiScript = document.createElement('script');
+          gsiScript.src = 'https://accounts.google.com/gsi/client';
+          gsiScript.async = true;
+          gsiScript.defer = true;
+          document.head.appendChild(gsiScript);
+        }
+      } catch (error) {
+        console.error('❌ Error in initGoogleAPI:', error);
+        setIsGapiLoaded(true);
       }
     };
 
     const initAuth = async () => {
       try {
-        console.log('Initializing Google API with credentials:', {
+        console.log('🔐 Initializing Google Auth...');
+        console.log('🔑 Using credentials:', {
           clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.substring(0, 20) + '...',
           apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY?.substring(0, 10) + '...'
         });
@@ -184,12 +224,12 @@ export default function Home() {
           scope: 'https://www.googleapis.com/auth/drive.metadata.readonly'
         });
 
-        console.log('Google API initialized successfully');
+        console.log('✅ Google API initialized successfully');
 
         const authInstance = window.gapi.auth2.getAuthInstance();
         const isSignedIn = authInstance.isSignedIn.get();
         
-        console.log('Current sign-in status:', isSignedIn);
+        console.log('🔍 Current sign-in status:', isSignedIn);
         
         if (isSignedIn) {
           const user = authInstance.currentUser.get();
@@ -197,12 +237,17 @@ export default function Home() {
             isSignedIn: true,
             userEmail: user.getBasicProfile().getEmail()
           });
-          console.log('User already signed in:', user.getBasicProfile().getEmail());
+          console.log('✅ User already signed in:', user.getBasicProfile().getEmail());
         }
         
         setIsGapiLoaded(true);
-      } catch (error) {
-        console.error('Failed to initialize Google API:', error);
+      } catch (error: any) {
+        console.error('❌ Failed to initialize Google API:', error);
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          details: error.details || 'No additional details'
+        });
         setIsGapiLoaded(true);
       }
     };
@@ -267,29 +312,8 @@ export default function Home() {
       'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
       'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
       'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
-      'https://www.shutterstock.com/shutterstock/photos/2564533355/display_1500/stock-photo-a-young-couple-joyfully-embraces-in-a-studio-radiating-romance-and-style-for-valentines-day-2564533355.jpg', // Replace with your Shutterstock URL
       'https://image.shutterstock.com/image-photo/sample-19.jpg', // Replace with your Shutterstock URL
-      'https://image.shutterstock.com/image-photo/sample-20.jpg', // Replace with your Shutterstock URL
+      'https://image.shutterstock.com/image-photo/sample-20.jpg' // Replace with your Shutterstock URL
     ];
     
     // Create mock photos from the sample URLs
@@ -303,31 +327,80 @@ export default function Home() {
     setCurrentScreen('package');
   };
 
+  const handleGoogleCredentialResponse = (response: any) => {
+    console.log('🔑 Processing Google credential response...');
+    try {
+      // Decode the JWT token to get user info
+      const credential = response.credential;
+      const base64Url = credential.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      
+      const userInfo = JSON.parse(jsonPayload);
+      console.log('✅ User info extracted:', userInfo);
+      
+      setGoogleAuth({
+        isSignedIn: true,
+        userEmail: userInfo.email
+      });
+      
+      // Load root folders
+      loadDriveFolders();
+    } catch (error) {
+      console.error('❌ Failed to process credential response:', error);
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     try {
-      console.log('Starting Google sign-in process...');
+      console.log('🔐 Starting Google sign-in process...');
       
+      // Try newer Google Identity Services first
+      if (window.google && window.google.accounts) {
+        console.log('🔄 Trying Google Identity Services...');
+        try {
+          // Initialize Google Identity Services
+          window.google.accounts.id.initialize({
+            client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+            callback: (response: any) => {
+              console.log('✅ Google Identity Services sign-in successful');
+              // Handle the credential response
+              handleGoogleCredentialResponse(response);
+            }
+          });
+          
+          // Prompt for sign-in
+          window.google.accounts.id.prompt();
+          return;
+        } catch (gsiError) {
+          console.log('🔄 Google Identity Services failed, trying legacy method...');
+        }
+      }
+      
+      // Fallback to legacy method
       if (!window.gapi || !window.gapi.auth2) {
-        console.error('Google API not loaded properly');
+        console.error('❌ Google API not loaded properly');
         alert('Google API not loaded. Please refresh the page and try again.');
         return;
       }
 
       const authInstance = window.gapi.auth2.getAuthInstance();
-      console.log('Auth instance:', authInstance);
+      console.log('🔍 Auth instance:', authInstance);
       
       if (!authInstance) {
-        console.error('Google Auth instance not available');
+        console.error('❌ Google Auth instance not available');
         alert('Google Auth not initialized. Please refresh the page and try again.');
         return;
       }
 
-      console.log('Attempting to sign in...');
+      console.log('🚀 Attempting legacy sign in...');
       
       // Try the simpler signIn method without options first
       const user = await authInstance.signIn();
       
-      console.log('Sign in successful:', user);
+      console.log('✅ Legacy sign in successful:', user);
       
       setGoogleAuth({
         isSignedIn: true,
@@ -739,12 +812,20 @@ export default function Home() {
                     Sign in to access your photo folders and client sessions
                   </p>
                 </div>
-                <button
-                  onClick={handleGoogleSignIn}
-                  className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium text-lg hover:bg-blue-700 transition-all duration-200 shadow-md"
-                >
-                  Sign in with Google
-                </button>
+                                  <button
+                    onClick={handleGoogleSignIn}
+                    className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium text-lg hover:bg-blue-700 transition-all duration-200 shadow-md"
+                  >
+                    Sign in with Google
+                  </button>
+                  <div className="mt-4">
+                    <button
+                      onClick={showDebugInfo}
+                      className="bg-gray-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-600 transition-all duration-200"
+                    >
+                      🔍 Debug Info
+                    </button>
+                  </div>
               </div>
 
               {/* Demo Mode Option */}
@@ -765,6 +846,22 @@ export default function Home() {
                   </button>
                 </div>
               </div>
+
+              {/* Debug Info Display */}
+              {debugInfo && (
+                <div className="bg-gray-100 border border-gray-300 rounded-lg p-4 mt-6">
+                  <h4 className="text-lg font-semibold text-gray-800 mb-2">🔍 Debug Information</h4>
+                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono max-h-96 overflow-y-auto">
+                    {debugInfo}
+                  </pre>
+                  <button
+                    onClick={() => setDebugInfo('')}
+                    className="mt-2 bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600"
+                  >
+                    Close Debug
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="bg-white rounded-lg p-8 shadow-sm">
