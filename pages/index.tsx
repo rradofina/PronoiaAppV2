@@ -67,10 +67,24 @@ export default function Home() {
   // Load main folder from localStorage on initial render
   useEffect(() => {
     const savedFolder = localStorage.getItem('mainSessionsFolder');
+    const savedToken = localStorage.getItem('google_access_token');
+    const tokenExpiry = localStorage.getItem('google_token_expiry');
+    
     if (savedFolder) {
       setMainSessionsFolder(JSON.parse(savedFolder));
+      
+      // If we have both a saved folder and valid token, set screen to folder-selection immediately
+      if (savedToken && tokenExpiry) {
+        const expiryTime = parseInt(tokenExpiry);
+        const currentTime = Date.now();
+        
+        // Check if token is still valid (with 5 minute buffer)
+        if (currentTime < expiryTime - 300000) {
+          setCurrentScreen('folder-selection');
+        }
+      }
     }
-  }, [setMainSessionsFolder]);
+  }, [setMainSessionsFolder, setCurrentScreen]);
 
   // Function to validate and restore token
   const restoreAuthFromStorage = async () => {
@@ -98,13 +112,16 @@ export default function Home() {
             await loadDriveFolders();
             addEvent('Authentication restored successfully');
             
-            // If we have a main folder, go directly to folder selection
-            // If not, stay on drive-setup to select main folder
+            // If we have a main folder, load client folders and ensure we're on folder-selection
             const savedFolder = localStorage.getItem('mainSessionsFolder');
             if (savedFolder) {
-              setCurrentScreen('folder-selection');
               const folderData = JSON.parse(savedFolder);
               setSelectedMainFolder({ id: folderData.id, name: folderData.name, createdTime: '' });
+              
+              // Always ensure we're on folder-selection screen when we have a main folder
+              if (currentScreen !== 'folder-selection') {
+                setCurrentScreen('folder-selection');
+              }
               
               // Load client folders for the main folder
               try {
