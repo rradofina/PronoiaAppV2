@@ -97,6 +97,27 @@ export default function Home() {
             // Test the token by loading folders
             await loadDriveFolders();
             addEvent('Authentication restored successfully');
+            
+            // If we have a main folder, go directly to folder selection
+            // If not, stay on drive-setup to select main folder
+            const savedFolder = localStorage.getItem('mainSessionsFolder');
+            if (savedFolder) {
+              setCurrentScreen('folder-selection');
+              const folderData = JSON.parse(savedFolder);
+              setSelectedMainFolder({ id: folderData.id, name: folderData.name, createdTime: '' });
+              
+              // Load client folders for the main folder
+              try {
+                const response = await window.gapi.client.drive.files.list({
+                  q: `'${folderData.id}' in parents and mimeType='application/vnd.google-apps.folder'`,
+                  fields: 'files(id, name, createdTime)',
+                  orderBy: 'name'
+                });
+                setClientFolders(response.result.files || []);
+              } catch (error) {
+                console.error('Failed to load client folders during auth restoration:', error);
+              }
+            }
           }
         } catch (error) {
           // Token might be invalid, clear it
@@ -311,8 +332,13 @@ export default function Home() {
   }, [isGapiLoaded, addEvent, setGoogleAuth, isRestoringAuth]);
 
   const handleMainFolderSelect = async (folder: DriveFolder) => {
+    addEvent(`Main folder selected: ${folder.name}`);
     setSelectedMainFolder(folder);
     setMainSessionsFolder({ id: folder.id, name: folder.name });
+    
+    // Save to localStorage
+    localStorage.setItem('mainSessionsFolder', JSON.stringify({ id: folder.id, name: folder.name }));
+    
     try {
       const response = await window.gapi.client.drive.files.list({
         q: `'${folder.id}' in parents and mimeType='application/vnd.google-apps.folder'`,
@@ -322,7 +348,8 @@ export default function Home() {
       setClientFolders(response.result.files || []);
       setCurrentScreen('folder-selection');
     } catch (error) {
-      alert('Failed to load client folders.');
+      console.error('Failed to load client folders:', error);
+      alert('Failed to load client folders. Please try again.');
     }
   };
 
@@ -364,6 +391,25 @@ export default function Home() {
     // Clear main folder from localStorage as well
     localStorage.removeItem('mainSessionsFolder');
     setMainSessionsFolder(null);
+    
+    // Clear other state
+    setDriveFolders([]);
+    setSelectedMainFolder(null);
+    setClientFolders([]);
+    setSelectedClientFolder(null);
+    setLocalPhotos([]);
+    setPhotos([]);
+    setSelectedPackage(null);
+    setClientName('');
+    setTemplateSlots([]);
+    setSelectedSlot(null);
+  };
+
+  const handleChangeMainFolder = () => {
+    addEvent('User wants to change main folder');
+    setCurrentScreen('drive-setup');
+    setClientFolders([]);
+    setSelectedClientFolder(null);
   };
 
   const showDebugInfo = () => {
@@ -618,7 +664,9 @@ export default function Home() {
             clientFolders={clientFolders}
             handleDemoClientSelect={handleDemoFolderSelect}
             handleClientFolderSelect={handleClientFolderSelect}
-            handleBack={() => setCurrentScreen('drive-setup')}
+            mainSessionsFolder={mainSessionsFolder}
+            onSignOut={handleSignOut}
+            onChangeMainFolder={handleChangeMainFolder}
           />
         );
       case 'package':
