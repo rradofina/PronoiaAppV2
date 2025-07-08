@@ -13,6 +13,7 @@ interface DriveSetupScreenProps {
   mainSessionsFolder: { id: string; name: string } | null;
   handleSignOut: () => void;
   isConnecting: boolean;
+  isRestoringAuth?: boolean;
 }
 
 export default function DriveSetupScreen({
@@ -27,6 +28,7 @@ export default function DriveSetupScreen({
   mainSessionsFolder,
   handleSignOut,
   isConnecting,
+  isRestoringAuth = false,
 }: DriveSetupScreenProps) {
   const [isSelectingFolder, setIsSelectingFolder] = useState(false);
   
@@ -46,7 +48,9 @@ export default function DriveSetupScreen({
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <p className="mt-4 text-gray-600">Connecting to Google Drive...</p>
+          <p className="mt-4 text-gray-600">
+            {isRestoringAuth ? 'Restoring your session...' : 'Connecting to Google Drive...'}
+          </p>
         </div>
       </div>
     );

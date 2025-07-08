@@ -62,6 +62,7 @@ export default function Home() {
   const [tokenClient, setTokenClient] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [localPhotos, setLocalPhotos] = useState<Photo[]>([]);
+  const [isRestoringAuth, setIsRestoringAuth] = useState(false);
 
   // Load main folder from localStorage on initial render
   useEffect(() => {
@@ -70,6 +71,54 @@ export default function Home() {
       setMainSessionsFolder(JSON.parse(savedFolder));
     }
   }, [setMainSessionsFolder]);
+
+  // Function to validate and restore token
+  const restoreAuthFromStorage = async () => {
+    const storedToken = localStorage.getItem('google_access_token');
+    const storedEmail = localStorage.getItem('google_user_email');
+    const tokenExpiry = localStorage.getItem('google_token_expiry');
+    
+    if (storedToken && tokenExpiry) {
+      const expiryTime = parseInt(tokenExpiry);
+      const currentTime = Date.now();
+      
+      // Check if token is still valid (with 5 minute buffer)
+      if (currentTime < expiryTime - 300000) {
+        addEvent('Restoring authentication from localStorage');
+        setIsRestoringAuth(true);
+        
+        try {
+          // Set the token in GAPI
+          if (window.gapi && window.gapi.client) {
+            window.gapi.client.setToken({ access_token: storedToken });
+            googleDriveService.setAccessToken(storedToken);
+            setGoogleAuth({ isSignedIn: true, userEmail: storedEmail || 'Authenticated' });
+            
+            // Test the token by loading folders
+            await loadDriveFolders();
+            addEvent('Authentication restored successfully');
+          }
+        } catch (error) {
+          // Token might be invalid, clear it
+          addEvent('Failed to restore authentication, clearing stored token');
+          clearStoredAuth();
+        } finally {
+          setIsRestoringAuth(false);
+        }
+      } else {
+        // Token expired, clear it
+        addEvent('Stored token expired, clearing');
+        clearStoredAuth();
+      }
+    }
+  };
+
+  const clearStoredAuth = () => {
+    localStorage.removeItem('google_access_token');
+    localStorage.removeItem('google_user_email');
+    localStorage.removeItem('google_token_expiry');
+    setGoogleAuth({ isSignedIn: false, userEmail: null });
+  };
 
   // Load Google API
   useEffect(() => {
@@ -99,6 +148,9 @@ export default function Home() {
         setIsGapiLoaded(true);
         console.log('✅ GAPI client initialized');
         addEvent('GAPI client initialized');
+        
+        // Try to restore authentication after GAPI is loaded
+        await restoreAuthFromStorage();
       });
     };
     document.head.appendChild(gapiScript);
@@ -177,11 +229,29 @@ export default function Home() {
         orderBy: 'name'
       });
       setDriveFolders(response.result.files || []);
+      
+      // Try to get user info if we have a token
+      try {
+        const aboutResponse = await window.gapi.client.drive.about.get({
+          fields: 'user(emailAddress)'
+        });
+        if (aboutResponse.result.user?.emailAddress) {
+          const email = aboutResponse.result.user.emailAddress;
+          localStorage.setItem('google_user_email', email);
+          setGoogleAuth({ isSignedIn: true, userEmail: email });
+        }
+      } catch (e) {
+        // Failed to get user info, but that's okay
+        addEvent('Could not retrieve user email');
+      }
     } catch (error: any) {
       console.error('❌ Failed to load folders:', error);
       let errorMessage = 'Failed to load Google Drive folders.';
       if (error.status === 403) errorMessage = 'Permission denied.';
-      else if (error.status === 401) errorMessage = 'Authentication expired.';
+      else if (error.status === 401) {
+        errorMessage = 'Authentication expired.';
+        clearStoredAuth();
+      }
       alert(errorMessage);
     } finally {
       setIsConnecting(false);
@@ -199,6 +269,7 @@ export default function Home() {
         const state = params.get('state');
         const error = params.get('error');
         const storedState = sessionStorage.getItem('oauth_state');
+        const expiresIn = params.get('expires_in'); // Usually 3600 seconds (1 hour)
 
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
 
@@ -219,6 +290,13 @@ export default function Home() {
           window.gapi.client.setToken({ access_token: accessToken });
           googleDriveService.setAccessToken(accessToken);
           sessionStorage.removeItem('oauth_state');
+          
+          // Store token in localStorage with expiry time
+          const expiryTime = Date.now() + (parseInt(expiresIn || '3600') * 1000);
+          localStorage.setItem('google_access_token', accessToken);
+          localStorage.setItem('google_token_expiry', expiryTime.toString());
+          // Note: We'll try to get the email after loading folders
+          
           setGoogleAuth({ isSignedIn: true, userEmail: 'Authenticated' });
           loadDriveFolders();
         } else {
@@ -227,10 +305,10 @@ export default function Home() {
       }
     };
     
-    if (isGapiLoaded) {
+    if (isGapiLoaded && !isRestoringAuth) {
       handleOAuthRedirect();
     }
-  }, [isGapiLoaded, addEvent, setGoogleAuth]);
+  }, [isGapiLoaded, addEvent, setGoogleAuth, isRestoringAuth]);
 
   const handleMainFolderSelect = async (folder: DriveFolder) => {
     setSelectedMainFolder(folder);
@@ -268,24 +346,24 @@ export default function Home() {
   };
 
   const handleSignOut = () => {
-    addEvent('Signing out');
-    if (googleAuth.userEmail) {
-      googleDriveService.signOut();
-      setGoogleAuth({ isSignedIn: false, userEmail: null });
-      setDriveFolders([]);
-      setSelectedMainFolder(null);
-      setClientFolders([]);
-      setSelectedClientFolder(null);
-      setLocalPhotos([]);
-      setPhotos([]);
-      setSelectedPackage(null);
-      setClientName('');
-      setTemplateSlots([]);
-      setSelectedSlot(null);
-      setCurrentScreen('drive-setup');
-      localStorage.removeItem('mainSessionsFolder');
-      setMainSessionsFolder(null);
+    addEvent('User signed out');
+    if (tokenClient) {
+      const hint = googleAuth.userEmail || '';
+      if (window.google?.accounts?.id?.revoke) {
+        window.google.accounts.id.revoke(hint, () => {
+          console.log('✅ Authorization revoked for:', hint);
+          addEvent('Authorization revoked for: ' + hint);
+        });
+      }
     }
+    googleDriveService.signOut();
+    clearStoredAuth();
+    setGoogleAuth({ isSignedIn: false, userEmail: null });
+    setCurrentScreen('drive-setup');
+    
+    // Clear main folder from localStorage as well
+    localStorage.removeItem('mainSessionsFolder');
+    setMainSessionsFolder(null);
   };
 
   const showDebugInfo = () => {
@@ -528,7 +606,8 @@ export default function Home() {
             showDebugInfo={showDebugInfo}
             mainSessionsFolder={mainSessionsFolder}
             handleSignOut={handleSignOut}
-            isConnecting={isConnecting}
+            isConnecting={isConnecting || isRestoringAuth}
+            isRestoringAuth={isRestoringAuth}
           />
         );
       case 'folder-selection':
