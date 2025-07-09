@@ -41,7 +41,6 @@ export default function Home() {
     selectedSlot,
     packages,
     eventLog,
-    addonPrints,
     setCurrentScreen,
     setGoogleAuth,
     setIsGapiLoaded,
@@ -51,7 +50,6 @@ export default function Home() {
     setTemplateSlots,
     setSelectedSlot,
     setPhotos,
-    setAddonPrints,
     addEvent,
     handleTemplateCountChange,
     getTotalTemplateCount,
@@ -65,6 +63,7 @@ export default function Home() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [localPhotos, setLocalPhotos] = useState<Photo[]>([]);
   const [isRestoringAuth, setIsRestoringAuth] = useState(false);
+  const [additionalPrints, setAdditionalPrints] = useState(0);
 
   // Load main folder from localStorage on initial render
   useEffect(() => {
@@ -451,6 +450,7 @@ export default function Home() {
       setPhotos([]);
       setSelectedPackage(null);
       setClientName('');
+      setAdditionalPrints(0);
     } else if (currentScreen === 'template') {
       setCurrentScreen('package');
     } else if (currentScreen === 'photos') {
@@ -468,9 +468,7 @@ export default function Home() {
 
   const handleTemplateContinue = () => {
     const totalCount = getTotalTemplateCount();
-    const maxAllowed = (selectedPackage?.templateCount || 0) + addonPrints;
-    
-    if (totalCount > 0 && totalCount <= maxAllowed) {
+    if (totalCount > 0) {
       const slots: TemplateSlot[] = [];
       
       // Create slots based on template counts
@@ -496,10 +494,6 @@ export default function Home() {
       
       setTemplateSlots(slots);
       setCurrentScreen('photos');
-    } else if (totalCount > maxAllowed) {
-      alert(`You can only select up to ${maxAllowed} templates with your current package and add-ons.`);
-    } else {
-      alert('Please select at least one template.');
     }
   };
 
@@ -662,6 +656,24 @@ export default function Home() {
     return null;
   };
 
+  // Helper function to get total allowed prints (base package + additional)
+  const getTotalAllowedPrints = () => {
+    const basePrints = selectedPackage?.templateCount || 0;
+    return basePrints + additionalPrints;
+  };
+
+  // Custom template count change handler that accounts for additional prints
+  const handleTemplateCountChangeWithAddons = (templateId: string, change: number) => {
+    const currentCount = templateCounts[templateId] || 0;
+    const newCount = Math.max(0, currentCount + change);
+    const totalCount = Object.values(templateCounts).reduce((sum, count) => sum + count, 0) - currentCount + newCount;
+    
+    // Use total allowed prints (base + additional) instead of just package count
+    if (totalCount <= getTotalAllowedPrints()) {
+      handleTemplateCountChange(templateId, change);
+    }
+  };
+
   const renderScreen = () => {
     switch (currentScreen) {
       case 'drive-setup':
@@ -702,11 +714,12 @@ export default function Home() {
             photos={localPhotos}
             packages={packages}
             selectedPackage={selectedPackage}
-            addonPrints={addonPrints}
             setSelectedPackage={setSelectedPackage}
-            setAddonPrints={setAddonPrints}
             handleBack={handleBack}
             handlePackageContinue={handlePackageContinue}
+            additionalPrints={additionalPrints}
+            setAdditionalPrints={setAdditionalPrints}
+            additionalPrintPrice={50}
           />
         );
       case 'template':
@@ -718,9 +731,10 @@ export default function Home() {
             templateTypes={templateTypes}
             templateCounts={templateCounts}
             getTotalTemplateCount={getTotalTemplateCount}
-            handleTemplateCountChange={handleTemplateCountChange}
+            handleTemplateCountChange={handleTemplateCountChangeWithAddons}
             handleBack={handleBack}
             handleTemplateContinue={handleTemplateContinue}
+            totalAllowedPrints={getTotalAllowedPrints()}
           />
         );
       case 'photos':
@@ -738,6 +752,7 @@ export default function Home() {
             handleSlotSelect={handleSlotSelect}
             handleBack={handleBack}
             TemplateVisual={TemplateVisual}
+            totalAllowedPrints={getTotalAllowedPrints()}
           />
         );
       default:

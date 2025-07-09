@@ -7,11 +7,12 @@ interface PackageSelectionScreenProps {
   photos: Photo[];
   packages: Package[];
   selectedPackage: Package | null;
-  addonPrints: number;
   setSelectedPackage: (pkg: Package) => void;
-  setAddonPrints: (count: number) => void;
   handleBack: () => void;
   handlePackageContinue: () => void;
+  additionalPrints: number;
+  setAdditionalPrints: (count: number) => void;
+  additionalPrintPrice: number;
 }
 
 export default function PackageSelectionScreen({
@@ -20,25 +21,28 @@ export default function PackageSelectionScreen({
   photos,
   packages,
   selectedPackage,
-  addonPrints,
   setSelectedPackage,
-  setAddonPrints,
   handleBack,
   handlePackageContinue,
+  additionalPrints,
+  setAdditionalPrints,
+  additionalPrintPrice = 50, // Default ₱50 per additional print
 }: PackageSelectionScreenProps) {
-  const handlePackageSelect = (pkg: Package) => {
-    setSelectedPackage(pkg);
-    setAddonPrints(0); // Reset add-ons when selecting a new package
-  };
-
+  
   const getTotalPrice = () => {
-    if (!selectedPackage) return 0;
-    return selectedPackage.price + (addonPrints * (selectedPackage.addonPrintPrice || 0));
+    const basePrice = selectedPackage?.price || 0;
+    const addOnPrice = additionalPrints * additionalPrintPrice;
+    return basePrice + addOnPrice;
   };
 
   const getTotalPrints = () => {
-    if (!selectedPackage) return 0;
-    return selectedPackage.templateCount + addonPrints;
+    const basePrints = selectedPackage?.templateCount || 0;
+    return basePrints + additionalPrints;
+  };
+
+  const handleAdditionalPrintChange = (change: number) => {
+    const newCount = Math.max(0, additionalPrints + change);
+    setAdditionalPrints(newCount);
   };
 
   return (
@@ -60,7 +64,7 @@ export default function PackageSelectionScreen({
           {packages.map((pkg) => (
             <div
               key={pkg.id}
-              onClick={() => handlePackageSelect(pkg)}
+              onClick={() => setSelectedPackage(pkg)}
               className={`bg-white rounded-lg p-6 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md ${
                 selectedPackage?.id === pkg.id
                   ? 'ring-2 ring-blue-500 bg-blue-50'
@@ -80,56 +84,60 @@ export default function PackageSelectionScreen({
                 <div className="text-lg text-blue-600 font-medium mb-3">
                   {pkg.templateCount} {pkg.templateCount === 1 ? 'Print' : 'Prints'}
                 </div>
-                <p className="text-sm text-gray-600 mb-3">
+                <p className="text-sm text-gray-600">
                   {pkg.description}
                 </p>
-                {pkg.addonPrintPrice && (
-                  <div className="text-xs text-gray-500 border-t pt-2">
-                    Add-on: ₱{pkg.addonPrintPrice} per print
-                    <br />
-                    (Max {pkg.maxAddonPrints} add-ons)
-                  </div>
-                )}
               </div>
             </div>
           ))}
         </div>
 
         {/* Add-on Section */}
-        {selectedPackage && selectedPackage.addonPrintPrice && (
-          <div className="bg-white rounded-lg p-6 mb-6 shadow-sm">
+        {selectedPackage && (
+          <div className="bg-white rounded-lg p-6 shadow-sm mb-8">
             <h3 className="text-xl font-semibold text-gray-800 mb-4 text-center">
-              Add Additional Prints
+              📈 Add Additional Prints
             </h3>
-            <div className="flex items-center justify-center space-x-4">
-              <button
-                onClick={() => setAddonPrints(Math.max(0, addonPrints - 1))}
-                disabled={addonPrints === 0}
-                className="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl transition-colors"
-              >
-                -
-              </button>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600 mb-1">
-                  {addonPrints}
+            <p className="text-gray-600 text-center mb-6">
+              Want more prints? Add extra prints to your package for ₱{additionalPrintPrice} each.
+            </p>
+            
+            <div className="flex items-center justify-center space-x-6">
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => handleAdditionalPrintChange(-1)}
+                  disabled={additionalPrints === 0}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-200 ${
+                    additionalPrints === 0
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-red-500 text-white hover:bg-red-600 shadow-md'
+                  }`}
+                >
+                  −
+                </button>
+                
+                <div className="text-center min-w-[120px]">
+                  <div className="text-3xl font-bold text-gray-800">{additionalPrints}</div>
+                  <div className="text-sm text-gray-600">Additional Prints</div>
                 </div>
-                <div className="text-sm text-gray-600">
-                  Additional {addonPrints === 1 ? 'Print' : 'Prints'}
-                </div>
+                
+                <button
+                  onClick={() => handleAdditionalPrintChange(1)}
+                  className="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center text-xl font-bold hover:bg-green-600 transition-all duration-200 shadow-md"
+                >
+                  +
+                </button>
               </div>
-              <button
-                onClick={() => setAddonPrints(Math.min(selectedPackage.maxAddonPrints || 0, addonPrints + 1))}
-                disabled={addonPrints >= (selectedPackage.maxAddonPrints || 0)}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-100 disabled:text-gray-400 text-white w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl transition-colors"
-              >
-                +
-              </button>
+              
+              {additionalPrints > 0 && (
+                <div className="text-center bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="text-lg font-semibold text-gray-800">
+                    +₱{(additionalPrints * additionalPrintPrice).toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600">Add-on Cost</div>
+                </div>
+              )}
             </div>
-            {addonPrints > 0 && (
-              <div className="mt-4 text-center text-sm text-gray-600">
-                Add-on cost: ₱{addonPrints * (selectedPackage.addonPrintPrice || 0)}
-              </div>
-            )}
           </div>
         )}
 
@@ -155,18 +163,22 @@ export default function PackageSelectionScreen({
 
         {selectedPackage && (
           <div className="mt-6 text-center">
-            <div className="bg-blue-50 rounded-lg p-4 inline-block">
-              <p className="text-gray-600 mb-2">
-                Selected: <span className="font-medium text-gray-800">{selectedPackage.name}</span>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 inline-block">
+              <p className="text-gray-800 font-medium">
+                📦 Selected: <span className="text-blue-700">{selectedPackage.name}</span>
               </p>
-              <p className="text-lg font-semibold text-blue-600">
-                {getTotalPrints()} total print(s) • ₱{getTotalPrice()}
+              <p className="text-gray-700 mt-1">
+                🖼️ Total Prints: <span className="font-semibold">{getTotalPrints()}</span>
+                {additionalPrints > 0 && (
+                  <span className="text-green-600"> ({selectedPackage.templateCount} base + {additionalPrints} additional)</span>
+                )}
               </p>
-              {addonPrints > 0 && (
-                <p className="text-sm text-gray-600 mt-1">
-                  Base: {selectedPackage.templateCount} print(s) + {addonPrints} add-on(s)
-                </p>
-              )}
+              <p className="text-gray-700 mt-1">
+                💰 Total Cost: <span className="font-bold text-xl">₱{getTotalPrice().toLocaleString()}</span>
+                {additionalPrints > 0 && (
+                  <span className="text-green-600 text-sm"> (₱{selectedPackage.price} + ₱{additionalPrints * additionalPrintPrice})</span>
+                )}
+              </p>
             </div>
           </div>
         )}

@@ -193,36 +193,27 @@ class GoogleDriveService {
       const folder = await this.getFolderContents(folderId);
       console.log(`Found ${folder.files.length} files in folder`);
       
-      // Filter for image files only
-      const imageFiles = folder.files.filter(file => 
-        file.mimeType.startsWith('image/') || 
-        SUPPORTED_IMAGE_TYPES.includes(file.mimeType)
-      );
-      
-      const photos = imageFiles.map((file) => {
+      // Simple approach - just use thumbnail URLs directly
+      const photos = folder.files.map((file) => {
         let photoUrl = '';
-        let thumbnailUrl = '';
         
-        // For thumbnails, use Google's thumbnail service with better size
+        // Try different URL approaches
         if (file.thumbnailLink) {
-          thumbnailUrl = file.thumbnailLink.replace('=s220', '=s400');
+          // Use Google's thumbnail with larger size
+          photoUrl = file.thumbnailLink.replace('=s220', '=s800');
+          console.log(`Using thumbnailLink: ${photoUrl}`);
+        } else {
+          // Fallback to authenticated API endpoint
+          photoUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&access_token=${this.accessToken}`;
+          console.log(`Using API endpoint: ${photoUrl}`);
         }
         
-        // For main photo URL, use authenticated API endpoint with proper headers
-        if (this.accessToken) {
-          photoUrl = `https://drive.google.com/uc?id=${file.id}&export=view`;
-          // Fallback to API endpoint if needed
-          if (!photoUrl) {
-            photoUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&access_token=${this.accessToken}`;
-          }
-        }
-        
-        console.log(`Photo: ${file.name}, URL: ${photoUrl}, Thumbnail: ${thumbnailUrl}`);
+        console.log(`Photo: ${file.name}, URL: ${photoUrl}`);
         
         return {
           id: file.id,
           url: photoUrl,
-          thumbnailUrl: thumbnailUrl,
+          thumbnailUrl: file.thumbnailLink || '',
           name: file.name,
           mimeType: file.mimeType,
           size: parseInt(file.size) || 0,

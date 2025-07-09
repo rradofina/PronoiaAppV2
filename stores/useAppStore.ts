@@ -41,7 +41,6 @@ interface AppStore extends AppState {
   templateCounts: Record<string, number>;
   packages: Package[];
   templateTypes: TemplateTypeInfo[];
-  addonPrints: number;
 
   // Actions for new state
   setCurrentScreen: (screen: Screen) => void;
@@ -56,7 +55,6 @@ interface AppStore extends AppState {
   setSelectedPackage: (pkg: Package | null) => void;
   setClientName: (name: string) => void;
   setTemplateCounts: (counts: Record<string, number>) => void;
-  setAddonPrints: (count: number) => void;
   handleTemplateCountChange: (templateId: string, change: number) => void;
   getTotalTemplateCount: () => number;
 
@@ -270,7 +268,6 @@ const useAppStore = create<AppStore>()(
             slots: 6
           }
         ],
-        addonPrints: 0,
 
         // Actions for new state
         setCurrentScreen: (screen) => set({ currentScreen: screen }),
@@ -285,16 +282,12 @@ const useAppStore = create<AppStore>()(
         setSelectedPackage: (pkg) => set({ selectedPackage: pkg }),
         setClientName: (name) => set({ clientName: name }),
         setTemplateCounts: (counts) => set({ templateCounts: counts }),
-        setAddonPrints: (count) => set({ addonPrints: count }),
         handleTemplateCountChange: (templateId, change) => {
           const state = get();
           const currentCount = state.templateCounts[templateId] || 0;
           const newCount = Math.max(0, currentCount + change);
-          const baseTemplateCount = Object.values(state.templateCounts).reduce((sum, count) => sum + count, 0);
-          const totalCount = baseTemplateCount - currentCount + newCount;
-          const maxAllowed = (state.selectedPackage?.templateCount || 0) + state.addonPrints;
-          
-          if (totalCount <= maxAllowed) {
+          const totalCount = Object.values(state.templateCounts).reduce((sum, count) => sum + count, 0) - currentCount + newCount;
+          if (totalCount <= (state.selectedPackage?.templateCount || 0)) {
             set({
               templateCounts: {
                 ...state.templateCounts,
@@ -305,8 +298,7 @@ const useAppStore = create<AppStore>()(
         },
         getTotalTemplateCount: () => {
           const state = get();
-          const baseCount = Object.values(state.templateCounts).reduce((sum, count) => sum + count, 0);
-          return baseCount + state.addonPrints;
+          return Object.values(state.templateCounts).reduce((sum, count) => sum + count, 0);
         },
 
         // Session actions

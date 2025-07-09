@@ -10,6 +10,7 @@ interface TemplateSelectionScreenProps {
   handleTemplateCountChange: (templateId: string, change: number) => void;
   handleBack: () => void;
   handleTemplateContinue: () => void;
+  totalAllowedPrints: number;
 }
 
 export default function TemplateSelectionScreen({
@@ -22,6 +23,7 @@ export default function TemplateSelectionScreen({
   handleTemplateCountChange,
   handleBack,
   handleTemplateContinue,
+  totalAllowedPrints,
 }: TemplateSelectionScreenProps) {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -32,10 +34,13 @@ export default function TemplateSelectionScreen({
             Print Selection
           </h1>
           <p className="text-gray-600 text-lg">
-            Choose up to {selectedPackage?.templateCount} print types for {clientName}
+            Choose up to {totalAllowedPrints} print types for {clientName}
           </p>
           <div className="mt-2 text-sm text-blue-600">
             {selectedPackage?.name} • ₱{selectedPackage?.price}
+            {totalAllowedPrints > (selectedPackage?.templateCount || 0) && (
+              <span className="ml-2 text-green-600">+ {totalAllowedPrints - (selectedPackage?.templateCount || 0)} additional</span>
+            )}
             {googleAuth.userEmail === 'demo@example.com' && <span className="ml-2 bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">DEMO MODE</span>}
           </div>
         </div>
@@ -44,12 +49,12 @@ export default function TemplateSelectionScreen({
         <div className="bg-white rounded-lg p-4 mb-6 shadow-sm">
           <div className="flex justify-between items-center">
             <span className="text-gray-600">
-              Prints Selected: {getTotalTemplateCount()} / {selectedPackage?.templateCount}
+              Prints Selected: {getTotalTemplateCount()} / {totalAllowedPrints}
             </span>
             <div className="w-48 bg-gray-200 rounded-full h-2">
               <div
                 className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${(getTotalTemplateCount() / (selectedPackage?.templateCount || 1)) * 100}%` }}
+                style={{ width: `${(getTotalTemplateCount() / (totalAllowedPrints || 1)) * 100}%` }}
               ></div>
             </div>
           </div>
@@ -60,7 +65,7 @@ export default function TemplateSelectionScreen({
           {templateTypes.map((template) => {
             const count = templateCounts[template.id] || 0;
             const totalCount = getTotalTemplateCount();
-            const canIncrease = totalCount < (selectedPackage?.templateCount || 0);
+            const canIncrease = totalCount < totalAllowedPrints;
 
             return (
               <div

@@ -1,42 +1,30 @@
-import { PhotoStudioPackage, TemplateType, TemplateLayout, Package } from '../types';
+import { PhotoStudioPackage, TemplateType, TemplateLayout } from '../types';
 
 // Package definitions
-export const PACKAGES: Package[] = [
+export const PACKAGES: PhotoStudioPackage[] = [
   {
     id: 'A',
     name: 'Package A',
     templateCount: 1,
-    price: 500,
     description: 'Perfect for single template selection',
-    addonPrintPrice: 150,
-    maxAddonPrints: 5,
   },
   {
     id: 'B',
     name: 'Package B',
     templateCount: 2,
-    price: 800,
     description: 'Great for couples or small collections',
-    addonPrintPrice: 120,
-    maxAddonPrints: 8,
   },
   {
     id: 'C',
     name: 'Package C',
     templateCount: 5,
-    price: 1500,
     description: 'Ideal for families and groups',
-    addonPrintPrice: 100,
-    maxAddonPrints: 10,
   },
   {
     id: 'D',
     name: 'Package D',
     templateCount: 10,
-    price: 2500,
     description: 'Complete studio experience',
-    addonPrintPrice: 80,
-    maxAddonPrints: 15,
   },
 ];
 
