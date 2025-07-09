@@ -20,6 +20,8 @@ export interface Package {
   templateCount: number;
   price: number;
   description?: string;
+  addonPrintPrice?: number; // Price per additional print
+  maxAddonPrints?: number; // Maximum number of add-on prints allowed
 }
 
 export interface TemplateSlot {

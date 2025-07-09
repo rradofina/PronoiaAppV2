@@ -41,6 +41,7 @@ export default function Home() {
     selectedSlot,
     packages,
     eventLog,
+    addonPrints,
     setCurrentScreen,
     setGoogleAuth,
     setIsGapiLoaded,
@@ -50,6 +51,7 @@ export default function Home() {
     setTemplateSlots,
     setSelectedSlot,
     setPhotos,
+    setAddonPrints,
     addEvent,
     handleTemplateCountChange,
     getTotalTemplateCount,
@@ -466,7 +468,9 @@ export default function Home() {
 
   const handleTemplateContinue = () => {
     const totalCount = getTotalTemplateCount();
-    if (totalCount > 0) {
+    const maxAllowed = (selectedPackage?.templateCount || 0) + addonPrints;
+    
+    if (totalCount > 0 && totalCount <= maxAllowed) {
       const slots: TemplateSlot[] = [];
       
       // Create slots based on template counts
@@ -492,6 +496,10 @@ export default function Home() {
       
       setTemplateSlots(slots);
       setCurrentScreen('photos');
+    } else if (totalCount > maxAllowed) {
+      alert(`You can only select up to ${maxAllowed} templates with your current package and add-ons.`);
+    } else {
+      alert('Please select at least one template.');
     }
   };
 
@@ -694,7 +702,9 @@ export default function Home() {
             photos={localPhotos}
             packages={packages}
             selectedPackage={selectedPackage}
+            addonPrints={addonPrints}
             setSelectedPackage={setSelectedPackage}
+            setAddonPrints={setAddonPrints}
             handleBack={handleBack}
             handlePackageContinue={handlePackageContinue}
           />
@@ -726,6 +736,7 @@ export default function Home() {
             handlePhotoContinue={() => alert('Photo selection complete!')}
             handlePhotoSelect={handlePhotoSelect}
             handleSlotSelect={handleSlotSelect}
+            handleBack={handleBack}
             TemplateVisual={TemplateVisual}
           />
         );

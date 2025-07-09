@@ -193,27 +193,36 @@ class GoogleDriveService {
       const folder = await this.getFolderContents(folderId);
       console.log(`Found ${folder.files.length} files in folder`);
       
-      // Simple approach - just use thumbnail URLs directly
-      const photos = folder.files.map((file) => {
+      // Filter for image files only
+      const imageFiles = folder.files.filter(file => 
+        file.mimeType.startsWith('image/') || 
+        SUPPORTED_IMAGE_TYPES.includes(file.mimeType)
+      );
+      
+      const photos = imageFiles.map((file) => {
         let photoUrl = '';
+        let thumbnailUrl = '';
         
-        // Try different URL approaches
+        // For thumbnails, use Google's thumbnail service with better size
         if (file.thumbnailLink) {
-          // Use Google's thumbnail with larger size
-          photoUrl = file.thumbnailLink.replace('=s220', '=s800');
-          console.log(`Using thumbnailLink: ${photoUrl}`);
-        } else {
-          // Fallback to authenticated API endpoint
-          photoUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&access_token=${this.accessToken}`;
-          console.log(`Using API endpoint: ${photoUrl}`);
+          thumbnailUrl = file.thumbnailLink.replace('=s220', '=s400');
         }
         
-        console.log(`Photo: ${file.name}, URL: ${photoUrl}`);
+        // For main photo URL, use authenticated API endpoint with proper headers
+        if (this.accessToken) {
+          photoUrl = `https://drive.google.com/uc?id=${file.id}&export=view`;
+          // Fallback to API endpoint if needed
+          if (!photoUrl) {
+            photoUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&access_token=${this.accessToken}`;
+          }
+        }
+        
+        console.log(`Photo: ${file.name}, URL: ${photoUrl}, Thumbnail: ${thumbnailUrl}`);
         
         return {
           id: file.id,
           url: photoUrl,
-          thumbnailUrl: file.thumbnailLink || '',
+          thumbnailUrl: thumbnailUrl,
           name: file.name,
           mimeType: file.mimeType,
           size: parseInt(file.size) || 0,
