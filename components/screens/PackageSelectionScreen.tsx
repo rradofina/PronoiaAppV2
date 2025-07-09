@@ -107,11 +107,12 @@ export default function PackageSelectionScreen({
                 <button
                   onClick={() => handleAdditionalPrintChange(-1)}
                   disabled={additionalPrints === 0}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-200 ${
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-xl font-bold transition-colors duration-200 transform-gpu ${
                     additionalPrints === 0
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      : 'bg-red-500 text-white hover:bg-red-600 shadow-md'
+                      : 'bg-red-500 text-white hover:bg-red-600 shadow-md active:bg-red-700'
                   }`}
+                  style={{ transform: 'translateZ(0)' }}
                 >
                   −
                 </button>
@@ -123,7 +124,8 @@ export default function PackageSelectionScreen({
                 
                 <button
                   onClick={() => handleAdditionalPrintChange(1)}
-                  className="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center text-xl font-bold hover:bg-green-600 transition-all duration-200 shadow-md"
+                  className="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center text-xl font-bold hover:bg-green-600 active:bg-green-700 transition-colors duration-200 shadow-md transform-gpu"
+                  style={{ transform: 'translateZ(0)' }}
                 >
                   +
                 </button>

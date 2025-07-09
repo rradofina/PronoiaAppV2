@@ -53,6 +53,7 @@ export default function Home() {
     addEvent,
     handleTemplateCountChange,
     getTotalTemplateCount,
+    setTemplateCounts,
   } = useAppStore();
 
   const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
@@ -656,6 +657,40 @@ export default function Home() {
     return null;
   };
 
+  // Wrapper function to handle additional prints changes and adjust template counts if needed
+  const handleAdditionalPrintsChange = (newAdditionalPrints: number) => {
+    setAdditionalPrints(newAdditionalPrints);
+    
+    // Check if current template count exceeds new total allowed prints
+    const newTotalAllowed = (selectedPackage?.templateCount || 0) + newAdditionalPrints;
+    const currentTemplateTotal = getTotalTemplateCount();
+    
+    if (currentTemplateTotal > newTotalAllowed) {
+      // Reduce template counts proportionally to fit within new limit
+      const reductionNeeded = currentTemplateTotal - newTotalAllowed;
+      let remaining = reductionNeeded;
+      
+      // Create a copy of current template counts
+      const newTemplateCounts = { ...templateCounts };
+      
+      // Reduce from highest counts first
+      const sortedTemplates = Object.entries(templateCounts)
+        .filter(([, count]) => count > 0)
+        .sort(([, a], [, b]) => b - a);
+      
+      for (const [templateId, count] of sortedTemplates) {
+        if (remaining <= 0) break;
+        
+        const reduction = Math.min(count, remaining);
+        newTemplateCounts[templateId] = count - reduction;
+        remaining -= reduction;
+      }
+      
+      // Update the template counts
+      setTemplateCounts(newTemplateCounts);
+    }
+  };
+
   // Helper function to get total allowed prints (base package + additional)
   const getTotalAllowedPrints = () => {
     const basePrints = selectedPackage?.templateCount || 0;
@@ -664,14 +699,8 @@ export default function Home() {
 
   // Custom template count change handler that accounts for additional prints
   const handleTemplateCountChangeWithAddons = (templateId: string, change: number) => {
-    const currentCount = templateCounts[templateId] || 0;
-    const newCount = Math.max(0, currentCount + change);
-    const totalCount = Object.values(templateCounts).reduce((sum, count) => sum + count, 0) - currentCount + newCount;
-    
-    // Use total allowed prints (base + additional) instead of just package count
-    if (totalCount <= getTotalAllowedPrints()) {
-      handleTemplateCountChange(templateId, change);
-    }
+    const totalAllowedPrints = getTotalAllowedPrints();
+    handleTemplateCountChange(templateId, change, totalAllowedPrints);
   };
 
   const renderScreen = () => {
@@ -718,7 +747,7 @@ export default function Home() {
             handleBack={handleBack}
             handlePackageContinue={handlePackageContinue}
             additionalPrints={additionalPrints}
-            setAdditionalPrints={setAdditionalPrints}
+            setAdditionalPrints={handleAdditionalPrintsChange}
             additionalPrintPrice={50}
           />
         );

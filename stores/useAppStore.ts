@@ -55,7 +55,7 @@ interface AppStore extends AppState {
   setSelectedPackage: (pkg: Package | null) => void;
   setClientName: (name: string) => void;
   setTemplateCounts: (counts: Record<string, number>) => void;
-  handleTemplateCountChange: (templateId: string, change: number) => void;
+  handleTemplateCountChange: (templateId: string, change: number, customLimit?: number) => void;
   getTotalTemplateCount: () => number;
 
   // UI State
@@ -282,12 +282,13 @@ const useAppStore = create<AppStore>()(
         setSelectedPackage: (pkg) => set({ selectedPackage: pkg }),
         setClientName: (name) => set({ clientName: name }),
         setTemplateCounts: (counts) => set({ templateCounts: counts }),
-        handleTemplateCountChange: (templateId, change) => {
+        handleTemplateCountChange: (templateId, change, customLimit) => {
           const state = get();
           const currentCount = state.templateCounts[templateId] || 0;
           const newCount = Math.max(0, currentCount + change);
           const totalCount = Object.values(state.templateCounts).reduce((sum, count) => sum + count, 0) - currentCount + newCount;
-          if (totalCount <= (state.selectedPackage?.templateCount || 0)) {
+          const limit = customLimit !== undefined ? customLimit : (state.selectedPackage?.templateCount || 0);
+          if (totalCount <= limit) {
             set({
               templateCounts: {
                 ...state.templateCounts,
