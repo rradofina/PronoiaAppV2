@@ -5,7 +5,6 @@ interface FolderSelectionScreenProps {
   googleAuth: GoogleAuth;
   selectedMainFolder: DriveFolder | null;
   clientFolders: DriveFolder[];
-  handleDemoClientSelect: (folder: DriveFolder) => void;
   handleClientFolderSelect: (folder: DriveFolder) => void;
   mainSessionsFolder: { id: string; name: string } | null;
   onSignOut: () => void;
@@ -16,13 +15,12 @@ export default function FolderSelectionScreen({
   googleAuth,
   selectedMainFolder,
   clientFolders,
-  handleDemoClientSelect,
   handleClientFolderSelect,
   mainSessionsFolder,
   onSignOut,
   onChangeMainFolder,
 }: FolderSelectionScreenProps) {
-  const isDemoMode = googleAuth.userEmail === 'demo@example.com';
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -45,7 +43,6 @@ export default function FolderSelectionScreen({
             </p>
             <div className="mt-2 text-sm text-blue-600">
               Main folder: {selectedMainFolder?.name}
-              {isDemoMode && <span className="ml-2 bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">DEMO MODE</span>}
             </div>
           </div>
 
@@ -54,7 +51,7 @@ export default function FolderSelectionScreen({
               {clientFolders.map((folder) => (
                 <div
                   key={folder.id}
-                  onClick={() => isDemoMode ? handleDemoClientSelect(folder) : handleClientFolderSelect(folder)}
+                  onClick={() => handleClientFolderSelect(folder)}
                   className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200"
                 >
                   <div className="flex items-center">

@@ -6,10 +6,7 @@ interface DriveSetupScreenProps {
   googleAuth: GoogleAuth;
   driveFolders: DriveFolder[];
   handleGoogleSignIn: () => void;
-  handleDemoMode: () => void;
   handleMainFolderSelect: (folder: DriveFolder) => void;
-  handleDemoFolderSelect: (folder: DriveFolder) => void;
-  showDebugInfo: () => void;
   mainSessionsFolder: { id: string; name: string } | null;
   handleSignOut: () => void;
   isConnecting: boolean;
@@ -21,10 +18,7 @@ export default function DriveSetupScreen({
   googleAuth,
   driveFolders,
   handleGoogleSignIn,
-  handleDemoMode,
   handleMainFolderSelect,
-  handleDemoFolderSelect,
-  showDebugInfo,
   mainSessionsFolder,
   handleSignOut,
   isConnecting,
@@ -91,23 +85,7 @@ export default function DriveSetupScreen({
               </div>
             </div>
 
-            {/* Demo Mode Option */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-              <div className="text-center">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-                  Demo Mode
-                </h2>
-                <p className="text-gray-600 mb-4">
-                  Or, try the app with sample photos and folders
-                </p>
-                <button
-                  onClick={handleDemoMode}
-                  className="bg-yellow-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-yellow-700 transition-all duration-200 shadow-md"
-                >
-                  Try Demo Mode
-                </button>
-              </div>
-            </div>
+
           </div>
         ) : (
           <div className="bg-white rounded-lg p-8 shadow-sm">
@@ -170,7 +148,7 @@ export default function DriveSetupScreen({
                       <div
                         key={folder.id}
                         onClick={() => {
-                          googleAuth.userEmail === 'demo@example.com' ? handleDemoFolderSelect(folder) : handleMainFolderSelect(folder);
+                          handleMainFolderSelect(folder);
                           setIsSelectingFolder(false);
                         }}
                         className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200"
@@ -208,14 +186,7 @@ export default function DriveSetupScreen({
               </div>
             )}
 
-            <div className="mt-6 text-center">
-              <button
-                onClick={showDebugInfo}
-                className="text-sm text-blue-600 hover:underline"
-              >
-                Show Debug Info
-              </button>
-            </div>
+
           </div>
         )}
       </div>

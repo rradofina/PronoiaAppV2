@@ -431,13 +431,7 @@ export default function Home() {
     setSelectedClientFolder(null);
   };
 
-  const showDebugInfo = () => {
-    alert(eventLog.join('\n'));
-  };
 
-  // Dummy functions for props
-  const handleDemoMode = () => {};
-  const handleDemoFolderSelect = () => {};
 
   const handleBack = () => {
     if (currentScreen === 'folder-selection') {
@@ -712,10 +706,7 @@ export default function Home() {
             googleAuth={googleAuth}
             driveFolders={driveFolders}
             handleGoogleSignIn={handleGoogleSignIn}
-            handleDemoMode={handleDemoMode}
             handleMainFolderSelect={handleMainFolderSelect}
-            handleDemoFolderSelect={handleDemoFolderSelect}
-            showDebugInfo={showDebugInfo}
             mainSessionsFolder={mainSessionsFolder}
             handleSignOut={handleSignOut}
             isConnecting={isConnecting || isRestoringAuth}
@@ -728,7 +719,6 @@ export default function Home() {
             googleAuth={googleAuth}
             selectedMainFolder={selectedMainFolder}
             clientFolders={clientFolders}
-            handleDemoClientSelect={handleDemoFolderSelect}
             handleClientFolderSelect={handleClientFolderSelect}
             mainSessionsFolder={mainSessionsFolder}
             onSignOut={handleSignOut}
