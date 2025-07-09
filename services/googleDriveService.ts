@@ -193,27 +193,16 @@ class GoogleDriveService {
       const folder = await this.getFolderContents(folderId);
       console.log(`Found ${folder.files.length} files in folder`);
       
-      // Simple approach - just use thumbnail URLs directly
-      const photos = folder.files.map((file) => {
-        let photoUrl = '';
+      // Create photos with multiple URL strategies
+      const photos = await Promise.all(folder.files.map(async (file) => {
+        const urls = await this.generatePhotoUrls(file);
         
-        // Try different URL approaches
-        if (file.thumbnailLink) {
-          // Use Google's thumbnail with larger size
-          photoUrl = file.thumbnailLink.replace('=s220', '=s800');
-          console.log(`Using thumbnailLink: ${photoUrl}`);
-        } else {
-          // Fallback to authenticated API endpoint
-          photoUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&access_token=${this.accessToken}`;
-          console.log(`Using API endpoint: ${photoUrl}`);
-        }
-        
-        console.log(`Photo: ${file.name}, URL: ${photoUrl}`);
+        console.log(`Generated URLs for ${file.name}:`, urls);
         
         return {
           id: file.id,
-          url: photoUrl,
-          thumbnailUrl: file.thumbnailLink || '',
+          url: urls.primary,
+          thumbnailUrl: urls.thumbnail,
           name: file.name,
           mimeType: file.mimeType,
           size: parseInt(file.size) || 0,
@@ -223,14 +212,65 @@ class GoogleDriveService {
           createdTime: file.createdTime,
           modifiedTime: file.modifiedTime,
         };
-      });
+      }));
 
-      console.log(`Returning ${photos.length} photos with URLs:`, photos.map(p => ({ name: p.name, url: p.url })));
+      console.log(`Returning ${photos.length} photos`);
       return photos;
     } catch (error) {
       console.error('Failed to get photos from folder:', error);
       throw error;
     }
+  }
+
+  private async generatePhotoUrls(file: GoogleDriveFile): Promise<{
+    primary: string;
+    thumbnail: string;
+    fallbacks: string[];
+  }> {
+    const urls = {
+      primary: '',
+      thumbnail: '',
+      fallbacks: [] as string[]
+    };
+
+    // Strategy 1: Try blob URL (most reliable)
+    try {
+      if (this.accessToken) {
+        const blobUrl = await this.createBlobUrlForImage(file.id);
+        urls.primary = blobUrl;
+        urls.thumbnail = blobUrl;
+        console.log(`✅ Created blob URL for ${file.name}`);
+        return urls;
+      }
+    } catch (blobError) {
+      console.warn(`Blob URL failed for ${file.name}:`, blobError);
+    }
+
+    // Strategy 2: Google Drive thumbnail URL (may work for public files)
+    if (file.thumbnailLink) {
+      const thumbUrl = file.thumbnailLink.replace('=s220', '=s800');
+      urls.primary = thumbUrl;
+      urls.thumbnail = file.thumbnailLink;
+      urls.fallbacks.push(thumbUrl);
+      console.log(`Using thumbnail URL for ${file.name}: ${thumbUrl}`);
+    }
+
+    // Strategy 3: Google Drive direct link
+    const directUrl = `https://drive.google.com/uc?id=${file.id}&export=view`;
+    urls.fallbacks.push(directUrl);
+
+    // Strategy 4: API endpoint with token
+    if (this.accessToken) {
+      const apiUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&access_token=${this.accessToken}`;
+      urls.fallbacks.push(apiUrl);
+    }
+
+    // If no primary URL was set, use the first fallback
+    if (!urls.primary && urls.fallbacks.length > 0) {
+      urls.primary = urls.fallbacks[0];
+    }
+
+    return urls;
   }
 
   private async createBlobUrlForImage(fileId: string): Promise<string> {

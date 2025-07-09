@@ -14,6 +14,83 @@ import { Photo, Template, PhotoSlot } from '../types';
 // Components
 import { PhotoCropper } from './PhotoCropper';
 
+// A new, reusable component for robust image loading
+function RobustImage({ photo, className, style, alt }: { photo: Photo, className?: string, style?: React.CSSProperties, alt?: string }) {
+  const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
+  const [status, setStatus] = useState<'loading' | 'loaded' | 'failed'>('loading');
+  
+  const [fallbackUrls] = useState(() => {
+    const fallbacks = [photo.url, photo.thumbnailUrl];
+    if (photo.thumbnailUrl) {
+      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s800'));
+      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s600'));
+    }
+    fallbacks.push(`https://drive.google.com/uc?id=${photo.googleDriveId}&export=view`);
+    return [...new Set(fallbacks.filter(Boolean))];
+  });
+
+  const getCurrentUrl = () => fallbackUrls[currentUrlIndex] || photo.url;
+
+  useEffect(() => {
+    setStatus('loading');
+  }, [currentUrlIndex]);
+
+  const handleImageLoad = () => {
+    setStatus('loaded');
+  };
+
+  const handleImageError = () => {
+    if (currentUrlIndex < fallbackUrls.length - 1) {
+      setCurrentUrlIndex(prev => prev + 1);
+    } else {
+      setStatus('failed');
+    }
+  };
+
+  const handleRetry = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentUrlIndex(0);
+    setStatus('loading');
+  };
+
+  if (status === 'failed') {
+    return (
+        <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+            <div className="text-center p-2">
+              <div className="text-2xl mb-1">❌</div>
+              <div className="text-xs px-2">Failed</div>
+               <button onClick={handleRetry} className="text-xs text-blue-600 hover:text-blue-800 mt-1 underline">
+                  Retry
+                </button>
+            </div>
+        </div>
+    );
+  }
+
+  return (
+    <>
+      {status === 'loading' && (
+        <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+            <div className="text-center p-2">
+                <div className="text-2xl mb-1">⏳</div>
+                <div className="text-xs">Loading...</div>
+            </div>
+        </div>
+      )}
+      <img
+        key={`${photo.id}-${currentUrlIndex}`}
+        src={getCurrentUrl()}
+        alt={alt || photo.name}
+        className={className}
+        style={{...style, display: status === 'loaded' ? 'block' : 'none' }}
+        onLoad={handleImageLoad}
+        onError={handleImageError}
+        crossOrigin="anonymous"
+      />
+    </>
+  );
+}
+
 export default function PhotoSelection() {
   const { 
     session,
@@ -247,8 +324,8 @@ export default function PhotoSelection() {
                           {slot.photo ? (
                             <>
                               {/* Photo Preview */}
-                              <img
-                                src={slot.photo.thumbnailUrl}
+                              <RobustImage
+                                photo={slot.photo}
                                 alt={slot.photo.name}
                                 className="w-full h-full object-cover"
                                 style={{

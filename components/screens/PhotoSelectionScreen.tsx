@@ -133,6 +133,75 @@ export default function PhotoSelectionScreen({
 function PhotoCard({ photo, onSelect }: { photo: Photo; onSelect: () => void }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
+  const [fallbackUrls] = useState(() => {
+    // Generate fallback URLs for this photo
+    const fallbacks = [];
+    
+    // If we have a thumbnail, try different sizes
+    if (photo.thumbnailUrl) {
+      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s800'));
+      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s600'));
+      fallbacks.push(photo.thumbnailUrl);
+    }
+    
+    // Try direct Google Drive link
+    fallbacks.push(`https://drive.google.com/uc?id=${photo.googleDriveId}&export=view`);
+    
+    // Use the original URL as final fallback
+    if (photo.url && !fallbacks.includes(photo.url)) {
+      fallbacks.push(photo.url);
+    }
+    
+    return fallbacks.filter(Boolean);
+  });
+
+  const getCurrentUrl = () => {
+    if (currentUrlIndex < fallbackUrls.length) {
+      return fallbackUrls[currentUrlIndex];
+    }
+    return photo.url; // Final fallback
+  };
+
+  const handleImageLoad = () => {
+    console.log(`✅ Image loaded successfully: ${photo.name} (URL ${currentUrlIndex + 1}/${fallbackUrls.length})`);
+    setImageLoaded(true);
+    setImageError(false);
+  };
+
+  const handleImageError = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    const imgElement = event.currentTarget;
+    console.error(`❌ Failed to load ${photo.name} with URL ${currentUrlIndex + 1}/${fallbackUrls.length}:`, {
+      url: getCurrentUrl(),
+      naturalWidth: imgElement.naturalWidth,
+      naturalHeight: imgElement.naturalHeight,
+      complete: imgElement.complete
+    });
+
+    // Try next fallback URL
+    if (currentUrlIndex < fallbackUrls.length - 1) {
+      console.log(`🔄 Trying fallback URL ${currentUrlIndex + 2}/${fallbackUrls.length} for ${photo.name}`);
+      setCurrentUrlIndex(prev => prev + 1);
+      setImageLoaded(false);
+      setImageError(false);
+    } else {
+      // All URLs failed
+      console.error(`💥 All URLs failed for ${photo.name}`);
+      setImageError(true);
+      setErrorMessage('All sources failed');
+      setImageLoaded(false);
+    }
+  };
+
+  const handleRetry = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    console.log(`🔄 Manual retry for ${photo.name}`);
+    setCurrentUrlIndex(0);
+    setImageError(false);
+    setImageLoaded(false);
+    setErrorMessage('');
+  };
 
   return (
     <div
@@ -140,23 +209,35 @@ function PhotoCard({ photo, onSelect }: { photo: Photo; onSelect: () => void }) 
       className="bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer transform hover:scale-105 transition-transform duration-200"
     >
       <div className="w-full relative" style={{ aspectRatio: '2/3' }}>
-        {!imageError ? (
-          <img 
-            src={photo.url} 
-            alt={photo.name} 
-            className="w-full h-full object-cover"
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageError(true)}
-            style={{ display: imageLoaded ? 'block' : 'none' }}
-          />
-        ) : null}
+        <img 
+          key={`${photo.id}-${currentUrlIndex}`} // Force re-render on URL change
+          src={getCurrentUrl()} 
+          alt={photo.name} 
+          className="w-full h-full object-cover"
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+          style={{ display: imageLoaded && !imageError ? 'block' : 'none' }}
+          crossOrigin="anonymous"
+        />
         
-        {/* Loading/Error placeholder - only show when image hasn't loaded or failed */}
+        {/* Loading/Error placeholder */}
         {(!imageLoaded || imageError) && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100 text-gray-400">
-            <div className="text-center">
-              <div className="text-2xl mb-1">📷</div>
-              <div className="text-xs px-2">{imageError ? 'Failed to load' : 'Loading...'}</div>
+            <div className="text-center p-2">
+              <div className="text-2xl mb-1">
+                {imageError ? '❌' : '⏳'}
+              </div>
+              <div className="text-xs px-2">
+                {imageError ? errorMessage : `Loading... (${currentUrlIndex + 1}/${fallbackUrls.length})`}
+              </div>
+              {imageError && (
+                <button 
+                  onClick={handleRetry}
+                  className="text-xs text-blue-600 hover:text-blue-800 mt-1 underline"
+                >
+                  Retry
+                </button>
+              )}
             </div>
           </div>
         )}
