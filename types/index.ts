@@ -27,8 +27,15 @@ export interface TemplateSlot {
   templateId: string;
   templateName: string;
   templateType: TemplateType;
+  printSize?: '4R' | '5R' | 'A4';
   slotIndex: number;
   photoId?: string;
+  photoTransform?: {
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+  };
+  label?: string;
 }
 
 export interface PhotoStudioPackage {

@@ -3,12 +3,12 @@ import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 // Types
-import { Photo, PhotoSlot } from '../types';
+import { Photo, TemplateSlot } from '../types';
 
 interface PhotoCropperProps {
   photos: Photo[];
-  selectedSlot: PhotoSlot;
-  onPhotoSelect: (photo: Photo, transform?: { scale: number; offsetX: number; offsetY: number }) => void;
+  selectedSlot: TemplateSlot;
+  onPhotoSelect: (photo: Photo, transform?: { scale: number; offsetX: number; offsetY: number; }) => void;
   onClose: () => void;
 }
 
@@ -33,13 +33,16 @@ function PhotoCropper({ photos, selectedSlot, onPhotoSelect, onClose }: PhotoCro
 
   // Initialize with existing photo if editing
   useEffect(() => {
-    if (selectedSlot.photo) {
-      setSelectedPhoto(selectedSlot.photo);
+    const slotPhoto = photos.find(p => p.id === selectedSlot.photoId) || null;
+    if (slotPhoto) {
+      setSelectedPhoto(slotPhoto);
       if (selectedSlot.photoTransform) {
         setTransform(selectedSlot.photoTransform);
       }
+    } else {
+      setSelectedPhoto(null);
     }
-  }, [selectedSlot]);
+  }, [selectedSlot, photos]);
 
   const handlePhotoClick = (photo: Photo) => {
     setSelectedPhoto(photo);
@@ -156,13 +159,18 @@ function PhotoCropper({ photos, selectedSlot, onPhotoSelect, onClose }: PhotoCro
     }
   };
 
+  const position = { x: 0, y: 0, width: 400, height: 600 };
+  const photo = photos.find(p => p.id === selectedSlot.photoId) || null;
+  const photoTransform = selectedSlot.photoTransform || { scale: 1, offsetX: 0, offsetY: 0 };
+  const label = selectedSlot.label || `Slot ${selectedSlot.slotIndex + 1}`;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex flex-col">
       {/* Header */}
       <div className="bg-white px-6 py-4 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">
-            {selectedSlot.label || `Photo Slot ${selectedSlot.index + 1}`}
+            {label}
           </h2>
           <p className="text-gray-600">Select and frame your photo</p>
         </div>
@@ -242,40 +250,23 @@ function PhotoCropper({ photos, selectedSlot, onPhotoSelect, onClose }: PhotoCro
                 <div
                   className="absolute inset-4 bg-white rounded-lg shadow-lg overflow-hidden cursor-move"
                   style={{
-                    aspectRatio: selectedSlot.position.width / selectedSlot.position.height,
+                    aspectRatio: position.width / position.height,
                     maxWidth: '90%',
                     maxHeight: '90%',
-                    margin: 'auto',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
                   }}
-                  onTouchStart={handleTouchStart}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleTouchEnd}
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onWheel={handleWheel}
                 >
-                  <img
-                    src={selectedPhoto.url}
-                    alt={selectedPhoto.name}
-                    className="absolute inset-0 select-none pointer-events-none"
-                    onLoad={handleImageLoad}
-                    style={{
-                      transform: `scale(${transform.scale}) translate(${transform.offsetX}px, ${transform.offsetY}px)`,
-                      transformOrigin: 'center',
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                    }}
-                  />
-                  
-                  {/* Loading overlay */}
-                  {!imageLoaded && (
-                    <div className="absolute inset-0 bg-gray-200 flex items-center justify-center">
-                      <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                  {photo ? (
+                    <img
+                      src={photo.url}
+                      alt="Selected photo"
+                      className="w-full h-full object-contain"
+                      style={{
+                        transform: `scale(${photoTransform.scale}) translate(${photoTransform.offsetX}px, ${photoTransform.offsetY}px)`,
+                      }}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                      Select a photo below
                     </div>
                   )}
                 </div>

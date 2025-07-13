@@ -268,4 +268,19 @@ export const validateImageFile = (file: File): boolean => {
 export const validateImageUrl = (url: string): boolean => {
   const extension = url.split('.').pop()?.toLowerCase();
   return extension ? SUPPORTED_IMAGE_EXTENSIONS.indexOf(`.${extension}`) !== -1 : false;
-}; 
+};
+
+export const PRINT_SIZES = {
+  '4R': { width: 1200, height: 1800, dpi: 300, name: '4R (4x6")' },
+  '5R': { width: 1500, height: 2100, dpi: 300, name: '5R (5x7")' },
+  'A4': { width: 2480, height: 3508, dpi: 300, name: 'A4 (8.3x11.7")' },
+};
+
+export const TEMPLATE_TYPES = [
+  { id: 'solo', name: 'Solo Print', slots: 1, allowedSizes: ['4R', '5R', 'A4'] },
+  { id: 'collage', name: 'Collage Print', slots: 4, allowedSizes: ['4R'] },
+  { id: 'photocard', name: 'Photocard Print', slots: 4, allowedSizes: ['4R'] },
+  { id: 'photostrip', name: 'Photo Strip Print', slots: 6, allowedSizes: ['4R'] },
+];
+
+export const DEFAULT_TEMPLATE_CYCLE = ['solo', 'collage', 'photostrip', 'photocard']; 

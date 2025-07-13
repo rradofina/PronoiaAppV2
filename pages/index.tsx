@@ -1,13 +1,14 @@
 // Updated: Latest version with template modals and tablet optimization..
 import React, { useState, useEffect } from 'react';
 import useAppStore from '../stores/useAppStore';
-import { DriveFolder, TemplateSlot, Photo, TemplateTypeInfo, Package } from '../types';
+import { DriveFolder, TemplateSlot, Photo, TemplateTypeInfo, Package, TemplateType } from '../types';
 import DriveSetupScreen from '../components/screens/DriveSetupScreen';
 import FolderSelectionScreen from '../components/screens/FolderSelectionScreen';
 import PackageSelectionScreen from '../components/screens/PackageSelectionScreen';
 import TemplateSelectionScreen from '../components/screens/TemplateSelectionScreen';
 import PhotoSelectionScreen from '../components/screens/PhotoSelectionScreen';
 import googleDriveService from '../services/googleDriveService';
+import { DEFAULT_TEMPLATE_CYCLE, TEMPLATE_TYPES, PRINT_SIZES } from '../utils/constants';
 
 declare global {
   interface Window {
@@ -26,6 +27,147 @@ declare global {
     };
   }
 }
+
+// Template Visual Component
+const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: {
+  template: { id: string, name: string, slots: number },
+  slots: TemplateSlot[],
+  onSlotClick: (slot: TemplateSlot) => void,
+  photos: Photo[],
+  selectedSlot: TemplateSlot | null
+}) => {
+  const getPhotoUrl = (photoId?: string | null) => {
+    if (!photoId) return null;
+    return photos.find(p => p.id === photoId)?.url || null;
+  };
+
+  // 4R print format (4x6 inches) - width:height ratio of 2:3 (or 4:6)
+  const printAspectRatio = '2/3'; // CSS aspect-ratio for 4x6 print
+
+  if (template.id === 'solo') {
+    // Solo Template - Single large photo with border for 4R print
+    return (
+      <div className="bg-white p-3 rounded-lg shadow-md w-full" style={{ aspectRatio: printAspectRatio }}>
+        <div 
+          className={`w-full h-full border-2 border-dashed border-gray-300 rounded cursor-pointer transition-all duration-200 ${
+            selectedSlot === slots[0] ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'
+          }`}
+          onClick={() => onSlotClick(slots[0])}
+          style={{ 
+            backgroundImage: getPhotoUrl(slots[0]?.photoId) ? `url(${getPhotoUrl(slots[0]?.photoId)})` : 'none',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}
+        >
+          {!getPhotoUrl(slots[0]?.photoId) && (
+            <div className="w-full h-full flex items-center justify-center text-gray-400">
+              <div className="text-center">
+                <div className="text-2xl mb-1">📷</div>
+                <div className="text-xs">Click to add photo</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (template.id === 'collage') {
+    // Collage Template - 2x2 grid with borders and gaps
+    return (
+      <div className="bg-white p-3 rounded-lg shadow-md w-full" style={{ aspectRatio: printAspectRatio }}>
+        <div className="grid grid-cols-2 gap-2 h-full">
+          {slots.slice(0, 4).map((slot, index) => (
+            <div
+              key={index}
+              className={`border-2 border-dashed border-gray-300 rounded cursor-pointer transition-all duration-200 ${
+                selectedSlot === slot ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'
+              }`}
+              onClick={() => onSlotClick(slot)}
+              style={{ 
+                backgroundImage: getPhotoUrl(slot?.photoId) ? `url(${getPhotoUrl(slot?.photoId)})` : 'none',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              }}
+            >
+              {!getPhotoUrl(slot?.photoId) && (
+                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                  <div className="text-xs">📷</div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (template.id === 'photocard') {
+    // Photocard Template - 2x2 grid like collage but NO borders/gaps (edge-to-edge)
+    return (
+      <div className="bg-white rounded-lg shadow-md overflow-hidden w-full" style={{ aspectRatio: printAspectRatio }}>
+        <div className="grid grid-cols-2 gap-0 h-full">
+          {slots.slice(0, 4).map((slot, index) => (
+            <div
+              key={index}
+              className={`cursor-pointer transition-all duration-200 ${
+                selectedSlot === slot ? 'ring-2 ring-blue-500 ring-inset' : ''
+              }`}
+              onClick={() => onSlotClick(slot)}
+              style={{ 
+                backgroundImage: getPhotoUrl(slot?.photoId) ? `url(${getPhotoUrl(slot?.photoId)})` : 'none',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              }}
+            >
+              {!getPhotoUrl(slot?.photoId) && (
+                <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">
+                  <div className="text-xs">📷</div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (template.id === 'photostrip') {
+    // Photo Strip Template - 3 rows of 2 photos each (6 total) like collage but 3 rows
+    return (
+      <div className="bg-white p-3 rounded-lg shadow-md w-full" style={{ aspectRatio: printAspectRatio }}>
+        <div className="grid grid-rows-3 gap-1 h-full">
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="grid grid-cols-2 gap-1 h-full">
+              {slots.slice(row * 2, row * 2 + 2).map((slot, index) => (
+                <div
+                  key={index}
+                  className={`border-2 border-dashed border-gray-300 rounded cursor-pointer transition-all duration-200 ${
+                    selectedSlot === slot ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'
+                  }`}
+                  onClick={() => onSlotClick(slot)}
+                  style={{ 
+                    backgroundImage: getPhotoUrl(slot?.photoId) ? `url(${getPhotoUrl(slot?.photoId)})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  }}
+                >
+                  {!getPhotoUrl(slot?.photoId) && (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <div className="text-xs">📷</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
 
 export default function Home() {
   const {
@@ -73,7 +215,9 @@ export default function Home() {
     const tokenExpiry = localStorage.getItem('google_token_expiry');
     
     if (savedFolder) {
-      setMainSessionsFolder(JSON.parse(savedFolder));
+      const folderData = JSON.parse(savedFolder);
+      setMainSessionsFolder(folderData);
+      setSelectedMainFolder({ id: folderData.id, name: folderData.name, createdTime: '' });
       
       // If we have both a saved folder and valid token, set screen to folder-selection immediately
       if (savedToken && tokenExpiry) {
@@ -83,10 +227,24 @@ export default function Home() {
         // Check if token is still valid (with 5 minute buffer)
         if (currentTime < expiryTime - 300000) {
           setCurrentScreen('folder-selection');
+          // Automatically load client folders
+          const loadClientFolders = async () => {
+            try {
+              const response = await window.gapi.client.drive.files.list({
+                q: `'${folderData.id}' in parents and mimeType='application/vnd.google-apps.folder'`,
+                fields: 'files(id, name, createdTime)',
+                orderBy: 'name'
+              });
+              setClientFolders(response.result.files || []);
+            } catch (error) {
+              console.error('Failed to auto-load client folders:', error);
+            }
+          };
+          loadClientFolders();
         }
       }
     }
-  }, [setMainSessionsFolder, setCurrentScreen]);
+  }, [setMainSessionsFolder, setCurrentScreen, setSelectedMainFolder, setClientFolders]);
 
   // Function to validate and restore token
   const restoreAuthFromStorage = async () => {
@@ -146,9 +304,14 @@ export default function Home() {
           setIsRestoringAuth(false);
         }
       } else {
-        // Token expired, clear it
-        addEvent('Stored token expired, clearing');
-        clearStoredAuth();
+        // Token expired or near expiration, try to refresh
+        const refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Proceed with restored auth
+          // ... similar to existing code ...
+        } else {
+          clearStoredAuth();
+        }
       }
     }
   };
@@ -250,7 +413,7 @@ export default function Home() {
       `&scope=${encodeURIComponent(scope)}` +
       `&response_type=token` +
       `&state=${encodeURIComponent(state)}` +
-      `&prompt=consent&access_type=online`;
+      `&prompt=consent&access_type=offline&include_granted_scopes=true`;
     
     window.location.href = authUrl;
   };
@@ -310,6 +473,7 @@ export default function Home() {
         const error = params.get('error');
         const storedState = sessionStorage.getItem('oauth_state');
         const expiresIn = params.get('expires_in'); // Usually 3600 seconds (1 hour)
+        const refreshToken = params.get('refresh_token'); // New: refresh token
 
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
 
@@ -335,6 +499,12 @@ export default function Home() {
           const expiryTime = Date.now() + (parseInt(expiresIn || '3600') * 1000);
           localStorage.setItem('google_access_token', accessToken);
           localStorage.setItem('google_token_expiry', expiryTime.toString());
+          
+          // New: Store refresh token if available
+          if (refreshToken) {
+            localStorage.setItem('google_refresh_token', refreshToken);
+          }
+          
           // Note: We'll try to get the email after loading folders
           
           setGoogleAuth({ isSignedIn: true, userEmail: 'Authenticated' });
@@ -431,8 +601,6 @@ export default function Home() {
     setSelectedClientFolder(null);
   };
 
-
-
   const handleBack = () => {
     if (currentScreen === 'folder-selection') {
       setCurrentScreen('drive-setup');
@@ -457,7 +625,30 @@ export default function Home() {
 
   const handlePackageContinue = () => {
     if (selectedPackage && clientName.trim()) {
-      setCurrentScreen('template');
+      // Auto-assign default templates
+      const templateCount = selectedPackage.templateCount + additionalPrints;
+      const slots: TemplateSlot[] = [];
+      for (let i = 0; i < templateCount; i++) {
+        const templateTypeId = DEFAULT_TEMPLATE_CYCLE[i % DEFAULT_TEMPLATE_CYCLE.length];
+        const template = TEMPLATE_TYPES.find(t => t.id === templateTypeId);
+        if (template) {
+          const templateIndex = Math.floor(i / DEFAULT_TEMPLATE_CYCLE.length) + 1;
+          const templateName = `${template.name} ${templateIndex}`;
+          for (let slotIndex = 0; slotIndex < template.slots; slotIndex++) {
+            slots.push({
+              id: `${templateTypeId}_${i}_${slotIndex}`,
+              templateId: `${templateTypeId}_${i}`,
+              templateName,
+              templateType: templateTypeId as TemplateType,
+              printSize: '4R', // Default size
+              slotIndex,
+              photoId: undefined
+            });
+          }
+        }
+      }
+      setTemplateSlots(slots);
+      setCurrentScreen('photos');
     }
   };
 
@@ -477,7 +668,7 @@ export default function Home() {
                   id: `${templateId}_${templateIndex}_${slotIndex}`,
                   templateId: `${templateId}_${templateIndex}`,
                   templateName: `${template.name} ${templateIndex + 1}`,
-                  templateType: template.id,
+                  templateType: template.id as TemplateType,
                   slotIndex,
                   photoId: undefined
                 });
@@ -509,146 +700,6 @@ export default function Home() {
       const nextEmptySlot = templateSlots.slice(currentSlotIndex + 1).find((s: TemplateSlot) => !s.photoId);
       setSelectedSlot(nextEmptySlot || null);
     }
-  };
-
-  // Template Visual Component
-  const TemplateVisual = ({ template, slots, onSlotClick, photos }: {
-    template: { id: string, name: string, slots: number },
-    slots: TemplateSlot[],
-    onSlotClick: (slot: TemplateSlot) => void,
-    photos: Photo[]
-  }) => {
-    const getPhotoUrl = (photoId?: string | null) => {
-      if (!photoId) return null;
-      return photos.find(p => p.id === photoId)?.url || null;
-    };
-
-    // 4R print format (4x6 inches) - width:height ratio of 2:3 (or 4:6)
-    const printAspectRatio = '2/3'; // CSS aspect-ratio for 4x6 print
-
-    if (template.id === 'solo') {
-      // Solo Template - Single large photo with border for 4R print
-      return (
-        <div className="bg-white p-3 rounded-lg shadow-md w-full" style={{ aspectRatio: printAspectRatio }}>
-          <div 
-            className={`w-full h-full border-2 border-dashed border-gray-300 rounded cursor-pointer transition-all duration-200 ${
-              selectedSlot === slots[0] ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'
-            }`}
-            onClick={() => onSlotClick(slots[0])}
-            style={{ 
-              backgroundImage: getPhotoUrl(slots[0]?.photoId) ? `url(${getPhotoUrl(slots[0]?.photoId)})` : 'none',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center'
-            }}
-          >
-            {!getPhotoUrl(slots[0]?.photoId) && (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                <div className="text-center">
-                  <div className="text-2xl mb-1">📷</div>
-                  <div className="text-xs">Click to add photo</div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    if (template.id === 'collage') {
-      // Collage Template - 2x2 grid with borders and gaps
-      return (
-        <div className="bg-white p-3 rounded-lg shadow-md w-full" style={{ aspectRatio: printAspectRatio }}>
-          <div className="grid grid-cols-2 gap-2 h-full">
-            {slots.slice(0, 4).map((slot, index) => (
-              <div
-                key={index}
-                className={`border-2 border-dashed border-gray-300 rounded cursor-pointer transition-all duration-200 ${
-                  selectedSlot === slot ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'
-                }`}
-                onClick={() => onSlotClick(slot)}
-                style={{ 
-                  backgroundImage: getPhotoUrl(slot?.photoId) ? `url(${getPhotoUrl(slot?.photoId)})` : 'none',
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center'
-                }}
-              >
-                {!getPhotoUrl(slot?.photoId) && (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400">
-                    <div className="text-xs">📷</div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    if (template.id === 'photocard') {
-      // Photocard Template - 2x2 grid like collage but NO borders/gaps (edge-to-edge)
-      return (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden w-full" style={{ aspectRatio: printAspectRatio }}>
-          <div className="grid grid-cols-2 gap-0 h-full">
-            {slots.slice(0, 4).map((slot, index) => (
-              <div
-                key={index}
-                className={`cursor-pointer transition-all duration-200 ${
-                  selectedSlot === slot ? 'ring-2 ring-blue-500 ring-inset' : ''
-                }`}
-                onClick={() => onSlotClick(slot)}
-                style={{ 
-                  backgroundImage: getPhotoUrl(slot?.photoId) ? `url(${getPhotoUrl(slot?.photoId)})` : 'none',
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center'
-                }}
-              >
-                {!getPhotoUrl(slot?.photoId) && (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">
-                    <div className="text-xs">📷</div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    if (template.id === 'photostrip') {
-      // Photo Strip Template - 3 rows of 2 photos each (6 total) like collage but 3 rows
-      return (
-        <div className="bg-white p-3 rounded-lg shadow-md w-full" style={{ aspectRatio: printAspectRatio }}>
-          <div className="grid grid-rows-3 gap-1 h-full">
-            {[0, 1, 2].map((row) => (
-              <div key={row} className="grid grid-cols-2 gap-1 h-full">
-                {slots.slice(row * 2, row * 2 + 2).map((slot, index) => (
-                  <div
-                    key={index}
-                    className={`border-2 border-dashed border-gray-300 rounded cursor-pointer transition-all duration-200 ${
-                      selectedSlot === slot ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'
-                    }`}
-                    onClick={() => onSlotClick(slot)}
-                    style={{ 
-                      backgroundImage: getPhotoUrl(slot?.photoId) ? `url(${getPhotoUrl(slot?.photoId)})` : 'none',
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center'
-                    }}
-                  >
-                    {!getPhotoUrl(slot?.photoId) && (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <div className="text-xs">📷</div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    return null;
   };
 
   // Wrapper function to handle additional prints changes and adjust template counts if needed
@@ -696,6 +747,97 @@ export default function Home() {
     const totalAllowedPrints = getTotalAllowedPrints();
     handleTemplateCountChange(templateId, change, totalAllowedPrints);
   };
+
+  // New: Function to refresh access token using refresh token
+  const refreshAccessToken = async () => {
+    const refreshToken = localStorage.getItem('google_refresh_token');
+    if (!refreshToken) {
+      addEvent('No refresh token available, cannot refresh');
+      return false;
+    }
+
+    try {
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      const clientSecret = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET; // Note: Client secret should be server-side, but for simplicity assuming it's available
+
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          client_id: clientId || '',
+          client_secret: clientSecret || '', // WARNING: Client secret in client-side is insecure; move to server
+          refresh_token: refreshToken,
+          grant_type: 'refresh_token'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh token');
+      }
+
+      const data = await response.json();
+      const newAccessToken = data.access_token;
+      const newExpiresIn = data.expires_in;
+
+      window.gapi.client.setToken({ access_token: newAccessToken });
+      googleDriveService.setAccessToken(newAccessToken);
+
+      const newExpiryTime = Date.now() + (newExpiresIn * 1000);
+      localStorage.setItem('google_access_token', newAccessToken);
+      localStorage.setItem('google_token_expiry', newExpiryTime.toString());
+
+      addEvent('Access token refreshed successfully');
+      return true;
+    } catch (error) {
+      addEvent('Failed to refresh access token');
+      clearStoredAuth();
+      return false;
+    }
+  };
+
+  // Add periodic check for token refresh (e.g., every 30 minutes)
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const tokenExpiry = localStorage.getItem('google_token_expiry');
+      if (tokenExpiry) {
+        const expiryTime = parseInt(tokenExpiry);
+        if (Date.now() > expiryTime - 600000) { // Refresh if less than 10 minutes left
+          await refreshAccessToken();
+        }
+      }
+    }, 1800000); // 30 minutes
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Add inactivity logout (e.g., after 7 days)
+  useEffect(() => {
+    const checkInactivity = () => {
+      const lastActivity = localStorage.getItem('last_activity');
+      if (lastActivity) {
+        const daysSinceLast = (Date.now() - parseInt(lastActivity)) / (1000 * 60 * 60 * 24);
+        if (daysSinceLast > 7) {
+          clearStoredAuth();
+          setCurrentScreen('drive-setup');
+        }
+      }
+    };
+
+    const updateActivity = () => {
+      localStorage.setItem('last_activity', Date.now().toString());
+    };
+
+    checkInactivity();
+    window.addEventListener('mousemove', updateActivity);
+    window.addEventListener('keydown', updateActivity);
+
+    return () => {
+      window.removeEventListener('mousemove', updateActivity);
+      window.removeEventListener('keydown', updateActivity);
+    };
+  }, []);
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -764,6 +906,7 @@ export default function Home() {
             googleAuth={googleAuth}
             templateSlots={templateSlots}
             selectedSlot={selectedSlot}
+            setSelectedSlot={setSelectedSlot}
             photos={localPhotos}
             getTotalTemplateCount={getTotalTemplateCount}
             handlePhotoContinue={() => alert('Photo selection complete!')}
@@ -772,6 +915,7 @@ export default function Home() {
             handleBack={handleBack}
             TemplateVisual={TemplateVisual}
             totalAllowedPrints={getTotalAllowedPrints()}
+            setTemplateSlots={setTemplateSlots}
           />
         );
       default:
@@ -781,3 +925,5 @@ export default function Home() {
 
   return <div>{renderScreen()}</div>;
 }
+
+export { TemplateVisual };

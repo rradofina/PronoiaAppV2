@@ -1,5 +1,7 @@
 import { DriveFolder, GoogleAuth } from '../../types';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { ChevronRight, Folder, ChevronLeft } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface DriveSetupScreenProps {
   isGapiLoaded: boolean;
@@ -25,7 +27,59 @@ export default function DriveSetupScreen({
   isRestoringAuth = false,
 }: DriveSetupScreenProps) {
   const [isSelectingFolder, setIsSelectingFolder] = useState(false);
-  
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [folderPath, setFolderPath] = useState<{ id: string; name: string }[]>([]);
+  const [currentFolders, setCurrentFolders] = useState<DriveFolder[]>([]);
+
+  const loadFolders = async (parentId: string | null = null) => {
+    try {
+      const q = parentId 
+        ? `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+        : `mimeType='application/vnd.google-apps.folder' and 'root' in parents and trashed=false`;
+      
+      const response = await window.gapi.client.drive.files.list({
+        q,
+        fields: 'files(id, name, createdTime)',
+        orderBy: 'name'
+      });
+      
+      setCurrentFolders(response.result.files || []);
+    } catch (error) {
+      console.error('Failed to load folders:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (googleAuth.isSignedIn && !mainSessionsFolder) {
+      loadFolders(null); // Load root folders initially
+    }
+  }, [googleAuth.isSignedIn, mainSessionsFolder]);
+
+  const handleFolderClick = async (folder: DriveFolder) => {
+    setFolderPath([...folderPath, { id: folder.id, name: folder.name }]);
+    setCurrentFolderId(folder.id);
+    await loadFolders(folder.id);
+  };
+
+  const handleBreadcrumbClick = async (index: number) => {
+    const newPath = folderPath.slice(0, index);
+    setFolderPath(newPath);
+    const newCurrentId = newPath.length > 0 ? newPath[newPath.length - 1].id : null;
+    setCurrentFolderId(newCurrentId);
+    await loadFolders(newCurrentId);
+  };
+
+  const handleSelectCurrentFolder = () => {
+    if (currentFolderId && folderPath.length > 0) {
+      const selectedFolder = {
+        id: currentFolderId,
+        name: folderPath[folderPath.length - 1].name,
+        createdTime: ''
+      };
+      handleMainFolderSelect(selectedFolder);
+    }
+  };
+
   if (!isGapiLoaded) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -186,6 +240,77 @@ export default function DriveSetupScreen({
               </div>
             )}
 
+            {googleAuth.isSignedIn && !mainSessionsFolder && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-white rounded-lg p-8 shadow-sm"
+              >
+                <div className="mb-6">
+                  <div className="text-6xl mb-4 text-center">📂</div>
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-2 text-center">
+                    Select Main Sessions Folder
+                  </h2>
+                  <p className="text-gray-600 text-center">
+                    Choose the folder containing client session folders.
+                  </p>
+                </div>
+
+                {/* Breadcrumbs */}
+                <div className="flex items-center mb-4 overflow-x-auto">
+                  <button
+                    onClick={() => handleBreadcrumbClick(0)}
+                    className="flex items-center text-blue-600 hover:text-blue-800"
+                  >
+                    Root
+                  </button>
+                  {folderPath.map((path, index) => (
+                    <span key={path.id} className="flex items-center">
+                      <ChevronRight className="w-4 h-4 mx-2 text-gray-400" />
+                      <button
+                        onClick={() => handleBreadcrumbClick(index + 1)}
+                        className="text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                      >
+                        {path.name}
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                {/* Folder List */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-60 overflow-y-auto">
+                  {currentFolders.map((folder) => (
+                    <button
+                      key={folder.id}
+                      onClick={() => handleFolderClick(folder)}
+                      className="flex flex-col items-center p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <Folder className="w-8 h-8 text-yellow-500 mb-2" />
+                      <span className="text-sm text-center truncate w-full">{folder.name}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {folderPath.length > 0 && (
+                  <div className="flex justify-between mt-6">
+                    <button
+                      onClick={() => handleBreadcrumbClick(folderPath.length - 1)}
+                      className="flex items-center text-gray-600 hover:text-gray-800"
+                    >
+                      <ChevronLeft className="w-5 h-5 mr-1" />
+                      Back
+                    </button>
+                    <button
+                      onClick={handleSelectCurrentFolder}
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md"
+                    >
+                      Select This Folder
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            )}
 
           </div>
         )}
