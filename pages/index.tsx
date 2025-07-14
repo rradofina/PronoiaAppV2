@@ -409,9 +409,9 @@ export default function Home() {
     
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${encodeURIComponent(clientId)}` +
-      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&redirect_uri=${encodeURIComponent(`${window.location.origin}/api/auth/callback`)}` +
       `&scope=${encodeURIComponent(scope)}` +
-      `&response_type=token` +
+      `&response_type=code` +
       `&state=${encodeURIComponent(state)}` +
       `&prompt=consent&access_type=offline&include_granted_scopes=true`;
     
