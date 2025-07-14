@@ -2,6 +2,8 @@ import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType } from '../../ty
 import { useState } from 'react';
 import PhotoCropper from '../PhotoCropper';
 import { PRINT_SIZES, TEMPLATE_TYPES } from '../../utils/constants';
+import { Dialog, Transition } from '@headlessui/react';
+import { Fragment } from 'react';
 
 interface PhotoSelectionScreenProps {
   clientName: string;
@@ -40,6 +42,9 @@ export default function PhotoSelectionScreen({
 }: PhotoSelectionScreenProps) {
   const [isCropping, setIsCropping] = useState(false);
   const [currentEditingTemplateId, setCurrentEditingTemplateId] = useState<string | null>(null);
+  const [showAddPrintModal, setShowAddPrintModal] = useState(false);
+  const [selectedType, setSelectedType] = useState<TemplateType | null>(null);
+  const [selectedSize, setSelectedSize] = useState<'4R' | '5R' | 'A4'>('4R');
 
   const onSlotSelect = (slot: TemplateSlot) => {
     setSelectedSlot(slot);
@@ -76,30 +81,31 @@ export default function PhotoSelectionScreen({
     }
   };
 
-  const handleAddPrint = () => {
-    const type = prompt('Enter template type (solo, collage, etc.)');
-    let size: '4R' | '5R' | 'A4' = '4R';
-    const input = prompt('Enter size (4R, 5R, A4)') as '4R' | '5R' | 'A4' | null;
-    if (input) size = input;
-    
-    const template = TEMPLATE_TYPES.find(t => t.id === type);
-    if (template) {
-      const newTemplateIndex = templateSlots.length;
-      const newTemplateId = `${type}_${newTemplateIndex}`;
-      const newSlots = [];
-      for (let slotIndex = 0; slotIndex < template.slots; slotIndex++) {
-        newSlots.push({
-          id: `${type}_${newTemplateIndex}_${slotIndex}`,
-          templateId: newTemplateId,
-          templateName: `${template.name} (Additional)`,
-          templateType: type as TemplateType,
-          printSize: size,
-          slotIndex,
-          photoId: undefined
-        });
+  const openAddPrintModal = () => setShowAddPrintModal(true);
+  const handleConfirmAddPrint = () => {
+    if (selectedType) {
+      const template = TEMPLATE_TYPES.find(t => t.id === selectedType);
+      if (template) {
+        const newTemplateIndex = templateSlots.length;
+        const newTemplateId = `${selectedType}_${newTemplateIndex}`;
+        const newSlots: TemplateSlot[] = [];
+        for (let slotIndex = 0; slotIndex < template.slots; slotIndex++) {
+          newSlots.push({
+            id: `${selectedType}_${newTemplateIndex}_${slotIndex}`,
+            templateId: newTemplateId,
+            templateName: `${template.name} (Additional)`,
+            templateType: selectedType,
+            printSize: selectedSize,
+            slotIndex,
+            photoId: undefined
+          });
+        }
+        setTemplateSlots([...templateSlots, ...newSlots]);
       }
-      setTemplateSlots([...templateSlots, ...newSlots]);
     }
+    setShowAddPrintModal(false);
+    setSelectedType(null);
+    setSelectedSize('4R');
   };
 
   return (
@@ -150,9 +156,9 @@ export default function PhotoSelectionScreen({
       </div>
 
       {/* Print Templates - Fixed at bottom with increased height */}
-      <div className="bg-white shadow-lg p-4 flex-shrink-0">
+      <div className="bg-white shadow-lg p-4 flex-shrink-0 max-h-[30vh] md:max-h-[50vh] overflow-auto">
         <h2 className="text-xl font-bold text-gray-800 mb-3 text-center">Your Print Templates</h2>
-        <div className="flex flex-col md:flex-row space-y-4 md:space-x-4 md:space-y-0 overflow-y-auto md:overflow-x-auto pb-2" style={{ maxHeight: '500px' }}>
+        <div className="flex flex-col md:flex-row space-y-4 md:space-x-4 md:space-y-0 overflow-y-auto md:overflow-x-auto pb-2">
           {Object.values(
             templateSlots.reduce((acc, slot) => {
               if (!acc[slot.templateId]) {
@@ -206,11 +212,100 @@ export default function PhotoSelectionScreen({
       )}
 
       <button 
-        onClick={handleAddPrint} 
+        onClick={openAddPrintModal} 
         className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700"
       >
         + Add Print
       </button>
+
+      <Transition appear show={showAddPrintModal} as={Fragment}>
+        <Dialog as="div" className="relative z-10" onClose={() => setShowAddPrintModal(false)}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-25" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <Dialog.Title
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-gray-900"
+                  >
+                    Add New Print
+                  </Dialog.Title>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700">Template Type</label>
+                    <select
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      value={selectedType || ''}
+                      onChange={(e) => setSelectedType(e.target.value as TemplateType)}
+                    >
+                      <option value="">Select type</option>
+                      {TEMPLATE_TYPES.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700">Print Size</label>
+                    <select
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      value={selectedSize}
+                      onChange={(e) => setSelectedSize(e.target.value as '4R' | '5R' | 'A4')}
+                      disabled={!selectedType || selectedType !== 'solo'}
+                    >
+                      <option value="4R">4R</option>
+                      {selectedType === 'solo' && (
+                        <>
+                          <option value="5R">5R</option>
+                          <option value="A4">A4</option>
+                        </>
+                      )}
+                    </select>
+                    {selectedType && selectedType !== 'solo' && (
+                      <p className="mt-1 text-xs text-gray-500">Only Solo supports 5R/A4</p>
+                    )}
+                  </div>
+                  <div className="mt-6 flex justify-end space-x-3">
+                    <button
+                      type="button"
+                      className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      onClick={() => setShowAddPrintModal(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700"
+                      onClick={handleConfirmAddPrint}
+                      disabled={!selectedType}
+                    >
+                      Add
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
     </div>
   );
 }
