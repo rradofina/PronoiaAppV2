@@ -241,52 +241,13 @@ export default function DriveSetupScreen({
                       Back
                     </button>
                     <button
-                      onClick={handleSelectCurrentFolder}
+                      onClick={() => {
+                        handleSelectCurrentFolder();
+                        setIsSelectingFolder(false);
+                      }}
                       className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md"
                     >
                       Select This Folder
-                    </button>
-                  </div>
-                )}
-                
-                {driveFolders.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-                    {driveFolders.map((folder) => (
-                      <div
-                        key={folder.id}
-                        onClick={() => {
-                          handleMainFolderSelect(folder);
-                          setIsSelectingFolder(false);
-                        }}
-                        className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200"
-                      >
-                        <div className="flex items-center">
-                          <div className="text-2xl mr-3">📁</div>
-                          <div>
-                            <p className="font-medium text-gray-800">{folder.name}</p>
-                            <p className="text-xs text-gray-500">
-                              {new Date(folder.createdTime).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="text-3xl mb-4">📂</div>
-                    <p className="text-gray-600">No folders found in your Google Drive root.</p>
-                    <p className="text-gray-600 text-sm mt-2">Please create a folder in your Drive and refresh this page.</p>
-                  </div>
-                )}
-
-                {isSelectingFolder && (
-                  <div className="text-center mt-4">
-                    <button
-                      onClick={() => setIsSelectingFolder(false)}
-                      className="px-6 py-3 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200"
-                    >
-                      Cancel
                     </button>
                   </div>
                 )}
@@ -355,7 +316,10 @@ export default function DriveSetupScreen({
                       Back
                     </button>
                     <button
-                      onClick={handleSelectCurrentFolder}
+                      onClick={() => {
+                        handleSelectCurrentFolder();
+                        setIsSelectingFolder(false);
+                      }}
                       className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md"
                     >
                       Select This Folder
