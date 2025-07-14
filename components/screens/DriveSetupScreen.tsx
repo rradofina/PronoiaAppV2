@@ -196,6 +196,59 @@ export default function DriveSetupScreen({
                   This is the top-level folder in your Google Drive where all your client galleries are stored.
                 </p>
                 
+                {/* Breadcrumbs */}
+                <div className="flex items-center mb-4 overflow-x-auto">
+                  <button
+                    onClick={() => handleBreadcrumbClick(0)}
+                    className="flex items-center text-blue-600 hover:text-blue-800"
+                  >
+                    Root
+                  </button>
+                  {folderPath.map((path, index) => (
+                    <span key={path.id} className="flex items-center">
+                      <ChevronRight className="w-4 h-4 mx-2 text-gray-400" />
+                      <button
+                        onClick={() => handleBreadcrumbClick(index + 1)}
+                        className="text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                      >
+                        {path.name}
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                
+                {/* Folder List */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-60 overflow-y-auto">
+                  {currentFolders.map((folder) => (
+                    <button
+                      key={folder.id}
+                      onClick={() => handleFolderClick(folder)}
+                      className="flex flex-col items-center p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <Folder className="w-8 h-8 text-yellow-500 mb-2" />
+                      <span className="text-sm text-center truncate w-full">{folder.name}</span>
+                    </button>
+                  ))}
+                </div>
+                
+                {folderPath.length > 0 && (
+                  <div className="flex justify-between mt-6">
+                    <button
+                      onClick={() => handleBreadcrumbClick(folderPath.length - 1)}
+                      className="flex items-center text-gray-600 hover:text-gray-800"
+                    >
+                      <ChevronLeft className="w-5 h-5 mr-1" />
+                      Back
+                    </button>
+                    <button
+                      onClick={handleSelectCurrentFolder}
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md"
+                    >
+                      Select This Folder
+                    </button>
+                  </div>
+                )}
+                
                 {driveFolders.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
                     {driveFolders.map((folder) => (
