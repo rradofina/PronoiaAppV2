@@ -155,10 +155,10 @@ export default function PhotoSelectionScreen({
         </div>
       </div>
 
-      {/* Print Templates - Fixed at bottom with increased height */}
-      <div className="bg-white shadow-lg p-4 flex-shrink-0 max-h-[30vh] md:max-h-[50vh] overflow-auto">
+      {/* Print Templates - Fixed at bottom with a controlled, fixed height */}
+      <div className="bg-white shadow-lg p-4 flex-shrink-0" style={{ height: '380px' }}>
         <h2 className="text-xl font-bold text-gray-800 mb-3 text-center">Your Print Templates</h2>
-        <div className="flex flex-col md:flex-row space-y-4 md:space-x-4 md:space-y-0 overflow-y-auto md:overflow-x-auto pb-2">
+        <div className="flex space-x-4 overflow-x-auto overflow-y-hidden pb-4" style={{ height: '100%' }}>
           {Object.values(
             templateSlots.reduce((acc, slot) => {
               if (!acc[slot.templateId]) {
@@ -172,8 +172,8 @@ export default function PhotoSelectionScreen({
               return acc;
             }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
           ).map(({ templateId, templateName, slots }) => (
-            <div key={templateId} className="flex-shrink-0 w-full md:w-80">
-              <h3 className="font-semibold mb-2 text-center">{templateName}</h3>
+            <div key={templateId} className="flex-shrink-0" style={{ width: '220px' }}>
+              <h3 className="font-semibold mb-2 text-center text-sm">{templateName}</h3>
               <div className="w-full rounded-lg overflow-hidden">
                 <TemplateVisual
                   template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
