@@ -1,6 +1,5 @@
 import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType } from '../../types';
 import { useState } from 'react';
-import PhotoCropper from '../PhotoCropper';
 import { PRINT_SIZES, TEMPLATE_TYPES } from '../../utils/constants';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
