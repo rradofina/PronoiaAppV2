@@ -29,7 +29,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const data = await response.json();
   if (!response.ok) {
-    res.status(500).send('Token exchange failed');
+    console.error('Token exchange failed:', data);
+    res.status(500).send(`Token exchange failed: ${JSON.stringify(data)}`);
     return;
   }
 
