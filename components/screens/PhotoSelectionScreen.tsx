@@ -119,6 +119,19 @@ export default function PhotoSelectionScreen({
     setSelectedSize('4R');
   };
 
+  const handleDeletePrint = (templateIdToDelete: string) => {
+    if (window.confirm('Are you sure you want to delete this print? This will remove any photos placed in it.')) {
+      const newTemplateSlots = templateSlots.filter(s => s.templateId !== templateIdToDelete);
+      setTemplateSlots(newTemplateSlots);
+
+      // If the currently selected slot was part of the deleted template, deselect it
+      if (selectedSlot?.templateId === templateIdToDelete) {
+        setSelectedSlot(null);
+        setIsCropping(false);
+      }
+    }
+  };
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* Header - Fixed at top */}
@@ -192,7 +205,18 @@ export default function PhotoSelectionScreen({
               return acc;
             }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
           ).map(({ templateId, templateName, slots }) => (
-            <div key={templateId} className="flex-shrink-0" style={{ width: '220px' }}>
+            <div key={templateId} className="flex-shrink-0 relative pt-4" style={{ width: '220px' }}>
+              {templateName.includes('(Additional)') && (
+                <button
+                  onClick={() => handleDeletePrint(templateId)}
+                  title="Delete Print"
+                  className="absolute top-0 right-0 z-10 bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
               <h3 className="font-semibold mb-2 text-center text-sm">{templateName}</h3>
               <div className="w-full rounded-lg overflow-hidden">
                 <TemplateVisual
