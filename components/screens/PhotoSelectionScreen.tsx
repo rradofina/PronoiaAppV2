@@ -236,6 +236,7 @@ export default function PhotoSelectionScreen({
       {editingTemplate && (
         <InlineTemplateEditor
           templateSlots={editingTemplate}
+          initialSelectedSlotId={selectedSlot!.id}
           photos={photos}
           onClose={handleInlineEditorClose}
           onPhotoSelect={handleInlinePhotoSelect}
