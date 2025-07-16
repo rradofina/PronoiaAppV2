@@ -45,6 +45,7 @@ export default function PhotoSelectionScreen({
   const [showAddPrintModal, setShowAddPrintModal] = useState(false);
   const [selectedType, setSelectedType] = useState<TemplateType | null>(null);
   const [selectedSize, setSelectedSize] = useState<'4R' | '5R' | 'A4'>('4R');
+  const [addPrintQuantity, setAddPrintQuantity] = useState(1);
 
   const onSlotSelect = (slot: TemplateSlot) => {
     setSelectedSlot(slot);
@@ -81,26 +82,36 @@ export default function PhotoSelectionScreen({
     }
   };
 
-  const openAddPrintModal = () => setShowAddPrintModal(true);
+  const openAddPrintModal = () => {
+    setAddPrintQuantity(1); // Reset quantity when opening the modal
+    setShowAddPrintModal(true);
+  };
+
   const handleConfirmAddPrint = () => {
     if (selectedType) {
       const template = TEMPLATE_TYPES.find(t => t.id === selectedType);
       if (template) {
-        const newTemplateIndex = templateSlots.length;
-        const newTemplateId = `${selectedType}_${newTemplateIndex}`;
-        const newSlots: TemplateSlot[] = [];
-        for (let slotIndex = 0; slotIndex < template.slots; slotIndex++) {
-          newSlots.push({
-            id: `${selectedType}_${newTemplateIndex}_${slotIndex}`,
-            templateId: newTemplateId,
-            templateName: `${template.name} (Additional)`,
-            templateType: selectedType,
-            printSize: selectedSize,
-            slotIndex,
-            photoId: undefined
-          });
+        let newSlotsToAdd: TemplateSlot[] = [];
+        // Find the next available index for a new template to ensure unique IDs
+        const existingTemplateIds = new Set(templateSlots.map(s => s.templateId));
+        const nextTemplateIndex = existingTemplateIds.size;
+        
+        for (let i = 0; i < addPrintQuantity; i++) {
+          const newTemplateId = `${selectedType}_${nextTemplateIndex + i}`;
+          
+          for (let slotIndex = 0; slotIndex < template.slots; slotIndex++) {
+            newSlotsToAdd.push({
+              id: `${newTemplateId}_${slotIndex}`,
+              templateId: newTemplateId,
+              templateName: `${template.name} (Additional)`,
+              templateType: selectedType,
+              printSize: selectedSize,
+              slotIndex,
+              photoId: undefined
+            });
+          }
         }
-        setTemplateSlots([...templateSlots, ...newSlots]);
+        setTemplateSlots([...templateSlots, ...newSlotsToAdd]);
       }
     }
     setShowAddPrintModal(false);
@@ -111,7 +122,7 @@ export default function PhotoSelectionScreen({
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* Header - Fixed at top */}
-      <div className="bg-white shadow-sm p-4 flex-shrink-0">
+      <div className="bg-white shadow-sm p-4 flex-shrink-0 relative">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-800 mb-1">
             Photo Selection
@@ -132,6 +143,15 @@ export default function PhotoSelectionScreen({
             </div>
           )}
         </div>
+        <button 
+          onClick={openAddPrintModal} 
+          className="absolute top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-2"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+          </svg>
+          <span>Add Print</span>
+        </button>
       </div>
 
       {/* Photo Grid - Scrollable content area */}
@@ -211,13 +231,6 @@ export default function PhotoSelectionScreen({
         />
       )}
 
-      <button 
-        onClick={openAddPrintModal} 
-        className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700"
-      >
-        + Add Print
-      </button>
-
       <Transition appear show={showAddPrintModal} as={Fragment}>
         <Dialog as="div" className="relative z-10" onClose={() => setShowAddPrintModal(false)}>
           <Transition.Child
@@ -282,6 +295,31 @@ export default function PhotoSelectionScreen({
                     {selectedType && selectedType !== 'solo' && (
                       <p className="mt-1 text-xs text-gray-500">Only Solo supports 5R/A4</p>
                     )}
+                  </div>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700">Quantity</label>
+                    <div className="mt-1 flex items-center rounded-md border border-gray-300 w-min">
+                      <button
+                        type="button"
+                        className="px-3 py-1 border-r border-gray-300 text-gray-600 hover:bg-gray-100 rounded-l-md"
+                        onClick={() => setAddPrintQuantity(q => Math.max(1, q - 1))}
+                      >
+                        -
+                      </button>
+                      <input
+                        type="text"
+                        readOnly
+                        value={addPrintQuantity}
+                        className="w-12 text-center border-none bg-transparent"
+                      />
+                      <button
+                        type="button"
+                        className="px-3 py-1 border-l border-gray-300 text-gray-600 hover:bg-gray-100 rounded-r-md"
+                        onClick={() => setAddPrintQuantity(q => q + 1)}
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                   <div className="mt-6 flex justify-end space-x-3">
                     <button
