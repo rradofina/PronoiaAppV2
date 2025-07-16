@@ -7,9 +7,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = `${req.headers.host}/api/auth/callback`;
+
+  // Determine the redirect URI based on the environment
+  const redirectUri = process.env.NODE_ENV === 'production'
+    ? 'https://pronoia-app.vercel.app/api/auth/callback'
+    : 'http://localhost:3000/api/auth/callback';
 
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
