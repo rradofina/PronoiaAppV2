@@ -47,6 +47,7 @@ export default function PhotoSelectionScreen({
   const [addPrintQuantity, setAddPrintQuantity] = useState(1);
 
   const onSlotSelect = (slot: TemplateSlot) => {
+    setSelectedSlot(slot);
     const templateToEdit = templateSlots.filter(s => s.templateId === slot.templateId);
     setEditingTemplate(templateToEdit);
   };
