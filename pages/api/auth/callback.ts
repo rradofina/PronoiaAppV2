@@ -10,15 +10,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-  // --- Start Vercel Debugging ---
-  if (process.env.NODE_ENV === 'production') {
-    if (!clientSecret) {
-      res.status(500).send('Vercel server is not loading the GOOGLE_CLIENT_SECRET environment variable. Please check Vercel project settings.');
-      return;
-    }
-  }
-  // --- End Vercel Debugging ---
-
   // Determine the redirect URI based on the environment
   const redirectUri = process.env.NODE_ENV === 'production'
     ? 'https://pronoia-app.vercel.app/api/auth/callback'
