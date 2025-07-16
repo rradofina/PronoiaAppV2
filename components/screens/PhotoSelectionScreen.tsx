@@ -4,6 +4,7 @@ import PhotoCropper from '../PhotoCropper';
 import { PRINT_SIZES, TEMPLATE_TYPES } from '../../utils/constants';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
+import InlineTemplateEditor from '../InlineTemplateEditor';
 
 interface PhotoSelectionScreenProps {
   clientName: string;
@@ -40,46 +41,34 @@ export default function PhotoSelectionScreen({
   setSelectedSlot,
   setTemplateSlots,
 }: PhotoSelectionScreenProps) {
-  const [isCropping, setIsCropping] = useState(false);
-  const [currentEditingTemplateId, setCurrentEditingTemplateId] = useState<string | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState<TemplateSlot[] | null>(null);
   const [showAddPrintModal, setShowAddPrintModal] = useState(false);
   const [selectedType, setSelectedType] = useState<TemplateType | null>(null);
   const [selectedSize, setSelectedSize] = useState<'4R' | '5R' | 'A4'>('4R');
   const [addPrintQuantity, setAddPrintQuantity] = useState(1);
 
   const onSlotSelect = (slot: TemplateSlot) => {
-    setSelectedSlot(slot);
-    setIsCropping(true);
-    if (!currentEditingTemplateId) {
-      setCurrentEditingTemplateId(slot.templateId);
-    }
+    const templateToEdit = templateSlots.filter(s => s.templateId === slot.templateId);
+    setEditingTemplate(templateToEdit);
   };
 
-  const handleCropperSelect = (photo: Photo, transform?: { scale: number; offsetX: number; offsetY: number }) => {
-    if (selectedSlot) {
-      const finalTransform = transform || { scale: 1, offsetX: 0, offsetY: 0 };
-      const updatedSlots = templateSlots.map(s => 
-        s.id === selectedSlot.id 
-          ? { ...s, photoId: photo.id, transform: finalTransform } 
-          : s
-      );
-      setTemplateSlots(updatedSlots);
-      
-      const templateSlotsGroup = updatedSlots.filter(s => s.templateId === selectedSlot.templateId);
-      const nextEmpty = templateSlotsGroup.find(s => !s.photoId && s.slotIndex > selectedSlot.slotIndex);
-      
-      if (nextEmpty) {
-        setSelectedSlot(nextEmpty);
-      } else {
-        setIsCropping(false);
-        setCurrentEditingTemplateId(null);
-        setSelectedSlot(null);
-        
-        if (updatedSlots.every(s => s.photoId)) {
-          handlePhotoContinue();
-        }
-      }
-    }
+  const handleInlineEditorClose = () => {
+    setEditingTemplate(null);
+  };
+
+  const handleInlinePhotoSelect = (photo: Photo, slotId: string) => {
+    const updatedSlots = templateSlots.map(s =>
+      s.id === slotId ? { ...s, photoId: photo.id } : s
+    );
+    setTemplateSlots(updatedSlots);
+    setEditingTemplate(updatedSlots.filter(s => s.templateId === editingTemplate?.[0].templateId));
+  };
+
+  const handleInlineTransformChange = (slotId: string, transform: { scale: number; x: number; y: number }) => {
+    const updatedSlots = templateSlots.map(s =>
+      s.id === slotId ? { ...s, transform } : s
+    );
+    setTemplateSlots(updatedSlots);
   };
 
   const openAddPrintModal = () => {
@@ -127,7 +116,6 @@ export default function PhotoSelectionScreen({
       // If the currently selected slot was part of the deleted template, deselect it
       if (selectedSlot?.templateId === templateIdToDelete) {
         setSelectedSlot(null);
-        setIsCropping(false);
       }
     }
   };
@@ -189,7 +177,7 @@ export default function PhotoSelectionScreen({
       </div>
 
       {/* Print Templates - Fixed at bottom with a controlled, fixed height */}
-      <div className="bg-white shadow-lg p-4 flex-shrink-0" style={{ height: '380px' }}>
+      <div className="bg-white shadow-lg p-4 flex-shrink-0" style={{ height: '320px' }}>
         <h2 className="text-xl font-bold text-gray-800 mb-3 text-center">Your Print Templates</h2>
         <div className="flex space-x-4 overflow-x-auto overflow-y-hidden pb-4" style={{ height: '100%' }}>
           {Object.values(
@@ -205,7 +193,7 @@ export default function PhotoSelectionScreen({
               return acc;
             }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
           ).map(({ templateId, templateName, slots }) => (
-            <div key={templateId} className="flex-shrink-0 relative pt-4" style={{ width: '220px' }}>
+            <div key={templateId} className="flex-shrink-0 relative pt-4" style={{ width: '200px' }}>
               {templateName.includes('(Additional)') && (
                 <button
                   onClick={() => handleDeletePrint(templateId)}
@@ -246,12 +234,14 @@ export default function PhotoSelectionScreen({
         </div>
       </div>
 
-      {isCropping && selectedSlot && (
-        <PhotoCropper 
-          photos={photos} 
-          selectedSlot={selectedSlot} 
-          onPhotoSelect={handleCropperSelect} 
-          onClose={() => setIsCropping(false)} 
+      {editingTemplate && (
+        <InlineTemplateEditor
+          templateSlots={editingTemplate}
+          photos={photos}
+          onClose={handleInlineEditorClose}
+          onPhotoSelect={handleInlinePhotoSelect}
+          onTransformChange={handleInlineTransformChange}
+          templateVisual={TemplateVisual}
         />
       )}
 

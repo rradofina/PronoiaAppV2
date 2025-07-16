@@ -30,10 +30,10 @@ export interface TemplateSlot {
   printSize?: '4R' | '5R' | 'A4';
   slotIndex: number;
   photoId?: string;
-  photoTransform?: {
+  transform?: {
     scale: number;
-    offsetX: number;
-    offsetY: number;
+    x: number;
+    y: number;
   };
   label?: string;
 }
