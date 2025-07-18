@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Photo, TemplateSlot } from '../types';
 
 interface FullscreenPhotoViewerProps {
@@ -19,6 +19,26 @@ export default function FullscreenPhotoViewer({
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(() => 
     photo ? photos.findIndex(p => p.id === photo.id) : 0
   );
+  
+  // Update photo index when a new photo is selected (only when photo prop changes)
+  useEffect(() => {
+    if (photo && isVisible) {
+      const newIndex = photos.findIndex(p => p.id === photo.id);
+      if (newIndex !== -1) {
+        setCurrentPhotoIndex(newIndex);
+        setCurrentUrlIndex(0); // Reset URL index for new photo
+        setImageLoaded(false);
+        setImageError(false);
+      }
+    }
+  }, [photo?.id, isVisible, photos]); // Removed currentPhotoIndex from dependencies to prevent loop
+  
+  // Reset image states when photo index changes (for navigation)
+  useEffect(() => {
+    setCurrentUrlIndex(0);
+    setImageLoaded(false);
+    setImageError(false);
+  }, [currentPhotoIndex]);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
@@ -59,26 +79,41 @@ export default function FullscreenPhotoViewer({
     return currentPhoto.url; // Final fallback
   };
 
-  if (!isVisible || !photo) return null;
+  if (!isVisible || !photo || photos.length === 0) return null;
 
+  // Use photo from array at currentPhotoIndex, fallback to originally selected photo
   const currentPhoto = photos[currentPhotoIndex] || photo;
+  
+  // Ensure currentPhotoIndex is within valid bounds
+  if (currentPhotoIndex < 0 || currentPhotoIndex >= photos.length) {
+    console.warn('Photo index out of bounds:', currentPhotoIndex, 'photos length:', photos.length);
+    setCurrentPhotoIndex(photo ? photos.findIndex(p => p.id === photo.id) : 0);
+  }
 
   const handlePrevious = () => {
-    setCurrentPhotoIndex(prev => prev > 0 ? prev - 1 : photos.length - 1);
-    setImageLoaded(false);
-    setImageError(false);
-    setCurrentUrlIndex(0); // Reset URL index for new photo
+    const newIndex = currentPhotoIndex > 0 ? currentPhotoIndex - 1 : photos.length - 1;
+    // Ensure the new index is valid before updating
+    if (newIndex >= 0 && newIndex < photos.length && photos[newIndex]) {
+      console.log(`📸 Previous: ${currentPhotoIndex} → ${newIndex} (${photos[newIndex].name})`);
+      setCurrentPhotoIndex(newIndex);
+    } else {
+      console.error('Invalid previous index:', newIndex);
+    }
   };
 
   const handleNext = () => {
-    setCurrentPhotoIndex(prev => prev < photos.length - 1 ? prev + 1 : 0);
-    setImageLoaded(false);
-    setImageError(false);
-    setCurrentUrlIndex(0); // Reset URL index for new photo
+    const newIndex = currentPhotoIndex < photos.length - 1 ? currentPhotoIndex + 1 : 0;
+    // Ensure the new index is valid before updating
+    if (newIndex >= 0 && newIndex < photos.length && photos[newIndex]) {
+      console.log(`📸 Next: ${currentPhotoIndex} → ${newIndex} (${photos[newIndex].name})`);
+      setCurrentPhotoIndex(newIndex);
+    } else {
+      console.error('Invalid next index:', newIndex);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-95 flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-95 flex flex-col h-screen">
       {/* Header */}
       <div className="flex items-center justify-between p-4 text-white">
         <button
@@ -99,11 +134,17 @@ export default function FullscreenPhotoViewer({
       </div>
 
       {/* Photo Display */}
-      <div className="flex-1 flex items-center justify-center relative">
+      <div className="flex-1 flex items-center justify-center relative min-h-0">
         {/* Previous Button */}
         <button
-          onClick={handlePrevious}
-          className="absolute left-4 z-10 bg-black bg-opacity-50 text-white rounded-full p-2 hover:bg-opacity-70"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🔙 Previous button clicked');
+            handlePrevious();
+          }}
+          className="absolute left-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg"
+          style={{ pointerEvents: 'auto' }}
         >
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -142,7 +183,10 @@ export default function FullscreenPhotoViewer({
                 setImageLoaded(false);
               }
             }}
-            style={{ display: imageLoaded && !imageError ? 'block' : 'none' }}
+            style={{ 
+              display: imageLoaded && !imageError ? 'block' : 'none',
+              pointerEvents: 'auto'
+            }}
             crossOrigin="anonymous"
           />
           
@@ -179,8 +223,14 @@ export default function FullscreenPhotoViewer({
 
         {/* Next Button */}
         <button
-          onClick={handleNext}
-          className="absolute right-4 z-10 bg-black bg-opacity-50 text-white rounded-full p-2 hover:bg-opacity-70"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('➡️ Next button clicked');
+            handleNext();
+          }}
+          className="absolute right-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg"
+          style={{ pointerEvents: 'auto' }}
         >
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -188,8 +238,8 @@ export default function FullscreenPhotoViewer({
         </button>
       </div>
 
-      {/* Bottom Actions */}
-      <div className="p-4">
+      {/* Bottom Actions - Fixed height */}
+      <div className="p-4 flex-shrink-0">
         <button
           onClick={() => onAddToTemplate(currentPhoto)}
           className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors"
