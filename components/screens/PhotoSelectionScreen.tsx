@@ -128,7 +128,7 @@ export default function PhotoSelectionScreen({
   };
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden">
+    <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ touchAction: 'pan-y' }}>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
@@ -162,7 +162,7 @@ export default function PhotoSelectionScreen({
 
         {/* Print Templates - Different layouts for mobile vs desktop */}
         {/* Mobile/Tablet: Horizontal bottom section */}
-        <div className="lg:hidden bg-white shadow-lg border-t flex-shrink-0" style={{ height: '380px' }}>
+        <div className="lg:hidden bg-white shadow-lg border-t flex-shrink-0" style={{ height: '380px', touchAction: 'pan-x' }}>
           <div className="p-2 sm:p-3 h-full flex flex-col">
             <div className="flex-shrink-0 mb-2">
               <div className="flex items-center justify-between mb-1">
@@ -201,7 +201,7 @@ export default function PhotoSelectionScreen({
               )}
             </div>
             <div className="flex-1 overflow-hidden">
-              <div className="flex space-x-2 sm:space-x-3 overflow-x-auto h-full pb-2">
+              <div className="flex space-x-2 sm:space-x-3 overflow-x-auto h-full pb-2" style={{ touchAction: 'pan-x' }}>
                 {Object.values(
                   templateSlots.reduce((acc, slot) => {
                     if (!acc[slot.templateId]) {

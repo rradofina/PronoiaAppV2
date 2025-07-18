@@ -233,20 +233,31 @@ class GoogleDriveService {
       fallbacks: [] as string[]
     };
 
-    // Strategy 1: Try blob URL (most reliable)
+    // Strategy 1: Use thumbnail URLs first (fast, no download)
+    if (file.thumbnailLink) {
+      const thumbUrl = file.thumbnailLink.replace('=s220', '=s400');
+      urls.primary = thumbUrl;
+      urls.thumbnail = file.thumbnailLink; // Keep original =s220 for grid
+      urls.fallbacks.push(thumbUrl);
+      urls.fallbacks.push(file.thumbnailLink.replace('=s220', '=s600'));
+      console.log(`✅ Using thumbnail URLs for ${file.name}`);
+      return urls;
+    }
+
+    // Strategy 2: Fallback to blob URL only if no thumbnails (rare case)
     try {
       if (this.accessToken) {
         const blobUrl = await this.createBlobUrlForImage(file.id);
         urls.primary = blobUrl;
         urls.thumbnail = blobUrl;
-        console.log(`✅ Created blob URL for ${file.name}`);
+        console.log(`⚠️ Created blob URL for ${file.name} (no thumbnails available)`);
         return urls;
       }
     } catch (blobError) {
       console.warn(`Blob URL failed for ${file.name}:`, blobError);
     }
 
-    // Strategy 2: Google Drive thumbnail URL (may work for public files)
+    // Strategy 3: Google Drive direct URLs (last resort)
     if (file.thumbnailLink) {
       const thumbUrl = file.thumbnailLink.replace('=s220', '=s800');
       urls.primary = thumbUrl;
