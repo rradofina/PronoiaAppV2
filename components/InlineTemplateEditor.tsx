@@ -29,7 +29,7 @@ export default function InlineTemplateEditor({
   const getPhotoUrl = (photoId?: string) => photos.find(p => p.id === photoId)?.url;
 
   return (
-    <div className="fixed inset-0 z-20 bg-black bg-opacity-75 flex flex-col items-center justify-center p-4">
+    <div className="fixed inset-0 z-20 bg-black bg-opacity-75 flex flex-col items-center justify-center p-4 overflow-hidden">
       {/* Photo gallery at the top */}
       <div className="w-full max-w-5xl mb-4 flex-shrink-0">
         <h3 className="text-white text-center text-lg font-semibold mb-2">Select a Photo</h3>
@@ -47,10 +47,10 @@ export default function InlineTemplateEditor({
       </div>
 
       {/* Enlarged Template - with constrained height */}
-      <div className="w-full max-w-5xl bg-white p-4 rounded-lg shadow-xl flex-grow flex flex-col" style={{ minHeight: 0 }}>
+      <div className="w-full max-w-5xl bg-white p-4 rounded-lg shadow-xl flex-shrink-0" style={{ maxHeight: 'calc(100vh - 280px)', overflow: 'auto' }}>
         <h3 className="text-center font-bold mb-2">{currentTemplate.templateName}</h3>
-        <div className="relative flex-grow w-full h-full flex items-center justify-center">
-            <div className="w-full h-full" style={{ aspectRatio: '4 / 6', margin: 'auto' }}>
+        <div className="relative w-full flex items-center justify-center">
+            <div className="w-full" style={{ aspectRatio: '4 / 6', maxHeight: '400px', margin: 'auto' }}>
                 <TemplateVisual
                     template={{ id: currentTemplate.templateType, name: currentTemplate.templateName, slots: templateSlots.length }}
                     slots={templateSlots}
@@ -61,7 +61,6 @@ export default function InlineTemplateEditor({
             </div>
         </div>
       </div>
-
 
       {/* Action buttons */}
       <div className="mt-4 flex-shrink-0">
