@@ -161,70 +161,71 @@ export default function PhotoSelectionScreen({
         </button>
       </div>
 
-      {/* Main Content Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Photo Grid */}
-        <div className="p-3 sm:p-4">
-          {!selectedSlot && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-              <p className="text-yellow-800 text-center font-medium text-sm">
-                👇 Select a print slot below to start choosing photos
-              </p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
-            {photos.map((photo) => (
-              <PhotoCard 
-                key={photo.id}
-                photo={photo}
-                onSelect={() => handlePhotoSelect(photo)}
-              />
-            ))}
+      {/* Photo Grid - Scrollable area */}
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+        {!selectedSlot && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+            <p className="text-yellow-800 text-center font-medium text-sm">
+              👇 Select a print slot below to start choosing photos
+            </p>
           </div>
-        </div>
+        )}
 
-        {/* Print Templates - Scrollable section */}
-        <div className="bg-white shadow-lg p-3 sm:p-4 mt-4">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 text-center">Your Print Templates</h2>
-          <div className="flex space-x-3 sm:space-x-4 overflow-x-auto pb-4 min-h-[200px]">
-            {Object.values(
-              templateSlots.reduce((acc, slot) => {
-                if (!acc[slot.templateId]) {
-                  acc[slot.templateId] = {
-                    templateId: slot.templateId,
-                    templateName: slot.templateName,
-                    slots: [],
-                  };
-                }
-                acc[slot.templateId].slots.push(slot);
-                return acc;
-              }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
-            ).map(({ templateId, templateName, slots }) => (
-              <div key={templateId} className="flex-shrink-0 relative pt-4" style={{ width: '180px' }}>
-                {templateName.includes('(Additional)') && (
-                  <button
-                    onClick={() => handleDeletePrint(templateId)}
-                    title="Delete Print"
-                    className="absolute top-0 right-0 z-10 bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-                <h3 className="font-semibold mb-2 text-center text-xs sm:text-sm">{templateName}</h3>
-                <div className="w-full rounded-lg overflow-hidden">
-                  <TemplateVisual
-                    template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
-                    slots={slots}
-                    onSlotClick={onSlotSelect}
-                    photos={photos}
-                    selectedSlot={selectedSlot}
-                  />
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3 pb-4">
+          {photos.map((photo) => (
+            <PhotoCard 
+              key={photo.id}
+              photo={photo}
+              onSelect={() => handlePhotoSelect(photo)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Print Templates - Fixed visible section */}
+      <div className="bg-white shadow-lg border-t flex-shrink-0" style={{ height: '260px' }}>
+        <div className="p-3 sm:p-4 h-full flex flex-col">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 text-center flex-shrink-0">Your Print Templates</h2>
+          <div className="flex-1 overflow-hidden">
+            <div className="flex space-x-3 sm:space-x-4 overflow-x-auto h-full pb-2">
+              {Object.values(
+                templateSlots.reduce((acc, slot) => {
+                  if (!acc[slot.templateId]) {
+                    acc[slot.templateId] = {
+                      templateId: slot.templateId,
+                      templateName: slot.templateName,
+                      slots: [],
+                    };
+                  }
+                  acc[slot.templateId].slots.push(slot);
+                  return acc;
+                }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
+              ).map(({ templateId, templateName, slots }) => (
+                <div key={templateId} className="flex-shrink-0 relative pt-6" style={{ width: '160px' }}>
+                  {templateName.includes('(Additional)') && (
+                    <button
+                      onClick={() => handleDeletePrint(templateId)}
+                      title="Delete Print"
+                      className="absolute top-0 right-0 z-10 bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                  <h3 className="font-semibold mb-2 text-center text-xs leading-tight">{templateName}</h3>
+                  <div className="w-full rounded-lg overflow-hidden" style={{ height: '160px' }}>
+                    <TemplateVisual
+                      template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
+                      slots={slots}
+                      onSlotClick={onSlotSelect}
+                      photos={photos}
+                      selectedSlot={selectedSlot}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
