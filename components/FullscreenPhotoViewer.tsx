@@ -17,10 +17,12 @@ export default function FullscreenPhotoViewer({
   isVisible
 }: FullscreenPhotoViewerProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(() => 
-    photos.findIndex(p => p.id === photo.id)
+    photo ? photos.findIndex(p => p.id === photo.id) : 0
   );
 
-  const currentPhoto = photos[currentPhotoIndex];
+  if (!isVisible || !photo) return null;
+
+  const currentPhoto = photos[currentPhotoIndex] || photo;
 
   const handlePrevious = () => {
     setCurrentPhotoIndex(prev => prev > 0 ? prev - 1 : photos.length - 1);
@@ -29,8 +31,6 @@ export default function FullscreenPhotoViewer({
   const handleNext = () => {
     setCurrentPhotoIndex(prev => prev < photos.length - 1 ? prev + 1 : 0);
   };
-
-  if (!isVisible) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-95 flex flex-col">
