@@ -49,11 +49,11 @@ export default function InlineTemplateEditor({
         </div>
 
         {/* Template */}
-        <div className="w-full bg-white p-4 rounded-lg shadow-xl flex-1 flex flex-col" style={{ minHeight: 0 }}>
+        <div className="w-full bg-white p-2 rounded-lg shadow-xl flex-1 flex flex-col" style={{ minHeight: 0 }}>
           <h3 className="text-center font-bold mb-2">{currentTemplate.templateName}</h3>
           <div className="relative flex-1 w-full flex items-center justify-center">
             <div className="w-full h-full flex items-center justify-center">
-              <div style={{ aspectRatio: '4 / 6', height: '100%', maxHeight: '500px', width: 'auto' }}>
+              <div style={{ aspectRatio: '2 / 3', height: '100%', maxHeight: '70vh', width: 'auto', minHeight: '400px' }}>
                 <TemplateVisual
                   template={{ id: currentTemplate.templateType, name: currentTemplate.templateName, slots: templateSlots.length }}
                   slots={templateSlots}
@@ -99,11 +99,11 @@ export default function InlineTemplateEditor({
 
         {/* Right side: Template and action button */}
         <div className="flex-1 flex flex-col">
-          <div className="flex-1 bg-white p-6 rounded-lg shadow-xl flex flex-col">
+          <div className="flex-1 bg-white p-4 rounded-lg shadow-xl flex flex-col">
             <h3 className="text-center font-bold mb-4 text-xl">{currentTemplate.templateName}</h3>
             <div className="relative flex-1 w-full flex items-center justify-center">
               <div className="h-full flex items-center justify-center">
-                <div style={{ aspectRatio: '4 / 6', height: '100%', maxHeight: '700px', width: 'auto' }}>
+                <div style={{ aspectRatio: '2 / 3', height: '100%', maxHeight: '80vh', width: 'auto', minHeight: '500px' }}>
                   <TemplateVisual
                     template={{ id: currentTemplate.templateType, name: currentTemplate.templateName, slots: templateSlots.length }}
                     slots={templateSlots}

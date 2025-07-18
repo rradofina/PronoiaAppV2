@@ -51,6 +51,7 @@ export default function PhotoSelectionScreen({
   const [selectedType, setSelectedType] = useState<TemplateType | null>(null);
   const [selectedSize, setSelectedSize] = useState<'4R' | '5R' | 'A4'>('4R');
   const [addPrintQuantity, setAddPrintQuantity] = useState(1);
+  const [hasScrolled, setHasScrolled] = useState(false);
 
   const onSlotSelect = (slot: TemplateSlot) => {
     setSelectedSlot(slot);
@@ -128,99 +129,15 @@ export default function PhotoSelectionScreen({
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden">
-      {/* Header - Fixed at top on mobile/tablet, integrated on desktop */}
-      <div className="lg:hidden bg-white shadow-sm p-2 sm:p-3 flex-shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <button
-            onClick={handleBack}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-lg font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all duration-200 text-sm"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            <span>Back</span>
-          </button>
-          
-          <button 
-            onClick={openAddPrintModal} 
-            className="bg-green-600 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 text-sm"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            <span>Add</span>
-          </button>
-
-          <button
-            onClick={handlePhotoContinue}
-            className="bg-blue-600 text-white px-4 py-1.5 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 text-sm"
-          >
-            Done
-          </button>
-        </div>
-        
-        <div className="text-center">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-1">
-            Photo Selection
-          </h1>
-          <p className="text-xs sm:text-sm text-gray-600">
-            Assign photos to your print slots for {clientName}
-          </p>
-          <div className="mt-1 text-xs text-blue-600">
-            {selectedPackage?.name} • {totalAllowedPrints} print(s)
-            {totalAllowedPrints > (selectedPackage?.templateCount || 0) && (
-              <span className="ml-2 text-green-600">+ {totalAllowedPrints - (selectedPackage?.templateCount || 0)} additional</span>
-            )}
-          </div>
-          {selectedSlot && (
-            <div className="mt-2 text-xs text-white bg-blue-600 px-3 py-1 rounded-full inline-block">
-              📍 {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Photo Grid Section */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Desktop Header - Only visible on large screens */}
-          <div className="hidden lg:block bg-white shadow-sm p-4 flex-shrink-0">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-1">
-                  Photo Selection
-                </h1>
-                <p className="text-gray-600">
-                  Assign photos to your print slots for {clientName}
-                </p>
-                <div className="mt-1 text-sm text-blue-600">
-                  {selectedPackage?.name} • {totalAllowedPrints} print(s)
-                  {totalAllowedPrints > (selectedPackage?.templateCount || 0) && (
-                    <span className="ml-2 text-green-600">+ {totalAllowedPrints - (selectedPackage?.templateCount || 0)} additional</span>
-                  )}
-                </div>
-                {selectedSlot && (
-                  <div className="mt-2 text-sm text-white bg-blue-600 px-4 py-2 rounded-full inline-block">
-                    📍 Selecting for: {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
-                  </div>
-                )}
-              </div>
-              <button 
-                onClick={openAddPrintModal} 
-                className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-2"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                </svg>
-                <span>Add Print</span>
-              </button>
-            </div>
-          </div>
 
           {/* Photo Grid - Scrollable area */}
-          <div className="flex-1 overflow-y-auto p-3 sm:p-4">
-            {!selectedSlot && (
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4" onScroll={() => setHasScrolled(true)}>
+            {!selectedSlot && !hasScrolled && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
                 <p className="text-yellow-800 text-center font-medium text-sm">
                   👉 Select a print slot {/* Changed from down arrow to right arrow for desktop */}
@@ -231,7 +148,7 @@ export default function PhotoSelectionScreen({
               </div>
             )}
 
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 pb-4">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-0 pb-4">
               {photos.map((photo) => (
                 <PhotoCard 
                   key={photo.id}
@@ -245,9 +162,44 @@ export default function PhotoSelectionScreen({
 
         {/* Print Templates - Different layouts for mobile vs desktop */}
         {/* Mobile/Tablet: Horizontal bottom section */}
-        <div className="lg:hidden bg-white shadow-lg border-t flex-shrink-0" style={{ height: '320px' }}>
+        <div className="lg:hidden bg-white shadow-lg border-t flex-shrink-0" style={{ height: '380px' }}>
           <div className="p-2 sm:p-3 h-full flex flex-col">
-            <h2 className="text-base sm:text-lg font-bold text-gray-800 mb-2 text-center flex-shrink-0">Your Print Templates</h2>
+            <div className="flex-shrink-0 mb-2">
+              <div className="flex items-center justify-between mb-1">
+                <button
+                  onClick={handleBack}
+                  className="flex items-center space-x-1 px-2 py-1 rounded-lg font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all duration-200 text-xs"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Back</span>
+                </button>
+                
+                <button 
+                  onClick={openAddPrintModal} 
+                  className="bg-green-600 text-white px-2 py-1 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 text-xs"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  <span>Add</span>
+                </button>
+
+                <button
+                  onClick={handlePhotoContinue}
+                  className="bg-blue-600 text-white px-3 py-1 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 text-xs"
+                >
+                  Done
+                </button>
+              </div>
+              <h2 className="text-sm font-bold text-gray-800 text-center">📷 {clientName} • {selectedPackage?.name} • {totalAllowedPrints} print(s)</h2>
+              {selectedSlot && (
+                <div className="mt-1 text-xs text-white bg-blue-600 px-2 py-0.5 rounded-full text-center">
+                  📍 Selecting: {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
+                </div>
+              )}
+            </div>
             <div className="flex-1 overflow-hidden">
               <div className="flex space-x-2 sm:space-x-3 overflow-x-auto h-full pb-2">
                 {Object.values(
@@ -295,24 +247,30 @@ export default function PhotoSelectionScreen({
         {/* Desktop: Vertical right sidebar */}
         <div className="hidden lg:flex bg-white shadow-lg border-l flex-shrink-0 flex-col" style={{ width: '320px' }}>
           {/* Desktop Header in Sidebar */}
-          <div className="p-4 border-b">
-            <div className="flex items-center justify-between mb-3">
+          <div className="p-2 border-b">
+            <div className="flex items-center justify-between mb-2">
               <button 
                 onClick={openAddPrintModal} 
-                className="bg-green-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-2 text-sm"
+                className="bg-green-600 text-white px-2 py-1 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 text-xs"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
                 </svg>
-                <span>Add Print</span>
+                <span>Add</span>
               </button>
             </div>
-            <h2 className="text-lg font-bold text-gray-800 text-center">Your Print Templates</h2>
+            <h2 className="text-sm font-bold text-gray-800 text-center">📷 {clientName} Templates</h2>
+            <div className="text-xs text-gray-600 text-center">{selectedPackage?.name} • {totalAllowedPrints} print(s)</div>
+            {selectedSlot && (
+              <div className="mt-1 text-xs text-white bg-blue-600 px-2 py-0.5 rounded-full text-center">
+                📍 Selecting: {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
+              </div>
+            )}
           </div>
 
           {/* Templates List */}
           <div className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-4">
+            <div className="space-y-2">
               {Object.values(
                 templateSlots.reduce((acc, slot) => {
                   if (!acc[slot.templateId]) {
@@ -339,7 +297,7 @@ export default function PhotoSelectionScreen({
                     </button>
                   )}
                   <h3 className="font-semibold mb-2 text-center text-sm">{templateName}</h3>
-                  <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '280px' }}>
+                  <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '400px' }}>
                     <TemplateVisual
                       template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
                       slots={slots}
@@ -513,11 +471,11 @@ function PhotoCard({ photo, onSelect }: { photo: Photo; onSelect: () => void }) 
     // Generate fallback URLs for this photo
     const fallbacks = [];
     
-    // If we have a thumbnail, try different sizes
+    // If we have a thumbnail, prioritize smaller sizes for grid performance
     if (photo.thumbnailUrl) {
-      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s800'));
-      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s600'));
-      fallbacks.push(photo.thumbnailUrl);
+      fallbacks.push(photo.thumbnailUrl); // =s220 (220px - perfect for grid)
+      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s400')); // =s400 (fallback)
+      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s600')); // =s600 (last resort)
     }
     
     // Try direct Google Drive link
@@ -580,7 +538,7 @@ function PhotoCard({ photo, onSelect }: { photo: Photo; onSelect: () => void }) 
   return (
     <div
       onClick={onSelect}
-      className="bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer transform hover:scale-105 transition-transform duration-200"
+      className="relative overflow-hidden cursor-pointer hover:opacity-90 transition-opacity duration-200"
     >
       <div className="w-full relative" style={{ aspectRatio: '2/3' }}>
         <img 
@@ -615,8 +573,12 @@ function PhotoCard({ photo, onSelect }: { photo: Photo; onSelect: () => void }) 
             </div>
           </div>
         )}
+        
+        {/* Filename overlay at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white px-2 py-1">
+          <p className="text-xs truncate">{photo.name}</p>
+        </div>
       </div>
-      <p className="text-xs text-center p-2 truncate text-gray-600">{photo.name}</p>
     </div>
   );
 } 
