@@ -293,71 +293,86 @@ export default function PhotoSelectionScreen({
         </div>
 
         {/* Desktop: Vertical right sidebar */}
-        <div className="hidden lg:block bg-white shadow-lg border-l flex-shrink-0" style={{ width: '320px' }}>
-          <div className="p-4 h-full flex flex-col">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 text-center flex-shrink-0">Your Print Templates</h2>
-            <div className="flex-1 overflow-y-auto">
-              <div className="space-y-4">
-                {Object.values(
-                  templateSlots.reduce((acc, slot) => {
-                    if (!acc[slot.templateId]) {
-                      acc[slot.templateId] = {
-                        templateId: slot.templateId,
-                        templateName: slot.templateName,
-                        slots: [],
-                      };
-                    }
-                    acc[slot.templateId].slots.push(slot);
-                    return acc;
-                  }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
-                ).map(({ templateId, templateName, slots }) => (
-                  <div key={templateId} className="relative">
-                    {templateName.includes('(Additional)') && (
-                      <button
-                        onClick={() => handleDeletePrint(templateId)}
-                        title="Delete Print"
-                        className="absolute top-0 right-0 z-10 bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                    <h3 className="font-semibold mb-2 text-center text-sm">{templateName}</h3>
-                    <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '200px' }}>
-                      <TemplateVisual
-                        template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
-                        slots={slots}
-                        onSlotClick={onSlotSelect}
-                        photos={photos}
-                        selectedSlot={selectedSlot}
-                      />
-                    </div>
+        <div className="hidden lg:flex bg-white shadow-lg border-l flex-shrink-0 flex-col" style={{ width: '320px' }}>
+          {/* Desktop Header in Sidebar */}
+          <div className="p-4 border-b">
+            <div className="flex items-center justify-between mb-3">
+              <button 
+                onClick={openAddPrintModal} 
+                className="bg-green-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-2 text-sm"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                </svg>
+                <span>Add Print</span>
+              </button>
+            </div>
+            <h2 className="text-lg font-bold text-gray-800 text-center">Your Print Templates</h2>
+          </div>
+
+          {/* Templates List */}
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="space-y-4">
+              {Object.values(
+                templateSlots.reduce((acc, slot) => {
+                  if (!acc[slot.templateId]) {
+                    acc[slot.templateId] = {
+                      templateId: slot.templateId,
+                      templateName: slot.templateName,
+                      slots: [],
+                    };
+                  }
+                  acc[slot.templateId].slots.push(slot);
+                  return acc;
+                }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
+              ).map(({ templateId, templateName, slots }) => (
+                <div key={templateId} className="relative">
+                  {templateName.includes('(Additional)') && (
+                    <button
+                      onClick={() => handleDeletePrint(templateId)}
+                      title="Delete Print"
+                      className="absolute top-0 right-0 z-10 bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                  <h3 className="font-semibold mb-2 text-center text-sm">{templateName}</h3>
+                  <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '200px' }}>
+                    <TemplateVisual
+                      template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
+                      slots={slots}
+                      onSlotClick={onSlotSelect}
+                      photos={photos}
+                      selectedSlot={selectedSlot}
+                    />
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop Navigation in Sidebar */}
+          <div className="p-4 border-t bg-gray-50">
+            <div className="space-y-2">
+              <button
+                onClick={handleBack}
+                className="w-full px-4 py-2 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm"
+              >
+                ← Back to Templates
+              </button>
+              <button
+                onClick={handlePhotoContinue}
+                className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md"
+              >
+                Finalize Selections
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Bottom Navigation - Only visible on desktop */}
-      <div className="hidden lg:flex bg-white border-t shadow-lg p-3 sm:p-4 flex-shrink-0">
-        <div className="flex justify-between items-center max-w-full w-full">
-          <button
-            onClick={handleBack}
-            className="px-4 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm sm:text-base"
-          >
-            ← Back
-          </button>
-          <button
-            onClick={handlePhotoContinue}
-            className="bg-blue-600 text-white px-6 py-2 sm:px-8 sm:py-3 rounded-lg font-medium text-sm sm:text-lg hover:bg-blue-700 transition-all duration-200 shadow-md flex-shrink-0"
-          >
-            Finalize Selections
-          </button>
-        </div>
-      </div>
 
       {editingTemplate && (
         <InlineTemplateEditor
