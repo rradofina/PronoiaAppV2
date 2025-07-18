@@ -17,7 +17,13 @@ interface PhotoSelectionScreenProps {
   handlePhotoSelect: (photo: Photo) => void;
   handleSlotSelect: (slot: TemplateSlot) => void;
   handleBack: () => void;
-  TemplateVisual: React.FC<any>; // Using any for now to avoid circular dependencies
+  TemplateVisual: React.FC<{
+    template: { id: string; name: string; slots: number };
+    slots: TemplateSlot[];
+    onSlotClick: (slot: TemplateSlot) => void;
+    photos: Photo[];
+    selectedSlot: TemplateSlot | null;
+  }>;
   totalAllowedPrints: number;
   setSelectedSlot: (slot: TemplateSlot | null) => void;
   setTemplateSlots: (slots: TemplateSlot[]) => void;
@@ -136,7 +142,6 @@ export default function PhotoSelectionScreen({
             {totalAllowedPrints > (selectedPackage?.templateCount || 0) && (
               <span className="ml-2 text-green-600">+ {totalAllowedPrints - (selectedPackage?.templateCount || 0)} additional</span>
             )}
-            {googleAuth.userEmail === 'demo@example.com' && <span className="ml-2 bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">DEMO MODE</span>}
           </div>
           {selectedSlot && (
             <div className="mt-2 text-sm text-white bg-blue-600 px-4 py-2 rounded-full inline-block">

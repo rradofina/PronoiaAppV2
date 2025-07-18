@@ -41,7 +41,6 @@ export default function TemplateSelectionScreen({
             {totalAllowedPrints > (selectedPackage?.templateCount || 0) && (
               <span className="ml-2 text-green-600">+ {totalAllowedPrints - (selectedPackage?.templateCount || 0)} additional</span>
             )}
-            {googleAuth.userEmail === 'demo@example.com' && <span className="ml-2 bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">DEMO MODE</span>}
           </div>
         </div>
 
