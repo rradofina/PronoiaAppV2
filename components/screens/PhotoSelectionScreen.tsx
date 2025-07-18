@@ -276,7 +276,7 @@ export default function PhotoSelectionScreen({
                       </button>
                     )}
                     <h3 className="font-semibold mb-2 text-center text-xs leading-tight truncate px-1">{templateName}</h3>
-                    <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '220px' }}>
+                    <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '260px' }}>
                       <TemplateVisual
                         template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
                         slots={slots}
@@ -339,7 +339,7 @@ export default function PhotoSelectionScreen({
                     </button>
                   )}
                   <h3 className="font-semibold mb-2 text-center text-sm">{templateName}</h3>
-                  <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '200px' }}>
+                  <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '280px' }}>
                     <TemplateVisual
                       template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
                       slots={slots}

@@ -53,7 +53,7 @@ export default function InlineTemplateEditor({
           <h3 className="text-center font-bold mb-2">{currentTemplate.templateName}</h3>
           <div className="relative flex-1 w-full flex items-center justify-center">
             <div className="w-full h-full flex items-center justify-center">
-              <div style={{ aspectRatio: '4 / 6', height: '100%', maxHeight: '400px', width: 'auto' }}>
+              <div style={{ aspectRatio: '4 / 6', height: '100%', maxHeight: '500px', width: 'auto' }}>
                 <TemplateVisual
                   template={{ id: currentTemplate.templateType, name: currentTemplate.templateName, slots: templateSlots.length }}
                   slots={templateSlots}
@@ -103,7 +103,7 @@ export default function InlineTemplateEditor({
             <h3 className="text-center font-bold mb-4 text-xl">{currentTemplate.templateName}</h3>
             <div className="relative flex-1 w-full flex items-center justify-center">
               <div className="h-full flex items-center justify-center">
-                <div style={{ aspectRatio: '4 / 6', height: '100%', maxHeight: '600px', width: 'auto' }}>
+                <div style={{ aspectRatio: '4 / 6', height: '100%', maxHeight: '700px', width: 'auto' }}>
                   <TemplateVisual
                     template={{ id: currentTemplate.templateType, name: currentTemplate.templateName, slots: templateSlots.length }}
                     slots={templateSlots}
