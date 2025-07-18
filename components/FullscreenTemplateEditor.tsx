@@ -78,7 +78,7 @@ export default function FullscreenTemplateEditor({
       <div className="px-4 pb-4 border-b border-gray-800">
         <div className="flex items-center space-x-3">
           <img
-            src={selectedPhoto.thumbnailUrl || selectedPhoto.url}
+            src={selectedPhoto.thumbnailUrl ? selectedPhoto.thumbnailUrl.replace('=s220', '=s400') : selectedPhoto.url}
             alt={selectedPhoto.name}
             className="w-10 h-10 object-cover rounded"
           />

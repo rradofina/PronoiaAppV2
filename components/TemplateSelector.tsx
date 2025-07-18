@@ -62,7 +62,7 @@ export default function TemplateSelector({
       <div className="p-4 border-b border-gray-600">
         <div className="flex items-center space-x-3">
           <img
-            src={selectedPhoto.thumbnailUrl || selectedPhoto.url}
+            src={selectedPhoto.thumbnailUrl ? selectedPhoto.thumbnailUrl.replace('=s220', '=s400') : selectedPhoto.url}
             alt={selectedPhoto.name}
             className="w-12 h-12 object-cover rounded"
           />

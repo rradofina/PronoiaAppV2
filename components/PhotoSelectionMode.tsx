@@ -62,7 +62,7 @@ export default function PhotoSelectionMode({
               style={{ aspectRatio: '2/3' }}
             >
               <img 
-                src={photo.thumbnailUrl || photo.url} 
+                src={photo.thumbnailUrl ? photo.thumbnailUrl.replace('=s220', '=s400') : photo.url} 
                 alt={photo.name} 
                 className="w-full h-full object-cover"
               />

@@ -599,11 +599,11 @@ function PhotoCard({ photo, onSelect }: { photo: Photo; onSelect: () => void }) 
     // Generate fallback URLs for this photo
     const fallbacks = [];
     
-    // If we have a thumbnail, prioritize smaller sizes for grid performance
+    // If we have a thumbnail, use higher resolution for better quality on modern displays
     if (photo.thumbnailUrl) {
-      fallbacks.push(photo.thumbnailUrl); // =s220 (220px - perfect for grid)
-      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s400')); // =s400 (fallback)
-      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s600')); // =s600 (last resort)
+      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s400')); // =s400 (better quality for grid)
+      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s600')); // =s600 (high quality fallback)
+      fallbacks.push(photo.thumbnailUrl); // =s220 (original size as fallback)
     }
     
     // Try direct Google Drive link
