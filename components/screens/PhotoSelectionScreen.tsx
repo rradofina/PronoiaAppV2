@@ -4,6 +4,11 @@ import { PRINT_SIZES, TEMPLATE_TYPES } from '../../utils/constants';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import InlineTemplateEditor from '../InlineTemplateEditor';
+import FullscreenPhotoViewer from '../FullscreenPhotoViewer';
+import TemplateSelector from '../TemplateSelector';
+import FullscreenTemplateEditor from '../FullscreenTemplateEditor';
+import FullscreenTemplateSelector from '../FullscreenTemplateSelector';
+import PhotoSelectionMode from '../PhotoSelectionMode';
 
 interface PhotoSelectionScreenProps {
   clientName: string;
@@ -52,6 +57,13 @@ export default function PhotoSelectionScreen({
   const [selectedSize, setSelectedSize] = useState<'4R' | '5R' | 'A4'>('4R');
   const [addPrintQuantity, setAddPrintQuantity] = useState(1);
   const [hasScrolled, setHasScrolled] = useState(false);
+  
+  // New workflow states
+  const [viewMode, setViewMode] = useState<'normal' | 'photo-viewer' | 'template-selector' | 'template-editor' | 'template-first' | 'photo-selection'>('normal');
+  const [selectedPhotoForViewer, setSelectedPhotoForViewer] = useState<Photo | null>(null);
+  const [selectedPhotoForTemplate, setSelectedPhotoForTemplate] = useState<Photo | null>(null);
+  const [selectedTemplateForViewer, setSelectedTemplateForViewer] = useState<string | null>(null);
+  const [selectedSlotForEditor, setSelectedSlotForEditor] = useState<TemplateSlot | null>(null);
 
   const onSlotSelect = (slot: TemplateSlot) => {
     setSelectedSlot(slot);
@@ -127,6 +139,65 @@ export default function PhotoSelectionScreen({
     }
   };
 
+  // New workflow handlers
+  
+  // Photo-first workflow
+  const handlePhotoClick = (photo: Photo) => {
+    setSelectedPhotoForViewer(photo);
+    setViewMode('photo-viewer');
+  };
+
+  const handleAddToTemplate = (photo: Photo) => {
+    setSelectedPhotoForTemplate(photo);
+    setViewMode('template-selector');
+  };
+
+  const handleTemplateSelectFromPhoto = (templateId: string) => {
+    setSelectedTemplateForViewer(templateId);
+    setViewMode('template-editor');
+    
+    // For solo templates, auto-select the first slot
+    const templateSlot = templateSlots.find(s => s.templateId === templateId);
+    if (templateSlot?.templateType === 'solo') {
+      setSelectedSlotForEditor(templateSlot);
+    }
+  };
+
+  // Template-first workflow  
+  const handleTemplateClick = (templateId: string) => {
+    setSelectedTemplateForViewer(templateId);
+    setViewMode('template-first');
+  };
+
+  const handleSlotSelectFromTemplate = (slot: TemplateSlot) => {
+    setSelectedSlotForEditor(slot);
+    setViewMode('photo-selection');
+  };
+
+  const handlePhotoSelectForSlot = (photo: Photo) => {
+    setSelectedPhotoForTemplate(photo);
+    setViewMode('template-editor');
+  };
+
+  // Template editor
+  const handleApplyPhotoToSlot = (slotId: string, photoId: string, transform?: { scale: number; x: number; y: number }) => {
+    const updatedSlots = templateSlots.map(s =>
+      s.id === slotId ? { ...s, photoId, transform } : s
+    );
+    setTemplateSlots(updatedSlots);
+    
+    // Reset states and return to normal view
+    resetViewStates();
+  };
+
+  const resetViewStates = () => {
+    setViewMode('normal');
+    setSelectedPhotoForViewer(null);
+    setSelectedPhotoForTemplate(null);
+    setSelectedTemplateForViewer(null);
+    setSelectedSlotForEditor(null);
+  };
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ touchAction: 'pan-y' }}>
 
@@ -153,7 +224,7 @@ export default function PhotoSelectionScreen({
                 <PhotoCard 
                   key={photo.id}
                   photo={photo}
-                  onSelect={() => handlePhotoSelect(photo)}
+                  onSelect={() => handlePhotoClick(photo)}
                 />
               ))}
             </div>
@@ -229,13 +300,15 @@ export default function PhotoSelectionScreen({
                     )}
                     <h3 className="font-semibold mb-2 text-center text-xs leading-tight truncate px-1">{templateName}</h3>
                     <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '260px' }}>
-                      <TemplateVisual
-                        template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
-                        slots={slots}
-                        onSlotClick={onSlotSelect}
-                        photos={photos}
-                        selectedSlot={selectedSlot}
-                      />
+                      <div onClick={() => handleTemplateClick(templateId)}>
+                        <TemplateVisual
+                          template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
+                          slots={slots}
+                          onSlotClick={() => {}} // Disabled - clicking template goes to template-first mode
+                          photos={photos}
+                          selectedSlot={selectedSlot}
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -298,13 +371,15 @@ export default function PhotoSelectionScreen({
                   )}
                   <h3 className="font-semibold mb-2 text-center text-sm">{templateName}</h3>
                   <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '400px' }}>
-                    <TemplateVisual
-                      template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
-                      slots={slots}
-                      onSlotClick={onSlotSelect}
-                      photos={photos}
-                      selectedSlot={selectedSlot}
-                    />
+                    <div onClick={() => handleTemplateClick(templateId)}>
+                      <TemplateVisual
+                        template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
+                        slots={slots}
+                        onSlotClick={() => {}} // Disabled - clicking template goes to template-first mode
+                        photos={photos}
+                        selectedSlot={selectedSlot}
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -457,6 +532,59 @@ export default function PhotoSelectionScreen({
           </div>
         </Dialog>
       </Transition>
+
+      {/* New Workflow Components */}
+      
+      {/* Fullscreen Photo Viewer */}
+      <FullscreenPhotoViewer
+        photo={selectedPhotoForViewer!}
+        photos={photos}
+        onClose={resetViewStates}
+        onAddToTemplate={handleAddToTemplate}
+        isVisible={viewMode === 'photo-viewer' && !!selectedPhotoForViewer}
+      />
+
+      {/* Template Selector (from photo) */}
+      <TemplateSelector
+        templateSlots={templateSlots}
+        photos={photos}
+        selectedPhoto={selectedPhotoForTemplate!}
+        onTemplateSelect={handleTemplateSelectFromPhoto}
+        onClose={resetViewStates}
+        isVisible={viewMode === 'template-selector' && !!selectedPhotoForTemplate}
+      />
+
+      {/* Fullscreen Template Selector (template-first) */}
+      <FullscreenTemplateSelector
+        templateSlots={templateSlots}
+        selectedTemplateId={selectedTemplateForViewer || ''}
+        photos={photos}
+        onSlotSelect={handleSlotSelectFromTemplate}
+        onClose={resetViewStates}
+        isVisible={viewMode === 'template-first' && !!selectedTemplateForViewer}
+        TemplateVisual={TemplateVisual}
+      />
+
+      {/* Photo Selection Mode (template-first) */}
+      <PhotoSelectionMode
+        photos={photos}
+        selectedSlot={selectedSlotForEditor!}
+        onPhotoSelect={handlePhotoSelectForSlot}
+        onBack={() => setViewMode('template-first')}
+        isVisible={viewMode === 'photo-selection' && !!selectedSlotForEditor}
+      />
+
+      {/* Fullscreen Template Editor */}
+      <FullscreenTemplateEditor
+        templateSlots={templateSlots.filter(s => s.templateId === selectedSlotForEditor?.templateId)}
+        selectedSlot={selectedSlotForEditor!}
+        selectedPhoto={selectedPhotoForTemplate!}
+        photos={photos}
+        onApply={handleApplyPhotoToSlot}
+        onClose={resetViewStates}
+        isVisible={viewMode === 'template-editor' && !!selectedSlotForEditor && !!selectedPhotoForTemplate}
+        TemplateVisual={TemplateVisual}
+      />
     </div>
   );
 }
