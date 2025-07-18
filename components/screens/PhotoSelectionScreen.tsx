@@ -129,36 +129,55 @@ export default function PhotoSelectionScreen({
   return (
     <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden">
       {/* Header - Fixed at top on mobile/tablet, integrated on desktop */}
-      <div className="lg:hidden bg-white shadow-sm p-3 sm:p-4 flex-shrink-0 relative">
+      <div className="lg:hidden bg-white shadow-sm p-2 sm:p-3 flex-shrink-0">
+        <div className="flex items-center justify-between mb-2">
+          <button
+            onClick={handleBack}
+            className="flex items-center space-x-1 px-3 py-1.5 rounded-lg font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all duration-200 text-sm"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Back</span>
+          </button>
+          
+          <button 
+            onClick={openAddPrintModal} 
+            className="bg-green-600 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 text-sm"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+            <span>Add</span>
+          </button>
+
+          <button
+            onClick={handlePhotoContinue}
+            className="bg-blue-600 text-white px-4 py-1.5 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 text-sm"
+          >
+            Done
+          </button>
+        </div>
+        
         <div className="text-center">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-1">
             Photo Selection
           </h1>
-          <p className="text-sm sm:text-base text-gray-600">
+          <p className="text-xs sm:text-sm text-gray-600">
             Assign photos to your print slots for {clientName}
           </p>
-          <div className="mt-1 text-xs sm:text-sm text-blue-600">
+          <div className="mt-1 text-xs text-blue-600">
             {selectedPackage?.name} • {totalAllowedPrints} print(s)
             {totalAllowedPrints > (selectedPackage?.templateCount || 0) && (
               <span className="ml-2 text-green-600">+ {totalAllowedPrints - (selectedPackage?.templateCount || 0)} additional</span>
             )}
           </div>
           {selectedSlot && (
-            <div className="mt-2 text-xs sm:text-sm text-white bg-blue-600 px-3 py-1 sm:px-4 sm:py-2 rounded-full inline-block">
-              📍 Selecting for: {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
+            <div className="mt-2 text-xs text-white bg-blue-600 px-3 py-1 rounded-full inline-block">
+              📍 {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
             </div>
           )}
         </div>
-        <button 
-          onClick={openAddPrintModal} 
-          className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-green-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 sm:space-x-2 text-sm sm:text-base"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-          </svg>
-          <span className="hidden sm:inline">Add Print</span>
-          <span className="sm:hidden">Add</span>
-        </button>
       </div>
 
       {/* Main Content Area */}
@@ -226,11 +245,11 @@ export default function PhotoSelectionScreen({
 
         {/* Print Templates - Different layouts for mobile vs desktop */}
         {/* Mobile/Tablet: Horizontal bottom section */}
-        <div className="lg:hidden bg-white shadow-lg border-t flex-shrink-0" style={{ height: '260px' }}>
-          <div className="p-3 sm:p-4 h-full flex flex-col">
-            <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 text-center flex-shrink-0">Your Print Templates</h2>
+        <div className="lg:hidden bg-white shadow-lg border-t flex-shrink-0" style={{ height: '320px' }}>
+          <div className="p-2 sm:p-3 h-full flex flex-col">
+            <h2 className="text-base sm:text-lg font-bold text-gray-800 mb-2 text-center flex-shrink-0">Your Print Templates</h2>
             <div className="flex-1 overflow-hidden">
-              <div className="flex space-x-3 sm:space-x-4 overflow-x-auto h-full pb-2">
+              <div className="flex space-x-2 sm:space-x-3 overflow-x-auto h-full pb-2">
                 {Object.values(
                   templateSlots.reduce((acc, slot) => {
                     if (!acc[slot.templateId]) {
@@ -244,20 +263,20 @@ export default function PhotoSelectionScreen({
                     return acc;
                   }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
                 ).map(({ templateId, templateName, slots }) => (
-                  <div key={templateId} className="flex-shrink-0 relative pt-6" style={{ width: '160px' }}>
+                  <div key={templateId} className="flex-shrink-0 relative pt-4" style={{ width: '180px' }}>
                     {templateName.includes('(Additional)') && (
                       <button
                         onClick={() => handleDeletePrint(templateId)}
                         title="Delete Print"
                         className="absolute top-0 right-0 z-10 bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       </button>
                     )}
-                    <h3 className="font-semibold mb-2 text-center text-xs leading-tight">{templateName}</h3>
-                    <div className="w-full rounded-lg overflow-hidden" style={{ height: '160px' }}>
+                    <h3 className="font-semibold mb-2 text-center text-xs leading-tight truncate px-1">{templateName}</h3>
+                    <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '220px' }}>
                       <TemplateVisual
                         template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
                         slots={slots}
@@ -322,9 +341,9 @@ export default function PhotoSelectionScreen({
         </div>
       </div>
 
-      {/* Bottom Navigation - Always visible, fixed at bottom */}
-      <div className="bg-white border-t shadow-lg p-3 sm:p-4 flex-shrink-0">
-        <div className="flex justify-between items-center max-w-full">
+      {/* Bottom Navigation - Only visible on desktop */}
+      <div className="hidden lg:flex bg-white border-t shadow-lg p-3 sm:p-4 flex-shrink-0">
+        <div className="flex justify-between items-center max-w-full w-full">
           <button
             onClick={handleBack}
             className="px-4 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm sm:text-base"
