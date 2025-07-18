@@ -129,110 +129,118 @@ export default function PhotoSelectionScreen({
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* Header - Fixed at top */}
-      <div className="bg-white shadow-sm p-4 flex-shrink-0 relative">
+      <div className="bg-white shadow-sm p-3 sm:p-4 flex-shrink-0 relative">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-800 mb-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">
             Photo Selection
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600">
             Assign photos to your print slots for {clientName}
           </p>
-          <div className="mt-1 text-sm text-blue-600">
+          <div className="mt-1 text-xs sm:text-sm text-blue-600">
             {selectedPackage?.name} • {totalAllowedPrints} print(s)
             {totalAllowedPrints > (selectedPackage?.templateCount || 0) && (
               <span className="ml-2 text-green-600">+ {totalAllowedPrints - (selectedPackage?.templateCount || 0)} additional</span>
             )}
           </div>
           {selectedSlot && (
-            <div className="mt-2 text-sm text-white bg-blue-600 px-4 py-2 rounded-full inline-block">
+            <div className="mt-2 text-xs sm:text-sm text-white bg-blue-600 px-3 py-1 sm:px-4 sm:py-2 rounded-full inline-block">
               📍 Selecting for: {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
             </div>
           )}
         </div>
         <button 
           onClick={openAddPrintModal} 
-          className="absolute top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-2"
+          className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-green-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 sm:space-x-2 text-sm sm:text-base"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
           </svg>
-          <span>Add Print</span>
+          <span className="hidden sm:inline">Add Print</span>
+          <span className="sm:hidden">Add</span>
         </button>
       </div>
 
-      {/* Photo Grid - Scrollable content area */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {!selectedSlot && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-            <p className="text-yellow-800 text-center font-medium">
-              👇 Select a print slot below to start choosing photos
-            </p>
-          </div>
-        )}
+      {/* Main Content Area - Scrollable */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Photo Grid */}
+        <div className="p-3 sm:p-4">
+          {!selectedSlot && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+              <p className="text-yellow-800 text-center font-medium text-sm">
+                👇 Select a print slot below to start choosing photos
+              </p>
+            </div>
+          )}
 
-        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pb-4">
-          {photos.map((photo) => (
-            <PhotoCard 
-              key={photo.id}
-              photo={photo}
-              onSelect={() => handlePhotoSelect(photo)}
-            />
-          ))}
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
+            {photos.map((photo) => (
+              <PhotoCard 
+                key={photo.id}
+                photo={photo}
+                onSelect={() => handlePhotoSelect(photo)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Print Templates - Scrollable section */}
+        <div className="bg-white shadow-lg p-3 sm:p-4 mt-4">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 text-center">Your Print Templates</h2>
+          <div className="flex space-x-3 sm:space-x-4 overflow-x-auto pb-4 min-h-[200px]">
+            {Object.values(
+              templateSlots.reduce((acc, slot) => {
+                if (!acc[slot.templateId]) {
+                  acc[slot.templateId] = {
+                    templateId: slot.templateId,
+                    templateName: slot.templateName,
+                    slots: [],
+                  };
+                }
+                acc[slot.templateId].slots.push(slot);
+                return acc;
+              }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
+            ).map(({ templateId, templateName, slots }) => (
+              <div key={templateId} className="flex-shrink-0 relative pt-4" style={{ width: '180px' }}>
+                {templateName.includes('(Additional)') && (
+                  <button
+                    onClick={() => handleDeletePrint(templateId)}
+                    title="Delete Print"
+                    className="absolute top-0 right-0 z-10 bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+                <h3 className="font-semibold mb-2 text-center text-xs sm:text-sm">{templateName}</h3>
+                <div className="w-full rounded-lg overflow-hidden">
+                  <TemplateVisual
+                    template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
+                    slots={slots}
+                    onSlotClick={onSlotSelect}
+                    photos={photos}
+                    selectedSlot={selectedSlot}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Print Templates - Fixed at bottom with a controlled, fixed height */}
-      <div className="bg-white shadow-lg p-4 flex-shrink-0" style={{ height: '320px' }}>
-        <h2 className="text-xl font-bold text-gray-800 mb-3 text-center">Your Print Templates</h2>
-        <div className="flex space-x-4 overflow-x-auto overflow-y-hidden pb-4" style={{ height: '100%' }}>
-          {Object.values(
-            templateSlots.reduce((acc, slot) => {
-              if (!acc[slot.templateId]) {
-                acc[slot.templateId] = {
-                  templateId: slot.templateId,
-                  templateName: slot.templateName,
-                  slots: [],
-                };
-              }
-              acc[slot.templateId].slots.push(slot);
-              return acc;
-            }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
-          ).map(({ templateId, templateName, slots }) => (
-            <div key={templateId} className="flex-shrink-0 relative pt-4" style={{ width: '200px' }}>
-              {templateName.includes('(Additional)') && (
-                <button
-                  onClick={() => handleDeletePrint(templateId)}
-                  title="Delete Print"
-                  className="absolute top-0 right-0 z-10 bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-              <h3 className="font-semibold mb-2 text-center text-sm">{templateName}</h3>
-              <div className="w-full rounded-lg overflow-hidden">
-                <TemplateVisual
-                  template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
-                  slots={slots}
-                  onSlotClick={onSlotSelect}
-                  photos={photos}
-                  selectedSlot={selectedSlot}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 flex justify-between items-center">
+      {/* Bottom Navigation - Always visible, fixed at bottom */}
+      <div className="bg-white border-t shadow-lg p-3 sm:p-4 flex-shrink-0">
+        <div className="flex justify-between items-center max-w-full">
           <button
             onClick={handleBack}
-            className="px-6 py-3 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200"
+            className="px-4 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm sm:text-base"
           >
-            ← Back to Templates
+            ← Back
           </button>
           <button
             onClick={handlePhotoContinue}
-            className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium text-lg hover:bg-blue-700 transition-all duration-200 shadow-md"
+            className="bg-blue-600 text-white px-6 py-2 sm:px-8 sm:py-3 rounded-lg font-medium text-sm sm:text-lg hover:bg-blue-700 transition-all duration-200 shadow-md flex-shrink-0"
           >
             Finalize Selections
           </button>
