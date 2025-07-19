@@ -31,7 +31,6 @@ export default function TemplateBuilder() {
     error,
     successMessage,
     setBuilderMode,
-    setBuilderTemplate,
     setSelectedPrintSize,
     saveCustomTemplate,
     loadCustomTemplate,
@@ -205,7 +204,13 @@ export default function TemplateBuilder() {
         zoom: canvas.zoom,
         gridSize: canvas.gridSize,
       } as any,
-      photo_slots: photoSlots.map(({ isSelected, isDragging, ...slot }) => slot),
+      photo_slots: photoSlots.map((slot) => {
+        // Remove UI-only properties before saving
+        const cleanSlot = { ...slot };
+        delete (cleanSlot as any).isSelected;
+        delete (cleanSlot as any).isDragging;
+        return cleanSlot;
+      }),
       dimensions: currentPrintSize.dimensions,
       category: templateCategory || undefined,
       tags: templateTags.length > 0 ? templateTags : undefined,
@@ -237,7 +242,7 @@ export default function TemplateBuilder() {
       <AdminLayout>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-gray-600">Loading template builder...</p>
           </div>
         </div>
@@ -335,7 +340,7 @@ export default function TemplateBuilder() {
                     >
                       {Object.entries(PRINT_SIZES).map(([key, size]) => (
                         <option key={key} value={key}>
-                          {size.label} - {size.dimensions.inches.width}×{size.dimensions.inches.height}"
+                          {size.label} - {size.dimensions.inches.width}×{size.dimensions.inches.height}&quot;
                         </option>
                       ))}
                     </select>
@@ -491,10 +496,10 @@ export default function TemplateBuilder() {
                     {/* Resize handles */}
                     {slot.isSelected && (
                       <>
-                        <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 border border-white rounded-full cursor-nw-resize"></div>
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 border border-white rounded-full cursor-ne-resize"></div>
-                        <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 border border-white rounded-full cursor-sw-resize"></div>
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 border border-white rounded-full cursor-se-resize"></div>
+                        <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 border border-white rounded-full cursor-nw-resize" />
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 border border-white rounded-full cursor-ne-resize" />
+                        <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 border border-white rounded-full cursor-sw-resize" />
+                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 border border-white rounded-full cursor-se-resize" />
                       </>
                     )}
                   </div>

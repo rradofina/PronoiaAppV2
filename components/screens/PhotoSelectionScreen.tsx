@@ -100,7 +100,7 @@ export default function PhotoSelectionScreen({
     if (selectedType) {
       const template = TEMPLATE_TYPES.find(t => t.id === selectedType);
       if (template) {
-        let newSlotsToAdd: TemplateSlot[] = [];
+        const newSlotsToAdd: TemplateSlot[] = [];
         // Find the next available index for a new template to ensure unique IDs
         const existingTemplateIds = new Set(templateSlots.map(s => s.templateId));
         const nextTemplateIndex = existingTemplateIds.size;

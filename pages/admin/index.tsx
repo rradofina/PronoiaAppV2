@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { useAdminStore } from '../../stores/adminStore';
-import useAuthStore from '../../stores/authStore';
+// import useAuthStore from '../../stores/authStore';
 import { supabaseService } from '../../services/supabaseService';
 
 interface DashboardStats {
@@ -26,15 +27,14 @@ export default function AdminDashboard() {
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
-  const { adminUser, customTemplates, loadCustomTemplates } = useAdminStore();
-  const { googleAuth } = useAuthStore();
+  const { adminUser, loadCustomTemplates } = useAdminStore();
 
   useEffect(() => {
     if (adminUser) {
       loadDashboardStats();
       loadCustomTemplates(); // Load all templates for stats
     }
-  }, [adminUser]);
+  }, [adminUser, loadCustomTemplates]);
 
   const loadDashboardStats = async () => {
     setIsLoadingStats(true);
@@ -104,7 +104,7 @@ export default function AdminDashboard() {
       <AdminLayout>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-gray-600">Loading dashboard...</p>
           </div>
         </div>
@@ -121,7 +121,7 @@ export default function AdminDashboard() {
             Welcome back, {adminUser?.name || adminUser?.email}! 👋
           </h2>
           <p className="text-gray-600">
-            Here's an overview of your PronoiaApp admin panel.
+            Here&apos;s an overview of your PronoiaApp admin panel.
           </p>
         </div>
 
@@ -182,7 +182,7 @@ export default function AdminDashboard() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <a
+            <Link
               href="/admin/templates/builder"
               className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
             >
@@ -191,9 +191,9 @@ export default function AdminDashboard() {
                 <p className="font-medium text-gray-800">Create New Template</p>
                 <p className="text-sm text-gray-600">Design custom photo layouts</p>
               </div>
-            </a>
+            </Link>
 
-            <a
+            <Link
               href="/admin/templates"
               className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
             >
@@ -202,7 +202,7 @@ export default function AdminDashboard() {
                 <p className="font-medium text-gray-800">Manage Templates</p>
                 <p className="text-sm text-gray-600">Edit existing templates</p>
               </div>
-            </a>
+            </Link>
 
             <a
               href="/admin/templates/categories"
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
             {stats.recentActivity.map((activity) => (
               <div key={activity.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
                 <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full" />
                   <div>
                     <p className="text-sm font-medium text-gray-800">
                       {activity.action} <span className="text-blue-600">{activity.target}</span>
@@ -250,7 +250,7 @@ export default function AdminDashboard() {
                     <div 
                       className="bg-blue-500 h-2 rounded-full"
                       style={{ width: `${(count / stats.totalTemplates) * 100}%` }}
-                    ></div>
+                    />
                   </div>
                   <span className="text-sm text-gray-600 w-8">{count}</span>
                 </div>

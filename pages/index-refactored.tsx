@@ -13,7 +13,7 @@ import PhotoSelectionScreen from '../components/screens/PhotoSelectionScreen';
 import TemplateVisual from '../components/TemplateVisual';
 import ErrorBoundary from '../components/ErrorBoundary';
 import googleDriveService from '../services/googleDriveService';
-import { DEFAULT_TEMPLATE_CYCLE, TEMPLATE_TYPES } from '../utils/constants';
+// Removed unused import
 
 declare global {
   interface Window {
@@ -57,10 +57,8 @@ export default function Home() {
     selectedPackage,
     clientName,
     packages,
-    currentStep,
     setSelectedPackage,
     setClientName,
-    setCurrentStep,
     clearSession,
   } = useSessionStore();
   const {
@@ -72,7 +70,6 @@ export default function Home() {
     setSelectedSlot,
     handleTemplateCountChange,
     getTotalTemplateCount,
-    setTemplateCounts,
     clearTemplates,
   } = useTemplateStore();
   const { addEvent, setLoading, setError } = useUIStore();
@@ -189,7 +186,7 @@ export default function Home() {
               }
             }
           }
-        } catch (error) {
+        } catch {
           addEvent('Failed to restore authentication, clearing stored token');
           clearStoredAuth();
         } finally {
@@ -221,7 +218,7 @@ export default function Home() {
 
     setIsConnecting(true);
 
-    const redirectUri = window.location.origin;
+    // const redirectUri = window.location.origin;
     const scope = 'https://www.googleapis.com/auth/drive';
     const state = `${Math.random().toString(36).substring(2, 15)}`;
 
@@ -258,7 +255,7 @@ export default function Home() {
           localStorage.setItem('google_user_email', email);
           setGoogleAuth({ isSignedIn: true, userEmail: email });
         }
-      } catch (e) {
+      } catch {
         addEvent('Could not retrieve user email');
       }
     } catch (error: any) {

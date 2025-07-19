@@ -349,7 +349,7 @@ export class SupabaseService {
       const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
       if (adminEmails.length > 0 && adminEmails.includes(user.email)) {
         // Auto-grant admin role if not already set
-        if (!user.preferences?.role) {
+        if (!(user.preferences as any)?.role) {
           await this.grantAdminRole(user.email);
         }
         return true;

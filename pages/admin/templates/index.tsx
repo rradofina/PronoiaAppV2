@@ -100,7 +100,7 @@ export default function TemplateManagement() {
 
   useEffect(() => {
     loadCustomTemplates(selectedPrintSize);
-  }, [selectedPrintSize]);
+  }, [selectedPrintSize, loadCustomTemplates]);
 
   const handleEdit = (template: CustomTemplate) => {
     // Navigate to template builder in edit mode
@@ -190,7 +190,7 @@ export default function TemplateManagement() {
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
               <p className="text-gray-600">Loading templates...</p>
             </div>
           </div>
@@ -227,7 +227,7 @@ export default function TemplateManagement() {
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
               <h3 className="text-lg font-semibold text-gray-800 mb-2">Delete Template</h3>
               <p className="text-gray-600 mb-4">
-                Are you sure you want to delete "{deleteConfirm.name}"? This action cannot be undone.
+                Are you sure you want to delete &quot;{deleteConfirm.name}&quot;? This action cannot be undone.
               </p>
               <div className="flex space-x-3 justify-end">
                 <button
