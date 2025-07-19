@@ -2,9 +2,6 @@ import { DriveFolder, GoogleAuth } from '../../types';
 import { useState, useEffect } from 'react';
 import { ChevronRight, Folder, ChevronLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useSupabaseAuthStore } from '../../stores/supabaseAuthStore';
-import MagicLinkAuth from '../auth/MagicLinkAuth';
-import toast from 'react-hot-toast';
 
 interface DriveSetupScreenProps {
   isGapiLoaded: boolean;
@@ -29,7 +26,6 @@ export default function DriveSetupScreen({
   isConnecting,
   isRestoringAuth = false,
 }: DriveSetupScreenProps) {
-  const { isSignedIn: isSupabaseSignedIn, user, signOut: supabaseSignOut } = useSupabaseAuthStore();
   const [isSelectingFolder, setIsSelectingFolder] = useState(false);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderPath, setFolderPath] = useState<{ id: string; name: string }[]>([]);
@@ -120,34 +116,17 @@ export default function DriveSetupScreen({
           </p>
         </div>
 
-        {!isSupabaseSignedIn ? (
+        {!googleAuth.isSignedIn ? (
           <div className="space-y-6">
-            {/* Magic Link Authentication */}
-            <div className="bg-white rounded-lg p-8 shadow-sm">
-              <MagicLinkAuth
-                onSuccess={() => {
-                  toast.success('Authentication successful! Now connect to Google Drive.');
-                }}
-                onError={(error) => {
-                  toast.error(error);
-                }}
-              />
-            </div>
-          </div>
-        ) : !googleAuth.isSignedIn ? (
-          <div className="space-y-6">
-            {/* Google Drive Connection after Supabase auth */}
+            {/* Google Sign In */}
             <div className="bg-white rounded-lg p-8 shadow-sm text-center">
               <div className="mb-6">
                 <div className="text-6xl mb-4">📁</div>
                 <h2 className="text-2xl font-semibold text-gray-800 mb-2">
                   Connect Google Drive
                 </h2>
-                <p className="text-gray-600 mb-2">
-                  Welcome {user?.email}! Now let's connect to your Google Drive.
-                </p>
-                <p className="text-sm text-gray-500">
-                  This allows us to access your photo folders securely.
+                <p className="text-gray-600">
+                  Sign in to securely access your photo folders.
                 </p>
               </div>
               <div className="flex justify-center">
@@ -155,7 +134,7 @@ export default function DriveSetupScreen({
                   onClick={handleGoogleSignIn}
                   className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium text-lg hover:bg-blue-700 transition-all duration-200 shadow-md"
                 >
-                  Connect Google Drive
+                  Sign in with Google
                 </button>
               </div>
             </div>
@@ -167,30 +146,15 @@ export default function DriveSetupScreen({
               <h2 className="text-2xl font-semibold text-gray-800 mb-2">
                 Connected to Google Drive
               </h2>
-              <p className="text-gray-600 mb-2">
-                Supabase: <span className="font-medium">{user?.email}</span>
-              </p>
               <p className="text-gray-600">
-                Google Drive: <span className="font-medium">{googleAuth.userEmail}</span>
+                Signed in as: <span className="font-medium">{googleAuth.userEmail}</span>
               </p>
-              <div className="flex gap-2 justify-center mt-4">
-                <button
-                  onClick={handleSignOut}
-                  className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-600 transition-all duration-200"
-                >
-                  Disconnect Google Drive
-                </button>
-                <button
-                  onClick={() => {
-                    supabaseSignOut();
-                    handleSignOut(); // Also sign out of Google Drive
-                    toast.success('Signed out successfully');
-                  }}
-                  className="bg-gray-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-600 transition-all duration-200"
-                >
-                  Sign Out Completely
-                </button>
-              </div>
+              <button
+                onClick={handleSignOut}
+                className="mt-4 bg-red-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-600 transition-all duration-200"
+              >
+                Sign Out
+              </button>
             </div>
             
             {mainSessionsFolder && !isSelectingFolder ? (

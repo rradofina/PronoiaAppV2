@@ -2,11 +2,10 @@
 import '../styles/globals.css';
 import type { AppProps } from 'next/app';
 import { Toaster } from 'react-hot-toast';
-import AuthWrapper from '../components/auth/AuthWrapper';
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <AuthWrapper>
+    <>
       <Component {...pageProps} />
       <Toaster
         position="top-right"
@@ -32,6 +31,6 @@ export default function App({ Component, pageProps }: AppProps) {
           },
         }}
       />
-    </AuthWrapper>
+    </>
   );
 } 
