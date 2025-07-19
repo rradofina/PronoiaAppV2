@@ -17,14 +17,27 @@ const TemplateVisual: React.FC<TemplateVisualProps> = React.memo(({
   selectedSlot
 }) => {
   const getPhotoUrl = (photoId?: string | null) => {
-    if (!photoId) return null;
+    if (!photoId) {
+      console.log('🖼️ TemplateVisual: No photoId provided');
+      return null;
+    }
+    
     const photo = photos.find(p => p.id === photoId);
-    if (!photo) return null;
+    if (!photo) {
+      console.log('🖼️ TemplateVisual: Photo not found for ID:', photoId, 'Available photos:', photos.length);
+      return null;
+    }
+    
+    console.log('🖼️ TemplateVisual: Found photo:', photo.name, 'ID:', photoId);
     
     // Use higher resolution thumbnail for better template preview quality
     if (photo.thumbnailUrl) {
-      return photo.thumbnailUrl.replace('=s220', '=s600');
+      const url = photo.thumbnailUrl.replace('=s220', '=s600');
+      console.log('🖼️ TemplateVisual: Using thumbnail URL:', url);
+      return url;
     }
+    
+    console.log('🖼️ TemplateVisual: Using original URL:', photo.url);
     return photo.url || null;
   };
 

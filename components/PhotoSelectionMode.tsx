@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { TemplateSlot, Photo } from '../types';
 
 interface PhotoSelectionModeProps {
@@ -61,10 +62,8 @@ export default function PhotoSelectionMode({
               className="relative overflow-hidden cursor-pointer hover:opacity-75 transition-opacity"
               style={{ aspectRatio: '2/3' }}
             >
-              <img 
-                src={photo.thumbnailUrl ? photo.thumbnailUrl.replace('=s220', '=s400') : photo.url} 
-                alt={photo.name} 
-                className="w-full h-full object-cover"
+              <TemplateFirstPhotoCard 
+                photo={photo}
               />
               
               {/* Filename overlay */}
@@ -83,5 +82,91 @@ export default function PhotoSelectionMode({
         </p>
       </div>
     </div>
+  );
+}
+
+// Photo card component with better error handling for template-first workflow
+function TemplateFirstPhotoCard({ photo }: { photo: Photo }) {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
+  
+  const fallbackUrls = (() => {
+    const urls = [];
+    
+    if (photo.thumbnailUrl) {
+      urls.push(photo.thumbnailUrl.replace('=s220', '=s400')); // Good quality for grid
+      urls.push(photo.thumbnailUrl.replace('=s220', '=s600')); // Higher quality fallback
+      urls.push(photo.thumbnailUrl); // Original thumbnail
+    }
+    
+    if (photo.url) {
+      urls.push(photo.url);
+    }
+    
+    if (photo.googleDriveId) {
+      urls.push(`https://drive.google.com/uc?id=${photo.googleDriveId}&export=view`);
+    }
+    
+    return urls.filter(Boolean);
+  })();
+
+  const getCurrentUrl = () => {
+    if (currentUrlIndex < fallbackUrls.length) {
+      return fallbackUrls[currentUrlIndex];
+    }
+    return photo.url || '';
+  };
+
+  const handleImageLoad = () => {
+    console.log(`✅ Template-first photo loaded: ${photo.name} (URL ${currentUrlIndex + 1}/${fallbackUrls.length})`);
+    setImageLoaded(true);
+    setImageError(false);
+  };
+
+  const handleImageError = () => {
+    console.error(`❌ Template-first photo failed: ${photo.name} (URL ${currentUrlIndex + 1}/${fallbackUrls.length}):`, getCurrentUrl());
+    
+    // Try next fallback URL
+    if (currentUrlIndex < fallbackUrls.length - 1) {
+      console.log(`🔄 Trying fallback URL ${currentUrlIndex + 2}/${fallbackUrls.length} for ${photo.name}`);
+      setCurrentUrlIndex(prev => prev + 1);
+      setImageLoaded(false);
+      setImageError(false);
+    } else {
+      // All URLs failed
+      console.error(`💥 All URLs failed for template-first photo: ${photo.name}`);
+      setImageError(true);
+      setImageLoaded(false);
+    }
+  };
+
+  return (
+    <>
+      <img 
+        key={`${photo.id}-${currentUrlIndex}`}
+        src={getCurrentUrl()}
+        alt={photo.name} 
+        className="w-full h-full object-cover"
+        onLoad={handleImageLoad}
+        onError={handleImageError}
+        style={{ display: imageLoaded && !imageError ? 'block' : 'none' }}
+        crossOrigin="anonymous"
+      />
+      
+      {/* Loading/Error placeholder */}
+      {(!imageLoaded || imageError) && (
+        <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+          <div className="text-center p-2">
+            <div className="text-lg mb-1">
+              {imageError ? '❌' : '⏳'}
+            </div>
+            <div className="text-xs">
+              {imageError ? 'Failed' : 'Loading...'}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

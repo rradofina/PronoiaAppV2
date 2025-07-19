@@ -177,9 +177,19 @@ export default function PhotoSelectionScreen({
 
   // Template editor
   const handleApplyPhotoToSlot = (slotId: string, photoId: string, transform?: { scale: number; x: number; y: number }) => {
+    console.log('🔧 Apply button clicked:', { slotId, photoId, transform });
+    console.log('🔧 Current templateSlots before update:', templateSlots);
+    
     const updatedSlots = templateSlots.map(s =>
       s.id === slotId ? { ...s, photoId, transform } : s
     );
+    
+    console.log('🔧 Updated slots after applying photo:', updatedSlots);
+    
+    // Check if photo exists in photos array
+    const photo = photos.find(p => p.id === photoId);
+    console.log('🔧 Photo found in photos array:', photo);
+    
     setTemplateSlots(updatedSlots);
     
     // Reset states and return to normal view
