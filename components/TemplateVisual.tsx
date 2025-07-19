@@ -9,7 +9,7 @@ interface TemplateVisualProps {
   selectedSlot: TemplateSlot | null;
 }
 
-const TemplateVisual: React.FC<TemplateVisualProps> = React.memo(({
+const TemplateVisual: React.FC<TemplateVisualProps> = ({
   template,
   slots,
   onSlotClick,
@@ -64,7 +64,7 @@ const TemplateVisual: React.FC<TemplateVisualProps> = React.memo(({
             <div className="w-full h-full flex items-center justify-center text-gray-500 border-2 border-dashed border-gray-300">
               <div className="text-center">
                 <div className="text-3xl mb-2">+</div>
-                <div className="text-xs font-medium">Add Photo Here</div>
+                <div className="text-xs font-medium">Tap to Add Photo</div>
               </div>
             </div>
           )}
@@ -96,7 +96,7 @@ const TemplateVisual: React.FC<TemplateVisualProps> = React.memo(({
                 <div className="w-full h-full flex items-center justify-center text-gray-500 border-2 border-dashed border-gray-300">
                   <div className="text-center">
                     <div className="text-lg mb-1">+</div>
-                    <div className="text-xs font-medium">Add Photo</div>
+                    <div className="text-xs font-medium">Tap to Add</div>
                   </div>
                 </div>
               )}
@@ -130,7 +130,7 @@ const TemplateVisual: React.FC<TemplateVisualProps> = React.memo(({
                 <div className="w-full h-full flex items-center justify-center text-gray-500">
                   <div className="text-center">
                     <div className="text-lg mb-1">+</div>
-                    <div className="text-xs font-medium">Add Photo</div>
+                    <div className="text-xs font-medium">Tap to Add</div>
                   </div>
                 </div>
               )}
@@ -180,7 +180,7 @@ const TemplateVisual: React.FC<TemplateVisualProps> = React.memo(({
   }
 
   return null;
-});
+};
 
 TemplateVisual.displayName = 'TemplateVisual';
 

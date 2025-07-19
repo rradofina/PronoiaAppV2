@@ -308,6 +308,7 @@ export default function PhotoSelectionScreen({
                     <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '260px' }}>
                       <div onClick={() => handleTemplateClick(templateId)}>
                         <TemplateVisual
+                          key={`${templateId}-${slots.map(s => s.photoId).join('-')}`} // Force re-render when photos change
                           template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
                           slots={slots}
                           onSlotClick={() => {}} // Disabled - clicking template goes to template-first mode
@@ -379,6 +380,7 @@ export default function PhotoSelectionScreen({
                   <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '400px' }}>
                     <div onClick={() => handleTemplateClick(templateId)}>
                       <TemplateVisual
+                        key={`${templateId}-${slots.map(s => s.photoId).join('-')}`} // Force re-render when photos change
                         template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
                         slots={slots}
                         onSlotClick={() => {}} // Disabled - clicking template goes to template-first mode
