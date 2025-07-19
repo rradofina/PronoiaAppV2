@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { supabaseService } from '../../../services/supabaseService';
+import { supabase } from '../../../lib/supabase/client';
 
 // SECURITY: This is a one-time setup endpoint for production
 // After granting admin access, this endpoint should be removed or secured
@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('🔍 Admin Setup API: Looking for user with email:', email);
 
     // Find user by email
-    const { data: users, error: usersError } = await supabaseService.supabase
+    const { data: users, error: usersError } = await supabase
       .from('users')
       .select('*')
       .eq('email', email);
@@ -47,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('✅ Found user:', user.email);
 
     // Update user to admin
-    const { data: updatedUser, error: updateError } = await supabaseService.supabase
+    const { data: updatedUser, error: updateError } = await supabase
       .from('users')
       .update({
         preferences: {
