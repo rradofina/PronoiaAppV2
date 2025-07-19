@@ -12,6 +12,29 @@ npm run start        # Start production server
 npm run type-check   # TypeScript validation without build
 ```
 
+### Port Management
+**Important**: This application should only run on port 3000 to avoid conflicts.
+
+**Reset all ports and start fresh:**
+```bash
+# Kill all processes on ports 3000-3002
+npx kill-port 3000
+npx kill-port 3001
+npx kill-port 3002
+
+# Start development server (will use port 3000)
+npm run dev
+```
+
+**Check active ports:**
+```bash
+# Windows
+netstat -ano | findstr :3000
+
+# Kill specific process ID
+taskkill /F /PID <process_id>
+```
+
 ### Code Quality
 ```bash
 npm run lint         # Check for ESLint issues
@@ -25,6 +48,8 @@ Create `.env.local` with:
 ```env
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 NEXT_PUBLIC_GOOGLE_API_KEY=your_google_api_key
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 ## Architecture Overview
@@ -36,23 +61,38 @@ PronoiaApp is a **tablet-optimized photo studio management application** that al
 The application recently underwent a **major refactoring from monolithic to modular state management**:
 
 **Legacy**: Single `useAppStore.ts` (634 lines) - still exists for backward compatibility
-**Current**: Five specialized Zustand stores with clear separation of concerns:
+**Current**: Six specialized Zustand stores with clear separation of concerns:
 
-- `authStore.ts` - Google authentication state and user session
+- `authStore.ts` - Google authentication state and Supabase user management
 - `driveStore.ts` - Google Drive integration, folder navigation, and photo management  
 - `sessionStore.ts` - Client sessions, package selection, and workflow state
 - `templateStore.ts` - Template creation, photo assignment, and template management
 - `uiStore.ts` - UI states, loading indicators, and user interactions
+- `adminStore.ts` - Admin dashboard, user management, and custom template creation
+
+### Backend Integration Architecture
+**Supabase Backend**: PostgreSQL database with real-time capabilities
+- **Database Tables**: `users`, `sessions`, `templates`, `photo_slots`, `generated_templates`, `custom_templates`, `template_categories`
+- **Authentication Sync**: Google OAuth synced with Supabase user accounts
+- **Admin Features**: User management, custom template creation, analytics dashboard
+- **Data Persistence**: Session data, custom templates, and user preferences stored in Supabase
 
 ### Screen Flow Architecture
 The app follows a **linear multi-screen workflow** controlled by `currentScreen` state:
 
+**Main Application Flow:**
 1. **drive-setup** - Google Drive authentication and main folder selection
 2. **folder-selection** - Client folder selection from main sessions folder
 3. **package** - Package selection (A=1, B=2, C=5, D=10 templates)  
 4. **template** - Template type selection and count configuration
 5. **photos** - Photo assignment to template slots
 6. **preview/complete** - Review and export
+
+**Admin Dashboard Flow:**
+- **Admin Authentication** - Middleware protection via `middleware/adminAuth.ts`
+- **User Management** - View and manage registered users
+- **Custom Template Creation** - Admin-only template designer
+- **Session Analytics** - Track usage and performance metrics
 
 ### Template System Architecture
 Templates are based on **4R photo dimensions** (1200x1800px, 300 DPI) with four types:
@@ -104,18 +144,23 @@ Key service: `googleDriveService.ts` handles all Drive API interactions with pro
 ### Core Services
 - `services/googleDriveService.ts` - Google Drive API integration with authentication and file operations
 - `services/templateGenerationService.ts` - Canvas-based template generation and export
+- `services/supabaseService.ts` - Database operations, user management, and session persistence
 
 ### State Management
 - `stores/useAppStore.ts` - Legacy monolithic store (preserved for compatibility)
-- `stores/authStore.ts` - Google authentication state
+- `stores/authStore.ts` - Google authentication state and Supabase user sync
 - `stores/driveStore.ts` - Drive folders and photo management
-- `stores/sessionStore.ts` - Client sessions and packages
+- `stores/sessionStore.ts` - Client sessions, packages, and Supabase persistence
 - `stores/templateStore.ts` - Template and photo slot management
 - `stores/uiStore.ts` - UI state and loading indicators
+- `stores/adminStore.ts` - Admin dashboard and user management
 
 ### Configuration
 - `utils/constants.ts` - Package definitions, template layouts, Google Drive config
 - `types/index.ts` - TypeScript interfaces for all application entities
+- `lib/supabase/client.ts` - Supabase client configuration
+- `lib/supabase/types.ts` - Generated database types from Supabase
+- `middleware/adminAuth.ts` - Admin route protection middleware
 
 ## Development Notes
 
@@ -150,3 +195,60 @@ When working with state:
 - Implement retry mechanisms for API failures
 - Provide fallback UIs for missing photos or failed loads
 - Log errors to `uiStore` event system for debugging
+
+### Supabase Integration Patterns
+- **Dual Persistence**: Local storage fallback when Supabase unavailable
+- **User Sync**: Google OAuth automatically creates/updates Supabase users
+- **Session Management**: Both local and database session storage
+- **Admin Features**: Database-backed user management and analytics
+- **Custom Templates**: Admin-created templates stored in Supabase with metadata
+
+### Admin Dashboard Access
+- **Route**: `/admin/` with middleware protection
+- **Authentication**: Separate admin authentication system
+- **Features**: User management, template creation, session analytics
+- **Database**: Full CRUD operations on all data entities
+
+### Admin Setup for Production/Vercel
+
+**Prerequisites**: User must sign in with Google first to create account in database.
+
+**Method 1: Environment Variables (Recommended for Production)**
+```bash
+# In Vercel Environment Variables or .env.local
+ADMIN_EMAILS=your-email@gmail.com,admin2@company.com
+```
+- Automatically grants admin role to specified emails
+- Most secure for production deployments
+- No manual setup required after sign-in
+
+**Method 2: API Setup Route (One-time use)**
+```bash
+# POST request to your Vercel app
+curl -X POST https://your-app.vercel.app/api/admin/setup \
+  -H "Content-Type: application/json" \
+  -d '{"email": "your-email@gmail.com", "setupKey": "setup-admin-2024"}'
+```
+- Remove or secure this endpoint after use
+- Requires ADMIN_SETUP_KEY environment variable
+
+**Method 3: Supabase SQL Editor**
+```sql
+-- Run in Supabase Dashboard > SQL Editor
+UPDATE users 
+SET preferences = COALESCE(preferences, '{}'::jsonb) || '{"role": "admin"}'::jsonb
+WHERE email = 'your-email@gmail.com';
+```
+- Direct database access method
+- See `scripts/admin-setup.sql` for complete script
+
+### Template Builder System
+- **Template Builder**: `/admin/templates/builder` - Visual template designer
+- **Template Management**: `/admin/templates/` - View, edit, duplicate, delete templates
+- **Features**: 
+  - Canvas-based visual editor with drag & drop photo slots
+  - Support for 4R, 5R, and A4 print sizes
+  - Grid snapping and zoom controls
+  - Template properties (name, description, category, tags)
+  - Real-time preview and precise positioning
+- **Workflow**: Create custom photo layouts → Save to database → Available in main app

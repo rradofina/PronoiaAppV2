@@ -56,14 +56,13 @@ export async function checkAdminAuth(request: NextRequest): Promise<AdminAuthRes
 
 /**
  * HOC to protect admin routes
+ * Note: This is handled client-side in AdminLayout component
  */
 export function withAdminAuth<T extends object>(
   WrappedComponent: React.ComponentType<T>
 ): React.ComponentType<T> {
-  return function AdminProtectedComponent(props: T) {
-    // This will be handled client-side in the admin layout
-    return <WrappedComponent {...props} />;
-  };
+  // Return the component as-is since protection is handled in AdminLayout
+  return WrappedComponent;
 }
 
 /**

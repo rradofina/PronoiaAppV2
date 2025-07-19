@@ -1,7 +1,6 @@
 import { DriveFolder, GoogleAuth } from '../../types';
 import { useState, useEffect } from 'react';
 import { ChevronRight, Folder, ChevronLeft } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 interface DriveSetupScreenProps {
   isGapiLoaded: boolean;
@@ -18,7 +17,7 @@ interface DriveSetupScreenProps {
 export default function DriveSetupScreen({
   isGapiLoaded,
   googleAuth,
-  driveFolders,
+  driveFolders: _driveFolders,
   handleGoogleSignIn,
   handleMainFolderSelect,
   mainSessionsFolder,

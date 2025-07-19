@@ -1,6 +1,7 @@
 // Updated: Latest version with template modals and tablet optimization..
 import React, { useState, useEffect } from 'react';
 import useAppStore from '../stores/useAppStore';
+import useAuthStore from '../stores/authStore';
 import { DriveFolder, TemplateSlot, Photo, TemplateTypeInfo, Package, TemplateType } from '../types';
 import DriveSetupScreen from '../components/screens/DriveSetupScreen';
 import FolderSelectionScreen from '../components/screens/FolderSelectionScreen';
@@ -197,6 +198,25 @@ export default function Home() {
     getTotalTemplateCount,
     setTemplateCounts,
   } = useAppStore();
+
+  // Sync old store auth with new auth store for admin panel
+  const { setGoogleAuth: setNewGoogleAuth, syncWithSupabase } = useAuthStore();
+
+  // Sync Google auth between old and new stores
+  useEffect(() => {
+    console.log('🔄 Syncing auth stores:', googleAuth);
+    setNewGoogleAuth(googleAuth);
+    
+    // Also sync with Supabase if signed in
+    if (googleAuth.isSignedIn && googleAuth.userEmail) {
+      const userInfo = {
+        email: googleAuth.userEmail,
+        name: googleAuth.userEmail.split('@')[0], // Use email prefix as name fallback
+        id: googleAuth.userEmail, // Use email as ID fallback
+      };
+      syncWithSupabase(userInfo);
+    }
+  }, [googleAuth, setNewGoogleAuth, syncWithSupabase]);
 
   const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
   const [clientFolders, setClientFolders] = useState<DriveFolder[]>([]);

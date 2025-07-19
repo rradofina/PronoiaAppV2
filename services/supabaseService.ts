@@ -245,8 +245,8 @@ export class SupabaseService {
     description?: string;
     print_size: PrintSize;
     orientation: 'portrait' | 'landscape';
-    layout_data: object;
-    photo_slots: object[];
+    layout_data: any;
+    photo_slots: any[];
     dimensions?: object;
     margins?: object;
     background_color?: string;
@@ -297,15 +297,15 @@ export class SupabaseService {
       description: original.description ? `Copy of ${original.description}` : `Copy of ${original.name}`,
       print_size: original.print_size,
       orientation: original.orientation,
-      layout_data: original.layout_data,
-      photo_slots: original.photo_slots,
-      dimensions: original.dimensions,
-      margins: original.margins,
-      background_color: original.background_color,
-      created_by: userId || original.created_by,
-      category: original.category,
-      tags: original.tags,
-      sort_order: original.sort_order,
+      layout_data: original.layout_data as any,
+      photo_slots: (original.photo_slots as any) || [],
+      dimensions: original.dimensions as any,
+      margins: original.margins as any,
+      background_color: original.background_color || undefined,
+      created_by: userId || original.created_by || undefined,
+      category: original.category || undefined,
+      tags: (original.tags as any) || [],
+      sort_order: original.sort_order || undefined,
     };
 
     return await this.createCustomTemplate(duplicateData);
@@ -343,12 +343,40 @@ export class SupabaseService {
   async isUserAdmin(userId: string): Promise<boolean> {
     try {
       const user = await this.getUserByGoogleId(userId);
-      if (!user?.preferences) return false;
+      if (!user) return false;
       
+      // Check environment-based admin list first (for production deployments)
+      const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
+      if (adminEmails.length > 0 && adminEmails.includes(user.email)) {
+        // Auto-grant admin role if not already set
+        if (!user.preferences?.role) {
+          await this.grantAdminRole(user.email);
+        }
+        return true;
+      }
+      
+      // Check database role
+      if (!user.preferences) return false;
       const prefs = user.preferences as { role?: string };
       return prefs.role === 'admin' || prefs.role === 'super_admin';
     } catch {
       return false;
+    }
+  }
+
+  // Helper method to grant admin role
+  async grantAdminRole(userEmail: string): Promise<void> {
+    try {
+      await supabase
+        .from('users')
+        .update({
+          preferences: { role: 'admin' }
+        })
+        .eq('email', userEmail);
+      
+      console.log('✅ Auto-granted admin role to:', userEmail);
+    } catch (error) {
+      console.error('❌ Failed to auto-grant admin role:', error);
     }
   }
 

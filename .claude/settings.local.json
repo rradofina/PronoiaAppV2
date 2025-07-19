@@ -14,7 +14,12 @@
       "Bash(npm run lint)",
       "Bash(rm:*)",
       "Bash(npm install:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(npx kill-port 3000)",
+      "Bash(npx kill-port 3001)",
+      "Bash(npx kill-port 3002)",
+      "Bash(curl:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

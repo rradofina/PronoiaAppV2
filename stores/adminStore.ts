@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
+import { devtools } from 'zustand/middleware';
 import { supabaseService } from '../services/supabaseService';
-import { useAuthStore } from './authStore';
+import useAuthStore from './authStore';
 import { CustomTemplate, TemplateCategory, PrintSize } from '../types';
 
 interface AdminUser {
@@ -48,7 +48,7 @@ interface AdminState {
 
 interface AdminActions {
   // Auth actions
-  checkAdminAuth: () => Promise<boolean>;
+  checkAdminAuth: (googleAuth?: any, supabaseUser?: any) => Promise<boolean>;
   clearAdminAuth: () => void;
   
   // Template management actions
@@ -64,6 +64,10 @@ interface AdminActions {
   setSelectedPrintSize: (printSize: PrintSize) => void;
   
   // Template builder actions
+  setBuilderMode: (mode: 'create' | 'edit' | 'duplicate') => void;
+  setBuilderTemplate: (template: Partial<CustomTemplate> | null) => void;
+  loadCustomTemplate: (templateId: string) => Promise<void>;
+  saveCustomTemplate: (templateId: string | null, templateData: Partial<CustomTemplate>) => Promise<void>;
   initializeBuilder: (mode: 'create' | 'edit' | 'duplicate', template?: CustomTemplate) => void;
   updateBuilderTemplate: (updates: Partial<CustomTemplate>) => void;
   updateBuilderCanvas: (updates: Partial<AdminState['builderCanvas']>) => void;
@@ -78,7 +82,7 @@ interface AdminActions {
 }
 
 export const useAdminStore = create<AdminState & AdminActions>()(
-  subscribeWithSelector((set, get) => ({
+  devtools((set, get) => ({
     // Initial state
     isAdminAuthenticated: false,
     adminUser: null,
@@ -102,22 +106,29 @@ export const useAdminStore = create<AdminState & AdminActions>()(
     },
 
     // Auth actions
-    checkAdminAuth: async () => {
+    checkAdminAuth: async (googleAuth?: any, supabaseUser?: any) => {
       set({ isCheckingAdminAuth: true });
       
       try {
-        const { googleUser } = useAuthStore.getState();
         
-        if (!googleUser) {
+        console.log('🔍 AdminStore checkAdminAuth:', { 
+          googleAuth, 
+          supabaseUser,
+          isSignedIn: googleAuth.isSignedIn 
+        });
+        
+        if (!googleAuth.isSignedIn || !supabaseUser) {
+          console.log('❌ Admin auth failed: Not signed in or no Supabase user');
           set({ isAdminAuthenticated: false, adminUser: null, isCheckingAdminAuth: false });
           return false;
         }
 
-        const isAdmin = await supabaseService.isUserAdmin(googleUser.googleId);
+        console.log('🔍 Checking if user is admin for google_id:', supabaseUser.google_id);
+        const isAdmin = await supabaseService.isUserAdmin(supabaseUser.google_id);
         
         if (isAdmin) {
-          const user = await supabaseService.getUserByGoogleId(googleUser.googleId);
-          const role = user?.preferences?.role || 'admin';
+          const user = await supabaseService.getUserByGoogleId(supabaseUser.google_id);
+          const role = (user?.preferences as any)?.role || 'admin';
           
           set({
             isAdminAuthenticated: true,
@@ -174,12 +185,12 @@ export const useAdminStore = create<AdminState & AdminActions>()(
           dimensions: template.dimensions as any,
           margins: template.margins as any,
           background_color: template.background_color || '#FFFFFF',
-          created_by: template.created_by,
-          category: template.category,
+          created_by: template.created_by || undefined,
+          category: template.category || undefined,
           tags: template.tags || [],
           is_active: template.is_active,
           is_default: template.is_default,
-          sort_order: template.sort_order,
+          sort_order: template.sort_order || undefined,
           created_at: new Date(template.created_at),
           updated_at: new Date(template.updated_at),
         }));
@@ -197,10 +208,10 @@ export const useAdminStore = create<AdminState & AdminActions>()(
         const appCategories: TemplateCategory[] = categories.map(cat => ({
           id: cat.id,
           name: cat.name,
-          description: cat.description,
-          color: cat.color,
-          icon: cat.icon,
-          sort_order: cat.sort_order,
+          description: cat.description || undefined,
+          color: cat.color || undefined,
+          icon: cat.icon || undefined,
+          sort_order: cat.sort_order || undefined,
           created_at: new Date(cat.created_at),
         }));
         
@@ -316,6 +327,90 @@ export const useAdminStore = create<AdminState & AdminActions>()(
     },
 
     // Template builder actions
+    setBuilderMode: (mode: 'create' | 'edit' | 'duplicate') => {
+      set({ builderMode: mode });
+    },
+
+    setBuilderTemplate: (template: Partial<CustomTemplate> | null) => {
+      set({ builderTemplate: template });
+    },
+
+    loadCustomTemplate: async (templateId: string) => {
+      try {
+        set({ isLoading: true });
+        const template = await supabaseService.getCustomTemplate(templateId);
+        if (template) {
+          const convertedTemplate = {
+            ...template,
+            description: template.description || undefined,
+            category: template.category || undefined,
+            created_by: template.created_by || undefined,
+            sort_order: template.sort_order || undefined,
+            layout_data: template.layout_data as any,
+            photo_slots: template.photo_slots as any,
+            dimensions: template.dimensions as any,
+            margins: template.margins as any,
+            background_color: template.background_color || undefined,
+            tags: template.tags || undefined,
+            created_at: new Date(template.created_at),
+            updated_at: new Date(template.updated_at),
+          };
+          set({ 
+            builderTemplate: convertedTemplate,
+            selectedPrintSize: template.print_size,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load custom template:', error);
+        set({ error: 'Failed to load template' });
+      } finally {
+        set({ isLoading: false });
+      }
+    },
+
+    saveCustomTemplate: async (templateId: string | null, templateData: Partial<CustomTemplate>) => {
+      try {
+        set({ isSaving: true, error: null });
+        
+        if (templateId) {
+          // Update existing template
+          await supabaseService.updateCustomTemplate(templateId, templateData as any);
+          set({ successMessage: 'Template updated successfully!' });
+        } else {
+          // Create new template
+          const newTemplate = await supabaseService.createCustomTemplate(templateData as any);
+          const convertedTemplate = {
+            ...newTemplate,
+            description: newTemplate.description || undefined,
+            category: newTemplate.category || undefined,
+            created_by: newTemplate.created_by || undefined,
+            sort_order: newTemplate.sort_order || undefined,
+            layout_data: newTemplate.layout_data as any,
+            photo_slots: newTemplate.photo_slots as any,
+            dimensions: newTemplate.dimensions as any,
+            margins: newTemplate.margins as any,
+            background_color: newTemplate.background_color || undefined,
+            tags: newTemplate.tags || undefined,
+            created_at: new Date(newTemplate.created_at),
+            updated_at: new Date(newTemplate.updated_at),
+          };
+          set({ 
+            successMessage: 'Template created successfully!',
+            builderTemplate: convertedTemplate,
+          });
+        }
+        
+        // Reload templates list
+        const { selectedPrintSize } = get();
+        await get().loadCustomTemplates(selectedPrintSize);
+        
+      } catch (error) {
+        console.error('Failed to save template:', error);
+        set({ error: 'Failed to save template. Please try again.' });
+      } finally {
+        set({ isSaving: false });
+      }
+    },
     initializeBuilder: (mode: 'create' | 'edit' | 'duplicate', template?: CustomTemplate) => {
       const { selectedPrintSize } = get();
       
@@ -394,14 +489,4 @@ export const useAdminStore = create<AdminState & AdminActions>()(
   }))
 );
 
-// Initialize admin auth check when auth state changes
-useAuthStore.subscribe(
-  (state) => state.googleUser,
-  (googleUser) => {
-    if (googleUser) {
-      useAdminStore.getState().checkAdminAuth();
-    } else {
-      useAdminStore.getState().clearAdminAuth();
-    }
-  }
-);
+// Note: Admin auth initialization is now handled in AdminLayout component
