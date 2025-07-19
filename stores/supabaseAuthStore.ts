@@ -31,16 +31,31 @@ export const useSupabaseAuthStore = create<SupabaseAuthState>()(
       signInWithMagicLink: async (email: string) => {
         set({ loading: true })
         
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: {
-            // Redirect to the current page after sign in
-            emailRedirectTo: `${window.location.origin}`,
-          },
-        })
-        
-        set({ loading: false })
-        return { error }
+        try {
+          console.log('Attempting to send magic link to:', email)
+          console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+          
+          const { error } = await supabase.auth.signInWithOtp({
+            email,
+            options: {
+              // Redirect to the current page after sign in
+              emailRedirectTo: `${window.location.origin}`,
+            },
+          })
+          
+          if (error) {
+            console.error('Supabase auth error:', error)
+          } else {
+            console.log('Magic link sent successfully')
+          }
+          
+          set({ loading: false })
+          return { error }
+        } catch (err) {
+          console.error('Network error:', err)
+          set({ loading: false })
+          return { error: { message: 'Network error. Please check your connection and try again.' } }
+        }
       },
 
       signOut: async () => {
