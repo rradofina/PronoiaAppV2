@@ -231,19 +231,19 @@ export default function DriveSetupScreen({
                 </p>
                 
                 {/* Breadcrumbs */}
-                <div className="flex items-center mb-4 overflow-x-auto">
+                <div className="flex items-center mb-6 p-3 bg-gray-50 rounded-lg overflow-x-auto">
                   <button
                     onClick={() => handleBreadcrumbClick(0)}
-                    className="flex items-center text-blue-600 hover:text-blue-800"
+                    className="flex items-center text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-100 transition-colors"
                   >
-                    Root
+                    📁 Root
                   </button>
                   {folderPath.map((path, index) => (
                     <span key={path.id} className="flex items-center">
                       <ChevronRight className="w-4 h-4 mx-2 text-gray-400" />
                       <button
                         onClick={() => handleBreadcrumbClick(index + 1)}
-                        className="text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                        className="text-blue-600 hover:text-blue-800 whitespace-nowrap font-medium px-2 py-1 rounded hover:bg-blue-100 transition-colors"
                       >
                         {path.name}
                       </button>
@@ -252,24 +252,31 @@ export default function DriveSetupScreen({
                 </div>
                 
                 {/* Folder List */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-60 overflow-y-auto">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-80 overflow-y-auto p-2 bg-gray-50 rounded-lg">
                   {currentFolders.map((folder) => (
                     <button
                       key={folder.id}
                       onClick={() => handleFolderClick(folder)}
-                      className="flex flex-col items-center p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                      className="flex flex-col items-center p-4 bg-white border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-all duration-200 shadow-sm hover:shadow-md"
                     >
-                      <Folder className="w-8 h-8 text-yellow-500 mb-2" />
-                      <span className="text-sm text-center truncate w-full">{folder.name}</span>
+                      <Folder className="w-10 h-10 text-yellow-500 mb-3" />
+                      <span className="text-sm text-center font-medium text-gray-700 line-clamp-2 leading-tight">{folder.name}</span>
                     </button>
                   ))}
                 </div>
                 
+                {currentFolders.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Folder className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p className="text-sm">No folders found in this location</p>
+                  </div>
+                )}
+                
                 {folderPath.length > 0 && (
-                  <div className="flex justify-between mt-6">
+                  <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-200">
                     <button
                       onClick={() => handleBreadcrumbClick(folderPath.length - 1)}
-                      className="flex items-center text-gray-600 hover:text-gray-800"
+                      className="flex items-center text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
                     >
                       <ChevronLeft className="w-5 h-5 mr-1" />
                       Back
@@ -279,89 +286,15 @@ export default function DriveSetupScreen({
                         handleSelectCurrentFolder();
                         setIsSelectingFolder(false);
                       }}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md"
+                      className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-all duration-200 shadow-md flex items-center"
                     >
-                      Select This Folder
+                      ✓ Select This Folder
                     </button>
                   </div>
                 )}
               </div>
             )}
 
-            {googleAuth.isSignedIn && !mainSessionsFolder && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="bg-white rounded-lg p-8 shadow-sm"
-              >
-                <div className="mb-6">
-                  <div className="text-6xl mb-4 text-center">📂</div>
-                  <h2 className="text-2xl font-semibold text-gray-800 mb-2 text-center">
-                    Select Main Sessions Folder
-                  </h2>
-                  <p className="text-gray-600 text-center">
-                    Choose the folder containing client session folders.
-                  </p>
-                </div>
-
-                {/* Breadcrumbs */}
-                <div className="flex items-center mb-4 overflow-x-auto">
-                  <button
-                    onClick={() => handleBreadcrumbClick(0)}
-                    className="flex items-center text-blue-600 hover:text-blue-800"
-                  >
-                    Root
-                  </button>
-                  {folderPath.map((path, index) => (
-                    <span key={path.id} className="flex items-center">
-                      <ChevronRight className="w-4 h-4 mx-2 text-gray-400" />
-                      <button
-                        onClick={() => handleBreadcrumbClick(index + 1)}
-                        className="text-blue-600 hover:text-blue-800 whitespace-nowrap"
-                      >
-                        {path.name}
-                      </button>
-                    </span>
-                  ))}
-                </div>
-
-                {/* Folder List */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-60 overflow-y-auto">
-                  {currentFolders.map((folder) => (
-                    <button
-                      key={folder.id}
-                      onClick={() => handleFolderClick(folder)}
-                      className="flex flex-col items-center p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <Folder className="w-8 h-8 text-yellow-500 mb-2" />
-                      <span className="text-sm text-center truncate w-full">{folder.name}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {folderPath.length > 0 && (
-                  <div className="flex justify-between mt-6">
-                    <button
-                      onClick={() => handleBreadcrumbClick(folderPath.length - 1)}
-                      className="flex items-center text-gray-600 hover:text-gray-800"
-                    >
-                      <ChevronLeft className="w-5 h-5 mr-1" />
-                      Back
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleSelectCurrentFolder();
-                        setIsSelectingFolder(false);
-                      }}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md"
-                    >
-                      Select This Folder
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-            )}
 
           </div>
         )}

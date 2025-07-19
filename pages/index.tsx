@@ -230,12 +230,16 @@ export default function Home() {
           // Automatically load client folders
           const loadClientFolders = async () => {
             try {
-              const response = await window.gapi.client.drive.files.list({
-                q: `'${folderData.id}' in parents and mimeType='application/vnd.google-apps.folder'`,
-                fields: 'files(id, name, createdTime)',
-                orderBy: 'name'
-              });
-              setClientFolders(response.result.files || []);
+              if (window.gapi && window.gapi.client && window.gapi.client.drive) {
+                const response = await window.gapi.client.drive.files.list({
+                  q: `'${folderData.id}' in parents and mimeType='application/vnd.google-apps.folder'`,
+                  fields: 'files(id, name, createdTime)',
+                  orderBy: 'name'
+                });
+                setClientFolders(response.result.files || []);
+              } else {
+                console.warn('Google API not fully loaded yet, skipping auto-load');
+              }
             } catch (error) {
               console.error('Failed to auto-load client folders:', error);
             }
@@ -285,12 +289,16 @@ export default function Home() {
               
               // Load client folders for the main folder
               try {
-                const response = await window.gapi.client.drive.files.list({
-                  q: `'${folderData.id}' in parents and mimeType='application/vnd.google-apps.folder'`,
-                  fields: 'files(id, name, createdTime)',
-                  orderBy: 'name'
-                });
-                setClientFolders(response.result.files || []);
+                if (window.gapi && window.gapi.client && window.gapi.client.drive) {
+                  const response = await window.gapi.client.drive.files.list({
+                    q: `'${folderData.id}' in parents and mimeType='application/vnd.google-apps.folder'`,
+                    fields: 'files(id, name, createdTime)',
+                    orderBy: 'name'
+                  });
+                  setClientFolders(response.result.files || []);
+                } else {
+                  console.warn('Google API not fully loaded yet, skipping folder load');
+                }
               } catch (error) {
                 console.error('Failed to load client folders during auth restoration:', error);
               }
