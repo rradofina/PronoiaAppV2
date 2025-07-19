@@ -47,7 +47,7 @@ export default function SlidingTemplateBar({
   return (
     <div 
       className={`fixed inset-0 z-40 transition-all duration-500 ease-out ${
-        isVisible ? 'bg-black bg-opacity-50' : 'bg-transparent pointer-events-none'
+        isVisible ? 'bg-transparent' : 'bg-transparent pointer-events-none'
       }`}
     >
       {/* Background overlay */}
@@ -61,46 +61,28 @@ export default function SlidingTemplateBar({
         className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl transition-transform duration-500 ease-out ${
           isVisible ? 'translate-y-0' : 'translate-y-full'
         }`}
-        style={{ height: '50vh', minHeight: '400px' }}
+        style={{ height: '60vh', minHeight: '450px', maxHeight: '700px' }}
       >
         {/* Handle bar */}
         <div className="w-full flex justify-center py-3 border-b border-gray-200">
           <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
         </div>
 
-        {/* Header with Large Photo Preview */}
-        <div className="px-4 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-lg text-gray-800">Add to Print Template</h3>
+        {/* Simplified Header */}
+        <div className="px-4 py-3 border-b border-gray-200 bg-white">
+          <div className="flex items-center justify-between">
+            <div className="text-center flex-1">
+              <h3 className="font-bold text-lg text-gray-800">Add to Print Template</h3>
+              <p className="text-sm text-gray-600">Tap a placeholder below to add this photo</p>
+            </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors ml-4"
             >
               <svg className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-          </div>
-          
-          {/* Large Photo Preview */}
-          <div className="flex items-center space-x-4">
-            <div className="flex-shrink-0">
-              <img
-                src={selectedPhoto.thumbnailUrl ? selectedPhoto.thumbnailUrl.replace('=s220', '=s800') : selectedPhoto.url}
-                alt={selectedPhoto.name}
-                className="w-20 h-20 object-cover rounded-xl shadow-md border-2 border-white"
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-800 truncate">{selectedPhoto.name}</p>
-              <p className="text-sm text-gray-600 mt-1">Tap a placeholder below to add this photo</p>
-              <div className="mt-2 flex items-center space-x-2">
-                <div className="h-1 bg-blue-200 rounded-full flex-1">
-                  <div className="h-1 bg-blue-500 rounded-full w-full"></div>
-                </div>
-                <span className="text-xs text-blue-600 font-medium">Ready to place</span>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -142,10 +124,7 @@ export default function SlidingTemplateBar({
                       slots={slots}
                       photos={photos}
                       selectedSlot={null}
-                      onSlotClick={(slot: TemplateSlot) => {
-                        console.log('🎯 Slot clicked in SlidingTemplateBar:', slot);
-                        onSlotSelect(slot);
-                      }}
+                      onSlotClick={(slot: TemplateSlot) => onSlotSelect(slot)}
                     />
                   </div>
 

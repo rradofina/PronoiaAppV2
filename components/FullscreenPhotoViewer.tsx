@@ -7,6 +7,7 @@ interface FullscreenPhotoViewerProps {
   onClose: () => void;
   onAddToTemplate: (photo: Photo) => void;
   isVisible: boolean;
+  isDimmed?: boolean; // New prop to control dimming when template bar is open
 }
 
 export default function FullscreenPhotoViewer({
@@ -14,7 +15,8 @@ export default function FullscreenPhotoViewer({
   photos,
   onClose,
   onAddToTemplate,
-  isVisible
+  isVisible,
+  isDimmed = false
 }: FullscreenPhotoViewerProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(() => 
     photo ? photos.findIndex(p => p.id === photo.id) : 0
@@ -113,9 +115,9 @@ export default function FullscreenPhotoViewer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-95 flex flex-col h-screen">
+    <div className={`fixed inset-0 ${isDimmed ? 'z-30' : 'z-50'} bg-black ${isDimmed ? 'bg-opacity-50' : 'bg-opacity-95'} flex flex-col h-screen transition-all duration-300`}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 text-white">
+      <div className={`flex items-center justify-between p-4 text-white ${isDimmed ? 'opacity-50' : 'opacity-100'}`}>
         <button
           onClick={onClose}
           className="flex items-center space-x-2 text-white hover:text-gray-300"
@@ -143,8 +145,7 @@ export default function FullscreenPhotoViewer({
             console.log('🔙 Previous button clicked');
             handlePrevious();
           }}
-          className="absolute left-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg"
-          style={{ pointerEvents: 'auto' }}
+          className={`absolute left-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg ${isDimmed ? 'opacity-30 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
         >
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -229,8 +230,7 @@ export default function FullscreenPhotoViewer({
             console.log('➡️ Next button clicked');
             handleNext();
           }}
-          className="absolute right-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg"
-          style={{ pointerEvents: 'auto' }}
+          className={`absolute right-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg ${isDimmed ? 'opacity-30 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
         >
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -238,15 +238,17 @@ export default function FullscreenPhotoViewer({
         </button>
       </div>
 
-      {/* Bottom Actions - Fixed height */}
-      <div className="p-4 flex-shrink-0">
-        <button
-          onClick={() => onAddToTemplate(currentPhoto)}
-          className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-md"
-        >
-          Add to Print Template
-        </button>
-      </div>
+      {/* Bottom Actions - Fixed height - Hide when dimmed */}
+      {!isDimmed && (
+        <div className="p-4 flex-shrink-0">
+          <button
+            onClick={() => onAddToTemplate(currentPhoto)}
+            className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-md"
+          >
+            Add to Print Template
+          </button>
+        </div>
+      )}
     </div>
   );
 }

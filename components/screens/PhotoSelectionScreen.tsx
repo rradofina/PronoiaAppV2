@@ -150,13 +150,11 @@ export default function PhotoSelectionScreen({
 
   const handleAddToTemplate = (photo: Photo) => {
     setSelectedPhotoForTemplate(photo);
-    setSelectedPhotoForViewer(null); // Close the fullscreen viewer
+    // Keep the fullscreen viewer open but dimmed in background
     setViewMode('sliding-templates');
   };
 
   const handleSlotSelectFromSlidingBar = (slot: TemplateSlot) => {
-    console.log('📝 handleSlotSelectFromSlidingBar called with slot:', slot);
-    console.log('📝 selectedPhotoForTemplate:', selectedPhotoForTemplate);
     setSelectedSlotForEditor(slot);
     setViewMode('template-editor');
   };
@@ -179,11 +177,9 @@ export default function PhotoSelectionScreen({
 
   // Template editor
   const handleApplyPhotoToSlot = (slotId: string, photoId: string, transform?: { scale: number; x: number; y: number }) => {
-    console.log('🔧 handleApplyPhotoToSlot called:', { slotId, photoId, transform });
     const updatedSlots = templateSlots.map(s =>
       s.id === slotId ? { ...s, photoId, transform } : s
     );
-    console.log('🔧 Updated slots:', updatedSlots);
     setTemplateSlots(updatedSlots);
     
     // Reset states and return to normal view
@@ -541,7 +537,8 @@ export default function PhotoSelectionScreen({
         photos={photos}
         onClose={resetViewStates}
         onAddToTemplate={handleAddToTemplate}
-        isVisible={viewMode === 'photo-viewer' && !!selectedPhotoForViewer}
+        isVisible={(viewMode === 'photo-viewer' || viewMode === 'sliding-templates') && !!selectedPhotoForViewer}
+        isDimmed={viewMode === 'sliding-templates'}
       />
 
       {/* Sliding Template Bar (from photo) */}
