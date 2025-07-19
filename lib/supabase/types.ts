@@ -176,6 +176,97 @@ export interface Database {
           generated_at?: string;
         };
       };
+      custom_templates: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          print_size: '4R' | '5R' | 'A4';
+          orientation: 'portrait' | 'landscape';
+          layout_data: Json;
+          photo_slots: Json;
+          dimensions: Json;
+          margins: Json | null;
+          background_color: string | null;
+          created_by: string | null;
+          category: string | null;
+          tags: string[] | null;
+          is_active: boolean;
+          is_default: boolean;
+          sort_order: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          print_size?: '4R' | '5R' | 'A4';
+          orientation?: 'portrait' | 'landscape';
+          layout_data?: Json;
+          photo_slots?: Json;
+          dimensions?: Json;
+          margins?: Json | null;
+          background_color?: string | null;
+          created_by?: string | null;
+          category?: string | null;
+          tags?: string[] | null;
+          is_active?: boolean;
+          is_default?: boolean;
+          sort_order?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          description?: string | null;
+          print_size?: '4R' | '5R' | 'A4';
+          orientation?: 'portrait' | 'landscape';
+          layout_data?: Json;
+          photo_slots?: Json;
+          dimensions?: Json;
+          margins?: Json | null;
+          background_color?: string | null;
+          created_by?: string | null;
+          category?: string | null;
+          tags?: string[] | null;
+          is_active?: boolean;
+          is_default?: boolean;
+          sort_order?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      template_categories: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          color: string | null;
+          icon: string | null;
+          sort_order: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          color?: string | null;
+          icon?: string | null;
+          sort_order?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          description?: string | null;
+          color?: string | null;
+          icon?: string | null;
+          sort_order?: number | null;
+          created_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;

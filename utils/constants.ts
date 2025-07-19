@@ -270,10 +270,53 @@ export const validateImageUrl = (url: string): boolean => {
   return extension ? SUPPORTED_IMAGE_EXTENSIONS.indexOf(`.${extension}`) !== -1 : false;
 };
 
-export const PRINT_SIZES = {
-  '4R': { width: 1200, height: 1800, dpi: 300, name: '4R (4x6")' },
-  '5R': { width: 1500, height: 2100, dpi: 300, name: '5R (5x7")' },
-  'A4': { width: 2480, height: 3508, dpi: 300, name: 'A4 (8.3x11.7")' },
+// Print Size Configurations for Template Builder
+export const PRINT_SIZES: Record<string, any> = {
+  '4R': {
+    name: '4R' as const,
+    label: '4R (4×6")',
+    dimensions: {
+      width: 1200,
+      height: 1800,
+      dpi: 300,
+      inches: {
+        width: 4,
+        height: 6,
+      },
+    },
+    description: 'Standard 4×6 inch photo print with custom layout support',
+    is_custom_layouts: true,
+  },
+  '5R': {
+    name: '5R' as const,
+    label: '5R (5×7")',
+    dimensions: {
+      width: 1500,
+      height: 2100,
+      dpi: 300,
+      inches: {
+        width: 5,
+        height: 7,
+      },
+    },
+    description: 'Standard 5×7 inch photo print, full-size only',
+    is_custom_layouts: false,
+  },
+  'A4': {
+    name: 'A4' as const,
+    label: 'A4 (8.3×11.7")',
+    dimensions: {
+      width: 2480,
+      height: 3508,
+      dpi: 300,
+      inches: {
+        width: 8.27,
+        height: 11.69,
+      },
+    },
+    description: 'Standard A4 paper size, full-size only',
+    is_custom_layouts: false,
+  },
 };
 
 export const TEMPLATE_TYPES = [
@@ -283,4 +326,136 @@ export const TEMPLATE_TYPES = [
   { id: 'photostrip', name: 'Photo Strip Print', slots: 6, allowedSizes: ['4R'] },
 ];
 
-export const DEFAULT_TEMPLATE_CYCLE = ['solo', 'collage', 'photostrip', 'photocard']; 
+export const DEFAULT_TEMPLATE_CYCLE = ['solo', 'collage', 'photostrip', 'photocard'];
+
+// Template Builder Constants
+export const TEMPLATE_BUILDER = {
+  // Canvas settings
+  CANVAS: {
+    MIN_ZOOM: 0.1,
+    MAX_ZOOM: 3,
+    DEFAULT_ZOOM: 1,
+    ZOOM_STEP: 0.1,
+    SNAP_THRESHOLD: 10, // pixels
+    GRID_SIZE: 20, // pixels
+  },
+  
+  // Photo slot constraints
+  PHOTO_SLOT: {
+    MIN_WIDTH: 50,
+    MIN_HEIGHT: 50,
+    MAX_WIDTH: 3508, // A4 width
+    MAX_HEIGHT: 3508, // A4 height
+    DEFAULT_WIDTH: 300,
+    DEFAULT_HEIGHT: 400,
+    BORDER_WIDTH: 2,
+    HANDLE_SIZE: 12,
+  },
+  
+  // Drag and drop
+  DRAG_DROP: {
+    SNAP_DISTANCE: 15,
+    GHOST_OPACITY: 0.5,
+    DRAG_THRESHOLD: 5, // minimum pixels before drag starts
+    AUTO_SCROLL_SPEED: 10,
+    AUTO_SCROLL_MARGIN: 50,
+  },
+  
+  // Layout presets
+  LAYOUT_PRESETS: {
+    '4R': {
+      'Solo Portrait': {
+        type: 'solo',
+        slots: [{
+          x: 60, y: 60, width: 1080, height: 1680, aspect_ratio: 'free'
+        }]
+      },
+      'Classic Collage': {
+        type: 'collage',
+        slots: [
+          { x: 40, y: 40, width: 530, height: 870, aspect_ratio: '2:3' },
+          { x: 630, y: 40, width: 530, height: 870, aspect_ratio: '2:3' },
+          { x: 40, y: 950, width: 530, height: 870, aspect_ratio: '2:3' },
+          { x: 630, y: 950, width: 530, height: 870, aspect_ratio: '2:3' }
+        ]
+      },
+      'Photo Strip': {
+        type: 'photostrip',
+        slots: [
+          { x: 30, y: 30, width: 570, height: 280, aspect_ratio: '2:1' },
+          { x: 630, y: 30, width: 570, height: 280, aspect_ratio: '2:1' },
+          { x: 30, y: 325, width: 570, height: 280, aspect_ratio: '2:1' },
+          { x: 630, y: 325, width: 570, height: 280, aspect_ratio: '2:1' },
+          { x: 30, y: 620, width: 570, height: 280, aspect_ratio: '2:1' },
+          { x: 630, y: 620, width: 570, height: 280, aspect_ratio: '2:1' }
+        ]
+      }
+    },
+    '5R': {
+      'Full Portrait': {
+        type: 'simple',
+        slots: [{ x: 0, y: 0, width: 1500, height: 2100, aspect_ratio: '5:7' }]
+      },
+      'Full Landscape': {
+        type: 'simple',
+        slots: [{ x: 0, y: 0, width: 2100, height: 1500, aspect_ratio: '7:5' }]
+      }
+    },
+    'A4': {
+      'Full Portrait': {
+        type: 'simple',
+        slots: [{ x: 0, y: 0, width: 2480, height: 3508, aspect_ratio: '210:297' }]
+      },
+      'Full Landscape': {
+        type: 'simple',
+        slots: [{ x: 0, y: 0, width: 3508, height: 2480, aspect_ratio: '297:210' }]
+      }
+    }
+  },
+  
+  // Common aspect ratios for photo slots
+  ASPECT_RATIOS: [
+    { label: 'Free', value: 'free' },
+    { label: 'Square (1:1)', value: '1:1' },
+    { label: 'Portrait (2:3)', value: '2:3' },
+    { label: 'Landscape (3:2)', value: '3:2' },
+    { label: 'Landscape (2:1)', value: '2:1' },
+    { label: '5R (5:7)', value: '5:7' },
+    { label: 'A4 (210:297)', value: '210:297' },
+  ],
+  
+  // Colors for template builder UI
+  COLORS: {
+    CANVAS_BACKGROUND: '#f8f9fa',
+    GRID_COLOR: '#e9ecef',
+    SLOT_BORDER: '#007bff',
+    SLOT_BORDER_SELECTED: '#dc3545',
+    SLOT_FILL: 'rgba(0, 123, 255, 0.1)',
+    SLOT_FILL_SELECTED: 'rgba(220, 53, 69, 0.1)',
+    HANDLE_COLOR: '#ffffff',
+    HANDLE_BORDER: '#007bff',
+    SNAP_GUIDE: '#28a745',
+  }
+};
+
+// Admin role permissions
+export const ADMIN_PERMISSIONS = {
+  TEMPLATE_BUILDER: ['create', 'read', 'update', 'delete'],
+  TEMPLATE_CATEGORIES: ['create', 'read', 'update', 'delete'],
+  USER_MANAGEMENT: ['read', 'update'],
+  ANALYTICS: ['read'],
+  SYSTEM_SETTINGS: ['read', 'update'],
+};
+
+// Template validation rules
+export const TEMPLATE_VALIDATION = {
+  MIN_SLOTS: 1,
+  MAX_SLOTS: 20,
+  MIN_NAME_LENGTH: 3,
+  MAX_NAME_LENGTH: 50,
+  MAX_DESCRIPTION_LENGTH: 200,
+  ALLOWED_BACKGROUND_COLORS: [
+    '#FFFFFF', '#F8F9FA', '#E9ECEF', '#DEE2E6', '#CED4DA',
+    '#ADB5BD', '#6C757D', '#495057', '#343A40', '#212529'
+  ],
+}; 

@@ -1,11 +1,13 @@
 import { supabase } from '../lib/supabase/client';
 import { Database } from '../lib/supabase/types';
-import { Session, Template, PhotoSlot } from '../types';
+import { Session, Template, PhotoSlot, CustomTemplate, TemplateCategory, PrintSize } from '../types';
 
 type DbUser = Database['public']['Tables']['users']['Row'];
 type DbSession = Database['public']['Tables']['sessions']['Row'];
 type DbTemplate = Database['public']['Tables']['templates']['Row'];
 type DbPhotoSlot = Database['public']['Tables']['photo_slots']['Row'];
+type DbCustomTemplate = Database['public']['Tables']['custom_templates']['Row'];
+type DbTemplateCategory = Database['public']['Tables']['template_categories']['Row'];
 
 export class SupabaseService {
   // User management
@@ -207,6 +209,164 @@ export class SupabaseService {
         return acc;
       }, {} as Record<string, number>) || {},
     };
+  }
+
+  // Custom Template Management
+  async getCustomTemplates(printSize?: PrintSize): Promise<DbCustomTemplate[]> {
+    let query = supabase
+      .from('custom_templates')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false });
+
+    if (printSize) {
+      query = query.eq('print_size', printSize);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  async getCustomTemplate(templateId: string): Promise<DbCustomTemplate | null> {
+    const { data, error } = await supabase
+      .from('custom_templates')
+      .select('*')
+      .eq('id', templateId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
+  }
+
+  async createCustomTemplate(templateData: {
+    name: string;
+    description?: string;
+    print_size: PrintSize;
+    orientation: 'portrait' | 'landscape';
+    layout_data: object;
+    photo_slots: object[];
+    dimensions?: object;
+    margins?: object;
+    background_color?: string;
+    created_by?: string;
+    category?: string;
+    tags?: string[];
+    sort_order?: number;
+  }): Promise<DbCustomTemplate> {
+    const { data, error } = await supabase
+      .from('custom_templates')
+      .insert([templateData])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async updateCustomTemplate(templateId: string, updates: Partial<DbCustomTemplate>): Promise<DbCustomTemplate> {
+    const { data, error } = await supabase
+      .from('custom_templates')
+      .update(updates)
+      .eq('id', templateId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteCustomTemplate(templateId: string): Promise<void> {
+    const { error } = await supabase
+      .from('custom_templates')
+      .delete()
+      .eq('id', templateId);
+
+    if (error) throw error;
+  }
+
+  async duplicateCustomTemplate(templateId: string, newName: string, userId?: string): Promise<DbCustomTemplate> {
+    // Get original template
+    const original = await this.getCustomTemplate(templateId);
+    if (!original) throw new Error('Template not found');
+
+    // Create duplicate with new name
+    const duplicateData = {
+      name: newName,
+      description: original.description ? `Copy of ${original.description}` : `Copy of ${original.name}`,
+      print_size: original.print_size,
+      orientation: original.orientation,
+      layout_data: original.layout_data,
+      photo_slots: original.photo_slots,
+      dimensions: original.dimensions,
+      margins: original.margins,
+      background_color: original.background_color,
+      created_by: userId || original.created_by,
+      category: original.category,
+      tags: original.tags,
+      sort_order: original.sort_order,
+    };
+
+    return await this.createCustomTemplate(duplicateData);
+  }
+
+  // Template Categories
+  async getTemplateCategories(): Promise<DbTemplateCategory[]> {
+    const { data, error } = await supabase
+      .from('template_categories')
+      .select('*')
+      .order('sort_order', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  async createTemplateCategory(categoryData: {
+    name: string;
+    description?: string;
+    color?: string;
+    icon?: string;
+    sort_order?: number;
+  }): Promise<DbTemplateCategory> {
+    const { data, error } = await supabase
+      .from('template_categories')
+      .insert([categoryData])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  // Admin helpers
+  async isUserAdmin(userId: string): Promise<boolean> {
+    try {
+      const user = await this.getUserByGoogleId(userId);
+      if (!user?.preferences) return false;
+      
+      const prefs = user.preferences as { role?: string };
+      return prefs.role === 'admin' || prefs.role === 'super_admin';
+    } catch {
+      return false;
+    }
+  }
+
+  async getTemplatesByCategory(category: string, printSize?: PrintSize): Promise<DbCustomTemplate[]> {
+    let query = supabase
+      .from('custom_templates')
+      .select('*')
+      .eq('category', category)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (printSize) {
+      query = query.eq('print_size', printSize);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
   }
 
   // Test connection

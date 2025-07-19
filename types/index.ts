@@ -235,4 +235,93 @@ export interface LoadingState {
   isLoading: boolean;
   message?: string;
   progress?: number;
+}
+
+// Custom Template System Types
+export type PrintSize = '4R' | '5R' | 'A4';
+export type PrintOrientation = 'portrait' | 'landscape';
+
+export interface CustomPhotoSlot {
+  id: string;
+  index: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  aspect_ratio?: string;
+  photo_id?: string;
+  transform?: {
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+    rotation?: number;
+  };
+}
+
+export interface CustomTemplateLayout {
+  type: string;
+  padding: number;
+  spacing: number;
+  arrangement: 'single' | 'grid' | 'strip' | 'custom';
+  rows?: number;
+  columns?: number;
+}
+
+export interface PrintDimensions {
+  width: number;
+  height: number;
+  dpi: number;
+  unit?: 'px' | 'in' | 'mm';
+}
+
+export interface CustomTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  print_size: PrintSize;
+  orientation: PrintOrientation;
+  layout_data: CustomTemplateLayout;
+  photo_slots: CustomPhotoSlot[];
+  dimensions: PrintDimensions;
+  margins?: {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
+  background_color?: string;
+  created_by?: string;
+  category?: string;
+  tags?: string[];
+  is_active: boolean;
+  is_default: boolean;
+  sort_order?: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface TemplateCategory {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  sort_order?: number;
+  created_at: Date;
+}
+
+export interface PrintSizeConfig {
+  name: PrintSize;
+  label: string;
+  dimensions: {
+    width: number;
+    height: number;
+    dpi: number;
+    inches: {
+      width: number;
+      height: number;
+    };
+  };
+  description: string;
+  is_custom_layouts: boolean; // true for 4R, false for 5R/A4
 } 
