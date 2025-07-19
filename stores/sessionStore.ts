@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { Session, Package } from '../types';
 import { STORAGE_KEYS } from '../utils/constants';
+import { supabaseService } from '../services/supabaseService';
 
 interface SessionStore {
   session: Session | null;
@@ -9,6 +10,7 @@ interface SessionStore {
   clientName: string;
   packages: Package[];
   currentStep: 'package' | 'template' | 'photos' | 'preview' | 'complete';
+  userSessions: any[];
   
   setSession: (session: Session | null) => void;
   updateSession: (updates: Partial<Session>) => void;
@@ -17,6 +19,18 @@ interface SessionStore {
   setCurrentStep: (step: 'package' | 'template' | 'photos' | 'preview' | 'complete') => void;
   nextStep: () => void;
   previousStep: () => void;
+  
+  // Enhanced methods with Supabase
+  createSessionWithSupabase: (userId: string, sessionData: {
+    clientName: string;
+    packageType: 'A' | 'B' | 'C' | 'D';
+    googleDriveFolderId: string;
+    maxTemplates: number;
+  }) => Promise<void>;
+  saveSessionToSupabase: () => Promise<void>;
+  loadUserSessions: (userId: string) => Promise<void>;
+  
+  // Legacy methods (still work)
   saveSession: () => void;
   loadSession: () => void;
   clearSession: () => void;
@@ -30,6 +44,7 @@ const useSessionStore = create<SessionStore>()(
         selectedPackage: null,
         clientName: '',
         currentStep: 'package',
+        userSessions: [],
         packages: [
           { 
             id: 'A', 
@@ -110,6 +125,69 @@ const useSessionStore = create<SessionStore>()(
             }
           } catch (error) {
             console.error('Failed to load session:', error);
+          }
+        },
+        
+        // Enhanced Supabase methods
+        createSessionWithSupabase: async (userId, sessionData) => {
+          try {
+            const session = await supabaseService.createSession({
+              user_id: userId,
+              client_name: sessionData.clientName,
+              package_type: sessionData.packageType,
+              google_drive_folder_id: sessionData.googleDriveFolderId,
+              max_templates: sessionData.maxTemplates,
+            });
+            
+            set({ session, clientName: sessionData.clientName });
+            console.log('✅ Session created in Supabase:', session.id);
+          } catch (error) {
+            console.error('❌ Failed to create session in Supabase:', error);
+            // Fallback to localStorage
+            const fallbackSession: Session = {
+              id: `local_${Date.now()}`,
+              clientName: sessionData.clientName,
+              packageType: sessionData.packageType,
+              selectedTemplates: [],
+              maxTemplates: sessionData.maxTemplates,
+              usedTemplates: 0,
+              googleDriveFolderId: sessionData.googleDriveFolderId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              isCompleted: false,
+            };
+            set({ session: fallbackSession, clientName: sessionData.clientName });
+          }
+        },
+        
+        saveSessionToSupabase: async () => {
+          try {
+            const { session } = get();
+            if (!session || session.id.startsWith('local_')) {
+              console.log('No Supabase session to save');
+              return;
+            }
+            
+            await supabaseService.updateSession(session.id, {
+              client_name: session.clientName,
+              used_templates: session.usedTemplates,
+              output_folder_id: session.outputFolderId,
+              is_completed: session.isCompleted,
+            });
+            
+            console.log('✅ Session saved to Supabase');
+          } catch (error) {
+            console.error('❌ Failed to save session to Supabase:', error);
+          }
+        },
+        
+        loadUserSessions: async (userId) => {
+          try {
+            const sessions = await supabaseService.getUserSessions(userId);
+            set({ userSessions: sessions });
+            console.log(`✅ Loaded ${sessions.length} sessions from Supabase`);
+          } catch (error) {
+            console.error('❌ Failed to load user sessions:', error);
           }
         },
         

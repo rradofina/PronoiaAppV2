@@ -12,7 +12,8 @@
       "Bash(cmd /c:*)",
       "Bash(powershell:*)",
       "Bash(npm run lint)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   }

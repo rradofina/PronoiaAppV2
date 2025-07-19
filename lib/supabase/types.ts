@@ -1,0 +1,198 @@
+export interface Database {
+  public: {
+    Tables: {
+      users: {
+        Row: {
+          id: string;
+          email: string;
+          name: string | null;
+          google_id: string;
+          avatar_url: string | null;
+          preferences: Json | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          name?: string | null;
+          google_id: string;
+          avatar_url?: string | null;
+          preferences?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          name?: string | null;
+          google_id?: string;
+          avatar_url?: string | null;
+          preferences?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          client_name: string;
+          package_type: 'A' | 'B' | 'C' | 'D';
+          google_drive_folder_id: string;
+          output_folder_id: string | null;
+          max_templates: number;
+          used_templates: number;
+          is_completed: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          client_name: string;
+          package_type: 'A' | 'B' | 'C' | 'D';
+          google_drive_folder_id: string;
+          output_folder_id?: string | null;
+          max_templates: number;
+          used_templates?: number;
+          is_completed?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          client_name?: string;
+          package_type?: 'A' | 'B' | 'C' | 'D';
+          google_drive_folder_id?: string;
+          output_folder_id?: string | null;
+          max_templates?: number;
+          used_templates?: number;
+          is_completed?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      templates: {
+        Row: {
+          id: string;
+          session_id: string;
+          user_id: string;
+          type: 'solo' | 'collage' | 'photocard' | 'photostrip';
+          name: string;
+          dimensions: Json;
+          layout_config: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          user_id: string;
+          type: 'solo' | 'collage' | 'photocard' | 'photostrip';
+          name: string;
+          dimensions: Json;
+          layout_config: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          user_id?: string;
+          type?: 'solo' | 'collage' | 'photocard' | 'photostrip';
+          name?: string;
+          dimensions?: Json;
+          layout_config?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      photo_slots: {
+        Row: {
+          id: string;
+          template_id: string;
+          slot_index: number;
+          photo_google_id: string | null;
+          photo_metadata: Json | null;
+          transform_data: Json | null;
+          position_data: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          template_id: string;
+          slot_index: number;
+          photo_google_id?: string | null;
+          photo_metadata?: Json | null;
+          transform_data?: Json | null;
+          position_data: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          template_id?: string;
+          slot_index?: number;
+          photo_google_id?: string | null;
+          photo_metadata?: Json | null;
+          transform_data?: Json | null;
+          position_data?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      generated_templates: {
+        Row: {
+          id: string;
+          session_id: string;
+          template_id: string;
+          file_name: string;
+          google_drive_id: string;
+          file_url: string;
+          dimensions: Json;
+          generated_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          template_id: string;
+          file_name: string;
+          google_drive_id: string;
+          file_url: string;
+          dimensions: Json;
+          generated_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          template_id?: string;
+          file_name?: string;
+          google_drive_id?: string;
+          file_url?: string;
+          dimensions?: Json;
+          generated_at?: string;
+        };
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+  };
+}
+
+type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
