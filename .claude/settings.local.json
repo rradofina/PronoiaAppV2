@@ -13,7 +13,8 @@
       "Bash(powershell:*)",
       "Bash(npm run lint)",
       "Bash(rm:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git push:*)"
     ],
     "deny": []
   }
