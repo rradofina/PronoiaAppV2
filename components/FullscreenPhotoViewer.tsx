@@ -242,7 +242,7 @@ export default function FullscreenPhotoViewer({
       <div className="p-4 flex-shrink-0">
         <button
           onClick={() => onAddToTemplate(currentPhoto)}
-          className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-md"
         >
           Add to Print Template
         </button>

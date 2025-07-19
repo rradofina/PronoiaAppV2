@@ -4,7 +4,15 @@
       "Bash(npm run dev:*)",
       "Bash(npm run type-check:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(pkill:*)",
+      "Bash(true)",
+      "Bash(taskkill:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(cmd /c:*)",
+      "Bash(powershell:*)",
+      "Bash(npm run lint)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

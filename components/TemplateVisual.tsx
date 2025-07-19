@@ -18,7 +18,14 @@ const TemplateVisual: React.FC<TemplateVisualProps> = React.memo(({
 }) => {
   const getPhotoUrl = (photoId?: string | null) => {
     if (!photoId) return null;
-    return photos.find(p => p.id === photoId)?.url || null;
+    const photo = photos.find(p => p.id === photoId);
+    if (!photo) return null;
+    
+    // Use higher resolution thumbnail for better template preview quality
+    if (photo.thumbnailUrl) {
+      return photo.thumbnailUrl.replace('=s220', '=s600');
+    }
+    return photo.url || null;
   };
 
   // 4R print format (4x6 inches) - width:height ratio of 2:3 (or 4:6)
@@ -29,21 +36,22 @@ const TemplateVisual: React.FC<TemplateVisualProps> = React.memo(({
     return (
       <div className="bg-white p-3 rounded-lg shadow-md w-full h-full" style={{ aspectRatio: printAspectRatio, minHeight: '200px' }}>
         <div 
-          className={`w-full h-full border-2 border-dashed border-gray-300 rounded cursor-pointer transition-all duration-200 ${
-            selectedSlot === slots[0] ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'
+          className={`w-full h-full cursor-pointer transition-all duration-200 ${
+            selectedSlot === slots[0] ? 'ring-2 ring-blue-500 ring-inset' : ''
           }`}
           onClick={() => onSlotClick(slots[0])}
           style={{ 
             backgroundImage: getPhotoUrl(slots[0]?.photoId) ? `url(${getPhotoUrl(slots[0]?.photoId)})` : 'none',
             backgroundSize: 'cover',
-            backgroundPosition: 'center'
+            backgroundPosition: 'center',
+            backgroundColor: getPhotoUrl(slots[0]?.photoId) ? 'transparent' : '#f8f9fa'
           }}
         >
           {!getPhotoUrl(slots[0]?.photoId) && (
-            <div className="w-full h-full flex items-center justify-center text-gray-400">
+            <div className="w-full h-full flex items-center justify-center text-gray-500 border-2 border-dashed border-gray-300">
               <div className="text-center">
-                <div className="text-2xl mb-1">📷</div>
-                <div className="text-xs">Click to add photo</div>
+                <div className="text-3xl mb-2">+</div>
+                <div className="text-xs font-medium">Add Photo Here</div>
               </div>
             </div>
           )}
@@ -60,19 +68,23 @@ const TemplateVisual: React.FC<TemplateVisualProps> = React.memo(({
           {slots.slice(0, 4).map((slot, index) => (
             <div
               key={index}
-              className={`border-2 border-dashed border-gray-300 rounded cursor-pointer transition-all duration-200 ${
-                selectedSlot === slot ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'
+              className={`cursor-pointer transition-all duration-200 ${
+                selectedSlot === slot ? 'ring-2 ring-blue-500 ring-inset' : ''
               }`}
               onClick={() => onSlotClick(slot)}
               style={{ 
                 backgroundImage: getPhotoUrl(slot?.photoId) ? `url(${getPhotoUrl(slot?.photoId)})` : 'none',
                 backgroundSize: 'cover',
-                backgroundPosition: 'center'
+                backgroundPosition: 'center',
+                backgroundColor: getPhotoUrl(slot?.photoId) ? 'transparent' : '#f8f9fa'
               }}
             >
               {!getPhotoUrl(slot?.photoId) && (
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  <div className="text-xs">📷</div>
+                <div className="w-full h-full flex items-center justify-center text-gray-500 border-2 border-dashed border-gray-300">
+                  <div className="text-center">
+                    <div className="text-lg mb-1">+</div>
+                    <div className="text-xs font-medium">Add Photo</div>
+                  </div>
                 </div>
               )}
             </div>
@@ -97,12 +109,16 @@ const TemplateVisual: React.FC<TemplateVisualProps> = React.memo(({
               style={{ 
                 backgroundImage: getPhotoUrl(slot?.photoId) ? `url(${getPhotoUrl(slot?.photoId)})` : 'none',
                 backgroundSize: 'cover',
-                backgroundPosition: 'center'
+                backgroundPosition: 'center',
+                backgroundColor: getPhotoUrl(slot?.photoId) ? 'transparent' : '#f8f9fa'
               }}
             >
               {!getPhotoUrl(slot?.photoId) && (
-                <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">
-                  <div className="text-xs">📷</div>
+                <div className="w-full h-full flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <div className="text-lg mb-1">+</div>
+                    <div className="text-xs font-medium">Add Photo</div>
+                  </div>
                 </div>
               )}
             </div>
@@ -122,19 +138,23 @@ const TemplateVisual: React.FC<TemplateVisualProps> = React.memo(({
               {slots.slice(row * 2, row * 2 + 2).map((slot, index) => (
                 <div
                   key={index}
-                  className={`border-2 border-dashed border-gray-300 rounded cursor-pointer transition-all duration-200 ${
-                    selectedSlot === slot ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'
+                  className={`cursor-pointer transition-all duration-200 ${
+                    selectedSlot === slot ? 'ring-2 ring-blue-500 ring-inset' : ''
                   }`}
                   onClick={() => onSlotClick(slot)}
                   style={{ 
                     backgroundImage: getPhotoUrl(slot?.photoId) ? `url(${getPhotoUrl(slot?.photoId)})` : 'none',
                     backgroundSize: 'cover',
-                    backgroundPosition: 'center'
+                    backgroundPosition: 'center',
+                    backgroundColor: getPhotoUrl(slot?.photoId) ? 'transparent' : '#f8f9fa'
                   }}
                 >
                   {!getPhotoUrl(slot?.photoId) && (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <div className="text-xs">📷</div>
+                    <div className="w-full h-full flex items-center justify-center text-gray-500 border border-dashed border-gray-300">
+                      <div className="text-center">
+                        <div className="text-sm mb-1">+</div>
+                        <div className="text-xs font-medium">Add</div>
+                      </div>
                     </div>
                   )}
                 </div>

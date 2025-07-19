@@ -9,6 +9,7 @@ import TemplateSelector from '../TemplateSelector';
 import FullscreenTemplateEditor from '../FullscreenTemplateEditor';
 import FullscreenTemplateSelector from '../FullscreenTemplateSelector';
 import PhotoSelectionMode from '../PhotoSelectionMode';
+import SlidingTemplateBar from '../SlidingTemplateBar';
 
 interface PhotoSelectionScreenProps {
   clientName: string;
@@ -59,7 +60,7 @@ export default function PhotoSelectionScreen({
   const [hasScrolled, setHasScrolled] = useState(false);
   
   // New workflow states
-  const [viewMode, setViewMode] = useState<'normal' | 'photo-viewer' | 'template-selector' | 'template-editor' | 'template-first' | 'photo-selection'>('normal');
+  const [viewMode, setViewMode] = useState<'normal' | 'photo-viewer' | 'sliding-templates' | 'template-editor' | 'template-first' | 'photo-selection'>('normal');
   const [selectedPhotoForViewer, setSelectedPhotoForViewer] = useState<Photo | null>(null);
   const [selectedPhotoForTemplate, setSelectedPhotoForTemplate] = useState<Photo | null>(null);
   const [selectedTemplateForViewer, setSelectedTemplateForViewer] = useState<string | null>(null);
@@ -149,18 +150,15 @@ export default function PhotoSelectionScreen({
 
   const handleAddToTemplate = (photo: Photo) => {
     setSelectedPhotoForTemplate(photo);
-    setViewMode('template-selector');
+    setSelectedPhotoForViewer(null); // Close the fullscreen viewer
+    setViewMode('sliding-templates');
   };
 
-  const handleTemplateSelectFromPhoto = (templateId: string) => {
-    setSelectedTemplateForViewer(templateId);
+  const handleSlotSelectFromSlidingBar = (slot: TemplateSlot) => {
+    console.log('📝 handleSlotSelectFromSlidingBar called with slot:', slot);
+    console.log('📝 selectedPhotoForTemplate:', selectedPhotoForTemplate);
+    setSelectedSlotForEditor(slot);
     setViewMode('template-editor');
-    
-    // For solo templates, auto-select the first slot
-    const templateSlot = templateSlots.find(s => s.templateId === templateId);
-    if (templateSlot?.templateType === 'solo') {
-      setSelectedSlotForEditor(templateSlot);
-    }
   };
 
   // Template-first workflow  
@@ -181,9 +179,11 @@ export default function PhotoSelectionScreen({
 
   // Template editor
   const handleApplyPhotoToSlot = (slotId: string, photoId: string, transform?: { scale: number; x: number; y: number }) => {
+    console.log('🔧 handleApplyPhotoToSlot called:', { slotId, photoId, transform });
     const updatedSlots = templateSlots.map(s =>
       s.id === slotId ? { ...s, photoId, transform } : s
     );
+    console.log('🔧 Updated slots:', updatedSlots);
     setTemplateSlots(updatedSlots);
     
     // Reset states and return to normal view
@@ -544,14 +544,15 @@ export default function PhotoSelectionScreen({
         isVisible={viewMode === 'photo-viewer' && !!selectedPhotoForViewer}
       />
 
-      {/* Template Selector (from photo) */}
-      <TemplateSelector
+      {/* Sliding Template Bar (from photo) */}
+      <SlidingTemplateBar
         templateSlots={templateSlots}
-        photos={photos}
         selectedPhoto={selectedPhotoForTemplate!}
-        onTemplateSelect={handleTemplateSelectFromPhoto}
+        photos={photos}
+        onSlotSelect={handleSlotSelectFromSlidingBar}
         onClose={resetViewStates}
-        isVisible={viewMode === 'template-selector' && !!selectedPhotoForTemplate}
+        isVisible={viewMode === 'sliding-templates' && !!selectedPhotoForTemplate}
+        TemplateVisual={TemplateVisual}
       />
 
       {/* Fullscreen Template Selector (template-first) */}
