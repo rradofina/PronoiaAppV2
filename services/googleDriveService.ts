@@ -506,7 +506,7 @@ class GoogleDriveService {
     try {
       const folder = await this.getFolderContents(folderId);
       
-      if (maxDepth > 0) {
+      if (maxDepth > 0 && folder.folders) {
         const subfolderPromises = folder.folders.map(async subfolder => {
           return await this.getFolderTree(subfolder.id, maxDepth - 1);
         });
