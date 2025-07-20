@@ -200,20 +200,20 @@ export default function AdminDashboard() {
               <span className="text-2xl">📐</span>
               <div>
                 <p className="font-medium text-gray-800">Manage Templates</p>
-                <p className="text-sm text-gray-600">Edit existing templates</p>
+                <p className="text-sm text-gray-600">View PNG templates</p>
               </div>
             </Link>
 
-            <a
-              href="/admin/templates/categories"
+            <Link
+              href="/admin/templates/settings"
               className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              <span className="text-2xl">📁</span>
+              <span className="text-2xl">⚙️</span>
               <div>
-                <p className="font-medium text-gray-800">Template Categories</p>
-                <p className="text-sm text-gray-600">Organize templates</p>
+                <p className="font-medium text-gray-800">Template Settings</p>
+                <p className="text-sm text-gray-600">Configure Google Drive folder</p>
               </div>
-            </a>
+            </Link>
           </div>
         </div>
 

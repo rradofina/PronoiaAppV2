@@ -1,5 +1,5 @@
 import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType } from '../../types';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PRINT_SIZES, TEMPLATE_TYPES } from '../../utils/constants';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
@@ -10,6 +10,142 @@ import FullscreenTemplateEditor from '../FullscreenTemplateEditor';
 import FullscreenTemplateSelector from '../FullscreenTemplateSelector';
 import PhotoSelectionMode from '../PhotoSelectionMode';
 import SlidingTemplateBar from '../SlidingTemplateBar';
+
+// PNG Template Visual Component  
+const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: any) => {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  
+  // Get PNG templates from window (stored during package selection)
+  const pngTemplates = (window as any).pngTemplates || [];
+  
+  // Find the matching PNG template
+  const pngTemplate = pngTemplates.find((t: any) => 
+    t.templateType === template.id || 
+    t.name.toLowerCase().includes(template.id) ||
+    t.id === template.id.split('_')[0]
+  );
+  
+
+  // Download PNG as blob to avoid CORS issues
+  useEffect(() => {
+    if (pngTemplate) {
+      const downloadAsBlob = async () => {
+        try {
+          const { googleDriveService } = await import('../../services/googleDriveService');
+          console.log('🔍 Attempting to download template:', {
+            id: pngTemplate.id,
+            driveFileId: pngTemplate.driveFileId,
+            name: pngTemplate.name
+          });
+          
+          // Try driveFileId first, then fallback to id
+          const fileId = pngTemplate.driveFileId || pngTemplate.id;
+          const blob = await googleDriveService.downloadTemplate(fileId);
+          const url = URL.createObjectURL(blob);
+          setBlobUrl(url);
+        } catch (error) {
+          console.error('Failed to download PNG template:', error);
+          setBlobUrl(null); // Show fallback UI
+        }
+      };
+      downloadAsBlob();
+    }
+    
+    return () => {
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
+  }, [pngTemplate]);
+
+  const getPhotoUrl = (photoId?: string | null) => {
+    if (!photoId) return null;
+    return photos.find((p: any) => p.id === photoId)?.url || null;
+  };
+
+  if (!pngTemplate) {
+    console.warn('⚠️ PNG template not found for:', template.id, 'Available:', pngTemplates.length);
+    return (
+      <div className="bg-white p-3 rounded-lg shadow-md w-full h-full flex items-center justify-center">
+        <div className="text-center text-gray-500">
+          <div className="text-lg font-medium">{template.name}</div>
+          <div className="text-sm">{slots.length} photos</div>
+          <div className="text-xs mt-1 text-red-500">PNG not found</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!blobUrl) {
+    return (
+      <div className="bg-white p-3 rounded-lg shadow-md w-full h-full flex items-center justify-center">
+        <div className="text-center text-gray-500">
+          <div className="text-lg font-medium">{template.name}</div>
+          <div className="text-sm">{slots.length} photos</div>
+          <div className="text-xs mt-1">Loading template...</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full bg-white" 
+         style={{ 
+           aspectRatio: `${pngTemplate.dimensions.width}/${pngTemplate.dimensions.height}`,
+         }}>
+      {/* Background PNG Template - FULL template including branding */}
+      <img 
+        src={blobUrl}
+        alt={pngTemplate.name}
+        className="w-full h-full object-contain"
+      />
+      
+      {/* Photo Holes Overlay */}
+      {pngTemplate.holes.map((hole: any, holeIndex: number) => {
+        const slot = slots[holeIndex];
+        if (!slot) return null;
+        
+        const photoUrl = getPhotoUrl(slot.photoId);
+        const isSelected = selectedSlot?.id === slot.id;
+        
+        return (
+          <div
+            key={hole.id}
+            className={`absolute cursor-pointer transition-all duration-200 ${
+              isSelected ? 'ring-2 ring-blue-500' : 'hover:ring-1 hover:ring-blue-300'
+            }`}
+            style={{
+              left: `${(hole.x / pngTemplate.dimensions.width) * 100}%`,
+              top: `${(hole.y / pngTemplate.dimensions.height) * 100}%`,
+              width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
+              height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
+            }}
+            onClick={() => onSlotClick(slot)}
+          >
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt={`Photo ${holeIndex + 1}`}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-gray-200 flex items-center justify-center relative" 
+                   style={{ outline: '2px dashed #9ca3af', outlineOffset: '-2px' }}>
+                <span className="text-gray-500 text-xs font-medium">
+                  {holeIndex + 1}
+                </span>
+                {/* Debug info for hole dimensions */}
+                <div className="absolute top-0 right-0 bg-blue-500 text-white text-xs px-1 leading-tight">
+                  {hole.width}×{hole.height}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 interface PhotoSelectionScreenProps {
   clientName: string;
@@ -23,13 +159,6 @@ interface PhotoSelectionScreenProps {
   handlePhotoSelect: (photo: Photo) => void;
   handleSlotSelect: (slot: TemplateSlot) => void;
   handleBack: () => void;
-  TemplateVisual: React.FC<{
-    template: { id: string; name: string; slots: number };
-    slots: TemplateSlot[];
-    onSlotClick: (slot: TemplateSlot) => void;
-    photos: Photo[];
-    selectedSlot: TemplateSlot | null;
-  }>;
   totalAllowedPrints: number;
   setSelectedSlot: (slot: TemplateSlot | null) => void;
   setTemplateSlots: (slots: TemplateSlot[]) => void;
@@ -47,7 +176,6 @@ export default function PhotoSelectionScreen({
   handlePhotoSelect,
   handleSlotSelect,
   handleBack,
-  TemplateVisual,
   totalAllowedPrints,
   setSelectedSlot,
   setTemplateSlots,
@@ -98,7 +226,13 @@ export default function PhotoSelectionScreen({
 
   const handleConfirmAddPrint = () => {
     if (selectedType) {
-      const template = TEMPLATE_TYPES.find(t => t.id === selectedType);
+      // Get PNG templates from window
+      const pngTemplates = (window as any).pngTemplates || [];
+      const template = pngTemplates.find((t: any) => 
+        t.templateType === selectedType || 
+        t.name.toLowerCase().includes(selectedType.toLowerCase())
+      );
+      
       if (template) {
         const newSlotsToAdd: TemplateSlot[] = [];
         // Find the next available index for a new template to ensure unique IDs
@@ -106,9 +240,9 @@ export default function PhotoSelectionScreen({
         const nextTemplateIndex = existingTemplateIds.size;
         
         for (let i = 0; i < addPrintQuantity; i++) {
-          const newTemplateId = `${selectedType}_${nextTemplateIndex + i}`;
+          const newTemplateId = `${template.id}_${nextTemplateIndex + i}`;
           
-          for (let slotIndex = 0; slotIndex < template.slots; slotIndex++) {
+          for (let slotIndex = 0; slotIndex < template.holes.length; slotIndex++) {
             newSlotsToAdd.push({
               id: `${newTemplateId}_${slotIndex}`,
               templateId: newTemplateId,
@@ -305,7 +439,7 @@ export default function PhotoSelectionScreen({
                       </button>
                     )}
                     <h3 className="font-semibold mb-2 text-center text-xs leading-tight truncate px-1">{templateName}</h3>
-                    <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '260px' }}>
+                    <div className="w-full rounded-lg overflow-hidden border border-gray-200">
                       <div onClick={() => handleTemplateClick(templateId)}>
                         <TemplateVisual
                           key={`${templateId}-${slots.map(s => s.photoId).join('-')}`} // Force re-render when photos change
@@ -401,7 +535,7 @@ export default function PhotoSelectionScreen({
                 onClick={handleBack}
                 className="w-full px-4 py-2 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm"
               >
-                ← Back to Templates
+                ← Back to Package
               </button>
               <button
                 onClick={handlePhotoContinue}
@@ -460,16 +594,20 @@ export default function PhotoSelectionScreen({
                     Add New Print
                   </Dialog.Title>
                   <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700">Template Type</label>
+                    <label className="block text-sm font-medium text-gray-700">PNG Template</label>
                     <select
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       value={selectedType || ''}
                       onChange={(e) => setSelectedType(e.target.value as TemplateType)}
                     >
-                      <option value="">Select type</option>
-                      {TEMPLATE_TYPES.map(t => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
+                      <option value="">Select PNG template</option>
+                      {((window as any).pngTemplates || [])
+                        .filter((t: any) => t.printSize === selectedSize)
+                        .map((t: any) => (
+                          <option key={t.id} value={t.templateType}>
+                            {t.name} ({t.holes.length} slots)
+                          </option>
+                        ))}
                     </select>
                   </div>
                   <div className="mt-4">
@@ -586,7 +724,7 @@ export default function PhotoSelectionScreen({
 
       {/* Fullscreen Template Editor */}
       <FullscreenTemplateEditor
-        templateSlots={templateSlots.filter(s => s.templateId === selectedSlotForEditor?.templateId)}
+        templateSlots={templateSlots}
         selectedSlot={selectedSlotForEditor!}
         selectedPhoto={selectedPhotoForTemplate!}
         photos={photos}

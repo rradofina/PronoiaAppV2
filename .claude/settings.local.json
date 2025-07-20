@@ -22,7 +22,11 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(grep:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(wc:*)",
+      "Bash(npx supabase:*)",
+      "Bash(find:*)",
+      "Bash(timeout 30s npm run dev)"
     ],
     "deny": []
   }

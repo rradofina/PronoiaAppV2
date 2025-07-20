@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { UIState, LoadingState, PhotoSlot } from '../types';
+import { UIState, LoadingState, PhotoSlot, Screen } from '../types';
 
 interface UIStore extends UIState, LoadingState {
+  currentScreen: Screen;
   error: string | null;
   eventLog: string[];
   
+  setCurrentScreen: (screen: Screen) => void;
   setSelectedPhotoSlot: (slot: PhotoSlot | null) => void;
   setViewMode: (mode: 'grid' | 'list') => void;
   setSortBy: (sortBy: 'name' | 'date' | 'size') => void;
@@ -21,6 +23,9 @@ interface UIStore extends UIState, LoadingState {
 
 const useUIStore = create<UIStore>()(
   devtools((set, get) => ({
+    // Screen State
+    currentScreen: 'drive-setup',
+    
     // UI State
     showPhotoSelector: false,
     showTemplatePreview: false,
@@ -41,6 +46,7 @@ const useUIStore = create<UIStore>()(
     // Event Log
     eventLog: [],
     
+    setCurrentScreen: (screen) => set({ currentScreen: screen }),
     setSelectedPhotoSlot: (slot) => set({ selectedPhotoSlot: slot }),
     setViewMode: (mode) => set({ viewMode: mode }),
     setSortBy: (sortBy) => set({ sortBy }),

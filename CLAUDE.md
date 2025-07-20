@@ -13,7 +13,7 @@ npm run type-check   # TypeScript validation without build
 ```
 
 ### Port Management
-**Important**: This application should only run on port 3000 to avoid conflicts.
+**CRITICAL - LOCALHOST 3000 ONLY**: This application MUST ONLY run on port 3000. NEVER use 3001, 3002, or any other port. The user has explicitly required port 3000 only.
 
 **Reset all ports and start fresh:**
 ```bash
@@ -42,6 +42,60 @@ npm run lint:fix     # Auto-fix ESLint issues
 npm run format       # Format code with Prettier
 npm run format:check # Check formatting without changes
 ```
+
+## CRITICAL BUG FIX: Placeholder/Hole Positioning Issue
+
+### Problem
+Photo placeholders in PNG templates were appearing **square instead of rectangular** and **misaligned** with the actual holes in the PNG template background. This was a fundamental issue affecting the core template editing functionality.
+
+### Root Cause Analysis
+1. **Percentage positioning was incorrect** due to `object-contain` creating letterboxing
+2. **Template container sizing** was causing aspect ratio distortion  
+3. **Hole detection algorithm** was working correctly, but **CSS rendering** was wrong
+
+### Solution Applied
+**File: `components/FullscreenTemplateEditor.tsx`**
+
+**BEFORE (Broken):**
+```tsx
+// Used viewport-based sizing that caused stretching
+<div className="relative w-full h-full max-w-[90vw] max-h-[85vh]">
+  <img className="w-full h-full object-contain" />
+```
+
+**AFTER (Fixed):**
+```tsx
+// Fixed container sizing with exact aspect ratio
+<div className="relative" 
+     style={{ 
+       aspectRatio: `${pngTemplate.dimensions.width}/${pngTemplate.dimensions.height}`,
+       width: '800px',
+       height: 'auto'
+     }}>
+  <img className="w-full h-full" />
+```
+
+**Key Changes:**
+1. **Fixed width container (800px)** instead of viewport-based sizing
+2. **Auto height** with `aspectRatio` CSS property for precise scaling
+3. **Removed `object-contain`** to eliminate letterboxing
+4. **Percentage positioning now works correctly** because image fills container exactly
+
+### Technical Details
+- **Percentage positioning formula**: `left: ${(hole.x / template.width) * 100}%`
+- **No letterboxing**: Image fills container completely without distortion
+- **Zoom-safe**: Placeholders maintain alignment at all browser zoom levels
+- **Aspect ratio preserved**: Template displays at correct proportions
+
+### Verification
+- ✅ Placeholders are properly rectangular (not square)
+- ✅ Perfect alignment with PNG template holes
+- ✅ Consistent behavior across all zoom levels
+- ✅ No stretching or distortion
+
+### Files Modified
+- `components/FullscreenTemplateEditor.tsx` - Container sizing and positioning
+- `services/templateDetectionService.ts` - Enhanced hole detection precision
 
 ### Environment Setup
 Create `.env.local` with:
@@ -145,6 +199,7 @@ Key service: `googleDriveService.ts` handles all Drive API interactions with pro
 - `services/googleDriveService.ts` - Google Drive API integration with authentication and file operations
 - `services/templateGenerationService.ts` - Canvas-based template generation and export
 - `services/supabaseService.ts` - Database operations, user management, and session persistence
+- `services/loggerService.ts` - Centralized logging service with structured logging and category-based filtering
 
 ### State Management
 - `stores/useAppStore.ts` - Legacy monolithic store (preserved for compatibility)

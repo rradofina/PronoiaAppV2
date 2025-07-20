@@ -7,11 +7,38 @@ export interface DriveFolder {
   id: string;
   name: string;
   createdTime: string;
+  mimeType?: string;
+  parents?: string[];
 }
 
 export interface GoogleAuth {
   isSignedIn: boolean;
   userEmail: string | null;
+}
+
+export interface GoogleUserInfo {
+  id: string;
+  sub?: string;
+  email: string;
+  name: string;
+  picture?: string;
+  given_name?: string;
+  family_name?: string;
+  locale?: string;
+}
+
+export interface SupabaseUser {
+  id: string;
+  email: string;
+  name: string | null;
+  google_id: string;
+  avatar_url: string | null;
+  preferences?: {
+    role?: 'user' | 'admin';
+    [key: string]: any;
+  };
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Package {
@@ -146,11 +173,10 @@ export interface GoogleDriveFile {
   parents: string[];
 }
 
-export interface GoogleDriveFolder {
-  id: string;
-  name: string;
-  files: GoogleDriveFile[];
-  folders: GoogleDriveFolder[];
+// Alias for backward compatibility - use DriveFolder instead
+export type GoogleDriveFolder = DriveFolder & {
+  files?: GoogleDriveFile[];
+  folders?: GoogleDriveFolder[];
 }
 
 export interface TemplateGenerationOptions {
@@ -324,4 +350,24 @@ export interface PrintSizeConfig {
   };
   description: string;
   is_custom_layouts: boolean; // true for 4R, false for 5R/A4
+}
+
+export interface TemplateCacheData {
+  drive_file_id: string;
+  name: string;
+  print_size: string;
+  template_type: string;
+  holes: {
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }[];
+  png_url: string;
+  dimensions: {
+    width: number;
+    height: number;
+  };
+  has_internal_branding: boolean;
 } 

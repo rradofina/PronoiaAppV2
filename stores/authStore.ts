@@ -1,17 +1,17 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import { GoogleAuth } from '../types';
+import { GoogleAuth, GoogleUserInfo, SupabaseUser } from '../types';
 import { supabaseService } from '../services/supabaseService';
 
 interface AuthStore {
   googleAuth: GoogleAuth;
   isGapiLoaded: boolean;
-  supabaseUser: any | null;
+  supabaseUser: SupabaseUser | null;
   
   setGoogleAuth: (auth: GoogleAuth) => void;
   setIsGapiLoaded: (loaded: boolean) => void;
-  setSupabaseUser: (user: any | null) => void;
-  syncWithSupabase: (googleUserInfo?: any) => Promise<void>;
+  setSupabaseUser: (user: SupabaseUser | null) => void;
+  syncWithSupabase: (googleUserInfo?: GoogleUserInfo) => Promise<void>;
   clearAuth: () => void;
 }
 
@@ -32,9 +32,11 @@ const useAuthStore = create<AuthStore>()(
             const { googleAuth } = get();
             
             if (!googleAuth.isSignedIn || !googleUserInfo) {
-              console.log('Not syncing - not signed in or no user info');
+              console.log('🔄 Not syncing - not signed in or no user info');
               return;
             }
+
+            console.log('🔄 Syncing user with Supabase:', googleUserInfo.email);
 
             // Create or update user in Supabase
             const userData = {
@@ -47,10 +49,14 @@ const useAuthStore = create<AuthStore>()(
             const supabaseUser = await supabaseService.createOrUpdateUser(userData);
             set({ supabaseUser });
             
-            console.log('✅ Synced with Supabase:', supabaseUser.email);
+            console.log('✅ Successfully synced with Supabase:', supabaseUser.email);
           } catch (error) {
-            console.error('❌ Failed to sync with Supabase:', error);
+            console.warn('⚠️ Supabase sync failed (app will continue without database features):', error);
             // Don't throw - keep the app working even if Supabase fails
+            // Set a fallback user object so the app knows the sync was attempted
+            set({ 
+              supabaseUser: null 
+            });
           }
         },
         

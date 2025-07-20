@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { TemplateSlot, Photo } from '../types';
 
@@ -10,7 +10,6 @@ interface FullscreenTemplateEditorProps {
   onApply: (slotId: string, photoId: string, transform?: { scale: number; x: number; y: number }) => void;
   onClose: () => void;
   isVisible: boolean;
-  TemplateVisual: React.FC<any>;
 }
 
 export default function FullscreenTemplateEditor({
@@ -20,39 +19,90 @@ export default function FullscreenTemplateEditor({
   photos,
   onApply,
   onClose,
-  isVisible,
-  TemplateVisual
+  isVisible
 }: FullscreenTemplateEditorProps) {
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
-  const [mainPhotoLoading, setMainPhotoLoading] = useState(true);
-  const [mainPhotoError, setMainPhotoError] = useState(false);
-  const [currentPhotoUrl, setCurrentPhotoUrl] = useState('');
+  const [templateBlobUrl, setTemplateBlobUrl] = useState<string | null>(null);
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
+  const [imageRenderDimensions, setImageRenderDimensions] = useState<{width: number; height: number; x: number; y: number} | null>(null);
   const transformRef = useRef<any>();
+  const templateImageRef = useRef<HTMLImageElement>(null);
 
-  if (!isVisible) return null;
+  // Get PNG templates and find the one for this slot (with null checks)
+  const pngTemplates = (window as any).pngTemplates || [];
+  const templateId = selectedSlot?.templateId?.split('_')[0]; // Get base template ID
+  const pngTemplate = selectedSlot ? pngTemplates.find((t: any) => 
+    t.id === templateId || 
+    t.templateType === selectedSlot.templateType
+  ) : null;
 
-  // Generate fallback URLs for main photo
-  const getMainPhotoUrl = () => {
-    const urls = [];
-    
-    if (selectedPhoto.thumbnailUrl) {
-      urls.push(selectedPhoto.thumbnailUrl.replace('=s220', '=s1200')); // High res first
-      urls.push(selectedPhoto.thumbnailUrl.replace('=s220', '=s800'));  // Medium res
-      urls.push(selectedPhoto.thumbnailUrl.replace('=s220', '=s600'));  // Lower res
-      urls.push(selectedPhoto.thumbnailUrl); // Original thumbnail
+  // Get all slots for this template
+  const thisTemplateSlots = selectedSlot ? templateSlots.filter(slot => 
+    slot.templateId === selectedSlot.templateId
+  ) : [];
+
+  // Download PNG template as blob
+  useEffect(() => {
+    if (pngTemplate && isVisible) {
+      const downloadTemplate = async () => {
+        try {
+          const { googleDriveService } = await import('../services/googleDriveService');
+          const fileId = pngTemplate.driveFileId || pngTemplate.id;
+          const blob = await googleDriveService.downloadTemplate(fileId);
+          const url = URL.createObjectURL(blob);
+          setTemplateBlobUrl(url);
+        } catch (error) {
+          console.error('Failed to download template for fullscreen editor:', error);
+        }
+      };
+      downloadTemplate();
     }
-    
-    if (selectedPhoto.url) {
-      urls.push(selectedPhoto.url); // Original URL
+
+    return () => {
+      if (templateBlobUrl) {
+        URL.revokeObjectURL(templateBlobUrl);
+      }
+    };
+  }, [pngTemplate, isVisible]);
+
+  // Load selected photo URL - use blob to avoid CORS issues
+  useEffect(() => {
+    if (selectedPhoto && isVisible) {
+      const loadPhoto = async () => {
+        try {
+          const { googleDriveService } = await import('../services/googleDriveService');
+          const photoId = selectedPhoto.googleDriveId || selectedPhoto.id;
+          const blob = await googleDriveService.downloadPhoto(photoId);
+          const url = URL.createObjectURL(blob);
+          setSelectedPhotoUrl(url);
+        } catch (error) {
+          console.error('Failed to download selected photo:', error);
+          // Fallback to original URL
+          setSelectedPhotoUrl(selectedPhoto.url);
+        }
+      };
+      loadPhoto();
     }
-    
-    // Try direct Google Drive link
-    if (selectedPhoto.googleDriveId) {
-      urls.push(`https://drive.google.com/uc?id=${selectedPhoto.googleDriveId}&export=view`);
-    }
-    
-    return urls;
-  };
+
+    return () => {
+      if (selectedPhotoUrl && selectedPhotoUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(selectedPhotoUrl);
+      }
+    };
+  }, [selectedPhoto, isVisible]);
+
+  // Debug photos array and templateSlots
+  console.log('🔍 FullscreenTemplateEditor state:', {
+    isVisible,
+    selectedSlot: selectedSlot?.id,
+    selectedPhoto: selectedPhoto?.id,
+    photosCount: photos.length,
+    templateSlotsCount: templateSlots.length,
+    templateSlots: templateSlots.map(s => ({ id: s.id, photoId: s.photoId }))
+  });
+
+  // Early return after all hooks
+  if (!isVisible || !selectedSlot) return null;
 
   const handleApply = () => {
     onApply(selectedSlot.id, selectedPhoto.id, transform);
@@ -66,12 +116,12 @@ export default function FullscreenTemplateEditor({
     });
   };
 
-  // Create a temporary slot array with the photo assigned
-  const tempSlots = templateSlots.map(slot => 
-    slot.id === selectedSlot.id 
-      ? { ...slot, photoId: selectedPhoto.id }
-      : slot
-  );
+  const getPhotoUrl = (photoId?: string | null) => {
+    if (!photoId) return null;
+    const photo = photos.find((p: any) => p.id === photoId);
+    console.log('🔍 getPhotoUrl debug:', { photoId, photo, photoUrl: photo?.url });
+    return photo?.url || null;
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
@@ -84,223 +134,180 @@ export default function FullscreenTemplateEditor({
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
-          <span>Cancel</span>
+          <span>Close</span>
         </button>
         
         <div className="text-center">
           <h3 className="font-medium">{selectedSlot.templateName}</h3>
-          <p className="text-sm text-gray-300">Slot {selectedSlot.slotIndex + 1}</p>
+          <p className="text-sm text-gray-300">Editing Slot {selectedSlot.slotIndex + 1}</p>
         </div>
         
         <button
           onClick={handleApply}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700"
         >
-          Apply
+          Apply Photo
         </button>
       </div>
 
-      {/* Photo Info */}
-      <div className="px-4 pb-4 border-b border-gray-800">
-        <div className="text-white text-center">
-          <p className="font-medium text-sm">{selectedPhoto.name}</p>
-          <p className="text-xs text-gray-400">Pinch to zoom, drag to position</p>
-        </div>
-      </div>
-
-      {/* Photo Editor with Pinch/Zoom */}
-      <div className="flex-1 flex flex-col">
-        {/* Template Preview (Small) */}
-        <div className="px-4 py-2 bg-gray-900">
-          <p className="text-gray-400 text-xs mb-2 text-center">Template Preview:</p>
-          <div className="w-24 mx-auto" style={{ aspectRatio: '2/3' }}>
-            <TemplateVisual
-              template={{ 
-                id: selectedSlot.templateType, 
-                name: selectedSlot.templateName, 
-                slots: templateSlots.filter(s => s.templateId === selectedSlot.templateId).length 
-              }}
-              slots={tempSlots.filter(s => s.templateId === selectedSlot.templateId)}
-              photos={photos}
-              selectedSlot={selectedSlot}
-              onSlotClick={() => {}} // Disabled in editor mode
-            />
+      {/* Full Template Display */}
+      <div className="flex-1 flex items-center justify-center p-2">
+        {!templateBlobUrl || !pngTemplate ? (
+          <div className="text-white text-center">
+            <div className="text-4xl mb-4">📐</div>
+            <p>Loading template...</p>
           </div>
-        </div>
-
-        {/* Main Photo Editor */}
-        <div className="flex-1 flex items-center justify-center bg-gray-800 p-4">
-          <div className="relative w-full max-w-sm bg-white rounded-lg overflow-hidden" style={{ aspectRatio: '2/3', maxHeight: '400px' }}>
-            {mainPhotoError ? (
-              // Error state - show photo info and retry button
-              <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 p-4">
-                <div className="text-4xl mb-4">📷</div>
-                <p className="text-sm text-center mb-2">{selectedPhoto.name}</p>
-                <p className="text-xs text-center mb-4">Failed to load photo</p>
-                <button
-                  onClick={() => {
-                    setMainPhotoError(false);
-                    setMainPhotoLoading(true);
-                  }}
-                  className="px-3 py-1 bg-blue-600 text-white rounded text-xs"
-                >
-                  Retry
-                </button>
-                <div className="mt-4 text-xs text-gray-400 max-w-xs">
-                  <p>Tried URLs:</p>
-                  {getMainPhotoUrl().map((url, i) => (
-                    <p key={i} className="truncate">• {url.substring(0, 50)}...</p>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <TransformWrapper
-                ref={transformRef}
-                initialScale={1}
-                minScale={0.5}
-                maxScale={3}
-                centerOnInit={true}
-                onTransformed={handleTransformChange}
-              >
-                <TransformComponent
-                  wrapperClass="w-full h-full"
-                  contentClass="w-full h-full"
-                >
-                  <MainPhotoComponent
-                    photo={selectedPhoto}
-                    onLoad={() => {
-                      setMainPhotoLoading(false);
-                      setMainPhotoError(false);
-                    }}
-                    onError={() => {
-                      setMainPhotoLoading(false);
-                      setMainPhotoError(true);
-                    }}
-                    onUrlChange={setCurrentPhotoUrl}
-                  />
-                </TransformComponent>
-              </TransformWrapper>
-            )}
+        ) : (
+          <div className="relative w-full h-full flex items-center justify-center">
+            <div className="relative" 
+                 style={{ 
+                   aspectRatio: `${pngTemplate.dimensions.width}/${pngTemplate.dimensions.height}`,
+                   width: '800px',
+                   height: 'auto'
+                 }}>
+              {/* Full PNG Template Background */}
+              <img 
+                src={templateBlobUrl}
+                alt={pngTemplate.name}
+                className="w-full h-full"
+              />
             
-            {/* Loading overlay */}
-            {mainPhotoLoading && !mainPhotoError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90">
-                <div className="text-center">
-                  <div className="text-2xl mb-2">⏳</div>
-                  <p className="text-sm text-gray-600">Loading photo...</p>
+            {/* Photo Holes Overlay */}
+            {pngTemplate.holes.map((hole: any, holeIndex: number) => {
+              const slot = thisTemplateSlots[holeIndex];
+              if (!slot) return null;
+              
+              const photoUrl = getPhotoUrl(slot.photoId);
+              const isEditingSlot = slot.id === selectedSlot.id;
+              
+              // Debug slot state
+              console.log(`🔍 Slot ${holeIndex + 1} debug:`, {
+                slotId: slot.id,
+                photoId: slot.photoId,
+                isEditingSlot,
+                photoUrl,
+                hasPhotoInArray: !!photos.find(p => p.id === slot.photoId)
+              });
+              
+              // Debug the first hole only
+              if (holeIndex === 0) {
+                console.log('🔍 HOLE vs TEMPLATE DIMENSIONS:', {
+                  templateDimensions: pngTemplate.dimensions,
+                  hole: { x: hole.x, y: hole.y, width: hole.width, height: hole.height },
+                  holeAspectRatio: (hole.width / hole.height).toFixed(3),
+                  templateAspectRatio: (pngTemplate.dimensions.width / pngTemplate.dimensions.height).toFixed(3),
+                  percentages: {
+                    left: ((hole.x / pngTemplate.dimensions.width) * 100).toFixed(1) + '%',
+                    top: ((hole.y / pngTemplate.dimensions.height) * 100).toFixed(1) + '%',
+                    width: ((hole.width / pngTemplate.dimensions.width) * 100).toFixed(1) + '%',
+                    height: ((hole.height / pngTemplate.dimensions.height) * 100).toFixed(1) + '%'
+                  }
+                });
+              }
+              
+              return (
+                <div
+                  key={hole.id}
+                  className={`absolute transition-all duration-200 overflow-hidden ${
+                    isEditingSlot ? 'ring-4 ring-yellow-400' : ''
+                  }`}
+                  style={{
+                    left: `${(hole.x / pngTemplate.dimensions.width) * 100}%`,
+                    top: `${(hole.y / pngTemplate.dimensions.height) * 100}%`,
+                    width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
+                    height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
+                  }}
+                >
+                  {isEditingSlot ? (
+                    // Editing slot - fills the exact hole area
+                    selectedPhotoUrl ? (
+                      <TransformWrapper
+                        ref={transformRef}
+                        initialScale={1}
+                        minScale={0.5}
+                        maxScale={3}
+                        centerOnInit={false}
+                        limitToBounds={false}
+                        onTransformed={handleTransformChange}
+                        wrapperStyle={{ 
+                          width: '100%', 
+                          height: '100%',
+                          overflow: 'hidden'
+                        }}
+                        contentStyle={{ 
+                          width: '100%', 
+                          height: '100%',
+                          display: 'flex'
+                        }}
+                      >
+                        <TransformComponent
+                          wrapperClass="w-full h-full"
+                          contentClass="w-full h-full"
+                          wrapperStyle={{ width: '100%', height: '100%' }}
+                          contentStyle={{ width: '100%', height: '100%', display: 'flex' }}
+                        >
+                          <img
+                            src={selectedPhotoUrl}
+                            alt={selectedPhoto.name}
+                            style={{ 
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                              objectPosition: 'center'
+                            }}
+                          />
+                        </TransformComponent>
+                      </TransformWrapper>
+                    ) : (
+                      <div className="w-full h-full bg-gray-200 border border-gray-300 border-dashed flex items-center justify-center">
+                        <span className="text-gray-500 text-xs">Loading...</span>
+                      </div>
+                    )
+                  ) : (
+                    // Other slots - show existing photos or placeholder
+                    slot.photoId ? (
+                      <img
+                        src={photos.find(p => p.id === slot.photoId)?.url || ''}
+                        alt={`Photo ${holeIndex + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.log('❌ Image failed to load:', { 
+                            slotId: slot.id, 
+                            photoId: slot.photoId, 
+                            photoUrl,
+                            originalUrl: photos.find(p => p.id === slot.photoId)?.url,
+                            errorTarget: e.currentTarget.src
+                          });
+                        }}
+                        onLoad={() => {
+                          console.log('✅ Image loaded successfully:', {
+                            slotId: slot.id,
+                            photoId: slot.photoId,
+                            url: photos.find(p => p.id === slot.photoId)?.url
+                          });
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gray-200 border border-gray-300 border-dashed flex items-center justify-center">
+                        <span className="text-gray-500 text-xs">Empty</span>
+                      </div>
+                    )
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Transform Controls */}
-        <div className="px-4 py-3 bg-gray-900">
-          <div className="flex items-center justify-between text-white text-sm mb-2">
-            <span>Zoom: {(transform.scale * 100).toFixed(0)}%</span>
-            <button
-              onClick={() => {
-                if (transformRef.current) {
-                  transformRef.current.resetTransform();
-                  setTransform({ scale: 1, x: 0, y: 0 });
-                }
-              }}
-              className="text-blue-400 hover:text-blue-300 px-3 py-1 rounded border border-blue-400"
-            >
-              Reset
-            </button>
-          </div>
-          {currentPhotoUrl && (
-            <div className="text-xs text-gray-400 truncate">
-              URL: {currentPhotoUrl.substring(0, 60)}...
+              );
+            })}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Instructions */}
-      <div className="p-4 bg-gray-900 text-center">
-        <p className="text-gray-400 text-sm">
-          Use pinch gestures to zoom and drag to reposition the photo. Tap "Apply" when satisfied.
-        </p>
+      <div className="p-4 border-t border-gray-800">
+        <div className="text-center text-gray-400 text-sm">
+          <p className="font-medium text-yellow-400">📝 {selectedPhoto.name}</p>
+          <p>Pinch to zoom • Drag to position • Yellow border shows your editing area</p>
+        </div>
       </div>
     </div>
-  );
-}
-
-// Separate component for better photo loading control
-function MainPhotoComponent({ 
-  photo, 
-  onLoad, 
-  onError, 
-  onUrlChange 
-}: { 
-  photo: Photo; 
-  onLoad: () => void; 
-  onError: () => void; 
-  onUrlChange: (url: string) => void; 
-}) {
-  const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
-  
-  const fallbackUrls = (() => {
-    const urls = [];
-    
-    if (photo.thumbnailUrl) {
-      urls.push(photo.thumbnailUrl.replace('=s220', '=s1200'));
-      urls.push(photo.thumbnailUrl.replace('=s220', '=s800'));
-      urls.push(photo.thumbnailUrl.replace('=s220', '=s600'));
-      urls.push(photo.thumbnailUrl);
-    }
-    
-    if (photo.url) {
-      urls.push(photo.url);
-    }
-    
-    if (photo.googleDriveId) {
-      urls.push(`https://drive.google.com/uc?id=${photo.googleDriveId}&export=view`);
-    }
-    
-    return urls.filter(Boolean);
-  })();
-
-  const getCurrentUrl = () => {
-    if (currentUrlIndex < fallbackUrls.length) {
-      return fallbackUrls[currentUrlIndex];
-    }
-    return photo.url || '';
-  };
-
-  const handleImageLoad = () => {
-    const url = getCurrentUrl();
-    console.log(`✅ Main photo loaded successfully: ${photo.name} (URL ${currentUrlIndex + 1}/${fallbackUrls.length})`, url);
-    onUrlChange(url);
-    onLoad();
-  };
-
-  const handleImageError = () => {
-    const url = getCurrentUrl();
-    console.error(`❌ Failed to load main photo: ${photo.name} with URL ${currentUrlIndex + 1}/${fallbackUrls.length}:`, url);
-    
-    // Try next fallback URL
-    if (currentUrlIndex < fallbackUrls.length - 1) {
-      console.log(`🔄 Trying fallback URL ${currentUrlIndex + 2}/${fallbackUrls.length} for ${photo.name}`);
-      setCurrentUrlIndex(prev => prev + 1);
-    } else {
-      // All URLs failed
-      console.error(`💥 All URLs failed for main photo: ${photo.name}`);
-      onError();
-    }
-  };
-
-  return (
-    <img
-      key={`${photo.id}-${currentUrlIndex}`}
-      src={getCurrentUrl()}
-      alt={photo.name}
-      className="w-full h-full object-cover"
-      onLoad={handleImageLoad}
-      onError={handleImageError}
-      crossOrigin="anonymous"
-    />
   );
 }

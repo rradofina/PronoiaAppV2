@@ -1,13 +1,16 @@
 // Updated: Latest version with template modals and tablet optimization..
 import React, { useState, useEffect } from 'react';
-import useAppStore from '../stores/useAppStore';
 import useAuthStore from '../stores/authStore';
+import useDriveStore from '../stores/driveStore';
+import useSessionStore from '../stores/sessionStore';
+import useTemplateStore from '../stores/templateStore';
+import useUiStore from '../stores/uiStore';
 import { DriveFolder, TemplateSlot, Photo, TemplateTypeInfo, Package, TemplateType } from '../types';
 import DriveSetupScreen from '../components/screens/DriveSetupScreen';
 import FolderSelectionScreen from '../components/screens/FolderSelectionScreen';
 import PackageSelectionScreen from '../components/screens/PackageSelectionScreen';
-import TemplateSelectionScreen from '../components/screens/TemplateSelectionScreen';
 import PhotoSelectionScreen from '../components/screens/PhotoSelectionScreen';
+import TemplateSetupScreen from '../components/screens/TemplateSetupScreen';
 import googleDriveService from '../services/googleDriveService';
 import { DEFAULT_TEMPLATE_CYCLE, TEMPLATE_TYPES, PRINT_SIZES } from '../utils/constants';
 
@@ -171,52 +174,41 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
 };
 
 export default function Home() {
-  const {
-    currentScreen,
-    googleAuth,
-    isGapiLoaded,
-    mainSessionsFolder,
-    selectedPackage,
-    clientName,
-    templateCounts,
-    templateTypes,
-    templateSlots,
-    selectedSlot,
-    packages,
-    eventLog,
-    setCurrentScreen,
-    setGoogleAuth,
-    setIsGapiLoaded,
-    setMainSessionsFolder,
-    setSelectedPackage,
-    setClientName,
-    setTemplateSlots,
-    setSelectedSlot,
-    setPhotos,
-    addEvent,
-    handleTemplateCountChange,
-    getTotalTemplateCount,
-    setTemplateCounts,
-  } = useAppStore();
+  // Auth Store
+  const { googleAuth, isGapiLoaded, setGoogleAuth, setIsGapiLoaded, syncWithSupabase } = useAuthStore();
+  
+  // Drive Store
+  const { mainSessionsFolder, setMainSessionsFolder, photos, setPhotos } = useDriveStore();
+  
+  // Session Store  
+  const { selectedPackage, clientName, packages, setSelectedPackage, setClientName } = useSessionStore();
+  
+  // Template Store
+  const { 
+    templateCounts, 
+    templateSlots, 
+    selectedSlot, 
+    setTemplateSlots, 
+    setSelectedSlot, 
+    handleTemplateCountChange, 
+    getTotalTemplateCount, 
+    setTemplateCounts 
+  } = useTemplateStore();
+  
+  // UI Store
+  const { currentScreen, eventLog, setCurrentScreen, addEvent } = useUiStore();
 
-  // Sync old store auth with new auth store for admin panel
-  const { setGoogleAuth: setNewGoogleAuth, syncWithSupabase } = useAuthStore();
-
-  // Sync Google auth between old and new stores
+  // Sync with Supabase when user signs in
   useEffect(() => {
-    console.log('🔄 Syncing auth stores:', googleAuth);
-    setNewGoogleAuth(googleAuth);
-    
-    // Also sync with Supabase if signed in
     if (googleAuth.isSignedIn && googleAuth.userEmail) {
       const userInfo = {
+        id: googleAuth.userEmail, // Use email as ID fallback
         email: googleAuth.userEmail,
         name: googleAuth.userEmail.split('@')[0], // Use email prefix as name fallback
-        id: googleAuth.userEmail, // Use email as ID fallback
       };
       syncWithSupabase(userInfo);
     }
-  }, [googleAuth, setNewGoogleAuth, syncWithSupabase]);
+  }, [googleAuth, syncWithSupabase]);
 
   const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
   const [clientFolders, setClientFolders] = useState<DriveFolder[]>([]);
@@ -645,71 +637,61 @@ export default function Home() {
     } else if (currentScreen === 'template') {
       setCurrentScreen('package');
     } else if (currentScreen === 'photos') {
-      setCurrentScreen('template');
+      setCurrentScreen('package');
       setTemplateSlots([]);
       setSelectedSlot(null);
     }
   };
 
-  const handlePackageContinue = () => {
+  const handlePackageContinue = async () => {
     if (selectedPackage && clientName.trim()) {
-      // Auto-assign default templates
-      const templateCount = selectedPackage.templateCount + additionalPrints;
-      const slots: TemplateSlot[] = [];
-      for (let i = 0; i < templateCount; i++) {
-        const templateTypeId = DEFAULT_TEMPLATE_CYCLE[i % DEFAULT_TEMPLATE_CYCLE.length];
-        const template = TEMPLATE_TYPES.find(t => t.id === templateTypeId);
-        if (template) {
-          const templateIndex = Math.floor(i / DEFAULT_TEMPLATE_CYCLE.length) + 1;
+      try {
+        // Load PNG templates from Google Drive
+        const { pngTemplateService } = await import('../services/pngTemplateService');
+        const allTemplates = await pngTemplateService.loadTemplates();
+        const fourRTemplates = allTemplates.filter(t => t.printSize === '4R');
+        
+        if (fourRTemplates.length === 0) {
+          // No templates found - redirect to template setup
+          setCurrentScreen('template-setup');
+          return;
+        }
+
+        // Auto-assign templates based on package count
+        const templateCount = selectedPackage.templateCount + additionalPrints;
+        const slots: TemplateSlot[] = [];
+        
+        for (let i = 0; i < templateCount; i++) {
+          // Cycle through available PNG templates
+          const template = fourRTemplates[i % fourRTemplates.length];
+          const templateIndex = Math.floor(i / fourRTemplates.length) + 1;
           const templateName = `${template.name} ${templateIndex}`;
-          for (let slotIndex = 0; slotIndex < template.slots; slotIndex++) {
+          
+          // Create slots for each hole in the template
+          for (let slotIndex = 0; slotIndex < template.holes.length; slotIndex++) {
             slots.push({
-              id: `${templateTypeId}_${i}_${slotIndex}`,
-              templateId: `${templateTypeId}_${i}`,
+              id: `${template.id}_${i}_${slotIndex}`,
+              templateId: `${template.id}_${i}`,
               templateName,
-              templateType: templateTypeId as TemplateType,
-              printSize: '4R', // Default size
+              templateType: template.templateType as TemplateType,
+              printSize: '4R',
               slotIndex,
               photoId: undefined
             });
           }
         }
+        
+        setTemplateSlots(slots);
+        // Store PNG templates for photo selection screen
+        (window as any).pngTemplates = fourRTemplates;
+        setCurrentScreen('photos');
+      } catch (error) {
+        console.error('Error loading PNG templates:', error);
+        alert('Failed to load templates. Please check your template configuration.');
       }
-      setTemplateSlots(slots);
-      setCurrentScreen('photos');
     }
   };
 
-  const handleTemplateContinue = () => {
-    const totalCount = getTotalTemplateCount();
-    if (totalCount > 0) {
-      const slots: TemplateSlot[] = [];
-      
-      // Create slots based on template counts
-      Object.entries(templateCounts).forEach(([templateId, count]) => {
-        if ((count as number) > 0) {
-          const template = templateTypes.find((t: TemplateTypeInfo) => t.id === templateId);
-          if (template) {
-            for (let templateIndex = 0; templateIndex < (count as number); templateIndex++) {
-              for (let slotIndex = 0; slotIndex < template.slots; slotIndex++) {
-                slots.push({
-                  id: `${templateId}_${templateIndex}_${slotIndex}`,
-                  templateId: `${templateId}_${templateIndex}`,
-                  templateName: `${template.name} ${templateIndex + 1}`,
-                  templateType: template.id as TemplateType,
-                  slotIndex,
-                  photoId: undefined
-                });
-              }
-            }
-          }
-        }
-      });
-      
-      setTemplateSlots(slots);
-      setCurrentScreen('photos');
-    }
-  };
 
   const handleSlotSelect = (slot: TemplateSlot) => {
     setSelectedSlot(slot);
@@ -911,19 +893,11 @@ export default function Home() {
             additionalPrintPrice={50}
           />
         );
-      case 'template':
+      case 'template-setup':
         return (
-          <TemplateSelectionScreen
-            selectedPackage={selectedPackage}
-            clientName={clientName}
-            googleAuth={googleAuth}
-            templateTypes={templateTypes}
-            templateCounts={templateCounts}
-            getTotalTemplateCount={getTotalTemplateCount}
-            handleTemplateCountChange={handleTemplateCountChangeWithAddons}
-            handleBack={handleBack}
-            handleTemplateContinue={handleTemplateContinue}
-            totalAllowedPrints={getTotalAllowedPrints()}
+          <TemplateSetupScreen
+            onComplete={() => setCurrentScreen('package')}
+            onBack={() => setCurrentScreen('package')}
           />
         );
       case 'photos':
@@ -941,7 +915,6 @@ export default function Home() {
             handlePhotoSelect={handlePhotoSelect}
             handleSlotSelect={handleSlotSelect}
             handleBack={handleBack}
-            TemplateVisual={TemplateVisual}
             totalAllowedPrints={getTotalAllowedPrints()}
             setTemplateSlots={setTemplateSlots}
           />
@@ -954,4 +927,3 @@ export default function Home() {
   return <div>{renderScreen()}</div>;
 }
 
-export { TemplateVisual };

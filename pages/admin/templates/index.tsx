@@ -1,135 +1,100 @@
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
 import AdminLayout from '../../../components/admin/AdminLayout';
-import { useAdminStore } from '../../../stores/adminStore';
-import { CustomTemplate, PrintSize } from '../../../types';
+import { PngTemplate, pngTemplateService } from '../../../services/pngTemplateService';
+import { PrintSize } from '../../../types';
 import { PRINT_SIZES } from '../../../utils/constants';
 
-interface TemplateCardProps {
-  template: CustomTemplate;
-  onEdit: (template: CustomTemplate) => void;
-  onDuplicate: (template: CustomTemplate) => void;
-  onDelete: (template: CustomTemplate) => void;
+interface PngTemplateCardProps {
+  template: PngTemplate;
+  onRefresh: () => void;
 }
 
-function TemplateCard({ template, onEdit, onDuplicate, onDelete }: TemplateCardProps) {
-  const [showActions, setShowActions] = useState(false);
-
+function PngTemplateCard({ template, onRefresh }: PngTemplateCardProps) {
   return (
-    <div 
-      className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
-    >
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
       {/* Template Preview */}
       <div className="aspect-[3/4] bg-gray-100 relative flex items-center justify-center border-b border-gray-200">
         <div className="text-center p-4">
-          <div className="text-4xl mb-2">📐</div>
-          <p className="text-sm text-gray-600">{template.photo_slots.length} slots</p>
-        </div>
-        
-        {/* Action buttons overlay */}
-        {showActions && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center space-x-2">
-            <button
-              onClick={() => onEdit(template)}
-              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => onDuplicate(template)}
-              className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
-            >
-              Duplicate
-            </button>
-            <button
-              onClick={() => onDelete(template)}
-              className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-            >
-              Delete
-            </button>
+          <img 
+            src={template.pngUrl}
+            alt={template.name}
+            className="max-w-full max-h-full object-contain rounded"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+              (e.target as HTMLImageElement).nextElementSibling!.classList.remove('hidden');
+            }}
+          />
+          <div className="hidden text-center">
+            <div className="text-4xl mb-2">🖼️</div>
+            <p className="text-sm text-gray-600">{template.holes.length} holes</p>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Template Info */}
       <div className="p-4">
         <h3 className="font-medium text-gray-800 mb-1 truncate">{template.name}</h3>
-        <p className="text-sm text-gray-600 mb-2 line-clamp-2">{template.description}</p>
+        <p className="text-sm text-gray-600 mb-2">
+          {template.templateType} • {template.holes.length} photo slots
+        </p>
         
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <span className="bg-gray-100 px-2 py-1 rounded">{template.print_size}</span>
-          <span>{template.orientation}</span>
+        <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+          <span className="bg-gray-100 px-2 py-1 rounded">{template.printSize}</span>
+          <span>{template.dimensions.width}×{template.dimensions.height}</span>
         </div>
         
-        {template.tags && template.tags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {template.tags.slice(0, 2).map((tag, index) => (
-              <span key={index} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                {tag}
-              </span>
-            ))}
-            {template.tags.length > 2 && (
-              <span className="text-xs text-gray-500">+{template.tags.length - 2}</span>
-            )}
-          </div>
-        )}
+        <div className="text-xs text-gray-400">
+          Updated: {new Date(template.lastUpdated).toLocaleDateString()}
+        </div>
       </div>
     </div>
   );
 }
 
-export default function TemplateManagement() {
-  const {
-    customTemplates,
-    selectedPrintSize,
-    isLoading,
-    error,
-    successMessage,
-    loadCustomTemplates,
-    setSelectedPrintSize,
-    deleteCustomTemplate,
-    duplicateCustomTemplate,
-    clearMessages,
-  } = useAdminStore();
+export default function PngTemplateManagement() {
+  const [templates, setTemplates] = useState<PngTemplate[]>([]);
+  const [selectedPrintSize, setSelectedPrintSize] = useState<PrintSize>('4R');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [folderInfo, setFolderInfo] = useState<{id: string; name: string; url: string} | null>(null);
 
-  const [deleteConfirm, setDeleteConfirm] = useState<CustomTemplate | null>(null);
-  const [duplicateName, setDuplicateName] = useState('');
-  const [duplicateTemplate, setDuplicateTemplate] = useState<CustomTemplate | null>(null);
+  const loadTemplates = async (forceRefresh = false) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const allTemplates = await pngTemplateService.loadTemplates(forceRefresh);
+      setTemplates(allTemplates.filter(t => t.printSize === selectedPrintSize));
+      
+      // Also get folder info
+      const info = await pngTemplateService.getTemplateFolderInfo();
+      setFolderInfo(info);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load PNG templates');
+      console.error('Failed to load templates:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRefreshTemplates = () => {
+    loadTemplates(true); // Force refresh
+  };
+
+  const handleClearCache = async () => {
+    setIsLoading(true);
+    try {
+      await pngTemplateService.clearCache();
+      await loadTemplates(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to clear cache');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    loadCustomTemplates(selectedPrintSize);
-  }, [selectedPrintSize, loadCustomTemplates]);
-
-  const handleEdit = (template: CustomTemplate) => {
-    // Navigate to template builder in edit mode
-    window.location.href = `/admin/templates/builder?mode=edit&id=${template.id}`;
-  };
-
-  const handleDuplicate = (template: CustomTemplate) => {
-    setDuplicateTemplate(template);
-    setDuplicateName(`${template.name} (Copy)`);
-  };
-
-  const confirmDuplicate = async () => {
-    if (duplicateTemplate && duplicateName.trim()) {
-      await duplicateCustomTemplate(duplicateTemplate.id, duplicateName.trim());
-      setDuplicateTemplate(null);
-      setDuplicateName('');
-    }
-  };
-
-  const handleDelete = (template: CustomTemplate) => {
-    setDeleteConfirm(template);
-  };
-
-  const confirmDelete = async () => {
-    if (deleteConfirm) {
-      await deleteCustomTemplate(deleteConfirm.id);
-      setDeleteConfirm(null);
-    }
-  };
+    loadTemplates();
+  }, [selectedPrintSize]);
 
   return (
     <AdminLayout>
@@ -137,30 +102,58 @@ export default function TemplateManagement() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Template Management</h1>
-            <p className="text-gray-600">Manage your custom print templates</p>
+            <h1 className="text-2xl font-bold text-gray-800">PNG Template Management</h1>
+            <p className="text-gray-600">
+              Templates automatically detected from Google Drive with magenta (#FF00FF) photo holes
+            </p>
           </div>
           
-          <Link href="/admin/templates/builder">
-            <a className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
-              <span>+</span>
-              <span>Create Template</span>
-            </a>
-          </Link>
+          <div className="flex space-x-3">
+            <button
+              onClick={handleRefreshTemplates}
+              disabled={isLoading}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+            >
+              <span>🔄</span>
+              <span>{isLoading ? 'Refreshing...' : 'Refresh Templates'}</span>
+            </button>
+            
+            <button
+              onClick={handleClearCache}
+              disabled={isLoading}
+              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+            >
+              <span>🗑️</span>
+              <span>Clear Cache</span>
+            </button>
+          </div>
         </div>
 
-        {/* Success/Error Messages */}
+        {/* Google Drive Folder Info */}
+        {folderInfo && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-blue-800">Template Source Folder</h3>
+                <p className="text-sm text-blue-600">📁 {folderInfo.name}</p>
+              </div>
+              <a
+                href={folderInfo.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors text-sm"
+              >
+                Open in Google Drive
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Error Messages */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
             <span className="text-red-700">{error}</span>
-            <button onClick={clearMessages} className="text-red-500 hover:text-red-700">✕</button>
-          </div>
-        )}
-        
-        {successMessage && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
-            <span className="text-green-700">{successMessage}</span>
-            <button onClick={clearMessages} className="text-green-500 hover:text-green-700">✕</button>
+            <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">✕</button>
           </div>
         )}
 
@@ -186,100 +179,63 @@ export default function TemplateManagement() {
           </div>
         </div>
 
+        {/* Auto-Detection Info */}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <h3 className="font-medium text-green-800 mb-2">📤 How to Add New Templates</h3>
+          <div className="text-sm text-green-700 space-y-1">
+            <p>1. Create PNG files with <strong>magenta (#FF00FF)</strong> areas marking photo placement holes</p>
+            <p>2. Upload to the appropriate Google Drive folder: <strong>{selectedPrintSize}/</strong></p>
+            <p>3. Templates are auto-detected with 5-minute cache, or click "Refresh Templates" for immediate detection</p>
+          </div>
+        </div>
+
         {/* Templates Grid */}
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">Loading templates...</p>
+              <p className="text-gray-600">
+                {isLoading && templates.length === 0 ? 'Loading templates...' : 'Refreshing templates...'}
+              </p>
             </div>
           </div>
-        ) : customTemplates.length === 0 ? (
+        ) : templates.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <div className="text-6xl mb-4">📐</div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">No Templates Found</h3>
+            <div className="text-6xl mb-4">🖼️</div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">No PNG Templates Found</h3>
             <p className="text-gray-600 mb-6">
-              Create your first {selectedPrintSize} template to get started.
+              Upload PNG files with magenta holes to the {selectedPrintSize} folder in Google Drive.
             </p>
-            <Link href="/admin/templates/builder">
-              <a className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
-                Create Template
+            {folderInfo && (
+              <a
+                href={folderInfo.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors inline-block"
+              >
+                Open Google Drive Folder
               </a>
-            </Link>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {customTemplates.map((template) => (
-              <TemplateCard
-                key={template.id}
-                template={template}
-                onEdit={handleEdit}
-                onDuplicate={handleDuplicate}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Delete Confirmation Modal */}
-        {deleteConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Delete Template</h3>
-              <p className="text-gray-600 mb-4">
-                Are you sure you want to delete &quot;{deleteConfirm.name}&quot;? This action cannot be undone.
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-600">
+                Found {templates.length} template{templates.length !== 1 ? 's' : ''} for {selectedPrintSize}
               </p>
-              <div className="flex space-x-3 justify-end">
-                <button
-                  onClick={() => setDeleteConfirm(null)}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                >
-                  Delete
-                </button>
+              <div className="text-xs text-gray-500">
+                Cache updates every 5 minutes or when refreshed manually
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Duplicate Modal */}
-        {duplicateTemplate && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Duplicate Template</h3>
-              <p className="text-gray-600 mb-4">
-                Enter a name for the duplicated template:
-              </p>
-              <input
-                type="text"
-                value={duplicateName}
-                onChange={(e) => setDuplicateName(e.target.value)}
-                className="w-full border border-gray-300 rounded px-3 py-2 mb-4"
-                placeholder="Template name"
-              />
-              <div className="flex space-x-3 justify-end">
-                <button
-                  onClick={() => {
-                    setDuplicateTemplate(null);
-                    setDuplicateName('');
-                  }}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDuplicate}
-                  disabled={!duplicateName.trim()}
-                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Duplicate
-                </button>
-              </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {templates.map((template) => (
+                <PngTemplateCard
+                  key={template.id}
+                  template={template}
+                  onRefresh={handleRefreshTemplates}
+                />
+              ))}
             </div>
           </div>
         )}

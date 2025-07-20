@@ -44,6 +44,20 @@ export default function FolderSelectionScreen({
             <div className="mt-2 text-sm text-blue-600">
               Main folder: {selectedMainFolder?.name}
             </div>
+            
+            {/* Admin Access Button */}
+            <div className="mt-4">
+              <a
+                href="/admin/templates"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium shadow-md"
+              >
+                <span>⚙️</span>
+                <span>Manage PNG Templates</span>
+                <span className="text-xs bg-purple-500 px-2 py-1 rounded">Admin</span>
+              </a>
+            </div>
           </div>
 
           <div className="bg-white rounded-lg p-6 shadow-sm">

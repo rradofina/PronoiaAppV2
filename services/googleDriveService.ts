@@ -3,6 +3,7 @@
 // Updated: Google Drive service.
 import { GoogleDriveFile, GoogleDriveFolder, Photo } from '../types';
 import { GOOGLE_DRIVE_CONFIG, SUPPORTED_IMAGE_TYPES, ERROR_MESSAGES } from '../utils/constants';
+import { logger } from './loggerService';
 
 declare global {
   interface Window {
@@ -40,7 +41,7 @@ class GoogleDriveService {
       this.isInitialized = true;
       return true;
     } catch (error) {
-      console.error('Failed to initialize Google Drive API:', error);
+      logger.drive.error('Failed to initialize Google Drive API', error);
       throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
     }
   }
@@ -89,28 +90,6 @@ class GoogleDriveService {
     }
   }
 
-  async listFolders(parentId?: string): Promise<Array<{id: string; name: string; mimeType: string; parents?: string[]}>> {
-    try {
-      if (!this.isSignedIn()) {
-        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
-      }
-
-      const folderId = parentId || 'root';
-      const query = `'${folderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-
-      const response = await window.gapi.client.drive.files.list({
-        q: query,
-        fields: 'files(id,name,mimeType,parents)',
-        pageSize: 1000,
-        orderBy: 'name',
-      });
-
-      return response.result.files || [];
-    } catch (error) {
-      console.error('Failed to list folders:', error);
-      throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_FOLDER_NOT_FOUND);
-    }
-  }
 
   async getFolderContents(folderId: string): Promise<GoogleDriveFolder> {
     try {
@@ -146,7 +125,7 @@ class GoogleDriveService {
         });
 
         for (const file of filesResponse.result.files || []) {
-          console.log(`Found file: ${file.name}, mimeType: ${file.mimeType}, thumbnailLink: ${file.thumbnailLink}`);
+          logger.drive.debug(`Found file: ${file.name}`, { mimeType: file.mimeType, thumbnailLink: file.thumbnailLink });
           
           if (file.mimeType === 'application/vnd.google-apps.folder') {
             folders.push({
@@ -156,7 +135,7 @@ class GoogleDriveService {
               folders: [],
             });
           } else if (this.isImageFile(file.mimeType || '')) {
-            console.log(`✅ Added as image: ${file.name}`);
+            logger.drive.debug(`Added as image: ${file.name}`);
             files.push({
               id: file.id || '',
               name: file.name || '',
@@ -170,7 +149,7 @@ class GoogleDriveService {
               parents: file.parents || [],
             });
           } else {
-            console.log(`❌ Skipped (not image): ${file.name}, mimeType: ${file.mimeType}`);
+            logger.drive.debug(`Skipped (not image): ${file.name}`, { mimeType: file.mimeType });
           }
         }
         pageToken = filesResponse.result.nextPageToken;
@@ -183,7 +162,7 @@ class GoogleDriveService {
         folders,
       };
     } catch (error) {
-      console.error('Failed to get folder contents:', error);
+      logger.drive.error('Failed to get folder contents', error);
       throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_FOLDER_NOT_FOUND);
     }
   }
@@ -437,6 +416,36 @@ class GoogleDriveService {
     }
   }
 
+  // Download PNG template files with better error handling
+  async downloadTemplate(templateId: string): Promise<Blob> {
+    try {
+      if (!this.isSignedIn()) {
+        throw new Error('Not authenticated with Google Drive');
+      }
+
+      console.log(`📥 Downloading template: ${templateId}`);
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${templateId}?alt=media`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.error(`❌ Template download failed: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to download template: ${response.status} ${response.statusText}`);
+      }
+
+      console.log(`✅ Template downloaded successfully: ${templateId}`);
+      return await response.blob();
+    } catch (error) {
+      console.error('❌ Template download error:', error);
+      throw new Error(`Template download failed: ${error.message}`);
+    }
+  }
+
   async getPhotoMetadata(photoId: string): Promise<any> {
     try {
       if (!this.isSignedIn()) {
@@ -546,6 +555,106 @@ class GoogleDriveService {
     } catch (error) {
       console.error('Failed to refresh token:', error);
       return false;
+    }
+  }
+
+  /**
+   * List folders in a specific directory
+   */
+  async listFolders(parentFolderId: string = 'root'): Promise<Array<{id: string; name: string; mimeType: string; parents?: string[]; createdTime?: string; modifiedTime?: string}>> {
+    try {
+      if (!this.isSignedIn()) {
+        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
+      }
+
+      const response = await window.gapi.client.drive.files.list({
+        q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        fields: 'files(id,name,mimeType,parents,createdTime,modifiedTime)',
+        orderBy: 'name',
+      });
+
+      return (response.result.files || []).map((file: any) => ({
+        id: file.id || '',
+        name: file.name || '',
+        mimeType: file.mimeType || 'application/vnd.google-apps.folder',
+        parents: file.parents,
+        createdTime: file.createdTime,
+        modifiedTime: file.modifiedTime
+      }));
+    } catch (error) {
+      console.error('Failed to list folders:', error);
+      throw new Error('Failed to list folders from Google Drive');
+    }
+  }
+
+  /**
+   * List files in a directory with optional filters
+   */
+  async listFiles(parentFolderId: string, options: {
+    mimeType?: string;
+    orderBy?: string;
+    pageSize?: number;
+  } = {}): Promise<GoogleDriveFile[]> {
+    try {
+      if (!this.isSignedIn()) {
+        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
+      }
+
+      let query = `'${parentFolderId}' in parents and trashed=false`;
+      
+      if (options.mimeType) {
+        query += ` and mimeType='${options.mimeType}'`;
+      }
+
+      const response = await window.gapi.client.drive.files.list({
+        q: query,
+        fields: 'files(id,name,mimeType,size,thumbnailLink,webContentLink,webViewLink,createdTime,modifiedTime)',
+        orderBy: options.orderBy || 'name',
+        pageSize: options.pageSize || 100,
+      });
+
+      return response.result.files || [];
+    } catch (error) {
+      console.error('Failed to list files:', error);
+      throw new Error('Failed to list files from Google Drive');
+    }
+  }
+
+  /**
+   * Get file information
+   */
+  async getFileInfo(fileId: string): Promise<GoogleDriveFile> {
+    try {
+      if (!this.isSignedIn()) {
+        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
+      }
+
+      const response = await window.gapi.client.drive.files.get({
+        fileId: fileId,
+        fields: 'id,name,mimeType,size,thumbnailLink,webContentLink,webViewLink,createdTime,modifiedTime,parents',
+      });
+
+      return response.result;
+    } catch (error) {
+      console.error('Failed to get file info:', error);
+      throw new Error('Failed to get file information from Google Drive');
+    }
+  }
+
+  /**
+   * Get file download URL for templates
+   */
+  async getFileUrl(fileId: string): Promise<string> {
+    try {
+      if (!this.isSignedIn()) {
+        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
+      }
+
+      // For PNG templates, we need a direct access URL
+      return `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&access_token=${this.accessToken}`;
+    } catch (error) {
+      console.error('Failed to get file URL:', error);
+      throw new Error('Failed to get file URL from Google Drive');
     }
   }
 }

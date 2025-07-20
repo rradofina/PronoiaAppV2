@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { Template, TemplateSlot, Photo, TemplateType, TemplateTypeInfo } from '../types';
+import { PngTemplate } from '../services/pngTemplateService';
 
 interface TemplateStore {
   templates: Template[];
@@ -9,6 +10,11 @@ interface TemplateStore {
   selectedSlot: TemplateSlot | null;
   templateCounts: Record<string, number>;
   templateTypes: TemplateTypeInfo[];
+  
+  // PNG Template Support
+  pngTemplates: PngTemplate[];
+  selectedPngTemplate: PngTemplate | null;
+  pngTemplatePhotos: Record<string, Photo>; // holeId -> Photo mapping
   
   setTemplates: (templates: Template[]) => void;
   addTemplate: (templateType: TemplateType) => void;
@@ -25,6 +31,14 @@ interface TemplateStore {
   isTemplateComplete: (templateId: string) => boolean;
   getAllTemplatesComplete: () => boolean;
   clearTemplates: () => void;
+  
+  // PNG Template Actions
+  setPngTemplates: (templates: PngTemplate[]) => void;
+  selectPngTemplate: (template: PngTemplate | null) => void;
+  assignPhotoToHole: (holeId: string, photo: Photo) => void;
+  removePhotoFromHole: (holeId: string) => void;
+  isPngTemplateComplete: () => boolean;
+  clearPngTemplate: () => void;
 }
 
 const useTemplateStore = create<TemplateStore>()(
@@ -39,6 +53,11 @@ const useTemplateStore = create<TemplateStore>()(
       photocard: 0,
       photostrip: 0,
     },
+    
+    // PNG Template Initial State
+    pngTemplates: [],
+    selectedPngTemplate: null,
+    pngTemplatePhotos: {},
     templateTypes: [
       {
         id: 'solo',
@@ -188,6 +207,42 @@ const useTemplateStore = create<TemplateStore>()(
         photocard: 0,
         photostrip: 0,
       },
+    }),
+    
+    // PNG Template Actions
+    setPngTemplates: (templates) => set({ pngTemplates: templates }),
+    
+    selectPngTemplate: (template) => set({ 
+      selectedPngTemplate: template,
+      pngTemplatePhotos: {} // Clear photos when switching templates
+    }),
+    
+    assignPhotoToHole: (holeId, photo) => set((state) => ({
+      pngTemplatePhotos: {
+        ...state.pngTemplatePhotos,
+        [holeId]: photo
+      }
+    })),
+    
+    removePhotoFromHole: (holeId) => set((state) => {
+      const newPhotos = { ...state.pngTemplatePhotos };
+      delete newPhotos[holeId];
+      return { pngTemplatePhotos: newPhotos };
+    }),
+    
+    isPngTemplateComplete: () => {
+      const state = get();
+      if (!state.selectedPngTemplate) return false;
+      
+      // Check if all holes have photos assigned
+      return state.selectedPngTemplate.holes.every(hole => 
+        state.pngTemplatePhotos[hole.id] !== undefined
+      );
+    },
+    
+    clearPngTemplate: () => set({
+      selectedPngTemplate: null,
+      pngTemplatePhotos: {}
     }),
   }))
 );

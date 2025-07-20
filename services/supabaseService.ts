@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase/client';
 import { Database } from '../lib/supabase/types';
-import { Session, Template, PhotoSlot, CustomTemplate, TemplateCategory, PrintSize } from '../types';
+import { Session, Template, PhotoSlot, CustomTemplate, TemplateCategory, PrintSize, CustomTemplateLayout, CustomPhotoSlot, SupabaseUser, TemplateCacheData } from '../types';
 
 type DbUser = Database['public']['Tables']['users']['Row'];
 type DbSession = Database['public']['Tables']['sessions']['Row'];
@@ -245,8 +245,8 @@ export class SupabaseService {
     description?: string;
     print_size: PrintSize;
     orientation: 'portrait' | 'landscape';
-    layout_data: any;
-    photo_slots: any[];
+    layout_data: CustomTemplateLayout;
+    photo_slots: CustomPhotoSlot[];
     dimensions?: object;
     margins?: object;
     background_color?: string;
@@ -395,6 +395,88 @@ export class SupabaseService {
     const { data, error } = await query;
     if (error) throw error;
     return data || [];
+  }
+
+  // App Settings Management
+  async getSetting(key: string): Promise<string | null> {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', key)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data?.value || null;
+    } catch (error) {
+      console.error(`Error getting setting ${key}:`, error);
+      return null;
+    }
+  }
+
+  async setSetting(key: string, value: string, description?: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          key,
+          value,
+          description: description || undefined
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error(`Error setting ${key}:`, error);
+      throw error;
+    }
+  }
+
+  async updateSetting(key: string, value: string): Promise<void> {
+    return this.setSetting(key, value);
+  }
+
+  // Template Cache Management  
+  async getCachedTemplate(driveFileId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('template_cache')
+        .select('*')
+        .eq('drive_file_id', driveFileId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    } catch (error) {
+      console.error('Error getting cached template:', error);
+      return null;
+    }
+  }
+
+  async cacheTemplate(templateData: TemplateCacheData) {
+    try {
+      const { error } = await supabase
+        .from('template_cache')
+        .upsert(templateData);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error caching template:', error);
+      throw error;
+    }
+  }
+
+  async clearTemplateCache(): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('template_cache')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error clearing template cache:', error);
+      throw error;
+    }
   }
 
   // Test connection
