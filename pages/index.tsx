@@ -888,9 +888,6 @@ export default function Home() {
             setSelectedPackage={setSelectedPackage}
             handleBack={handleBack}
             handlePackageContinue={handlePackageContinue}
-            additionalPrints={additionalPrints}
-            setAdditionalPrints={handleAdditionalPrintsChange}
-            additionalPrintPrice={50}
           />
         );
       case 'template-setup':
