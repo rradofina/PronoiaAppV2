@@ -433,7 +433,7 @@ export class PngTemplateService {
     }
     
     // Fallback to template type with nice formatting
-    const typeNames = {
+    const typeNames: Record<string, string> = {
       'solo': 'Solo Print',
       'collage': 'Collage Print', 
       'photocard': 'Photo Card',
