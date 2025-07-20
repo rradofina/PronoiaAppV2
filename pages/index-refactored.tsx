@@ -466,10 +466,9 @@ export default function Home() {
             selectedPackage={selectedPackage}
             clientName={clientName}
             googleAuth={googleAuth}
-            templateTypes={templateTypes}
             templateCounts={templateCounts}
             getTotalTemplateCount={getTotalTemplateCount}
-            handleTemplateCountChange={handleTemplateCountChangeWithAddons}
+            handleTemplateCountChange={handleTemplateCountChange}
             handleBack={handleBack}
             handleTemplateContinue={handleTemplateContinue}
             totalAllowedPrints={getTotalAllowedPrints()}
