@@ -731,7 +731,6 @@ export default function PhotoSelectionScreen({
         onApply={handleApplyPhotoToSlot}
         onClose={resetViewStates}
         isVisible={viewMode === 'template-editor' && !!selectedSlotForEditor && !!selectedPhotoForTemplate}
-        TemplateVisual={TemplateVisual}
       />
     </div>
   );
