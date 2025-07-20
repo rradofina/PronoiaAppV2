@@ -47,7 +47,7 @@ const useAuthStore = create<AuthStore>()(
             };
 
             const supabaseUser = await supabaseService.createOrUpdateUser(userData);
-            set({ supabaseUser });
+            set({ supabaseUser: supabaseUser as SupabaseUser });
             
             console.log('✅ Successfully synced with Supabase:', supabaseUser.email);
           } catch (error) {
