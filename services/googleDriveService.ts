@@ -449,7 +449,7 @@ class GoogleDriveService {
       return await response.blob();
     } catch (error) {
       console.error('❌ Template download error:', error);
-      throw new Error(`Template download failed: ${error.message}`);
+      throw new Error(`Template download failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
