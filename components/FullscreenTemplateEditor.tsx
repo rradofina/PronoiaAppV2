@@ -24,9 +24,7 @@ export default function FullscreenTemplateEditor({
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
   const [templateBlobUrl, setTemplateBlobUrl] = useState<string | null>(null);
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
-  const [imageRenderDimensions, setImageRenderDimensions] = useState<{width: number; height: number; x: number; y: number} | null>(null);
   const transformRef = useRef<any>();
-  const templateImageRef = useRef<HTMLImageElement>(null);
 
   // Get PNG templates and find the one for this slot (with null checks)
   const pngTemplates = (window as any).pngTemplates || [];
@@ -229,22 +227,10 @@ export default function FullscreenTemplateEditor({
                         centerOnInit={false}
                         limitToBounds={false}
                         onTransformed={handleTransformChange}
-                        wrapperStyle={{ 
-                          width: '100%', 
-                          height: '100%',
-                          overflow: 'hidden'
-                        }}
-                        contentStyle={{ 
-                          width: '100%', 
-                          height: '100%',
-                          display: 'flex'
-                        }}
                       >
                         <TransformComponent
-                          wrapperClass="w-full h-full"
+                          wrapperClass="w-full h-full overflow-hidden"
                           contentClass="w-full h-full"
-                          wrapperStyle={{ width: '100%', height: '100%' }}
-                          contentStyle={{ width: '100%', height: '100%', display: 'flex' }}
                         >
                           <img
                             src={selectedPhotoUrl}
