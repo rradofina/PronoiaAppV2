@@ -119,7 +119,7 @@ export default function TemplateSelectionScreen({
 
               // Icon mapping for template types
               const getTemplateIcon = (type: string) => {
-                const icons = {
+                const icons: Record<string, string> = {
                   'solo': '🖼️',
                   'collage': '🏁',
                   'photocard': '🎴',
