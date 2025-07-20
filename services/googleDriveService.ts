@@ -161,6 +161,9 @@ class GoogleDriveService {
       return {
         id: folderResponse.result.id,
         name: folderResponse.result.name,
+        createdTime: folderResponse.result.createdTime || new Date().toISOString(),
+        mimeType: folderResponse.result.mimeType,
+        parents: folderResponse.result.parents,
         files,
         folders,
       };
