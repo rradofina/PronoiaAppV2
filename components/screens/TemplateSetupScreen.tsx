@@ -11,7 +11,7 @@ export default function TemplateSetupScreen({ onComplete, onBack }: TemplateSetu
   const [folderId, setFolderId] = useState('');
   const [folderUrl, setFolderUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [templates, setTemplates] = useState([]);
+  const [templates, setTemplates] = useState<any[]>([]);
 
   useEffect(() => {
     loadCurrentSettings();
