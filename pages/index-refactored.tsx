@@ -458,9 +458,6 @@ export default function Home() {
             setSelectedPackage={setSelectedPackage}
             handleBack={handleBack}
             handlePackageContinue={() => setCurrentScreen('template')}
-            additionalPrints={additionalPrints}
-            setAdditionalPrints={setAdditionalPrints}
-            additionalPrintPrice={50}
           />
         );
       case 'template':
