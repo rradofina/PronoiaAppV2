@@ -223,7 +223,7 @@ export class TemplateDetectionService {
   /**
    * Split a cross-shaped region into separate rectangular holes by finding individual magenta areas
    */
-  private splitCrossRegion(bounds: RegionBounds, imageData: ImageData): Array<{x: number; y: number; width: number; height: number}> {
+  private splitCrossRegion(bounds: Rectangle, imageData: ImageData): Array<{x: number; y: number; width: number; height: number}> {
     const { data, width } = imageData;
     const { minX, minY, maxX, maxY } = bounds;
     
