@@ -64,7 +64,7 @@ export default function TemplateSetupScreen({ onComplete, onBack }: TemplateSetu
       }
     } catch (error) {
       console.error('Error saving folder ID:', error);
-      alert('Failed to configure template folder: ' + error.message);
+      alert('Failed to configure template folder: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setIsLoading(false);
     }
