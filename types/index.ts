@@ -1,7 +1,7 @@
 // Updated: Types for the app.
 
 // Core types used throughout the application
-export type Screen = 'drive-setup' | 'folder-selection' | 'package' | 'template' | 'photos' | 'preview' | 'complete';
+export type Screen = 'drive-setup' | 'folder-selection' | 'package' | 'template' | 'template-setup' | 'photos' | 'preview' | 'complete';
 
 export interface DriveFolder {
   id: string;
