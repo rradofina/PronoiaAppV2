@@ -489,7 +489,6 @@ export default function Home() {
             handlePhotoSelect={handlePhotoSelect}
             handleSlotSelect={handleSlotSelect}
             handleBack={handleBack}
-            TemplateVisual={TemplateVisual}
             totalAllowedPrints={getTotalAllowedPrints()}
             setTemplateSlots={setTemplateSlots}
           />
