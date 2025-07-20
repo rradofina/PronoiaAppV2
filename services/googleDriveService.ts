@@ -176,10 +176,11 @@ class GoogleDriveService {
   async getPhotosFromFolder(folderId: string): Promise<Photo[]> {
     try {
       const folder = await this.getFolderContents(folderId);
-      console.log(`Found ${folder.files.length} files in folder`);
+      const files = folder.files || [];
+      console.log(`Found ${files.length} files in folder`);
       
       // Create photos with multiple URL strategies
-      const photos = await Promise.all(folder.files.map(async (file) => {
+      const photos = await Promise.all(files.map(async (file) => {
         const urls = await this.generatePhotoUrls(file);
         
         console.log(`Generated URLs for ${file.name}:`, urls);
