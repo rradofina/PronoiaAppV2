@@ -105,7 +105,7 @@ export class TemplateDetectionService {
         img.src = blobUrl;
       });
     } catch (error) {
-      throw new Error(`Failed to analyze template: ${error.message}`);
+      throw new Error(`Failed to analyze template: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -132,7 +132,7 @@ export class TemplateDetectionService {
       const blob = await googleDriveService.downloadPhoto(fileId);
       return URL.createObjectURL(blob);
     } catch (error) {
-      throw new Error(`Failed to download file: ${error.message}`);
+      throw new Error(`Failed to download file: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

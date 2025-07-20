@@ -48,7 +48,7 @@ export default function TemplateSelectionScreen({
       console.log(`📐 Loaded ${filteredTemplates.length} ${currentPrintSize} templates`);
     } catch (error: any) {
       console.error('Error loading PNG templates:', error);
-      setError(error.message || 'Failed to load templates');
+      setError(error instanceof Error ? error.message : 'Failed to load templates');
     } finally {
       setIsLoading(false);
     }

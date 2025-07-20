@@ -500,7 +500,7 @@ export default function Home() {
 
   return (
     <ErrorBoundary onError={(error, errorInfo) => {
-      addEvent(`Error boundary caught: ${error.message}`);
+      addEvent(`Error boundary caught: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Error boundary caught:', error, errorInfo);
     }}>
       <div>{renderScreen()}</div>
