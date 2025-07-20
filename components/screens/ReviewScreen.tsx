@@ -1,7 +1,7 @@
 import React from 'react';
 import { TemplateSlot, Photo, Package, GoogleAuth } from '../../types';
 
-import { TemplateVisual } from '../../pages/index'; // Assuming it's exported
+// TemplateVisual is passed as prop, no import needed
 
 interface ReviewScreenProps {
   clientName: string;
