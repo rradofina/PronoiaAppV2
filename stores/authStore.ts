@@ -41,9 +41,9 @@ const useAuthStore = create<AuthStore>()(
             // Create or update user in Supabase
             const userData = {
               email: googleUserInfo.email || googleAuth.userEmail || '',
-              name: googleUserInfo.name || null,
+              name: googleUserInfo.name || undefined,
               google_id: googleUserInfo.id || googleUserInfo.sub || '',
-              avatar_url: googleUserInfo.picture || null,
+              avatar_url: googleUserInfo.picture || undefined,
             };
 
             const supabaseUser = await supabaseService.createOrUpdateUser(userData);
