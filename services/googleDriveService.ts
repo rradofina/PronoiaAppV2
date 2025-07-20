@@ -131,6 +131,9 @@ class GoogleDriveService {
             folders.push({
               id: file.id || '',
               name: file.name || '',
+              createdTime: file.createdTime || new Date().toISOString(),
+              mimeType: file.mimeType,
+              parents: file.parents,
               files: [],
               folders: [],
             });
