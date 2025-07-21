@@ -60,7 +60,9 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
 
   const getPhotoUrl = (photoId?: string | null) => {
     if (!photoId) return null;
-    return photos.find((p: any) => p.id === photoId)?.url || null;
+    const photo = photos.find((p: any) => p.id === photoId);
+    console.log('🔍 getPhotoUrl lookup:', { photoId, found: !!photo, photoUrl: photo?.url });
+    return photo?.url || null;
   };
 
   if (!pngTemplate) {
@@ -108,36 +110,48 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
         const photoUrl = getPhotoUrl(slot.photoId);
         const isSelected = selectedSlot?.id === slot.id;
         
+        // Debug slot data
+        console.log(`🔍 Slot ${holeIndex} data:`, {
+          slotId: slot.id,
+          photoId: slot.photoId,
+          hasTransform: !!slot.transform,
+          transform: slot.transform,
+          photoUrl,
+          hasPhoto: !!photoUrl
+        });
+        
         return (
           <div
             key={hole.id}
-            className={`absolute cursor-pointer transition-all duration-200 ${
-              isSelected ? 'ring-2 ring-blue-500' : 'hover:ring-1 hover:ring-blue-300'
-            }`}
+            className="absolute cursor-pointer transition-all duration-200"
             style={{
               left: `${(hole.x / pngTemplate.dimensions.width) * 100}%`,
               top: `${(hole.y / pngTemplate.dimensions.height) * 100}%`,
               width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
               height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
+              border: isSelected ? '4px solid #3b82f6' : 'none',
+              boxSizing: 'border-box',
+              zIndex: isSelected ? 10 : 1
             }}
             onClick={() => onSlotClick(slot)}
           >
             {photoUrl ? (
-              <img
-                src={photoUrl}
-                alt={`Photo ${holeIndex + 1}`}
-                className="w-full h-full object-cover"
-              />
+              <>
+                {console.log(`✅ Rendering photo for slot ${holeIndex}:`, photoUrl)}
+                <img
+                  src={photoUrl}
+                  alt={`Photo ${holeIndex + 1}`}
+                  className="w-full h-full object-cover"
+                  onLoad={() => console.log(`🖼️ Photo loaded in slot ${holeIndex}`)}
+                  onError={() => console.log(`❌ Photo failed to load in slot ${holeIndex}:`, photoUrl)}
+                />
+              </>
             ) : (
               <div className="w-full h-full bg-gray-200 flex items-center justify-center relative" 
                    style={{ outline: '2px dashed #9ca3af', outlineOffset: '-2px' }}>
                 <span className="text-gray-500 text-xs font-medium">
                   {holeIndex + 1}
                 </span>
-                {/* Debug info for hole dimensions */}
-                <div className="absolute top-0 right-0 bg-blue-500 text-white text-xs px-1 leading-tight">
-                  {hole.width}×{hole.height}
-                </div>
               </div>
             )}
           </div>
@@ -193,6 +207,20 @@ export default function PhotoSelectionScreen({
   const [selectedPhotoForTemplate, setSelectedPhotoForTemplate] = useState<Photo | null>(null);
   const [selectedTemplateForViewer, setSelectedTemplateForViewer] = useState<string | null>(null);
   const [selectedSlotForEditor, setSelectedSlotForEditor] = useState<TemplateSlot | null>(null);
+
+  // Auto-select first empty placeholder when entering screen
+  useEffect(() => {
+    if (!selectedSlot && templateSlots.length > 0) {
+      // Find the first empty slot (no photo assigned)
+      const firstEmptySlot = templateSlots.find(slot => !slot.photoId);
+      if (firstEmptySlot) {
+        setSelectedSlot(firstEmptySlot);
+      } else {
+        // If all slots have photos, select the first slot anyway
+        setSelectedSlot(templateSlots[0]);
+      }
+    }
+  }, [templateSlots, selectedSlot, setSelectedSlot]);
 
   const onSlotSelect = (slot: TemplateSlot) => {
     setSelectedSlot(slot);
@@ -284,8 +312,14 @@ export default function PhotoSelectionScreen({
 
   const handleAddToTemplate = (photo: Photo) => {
     setSelectedPhotoForTemplate(photo);
-    // Keep the fullscreen viewer open but dimmed in background
-    setViewMode('sliding-templates');
+    if (selectedSlot) {
+      // If we have a selected slot, go directly to template editor
+      setSelectedSlotForEditor(selectedSlot);
+      setViewMode('template-editor');
+    } else {
+      // Fallback to sliding templates if no slot selected
+      setViewMode('sliding-templates');
+    }
   };
 
   const handleSlotSelectFromSlidingBar = (slot: TemplateSlot) => {
@@ -300,8 +334,7 @@ export default function PhotoSelectionScreen({
   };
 
   const handleSlotSelectFromTemplate = (slot: TemplateSlot) => {
-    setSelectedSlotForEditor(slot);
-    setViewMode('photo-selection');
+    setSelectedSlot(slot); // Just highlight the slot, stay in normal view
   };
 
   const handlePhotoSelectForSlot = (photo: Photo) => {
@@ -325,6 +358,12 @@ export default function PhotoSelectionScreen({
     console.log('🔧 Photo found in photos array:', photo);
     
     setTemplateSlots(updatedSlots);
+    
+    // Auto-select next empty slot
+    const nextEmptySlot = updatedSlots.find(slot => !slot.photoId && slot.id !== slotId);
+    if (nextEmptySlot) {
+      setSelectedSlot(nextEmptySlot);
+    }
     
     // Reset states and return to normal view
     resetViewStates();
@@ -440,16 +479,14 @@ export default function PhotoSelectionScreen({
                     )}
                     <h3 className="font-semibold mb-2 text-center text-xs leading-tight truncate px-1">{templateName}</h3>
                     <div className="w-full rounded-lg overflow-hidden border border-gray-200">
-                      <div onClick={() => handleTemplateClick(templateId)}>
-                        <TemplateVisual
-                          key={`${templateId}-${slots.map(s => s.photoId).join('-')}`} // Force re-render when photos change
-                          template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
-                          slots={slots}
-                          onSlotClick={() => {}} // Disabled - clicking template goes to template-first mode
-                          photos={photos}
-                          selectedSlot={selectedSlot}
-                        />
-                      </div>
+                      <TemplateVisual
+                        key={`${templateId}-${slots.map(s => `${s.photoId}-${s.transform?.scale || 0}`).join('-')}`} // Force re-render when photos or transforms change
+                        template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
+                        slots={slots}
+                        onSlotClick={handleSlotSelectFromTemplate} // Direct slot selection - go straight to photo list
+                        photos={photos}
+                        selectedSlot={selectedSlot}
+                      />
                     </div>
                   </div>
                 ))}
@@ -512,16 +549,14 @@ export default function PhotoSelectionScreen({
                   )}
                   <h3 className="font-semibold mb-2 text-center text-sm">{templateName}</h3>
                   <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '400px' }}>
-                    <div onClick={() => handleTemplateClick(templateId)}>
-                      <TemplateVisual
-                        key={`${templateId}-${slots.map(s => s.photoId).join('-')}`} // Force re-render when photos change
-                        template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
-                        slots={slots}
-                        onSlotClick={() => {}} // Disabled - clicking template goes to template-first mode
-                        photos={photos}
-                        selectedSlot={selectedSlot}
-                      />
-                    </div>
+                    <TemplateVisual
+                      key={`${templateId}-${slots.map(s => `${s.photoId}-${s.transform?.scale || 0}`).join('-')}`} // Force re-render when photos or transforms change
+                      template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
+                      slots={slots}
+                      onSlotClick={handleSlotSelectFromTemplate} // Direct slot selection - go straight to photo list
+                      photos={photos}
+                      selectedSlot={selectedSlot}
+                    />
                   </div>
                 </div>
               ))}

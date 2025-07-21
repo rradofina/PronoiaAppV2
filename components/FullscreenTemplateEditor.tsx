@@ -25,16 +25,23 @@ export default function FullscreenTemplateEditor({
   const [templateBlobUrl, setTemplateBlobUrl] = useState<string | null>(null);
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
   const [initialScale, setInitialScale] = useState(0.8);
+  const [minScale, setMinScale] = useState(0.1);
   const transformRef = useRef<any>();
   const imageRef = useRef<HTMLImageElement>(null);
 
   // Get PNG templates and find the one for this slot (with null checks)
   const pngTemplates = (window as any).pngTemplates || [];
   const templateId = selectedSlot?.templateId?.split('_')[0]; // Get base template ID
-  const pngTemplate = selectedSlot ? pngTemplates.find((t: any) => 
-    t.id === templateId || 
-    t.templateType === selectedSlot.templateType
-  ) : null;
+  const pngTemplate = selectedSlot ? pngTemplates.find((t: any) => {
+    console.log('🔍 Template matching:', { 
+      templateId, 
+      slotTemplateType: selectedSlot.templateType,
+      pngTemplateId: t.id, 
+      pngTemplateType: t.templateType,
+      matches: t.id === templateId || t.templateType === selectedSlot.templateType
+    });
+    return t.id === templateId || t.templateType === selectedSlot.templateType;
+  }) : null;
 
   // Get all slots for this template
   const thisTemplateSlots = selectedSlot ? templateSlots.filter(slot => 
@@ -145,6 +152,10 @@ export default function FullscreenTemplateEditor({
           const fitScale = calculateFitScale(img.naturalWidth, img.naturalHeight, slotWidth, slotHeight);
           setInitialScale(fitScale);
           
+          // Set minScale to allow zooming out further than the fit scale
+          const dynamicMinScale = Math.min(0.1, fitScale * 0.5);
+          setMinScale(dynamicMinScale);
+          
           // Reset transform to center with new scale
           if (transformRef.current) {
             transformRef.current.resetTransform();
@@ -182,7 +193,7 @@ export default function FullscreenTemplateEditor({
       </div>
 
       {/* Full Template Display */}
-      <div className="flex-1 flex items-center justify-center p-2">
+      <div className="flex-1 flex items-center justify-center p-2 min-h-0">
         {!templateBlobUrl || !pngTemplate ? (
           <div className="text-white text-center">
             <div className="text-4xl mb-4">📐</div>
@@ -193,7 +204,9 @@ export default function FullscreenTemplateEditor({
             <div className="relative" 
                  style={{ 
                    aspectRatio: `${pngTemplate.dimensions.width}/${pngTemplate.dimensions.height}`,
-                   width: '800px',
+                   maxWidth: 'min(800px, 90vw)',
+                   maxHeight: '85vh',
+                   width: 'auto',
                    height: 'auto'
                  }}>
               {/* Full PNG Template Background */}
@@ -256,7 +269,7 @@ export default function FullscreenTemplateEditor({
                       <TransformWrapper
                         ref={transformRef}
                         initialScale={initialScale}
-                        minScale={0.1}
+                        minScale={minScale}
                         maxScale={10}
                         centerOnInit={true}
                         limitToBounds={false}
