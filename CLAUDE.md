@@ -307,3 +307,113 @@ WHERE email = 'your-email@gmail.com';
   - Template properties (name, description, category, tags)
   - Real-time preview and precise positioning
 - **Workflow**: Create custom photo layouts → Save to database → Available in main app
+
+## CRITICAL BUG FIX: Photo Cropping in FullscreenTemplateEditor
+
+### The Problem
+When photos with different aspect ratios (square, landscape) were placed in vertical template slots, the system was **automatically cropping parts of photos** to force them to match the slot's aspect ratio. This resulted in:
+- Square photos showing only heads (bodies cropped off)
+- Landscape photos having sides cut off
+- Users never seeing the complete photo content
+- Loss of important image details
+
+### The Root Cause
+The core issue was **forcing photos to fill slot dimensions exactly** using CSS properties:
+- `objectFit: 'cover'` - Automatically cropped to fill container
+- `width: '100%', height: '100%'` - Forced aspect ratio matching
+- `minWidth/minHeight: '100%'` - Same cropping behavior
+- TransformWrapper was constraining usable area to photo aspect ratio instead of slot dimensions
+
+### The Breakthrough Solution
+**File: `components/FullscreenTemplateEditor.tsx`**
+
+**BEFORE (Broken - Cropped Photos):**
+```tsx
+// This approach CROPPED photos to match slot aspect ratio
+<img style={{ 
+  width: '100%',
+  height: '100%', 
+  objectFit: 'cover'  // ← CULPRIT: Automatically cropped photos
+}}/>
+
+<TransformWrapper initialScale={1.2}>
+  <TransformComponent
+    wrapperStyle={{ width: '100%', height: '100%' }}  // ← Forced dimensions
+    contentStyle={{ width: '100%', height: '100%' }}
+  />
+</TransformWrapper>
+```
+
+**AFTER (Fixed - Preserves Complete Photos):**
+```tsx
+// This approach preserves ENTIRE photo content
+<img style={{ 
+  maxWidth: 'none',     // ← No width constraints
+  maxHeight: 'none',    // ← No height constraints
+  width: 'auto',        // ← Natural photo dimensions
+  height: 'auto',       // ← Natural photo dimensions
+  display: 'block'
+}}/>
+
+<TransformWrapper initialScale={0.5}>  // ← Start zoomed out
+  <TransformComponent>  // ← No forced wrapper/content styles
+</TransformWrapper>
+```
+
+### How The Solution Works
+1. **Photo Keeps Natural Dimensions**: Image displays at its original aspect ratio
+2. **Slot = Viewport Window**: The slot container (with `overflow: hidden`) acts as a clipping window
+3. **No Automatic Cropping**: CSS doesn't force aspect ratio changes
+4. **User Control**: Users see the COMPLETE photo first (initialScale={0.5}), then zoom/pan to choose what's visible
+5. **Zero Data Loss**: Every pixel of the original photo is preserved and accessible
+
+### Technical Implementation Details
+```tsx
+// The slot container provides clipping boundaries
+<div style={{
+  left: `${(hole.x / pngTemplate.dimensions.width) * 100}%`,
+  top: `${(hole.y / pngTemplate.dimensions.height) * 100}%`, 
+  width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
+  height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
+  overflow: 'hidden'  // ← Creates viewport window effect
+}}>
+  <TransformWrapper initialScale={0.5}>  // ← Show full photo initially
+    <TransformComponent>
+      <img style={{ 
+        maxWidth: 'none',
+        maxHeight: 'none', 
+        width: 'auto',
+        height: 'auto'
+      }}/>
+    </TransformComponent>
+  </TransformWrapper>
+</div>
+```
+
+### Results Achieved
+- ✅ **Square photos in vertical slots**: Full square visible → users zoom/position as needed
+- ✅ **Landscape photos in vertical slots**: Full landscape visible → users zoom/position as needed  
+- ✅ **Vertical photos in vertical slots**: Works perfectly as expected
+- ✅ **No image content lost**: Complete preservation of all photo details
+- ✅ **User control**: Manual positioning instead of automatic cropping
+- ✅ **Professional workflow**: Users can see entire photo before deciding crop
+
+### The Mental Model
+Think of it as:
+- **Old approach**: "Force photo to fit the frame" (destructive cropping)
+- **New approach**: "Show entire photo through a window" (non-destructive viewport)
+
+The slot acts like looking through a **window** into a larger **canvas** where the complete photo exists. Users can move and scale the canvas to choose what appears in the window, but nothing is ever cropped away permanently.
+
+### Files Modified
+- `components/FullscreenTemplateEditor.tsx:223-250` - Removed forced dimensions and constraining styles
+- Core change: Natural photo dimensions + viewport clipping instead of aspect ratio forcing
+
+### Debugging Notes
+Used color-coding during debugging:
+- RED = Slot container (viewport window)
+- BLUE = Constraining wrapper (removed as unnecessary)
+- MAGENTA = Photo element  
+- GREEN = Other slots
+
+This visual debugging helped identify that TransformWrapper was constraining interaction area to photo aspect ratio instead of using full slot dimensions.

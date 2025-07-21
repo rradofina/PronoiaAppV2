@@ -214,6 +214,7 @@ export default function FullscreenTemplateEditor({
                     top: `${(hole.y / pngTemplate.dimensions.height) * 100}%`,
                     width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
                     height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
+                    // backgroundColor: isEditingSlot ? 'rgba(255, 0, 0, 0.2)' : 'rgba(0, 255, 0, 0.1)', // Debug colors removed
                   }}
                 >
                   {isEditingSlot ? (
@@ -221,25 +222,26 @@ export default function FullscreenTemplateEditor({
                     selectedPhotoUrl ? (
                       <TransformWrapper
                         ref={transformRef}
-                        initialScale={1}
-                        minScale={0.5}
-                        maxScale={3}
-                        centerOnInit={false}
+                        initialScale={0.5}
+                        minScale={0.1}
+                        maxScale={10}
+                        centerOnInit={true}
                         limitToBounds={false}
+                        wheel={{ step: 0.1 }}
+                        doubleClick={{ disabled: false, step: 0.5 }}
                         onTransformed={handleTransformChange}
                       >
-                        <TransformComponent
-                          wrapperClass="w-full h-full overflow-hidden"
-                          contentClass="w-full h-full"
-                        >
+                        <TransformComponent>
                           <img
                             src={selectedPhotoUrl}
                             alt={selectedPhoto.name}
                             style={{ 
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                              objectPosition: 'center'
+                              maxWidth: 'none',
+                              maxHeight: 'none', 
+                              width: 'auto',
+                              height: 'auto',
+                              display: 'block',
+                              // border: '2px solid magenta' // Debug border removed
                             }}
                           />
                         </TransformComponent>
