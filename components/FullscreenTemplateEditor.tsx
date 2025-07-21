@@ -24,7 +24,9 @@ export default function FullscreenTemplateEditor({
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
   const [templateBlobUrl, setTemplateBlobUrl] = useState<string | null>(null);
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
+  const [initialScale, setInitialScale] = useState(0.8);
   const transformRef = useRef<any>();
+  const imageRef = useRef<HTMLImageElement>(null);
 
   // Get PNG templates and find the one for this slot (with null checks)
   const pngTemplates = (window as any).pngTemplates || [];
@@ -119,6 +121,37 @@ export default function FullscreenTemplateEditor({
     const photo = photos.find((p: any) => p.id === photoId);
     console.log('🔍 getPhotoUrl debug:', { photoId, photo, photoUrl: photo?.url });
     return photo?.url || null;
+  };
+
+  // Calculate scale to fit photo within slot (like object-fit: contain)
+  const calculateFitScale = (imgWidth: number, imgHeight: number, slotWidth: number, slotHeight: number) => {
+    const scaleX = slotWidth / imgWidth;
+    const scaleY = slotHeight / imgHeight;
+    return Math.min(scaleX, scaleY); // Use smaller scale to ensure photo fits completely
+  };
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    const img = e.currentTarget;
+    if (selectedSlot && pngTemplate) {
+      const slot = thisTemplateSlots.find(s => s.id === selectedSlot.id);
+      if (slot) {
+        const holeIndex = thisTemplateSlots.indexOf(slot);
+        const hole = pngTemplate.holes[holeIndex];
+        if (hole) {
+          // Calculate slot dimensions in actual pixels (not percentages)
+          const slotWidth = (hole.width / pngTemplate.dimensions.width) * 800; // 800px is our template width
+          const slotHeight = (hole.height / pngTemplate.dimensions.height) * (800 * pngTemplate.dimensions.height / pngTemplate.dimensions.width);
+          
+          const fitScale = calculateFitScale(img.naturalWidth, img.naturalHeight, slotWidth, slotHeight);
+          setInitialScale(fitScale);
+          
+          // Reset transform to center with new scale
+          if (transformRef.current) {
+            transformRef.current.resetTransform();
+          }
+        }
+      }
+    }
   };
 
   return (
@@ -222,19 +255,41 @@ export default function FullscreenTemplateEditor({
                     selectedPhotoUrl ? (
                       <TransformWrapper
                         ref={transformRef}
-                        initialScale={0.5}
+                        initialScale={initialScale}
                         minScale={0.1}
                         maxScale={10}
                         centerOnInit={true}
                         limitToBounds={false}
-                        wheel={{ step: 0.1 }}
-                        doubleClick={{ disabled: false, step: 0.5 }}
+                        wheel={{ 
+                          step: 0.01,
+                          wheelDelta: 40,
+                          activationDistance: 10,
+                          smoothWheel: true
+                        }}
+                        doubleClick={{ 
+                          disabled: false, 
+                          step: 0.5,
+                          animationTime: 200
+                        }}
+                        panning={{
+                          excluded: [],
+                          velocityDisabled: false,
+                          lockAxisX: false,
+                          lockAxisY: false
+                        }}
+                        animations={{
+                          disabled: false,
+                          animationType: "easeOut",
+                          animationTime: 200
+                        }}
                         onTransformed={handleTransformChange}
                       >
                         <TransformComponent>
                           <img
+                            ref={imageRef}
                             src={selectedPhotoUrl}
                             alt={selectedPhoto.name}
+                            onLoad={handleImageLoad}
                             style={{ 
                               maxWidth: 'none',
                               maxHeight: 'none', 
