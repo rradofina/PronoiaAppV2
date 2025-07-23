@@ -11,7 +11,13 @@ import FolderSelectionScreen from '../components/screens/FolderSelectionScreen';
 import PackageSelectionScreen from '../components/screens/PackageSelectionScreen';
 import PhotoSelectionScreen from '../components/screens/PhotoSelectionScreen';
 import TemplateSetupScreen from '../components/screens/TemplateSetupScreen';
+import PngTemplateManagementScreen from '../components/screens/PngTemplateManagementScreen';
+import TemplateFolderSelectionScreen from '../components/screens/TemplateFolderSelectionScreen';
+import ManualTemplateManagerScreen from '../components/admin/ManualTemplateManagerScreen';
+import ManualPackageManagerScreen from '../components/admin/ManualPackageManagerScreen';
 import googleDriveService from '../services/googleDriveService';
+import { hybridTemplateService } from '../services/hybridTemplateService';
+import { manualPackageService } from '../services/manualPackageService';
 import { DEFAULT_TEMPLATE_CYCLE, TEMPLATE_TYPES, PRINT_SIZES } from '../utils/constants';
 
 declare global {
@@ -219,6 +225,8 @@ export default function Home() {
   const [localPhotos, setLocalPhotos] = useState<Photo[]>([]);
   const [isRestoringAuth, setIsRestoringAuth] = useState(false);
   const [additionalPrints, setAdditionalPrints] = useState(0);
+  const [templateRefreshTrigger, setTemplateRefreshTrigger] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   // Load main folder from localStorage on initial render
   useEffect(() => {
@@ -267,6 +275,17 @@ export default function Home() {
     const storedToken = localStorage.getItem('google_access_token');
     const storedEmail = localStorage.getItem('google_user_email');
     const tokenExpiry = localStorage.getItem('google_token_expiry');
+    
+    // Check if stored email is authorized before restoring
+    if (storedEmail) {
+      const allowedEmails = process.env.NEXT_PUBLIC_ALLOWED_EMAILS?.split(',').map(e => e.trim()) || [];
+      
+      if (!allowedEmails.includes(storedEmail)) {
+        console.log('🚫 Stored email not authorized, clearing auth');
+        clearStoredAuth();
+        return;
+      }
+    }
     
     if (storedToken && tokenExpiry) {
       const expiryTime = parseInt(tokenExpiry);
@@ -460,6 +479,16 @@ export default function Home() {
         });
         if (aboutResponse.result.user?.emailAddress) {
           const email = aboutResponse.result.user.emailAddress;
+          
+          // Check if email is in allowed list
+          const allowedEmails = process.env.NEXT_PUBLIC_ALLOWED_EMAILS?.split(',').map(e => e.trim()) || [];
+          
+          if (!allowedEmails.includes(email)) {
+            setError(`Access denied. Your email (${email}) is not authorized to use this application.`);
+            handleSignOut();
+            return;
+          }
+          
           localStorage.setItem('google_user_email', email);
           setGoogleAuth({ isSignedIn: true, userEmail: email });
         }
@@ -574,7 +603,8 @@ export default function Home() {
       
       setLocalPhotos(drivePhotos);
       setPhotos(drivePhotos);
-      setCurrentScreen('package');
+      // Don't change screen here - let the FolderSelectionScreen handle the package selection
+      // setCurrentScreen('package'); // Removed - package selection now happens in FolderSelectionScreen
     } catch (error) {
       console.error('Failed to load photos:', error);
       alert('Failed to load photos from the selected folder.');
@@ -635,9 +665,9 @@ export default function Home() {
       setClientName('');
       setAdditionalPrints(0);
     } else if (currentScreen === 'template') {
-      setCurrentScreen('package');
+      setCurrentScreen('folder-selection'); // Go back to folder selection (which includes package selection)
     } else if (currentScreen === 'photos') {
-      setCurrentScreen('package');
+      setCurrentScreen('folder-selection'); // Go back to folder selection (which includes package selection)
       setTemplateSlots([]);
       setSelectedSlot(null);
     }
@@ -646,18 +676,126 @@ export default function Home() {
   const handlePackageContinue = async () => {
     if (selectedPackage && clientName.trim()) {
       try {
-        // Load PNG templates from Google Drive
-        const { pngTemplateService } = await import('../services/pngTemplateService');
-        const allTemplates = await pngTemplateService.loadTemplates();
-        const fourRTemplates = allTemplates.filter(t => t.printSize === '4R');
+        const startTime = performance.now();
+        
+        // Check if this is a manual package (UUID format) or legacy package (A/B/C/D)
+        const isManualPackage = selectedPackage.id.length > 5; // UUIDs are much longer than A/B/C/D
+        
+        if (isManualPackage) {
+          console.log('📋 Loading configured templates for manual package:', selectedPackage.name);
+          
+          // Load package with its configured templates
+          const packageWithTemplates = await manualPackageService.getPackageWithTemplates(selectedPackage.id);
+          
+          if (!packageWithTemplates || !packageWithTemplates.package_templates) {
+            throw new Error(`Package ${selectedPackage.name} has no configured templates. Please configure templates in the Package Manager.`);
+          }
+          
+          // Sort templates by order_index to maintain Print #1, Print #2, etc. order
+          const orderedTemplates = packageWithTemplates.package_templates
+            .sort((a, b) => a.order_index - b.order_index)
+            .map(pt => pt.template);
+          
+          console.log(`✅ Found ${orderedTemplates.length} configured templates for package:`, orderedTemplates.map(t => t.name));
+          
+          // Convert manual templates to hybrid format for compatibility
+          const hybridTemplates = orderedTemplates.map(template => ({
+            id: template.id,
+            name: template.name,
+            template_type: template.template_type,
+            print_size: template.print_size,
+            drive_file_id: template.drive_file_id,
+            driveFileId: template.drive_file_id, // Add driveFileId for FullscreenTemplateEditor compatibility
+            holes: template.holes_data,
+            dimensions: template.dimensions,
+            source: 'manual' as const
+          }));
+          
+          // Store in window for PhotoSelectionScreen compatibility
+          (window as any).pngTemplates = hybridTemplates;
+          
+          // Create template slots from configured templates
+          const slots: TemplateSlot[] = [];
+          
+          // Add slots for each configured template
+          orderedTemplates.forEach((template, templateIndex) => {
+            const templateName = `${template.name} (Print #${templateIndex + 1})`;
+            
+            // Create slots for each hole in the template
+            for (let slotIndex = 0; slotIndex < template.holes_data.length; slotIndex++) {
+              slots.push({
+                id: `${template.id}_${templateIndex}_${slotIndex}`,
+                templateId: `${template.id}_${templateIndex}`,
+                templateName,
+                templateType: template.template_type,
+                printSize: template.print_size,
+                slotIndex,
+                photoId: undefined
+              });
+            }
+          });
+          
+          // Add additional prints if requested (repeat the configured templates)
+          if (additionalPrints > 0) {
+            for (let additionalIndex = 0; additionalIndex < additionalPrints; additionalIndex++) {
+              const templateToRepeat = orderedTemplates[additionalIndex % orderedTemplates.length];
+              const templateName = `${templateToRepeat.name} (Additional #${additionalIndex + 1})`;
+              const templateId = `${templateToRepeat.id}_additional_${additionalIndex}`;
+              
+              for (let slotIndex = 0; slotIndex < templateToRepeat.holes_data.length; slotIndex++) {
+                slots.push({
+                  id: `${templateId}_${slotIndex}`,
+                  templateId,
+                  templateName,
+                  templateType: templateToRepeat.template_type,
+                  printSize: templateToRepeat.print_size,
+                  slotIndex,
+                  photoId: undefined
+                });
+              }
+            }
+          }
+          
+          setTemplateSlots(slots);
+          const endTime = performance.now();
+          console.log(`⚡ Manual package continue completed in ${(endTime - startTime).toFixed(0)}ms with ${slots.length} slots`);
+          setCurrentScreen('photos');
+          return;
+        }
+        
+        // Legacy package handling (A/B/C/D packages)
+        console.log('🔄 Using legacy template cycling for package:', selectedPackage.name);
+        
+        // Use already-loaded templates from startup (much faster!)
+        let allTemplates = (window as any).pngTemplates || [];
+        
+        // If for some reason templates aren't loaded, load them now
+        if (allTemplates.length === 0) {
+          console.log('⚠️ Templates not found in cache, loading now...');
+          
+          // Ensure Google API is ready before loading
+          if (!window.gapi?.client?.drive) {
+            throw new Error('Google Drive API not ready. Please try again in a moment.');
+          }
+          
+          // Use hybrid template service for better reliability
+          allTemplates = await hybridTemplateService.getAllTemplates();
+          (window as any).pngTemplates = allTemplates;
+          console.log('✅ Templates loaded on demand:', allTemplates.length, 'templates');
+        } else {
+          console.log('✅ Using cached templates from startup:', allTemplates.length, 'templates');
+        }
+        
+        const fourRTemplates = allTemplates.filter((t: any) => t.print_size === '4R');
+        console.log('🔍 4R Templates found:', fourRTemplates.length);
         
         if (fourRTemplates.length === 0) {
-          // No templates found - redirect to template setup
+          console.error('❌ No 4R templates found! Available print sizes:', [...new Set(allTemplates.map((t: any) => t.print_size))]);
           setCurrentScreen('template-setup');
           return;
         }
 
-        // Auto-assign templates based on package count
+        // Auto-assign templates based on package count (legacy behavior)
         const templateCount = selectedPackage.templateCount + additionalPrints;
         const slots: TemplateSlot[] = [];
         
@@ -673,8 +811,8 @@ export default function Home() {
               id: `${template.id}_${i}_${slotIndex}`,
               templateId: `${template.id}_${i}`,
               templateName,
-              templateType: template.templateType as TemplateType,
-              printSize: '4R',
+              templateType: template.template_type || template.templateType as TemplateType,
+              printSize: template.print_size || '4R',
               slotIndex,
               photoId: undefined
             });
@@ -682,12 +820,12 @@ export default function Home() {
         }
         
         setTemplateSlots(slots);
-        // Store PNG templates for photo selection screen
-        (window as any).pngTemplates = fourRTemplates;
+        const endTime = performance.now();
+        console.log(`⚡ Legacy package continue completed in ${(endTime - startTime).toFixed(0)}ms`);
         setCurrentScreen('photos');
       } catch (error) {
-        console.error('Error loading PNG templates:', error);
-        alert('Failed to load templates. Please check your template configuration.');
+        console.error('Error loading package templates:', error);
+        alert(`Failed to load templates: ${error.message || 'Please check your template configuration.'}`);
       }
     }
   };
@@ -849,6 +987,41 @@ export default function Home() {
     };
   }, []);
 
+  // Load PNG templates on app startup when authenticated
+  useEffect(() => {
+    const loadPngTemplatesOnStartup = async () => {
+      // Check if we have proper Google API authentication
+      if (!window.gapi?.client?.drive) {
+        console.log('⚠️ Google Drive API not ready yet, skipping template loading');
+        return;
+      }
+
+      try {
+        console.log('🔄 Loading PNG templates on app startup...');
+        // Use hybrid template service for better reliability and manual template support
+        const allTemplates = await hybridTemplateService.getAllTemplates();
+        
+        // Store all templates globally for fullscreen editor access
+        (window as any).pngTemplates = allTemplates;
+        
+        console.log('✅ PNG templates loaded on startup:', {
+          totalTemplates: allTemplates.length,
+          templateTypes: allTemplates.map(t => `${t.name} (${t.template_type})`).slice(0, 5),
+          printSizes: [...new Set(allTemplates.map(t => t.print_size))]
+        });
+      } catch (error) {
+        console.warn('⚠️ Failed to load PNG templates on startup:', error);
+        console.log('📝 Templates will be loaded when needed during package selection');
+      }
+    };
+
+    // Only load if we have authentication, API is ready, and not restoring
+    if (googleAuth.isSignedIn && !isRestoringAuth && window.gapi?.client?.drive) {
+      // Add a small delay to ensure API is fully initialized
+      setTimeout(loadPngTemplatesOnStartup, 1000);
+    }
+  }, [googleAuth.isSignedIn, isRestoringAuth, isGapiLoaded]);
+
   const renderScreen = () => {
     switch (currentScreen) {
       case 'drive-setup':
@@ -875,26 +1048,24 @@ export default function Home() {
             mainSessionsFolder={mainSessionsFolder}
             onSignOut={handleSignOut}
             onChangeMainFolder={handleChangeMainFolder}
+            selectedPackage={selectedPackage}
+            setSelectedPackage={setSelectedPackage}
+            handleContinue={handlePackageContinue} // Skip package screen, go directly to template/photos
+            onManageTemplates={() => setCurrentScreen('manual-template-manager')}
+            onManagePackages={() => setCurrentScreen('manual-package-manager')}
           />
         );
       case 'package':
-        return (
-          <PackageSelectionScreen
-            clientName={clientName}
-            selectedClientFolder={selectedClientFolder}
-            photos={localPhotos}
-            packages={packages}
-            selectedPackage={selectedPackage}
-            setSelectedPackage={setSelectedPackage}
-            handleBack={handleBack}
-            handlePackageContinue={handlePackageContinue}
-          />
-        );
+        // Package selection is now handled within FolderSelectionScreen
+        // This should not be reached anymore, but if it is, redirect to photos
+        console.log('Package screen reached - this should not happen. Redirecting to photos.');
+        setCurrentScreen('photos');
+        return null;
       case 'template-setup':
         return (
           <TemplateSetupScreen
-            onComplete={() => setCurrentScreen('package')}
-            onBack={() => setCurrentScreen('package')}
+            onComplete={() => setCurrentScreen('folder-selection')}
+            onBack={() => setCurrentScreen('folder-selection')}
           />
         );
       case 'photos':
@@ -916,11 +1087,77 @@ export default function Home() {
             setTemplateSlots={setTemplateSlots}
           />
         );
+      case 'png-template-management':
+        return (
+          <PngTemplateManagementScreen
+            googleAuth={googleAuth}
+            mainSessionsFolder={mainSessionsFolder}
+            onSignOut={handleSignOut}
+            onChangeMainFolder={handleChangeMainFolder}
+            onBack={() => setCurrentScreen('folder-selection')}
+            onChangeTemplateFolder={() => setCurrentScreen('template-folder-selection')}
+            onManualTemplateManager={() => setCurrentScreen('manual-template-manager')}
+            refreshTrigger={templateRefreshTrigger}
+          />
+        );
+      case 'manual-package-manager':
+        return (
+          <ManualPackageManagerScreen
+            googleAuth={googleAuth}
+            mainSessionsFolder={mainSessionsFolder}
+            onSignOut={handleSignOut}
+            onChangeMainFolder={handleChangeMainFolder}
+            onBack={() => setCurrentScreen('folder-selection')}
+          />
+        );
+      case 'template-folder-selection':
+        return (
+          <TemplateFolderSelectionScreen
+            googleAuth={googleAuth}
+            mainSessionsFolder={mainSessionsFolder}
+            onSignOut={handleSignOut}
+            onChangeMainFolder={handleChangeMainFolder}
+            onBack={() => setCurrentScreen('folder-selection')}
+            onFolderSelected={() => {
+              setTemplateRefreshTrigger(prev => prev + 1); // Trigger refresh
+              setCurrentScreen('png-template-management');
+            }}
+          />
+        );
+      case 'manual-template-manager':
+        return (
+          <ManualTemplateManagerScreen
+            googleAuth={googleAuth}
+            mainSessionsFolder={mainSessionsFolder}
+            onSignOut={handleSignOut}
+            onChangeMainFolder={handleChangeMainFolder}
+            onBack={() => setCurrentScreen('folder-selection')}
+          />
+        );
+      case 'manual-package-manager':
+        return (
+          <ManualPackageManagerScreen
+            googleAuth={googleAuth}
+            mainSessionsFolder={mainSessionsFolder}
+            onSignOut={handleSignOut}
+            onChangeMainFolder={handleChangeMainFolder}
+            onBack={() => setCurrentScreen('manual-template-manager')}
+          />
+        );
       default:
         return <div>Unknown Screen</div>;
     }
   };
 
-  return <div>{renderScreen()}</div>;
+  return (
+    <div>
+      {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
+      <div className="fixed bottom-2 right-2 z-50 bg-blue-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
+        index.tsx ({currentScreen})
+      </div>
+      
+      {renderScreen()}
+    </div>
+  );
 }
 
