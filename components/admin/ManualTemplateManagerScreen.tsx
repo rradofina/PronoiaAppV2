@@ -164,7 +164,7 @@ export default function ManualTemplateManagerScreen({
     setIsDragging(false);
   };
 
-  const getTouchDistance = (touches: TouchList) => {
+  const getTouchDistance = (touches: React.TouchList) => {
     const touch1 = touches[0];
     const touch2 = touches[1];
     return Math.sqrt(
