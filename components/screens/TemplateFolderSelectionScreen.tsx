@@ -53,7 +53,13 @@ export default function TemplateFolderSelectionScreen({
     setError(null);
     try {
       const folders = await googleDriveService.listFolders(currentFolderId);
-      setDriveFolders(folders);
+      // Convert to DriveFolder format with required fields
+      const driveFolders = folders.map(folder => ({
+        ...folder,
+        createdTime: folder.createdTime || new Date().toISOString(),
+        modifiedTime: folder.modifiedTime || new Date().toISOString()
+      }));
+      setDriveFolders(driveFolders);
     } catch (error) {
       console.error('Failed to load Drive folders:', error);
       setError('Failed to load Google Drive folders. Please try again.');
