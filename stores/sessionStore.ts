@@ -118,7 +118,7 @@ const useSessionStore = create<SessionStore>()(
             const fallbackSession: Session = {
               id: `local_${Date.now()}`,
               clientName: sessionData.clientName,
-              packageType: sessionData.packageType,
+              package_id: sessionData.packageId, // Updated to use package_id
               selectedTemplates: [],
               maxTemplates: sessionData.maxTemplates,
               usedTemplates: 0,
