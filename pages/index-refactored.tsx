@@ -456,8 +456,9 @@ export default function Home() {
             clientName={clientName}
             selectedClientFolder={selectedClientFolder}
             photos={photos}
+            packages={[]} // Legacy packages array - now using manual package management
             selectedPackage={selectedPackage}
-            setSelectedPackage={setSelectedPackage}
+            setSelectedPackage={(pkg) => setSelectedPackage(pkg)}
             handleBack={handleBack}
             handlePackageContinue={() => setCurrentScreen('template')}
           />
