@@ -35,6 +35,7 @@ interface PackageFormData {
   thumbnail_url: string;
   price: string; // String for form input
   number_of_prints: number;
+  photo_limit: number; // Maximum number of photos client can select
   group_id?: string;
   print_positions: PrintPosition[];
 }
@@ -46,6 +47,7 @@ const EMPTY_FORM: PackageFormData = {
   thumbnail_url: '',
   price: '',
   number_of_prints: 1,
+  photo_limit: 20, // Default to 20 photos
   group_id: undefined,
   print_positions: [{
     position: 1,
@@ -259,6 +261,8 @@ export default function ManualPackageManagerScreen({
           thumbnail_url: pkg.thumbnail_url || '',
           price: pkg.price?.toString() || '',
           number_of_prints: printPositions.length || 1,
+          photo_limit: pkg.photo_limit || 20,
+          group_id: pkg.group_id,
           print_positions: printPositions.length > 0 ? printPositions : [{
             position: 1,
             default_template_id: null
@@ -281,6 +285,7 @@ export default function ManualPackageManagerScreen({
         print_size: '4R', // We'll need to determine this from the templates or make it dynamic
         template_count: formData.number_of_prints,
         price: formData.price ? parseFloat(formData.price) : undefined,
+        photo_limit: formData.photo_limit,
         group_id: formData.group_id,
         template_ids: formData.print_positions
           .filter(p => p.default_template_id)
@@ -663,6 +668,9 @@ export default function ManualPackageManagerScreen({
                                           {pkg.print_size}
                                         </span>
                                         <span>{pkg.template_count} templates</span>
+                                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                                          {pkg.photo_limit} photos max
+                                        </span>
                                         {pkg.price && <span>₱{pkg.price}</span>}
                                       </div>
                                     </div>
@@ -801,6 +809,9 @@ export default function ManualPackageManagerScreen({
                                         {pkg.print_size}
                                       </span>
                                       <span>{pkg.template_count} templates</span>
+                                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                                        {pkg.photo_limit} photos max
+                                      </span>
                                       {pkg.price && <span>₱{pkg.price}</span>}
                                       <select
                                         value=""
@@ -1072,7 +1083,7 @@ export default function ManualPackageManagerScreen({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Number of Prints *
@@ -1088,7 +1099,29 @@ export default function ManualPackageManagerScreen({
                           placeholder="1"
                         />
                         <div className="text-xs text-gray-500 mt-1">
-                          How many prints does this package include?
+                          How many prints included?
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Photo Limit *
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          min="1"
+                          max="500"
+                          value={formData.photo_limit}
+                          onChange={(e) => setFormData(prev => ({ 
+                            ...prev, 
+                            photo_limit: parseInt(e.target.value) || 20 
+                          }))}
+                          className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="20"
+                        />
+                        <div className="text-xs text-gray-500 mt-1">
+                          Max photos client can select
                         </div>
                       </div>
 
@@ -1244,6 +1277,9 @@ export default function ManualPackageManagerScreen({
                   </div>
                   <div>
                     <span className="font-medium">Template Count:</span> {packageDetails.template_count}
+                  </div>
+                  <div>
+                    <span className="font-medium">Photo Limit:</span> {packageDetails.photo_limit} photos max
                   </div>
                   <div>
                     <span className="font-medium">Price:</span> {packageDetails.price ? `₱${packageDetails.price}` : 'Free'}

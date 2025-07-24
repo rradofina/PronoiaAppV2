@@ -420,6 +420,7 @@ export interface ManualPackage {
   print_size: PrintSize;
   template_count: number;
   price?: number;
+  photo_limit: number; // Maximum number of photos client can select
   is_active: boolean;
   is_default: boolean;
   sort_order: number;
@@ -478,6 +479,7 @@ export interface CreateManualPackageRequest {
   print_size: PrintSize;
   template_count: number;
   price?: number;
+  photo_limit: number; // Maximum number of photos client can select
   group_id?: string;
   template_ids: string[]; // Templates to include in package
 }
