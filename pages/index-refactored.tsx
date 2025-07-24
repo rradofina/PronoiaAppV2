@@ -444,6 +444,10 @@ export default function Home() {
             mainSessionsFolder={mainSessionsFolder}
             onSignOut={handleSignOut}
             onChangeMainFolder={() => setCurrentScreen('drive-setup')}
+            selectedPackage={selectedPackage}
+            setSelectedPackage={setSelectedPackage}
+            handleContinue={() => setCurrentScreen('template')}
+            onManageTemplates={() => setCurrentScreen('template-setup')}
           />
         );
       case 'package':
