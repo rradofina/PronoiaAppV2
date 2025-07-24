@@ -367,11 +367,6 @@ export default function FullscreenTemplateEditor({
                           lockAxisX: false,
                           lockAxisY: false
                         }}
-                        animations={{
-                          disabled: false,
-                          animationType: "easeOut",
-                          animationTime: 200
-                        }}
                         onTransformed={handleTransformChange}
                       >
                         <TransformComponent>
