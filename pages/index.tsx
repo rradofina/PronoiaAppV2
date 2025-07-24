@@ -188,7 +188,7 @@ export default function Home() {
   const { mainSessionsFolder, setMainSessionsFolder, photos, setPhotos } = useDriveStore();
   
   // Session Store  
-  const { selectedPackage, clientName, packages, setSelectedPackage, setClientName } = useSessionStore();
+  const { selectedPackage, clientName, setSelectedPackage, setClientName } = useSessionStore();
   
   // Template Store
   const { 
