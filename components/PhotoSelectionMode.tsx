@@ -20,6 +20,10 @@ export default function PhotoSelectionMode({
 
   return (
     <div className="fixed inset-0 z-40 bg-white flex flex-col">
+      {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
+      <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
+        PhotoSelectionMode.tsx
+      </div>
       {/* Header with template indicator */}
       <div className="bg-white shadow-sm p-3 border-b">
         <div className="flex items-center justify-between">

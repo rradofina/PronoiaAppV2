@@ -18,7 +18,8 @@ import ManualPackageManagerScreen from '../components/admin/ManualPackageManager
 import googleDriveService from '../services/googleDriveService';
 import { hybridTemplateService } from '../services/hybridTemplateService';
 import { manualPackageService } from '../services/manualPackageService';
-import { DEFAULT_TEMPLATE_CYCLE, TEMPLATE_TYPES, PRINT_SIZES } from '../utils/constants';
+import { templateCacheService } from '../services/templateCacheService';
+import { TEMPLATE_TYPES, PRINT_SIZES } from '../utils/constants';
 
 declare global {
   interface Window {
@@ -592,21 +593,30 @@ export default function Home() {
   };
 
   const handleClientFolderSelect = async (folder: DriveFolder) => {
+    console.log('📂 handleClientFolderSelect called with folder:', folder.name);
     setSelectedClientFolder(folder);
     setClientName(folder.name);
     try {
-      console.log(`Loading photos from folder: ${folder.name} (${folder.id})`);
+      console.log(`📥 Loading photos from folder: ${folder.name} (${folder.id})`);
       
       // Use our Google Drive service instead of raw API
       const drivePhotos = await googleDriveService.getPhotosFromFolder(folder.id);
-      console.log(`Loaded ${drivePhotos.length} photos:`, drivePhotos);
+      console.log(`✅ Loaded ${drivePhotos.length} photos from folder. Sample:`, drivePhotos.slice(0, 2));
+      
+      // CRITICAL DEBUG: Check if we actually have photos
+      if (drivePhotos.length === 0) {
+        console.error('❌ NO PHOTOS FOUND IN FOLDER - This is the problem!');
+        alert('No photos found in the selected folder. Make sure the folder contains image files.');
+        return;
+      }
       
       setLocalPhotos(drivePhotos);
       setPhotos(drivePhotos);
+      console.log('📦 Photos stored in localPhotos and photos state');
       // Don't change screen here - let the FolderSelectionScreen handle the package selection
       // setCurrentScreen('package'); // Removed - package selection now happens in FolderSelectionScreen
     } catch (error) {
-      console.error('Failed to load photos:', error);
+      console.error('❌ Failed to load photos:', error);
       alert('Failed to load photos from the selected folder.');
     }
   };
@@ -678,150 +688,97 @@ export default function Home() {
       try {
         const startTime = performance.now();
         
-        // Check if this is a manual package (UUID format) or legacy package (A/B/C/D)
-        const isManualPackage = selectedPackage.id.length > 5; // UUIDs are much longer than A/B/C/D
+        console.log('📋 Loading configured templates for manual package:', selectedPackage.name);
         
-        if (isManualPackage) {
-          console.log('📋 Loading configured templates for manual package:', selectedPackage.name);
+        // Load package with its configured templates
+        const packageWithTemplates = await manualPackageService.getPackageWithTemplates(selectedPackage.id);
+        
+        if (!packageWithTemplates || !packageWithTemplates.package_templates) {
+          throw new Error(`Package ${selectedPackage.name} has no configured templates. Please configure templates in the Package Manager.`);
+        }
+        
+        // Sort templates by order_index to maintain Print #1, Print #2, etc. order
+        const orderedTemplates = packageWithTemplates.package_templates
+          .sort((a, b) => a.order_index - b.order_index)
+          .map(pt => pt.template);
+        
+        console.log(`✅ Found ${orderedTemplates.length} configured templates for package:`, orderedTemplates.map(t => t.name));
+        
+        // Convert manual templates to hybrid format for compatibility
+        const hybridTemplates = orderedTemplates.map(template => ({
+          id: template.id,
+          name: template.name,
+          template_type: template.template_type,
+          print_size: template.print_size,
+          drive_file_id: template.drive_file_id,
+          driveFileId: template.drive_file_id, // Add driveFileId for FullscreenTemplateEditor compatibility
+          holes: template.holes_data,
+          dimensions: template.dimensions,
+          base64_preview: template.base64_preview, // Include base64 preview for instant loading
+          source: 'manual' as const
+        }));
+        
+        // Store in window for PhotoSelectionScreen compatibility
+        (window as any).pngTemplates = hybridTemplates;
+        
+        // Skip template preloading for now to avoid timeouts
+        // console.log('🎨 Starting template preloading for package...');
+        // templateCacheService.preloadPackageTemplates(
+        //   orderedTemplates.map(template => ({
+        //     id: template.id,
+        //     driveFileId: template.drive_file_id,
+        //     base64Preview: template.base64_preview
+        //   }))
+        // ).catch(error => {
+        //   console.warn('⚠️ Template preloading failed (non-critical):', error);
+        // });
+        
+        // Create template slots from configured templates
+        const slots: TemplateSlot[] = [];
+        
+        // Add slots for each configured template
+        orderedTemplates.forEach((template, templateIndex) => {
+          const templateName = `${template.name} (Print #${templateIndex + 1})`;
           
-          // Load package with its configured templates
-          const packageWithTemplates = await manualPackageService.getPackageWithTemplates(selectedPackage.id);
-          
-          if (!packageWithTemplates || !packageWithTemplates.package_templates) {
-            throw new Error(`Package ${selectedPackage.name} has no configured templates. Please configure templates in the Package Manager.`);
+          // Create slots for each hole in the template
+          for (let slotIndex = 0; slotIndex < template.holes_data.length; slotIndex++) {
+            slots.push({
+              id: `${template.id}_${templateIndex}_${slotIndex}`,
+              templateId: `${template.id}_${templateIndex}`,
+              templateName,
+              templateType: template.template_type,
+              printSize: template.print_size,
+              slotIndex,
+              photoId: undefined
+            });
           }
-          
-          // Sort templates by order_index to maintain Print #1, Print #2, etc. order
-          const orderedTemplates = packageWithTemplates.package_templates
-            .sort((a, b) => a.order_index - b.order_index)
-            .map(pt => pt.template);
-          
-          console.log(`✅ Found ${orderedTemplates.length} configured templates for package:`, orderedTemplates.map(t => t.name));
-          
-          // Convert manual templates to hybrid format for compatibility
-          const hybridTemplates = orderedTemplates.map(template => ({
-            id: template.id,
-            name: template.name,
-            template_type: template.template_type,
-            print_size: template.print_size,
-            drive_file_id: template.drive_file_id,
-            driveFileId: template.drive_file_id, // Add driveFileId for FullscreenTemplateEditor compatibility
-            holes: template.holes_data,
-            dimensions: template.dimensions,
-            source: 'manual' as const
-          }));
-          
-          // Store in window for PhotoSelectionScreen compatibility
-          (window as any).pngTemplates = hybridTemplates;
-          
-          // Create template slots from configured templates
-          const slots: TemplateSlot[] = [];
-          
-          // Add slots for each configured template
-          orderedTemplates.forEach((template, templateIndex) => {
-            const templateName = `${template.name} (Print #${templateIndex + 1})`;
+        });
+        
+        // Add additional prints if requested (repeat the configured templates)
+        if (additionalPrints > 0) {
+          for (let additionalIndex = 0; additionalIndex < additionalPrints; additionalIndex++) {
+            const templateToRepeat = orderedTemplates[additionalIndex % orderedTemplates.length];
+            const templateName = `${templateToRepeat.name} (Additional #${additionalIndex + 1})`;
+            const templateId = `${templateToRepeat.id}_additional_${additionalIndex}`;
             
-            // Create slots for each hole in the template
-            for (let slotIndex = 0; slotIndex < template.holes_data.length; slotIndex++) {
+            for (let slotIndex = 0; slotIndex < templateToRepeat.holes_data.length; slotIndex++) {
               slots.push({
-                id: `${template.id}_${templateIndex}_${slotIndex}`,
-                templateId: `${template.id}_${templateIndex}`,
+                id: `${templateId}_${slotIndex}`,
+                templateId,
                 templateName,
-                templateType: template.template_type,
-                printSize: template.print_size,
+                templateType: templateToRepeat.template_type,
+                printSize: templateToRepeat.print_size,
                 slotIndex,
                 photoId: undefined
               });
             }
-          });
-          
-          // Add additional prints if requested (repeat the configured templates)
-          if (additionalPrints > 0) {
-            for (let additionalIndex = 0; additionalIndex < additionalPrints; additionalIndex++) {
-              const templateToRepeat = orderedTemplates[additionalIndex % orderedTemplates.length];
-              const templateName = `${templateToRepeat.name} (Additional #${additionalIndex + 1})`;
-              const templateId = `${templateToRepeat.id}_additional_${additionalIndex}`;
-              
-              for (let slotIndex = 0; slotIndex < templateToRepeat.holes_data.length; slotIndex++) {
-                slots.push({
-                  id: `${templateId}_${slotIndex}`,
-                  templateId,
-                  templateName,
-                  templateType: templateToRepeat.template_type,
-                  printSize: templateToRepeat.print_size,
-                  slotIndex,
-                  photoId: undefined
-                });
-              }
-            }
-          }
-          
-          setTemplateSlots(slots);
-          const endTime = performance.now();
-          console.log(`⚡ Manual package continue completed in ${(endTime - startTime).toFixed(0)}ms with ${slots.length} slots`);
-          setCurrentScreen('photos');
-          return;
-        }
-        
-        // Legacy package handling (A/B/C/D packages)
-        console.log('🔄 Using legacy template cycling for package:', selectedPackage.name);
-        
-        // Use already-loaded templates from startup (much faster!)
-        let allTemplates = (window as any).pngTemplates || [];
-        
-        // If for some reason templates aren't loaded, load them now
-        if (allTemplates.length === 0) {
-          console.log('⚠️ Templates not found in cache, loading now...');
-          
-          // Ensure Google API is ready before loading
-          if (!window.gapi?.client?.drive) {
-            throw new Error('Google Drive API not ready. Please try again in a moment.');
-          }
-          
-          // Use hybrid template service for better reliability
-          allTemplates = await hybridTemplateService.getAllTemplates();
-          (window as any).pngTemplates = allTemplates;
-          console.log('✅ Templates loaded on demand:', allTemplates.length, 'templates');
-        } else {
-          console.log('✅ Using cached templates from startup:', allTemplates.length, 'templates');
-        }
-        
-        const fourRTemplates = allTemplates.filter((t: any) => t.print_size === '4R');
-        console.log('🔍 4R Templates found:', fourRTemplates.length);
-        
-        if (fourRTemplates.length === 0) {
-          console.error('❌ No 4R templates found! Available print sizes:', [...new Set(allTemplates.map((t: any) => t.print_size))]);
-          setCurrentScreen('template-setup');
-          return;
-        }
-
-        // Auto-assign templates based on package count (legacy behavior)
-        const templateCount = selectedPackage.templateCount + additionalPrints;
-        const slots: TemplateSlot[] = [];
-        
-        for (let i = 0; i < templateCount; i++) {
-          // Cycle through available PNG templates
-          const template = fourRTemplates[i % fourRTemplates.length];
-          const templateIndex = Math.floor(i / fourRTemplates.length) + 1;
-          const templateName = `${template.name} ${templateIndex}`;
-          
-          // Create slots for each hole in the template
-          for (let slotIndex = 0; slotIndex < template.holes.length; slotIndex++) {
-            slots.push({
-              id: `${template.id}_${i}_${slotIndex}`,
-              templateId: `${template.id}_${i}`,
-              templateName,
-              templateType: template.template_type || template.templateType as TemplateType,
-              printSize: template.print_size || '4R',
-              slotIndex,
-              photoId: undefined
-            });
           }
         }
         
         setTemplateSlots(slots);
         const endTime = performance.now();
-        console.log(`⚡ Legacy package continue completed in ${(endTime - startTime).toFixed(0)}ms`);
+        console.log(`⚡ Manual package continue completed in ${(endTime - startTime).toFixed(0)}ms with ${slots.length} slots`);
+        console.log('📋 Package templates loaded and preloading initiated');
         setCurrentScreen('photos');
       } catch (error) {
         console.error('Error loading package templates:', error);

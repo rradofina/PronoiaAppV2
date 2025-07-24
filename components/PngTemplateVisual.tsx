@@ -28,14 +28,33 @@ export default function PngTemplateVisual({
     slot.templateId.startsWith(pngTemplate.id)
   );
 
+  // Get the PNG URL from the correct property
+  const fileId = pngTemplate.drive_file_id?.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+  const pngUrl = pngTemplate.pngUrl || 
+                 pngTemplate.thumbnail_url || 
+                 pngTemplate.base64_preview ||
+                 (fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : null);
+  
+  console.log('🖼️ PngTemplateVisual DEBUG:', {
+    templateName: pngTemplate.name,
+    finalPngUrl: pngUrl,
+    base64_preview: pngTemplate.base64_preview,
+    drive_file_id: pngTemplate.drive_file_id,
+    thumbnail_url: pngTemplate.thumbnail_url,
+    allTemplateProperties: Object.keys(pngTemplate),
+    fullTemplate: pngTemplate
+  });
+
   return (
     <div className="relative w-full h-full">
       {/* Background PNG Template */}
       <img 
-        src={pngTemplate.pngUrl}
+        src={pngUrl}
         alt={pngTemplate.name}
         className="w-full h-full object-contain"
         style={{ aspectRatio: `${pngTemplate.dimensions.width}/${pngTemplate.dimensions.height}` }}
+        onLoad={() => console.log('✅ PNG loaded successfully:', pngTemplate.name)}
+        onError={() => console.error('❌ PNG failed to load:', pngUrl)}
       />
       
       {/* Photo Holes Overlay */}
@@ -45,6 +64,16 @@ export default function PngTemplateVisual({
         
         const photoUrl = getPhotoUrl(slot.photoId);
         const isSelected = selectedSlot?.id === slot.id;
+        
+        // Debug transform values
+        if (slot.transform) {
+          console.log(`🔧 Slot ${holeIndex} transform:`, {
+            scale: slot.transform.scale,
+            x: slot.transform.x,
+            y: slot.transform.y,
+            photoUrl: photoUrl?.substring(0, 50) + '...'
+          });
+        }
         
         return (
           <div
@@ -67,14 +96,8 @@ export default function PngTemplateVisual({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full bg-gray-200 flex items-center justify-center relative" style={{ outline: '2px dashed #9ca3af', outlineOffset: '-2px' }}>
-                <span className="text-gray-500 text-xs font-medium">
-                  {holeIndex + 1}
-                </span>
-                {/* Debug info for hole dimensions */}
-                <div className="absolute top-0 right-0 bg-green-500 text-white text-xs px-1 leading-tight">
-                  {pngTemplate.holes[holeIndex]?.width}×{pngTemplate.holes[holeIndex]?.height}
-                </div>
+              <div className="w-full h-full bg-gray-200 flex items-center justify-center relative overflow-hidden">
+                {/* Completely clean placeholder - no outline or icons */}
               </div>
             )}
           </div>

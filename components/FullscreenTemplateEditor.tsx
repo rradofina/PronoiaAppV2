@@ -29,19 +29,49 @@ export default function FullscreenTemplateEditor({
   const transformRef = useRef<any>();
   const imageRef = useRef<HTMLImageElement>(null);
 
+  // Reset transform when selectedSlot or selectedPhoto changes
+  useEffect(() => {
+    setTransform({ scale: 1, x: 0, y: 0 });
+    setInitialScale(0.8);
+    setMinScale(0.1);
+  }, [selectedSlot?.id, selectedPhoto?.id]);
+
   // Get PNG templates and find the one for this slot (with null checks)
   const pngTemplates = (window as any).pngTemplates || [];
   const templateId = selectedSlot?.templateId?.split('_')[0]; // Get base template ID
   const pngTemplate = selectedSlot ? pngTemplates.find((t: any) => {
-    console.log('🔍 Template matching:', { 
+    // First priority: exact ID match
+    const idMatch = t.id === templateId;
+    
+    // Second priority: exact template type AND similar ID/name
+    const typeMatch = t.templateType === selectedSlot.templateType;
+    const nameMatch = t.name && t.name.toLowerCase().includes(templateId?.toLowerCase() || '');
+    
+    console.log('🔍 Template matching debug:', { 
       templateId, 
       slotTemplateType: selectedSlot.templateType,
       pngTemplateId: t.id, 
       pngTemplateType: t.templateType,
-      matches: t.id === templateId || t.templateType === selectedSlot.templateType
+      pngTemplateName: t.name,
+      idMatch,
+      typeMatch,
+      nameMatch,
+      finalMatch: idMatch || (typeMatch && nameMatch)
     });
-    return t.id === templateId || t.templateType === selectedSlot.templateType;
+    
+    // Be more strict: only match if ID matches OR (type matches AND name matches)
+    return idMatch || (typeMatch && nameMatch);
   }) : null;
+
+  // Debug: log what template was matched
+  console.log('🎯 Final template match result:', {
+    selectedSlotType: selectedSlot?.templateType,
+    matchedTemplate: pngTemplate ? {
+      id: pngTemplate.id,
+      name: pngTemplate.name,
+      type: pngTemplate.templateType
+    } : 'NO MATCH FOUND'
+  });
 
   // Get all slots for this template
   const thisTemplateSlots = selectedSlot ? templateSlots.filter(slot => 
@@ -74,6 +104,9 @@ export default function FullscreenTemplateEditor({
 
   // Load selected photo URL - use blob to avoid CORS issues
   useEffect(() => {
+    // Clear the photo URL immediately when selectedPhoto changes to prevent flashing
+    setSelectedPhotoUrl(null);
+    
     if (selectedPhoto && isVisible) {
       const loadPhoto = async () => {
         try {
@@ -130,11 +163,21 @@ export default function FullscreenTemplateEditor({
     return photo?.url || null;
   };
 
-  // Calculate scale to fit photo within slot (like object-fit: contain)
+  // Calculate scale to fit photo within slot - prioritize fitting to height for landscape/square
   const calculateFitScale = (imgWidth: number, imgHeight: number, slotWidth: number, slotHeight: number) => {
-    const scaleX = slotWidth / imgWidth;
-    const scaleY = slotHeight / imgHeight;
-    return Math.min(scaleX, scaleY); // Use smaller scale to ensure photo fits completely
+    const photoAspectRatio = imgWidth / imgHeight;
+    const slotAspectRatio = slotWidth / slotHeight;
+    
+    // For landscape or square photos, prioritize fitting to slot height
+    if (photoAspectRatio >= 1) {
+      // Photo is landscape or square - fit to height first
+      return slotHeight / imgHeight;
+    } else {
+      // Photo is portrait - use traditional contain logic
+      const scaleX = slotWidth / imgWidth;
+      const scaleY = slotHeight / imgHeight;
+      return Math.min(scaleX, scaleY);
+    }
   };
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
@@ -145,21 +188,43 @@ export default function FullscreenTemplateEditor({
         const holeIndex = thisTemplateSlots.indexOf(slot);
         const hole = pngTemplate.holes[holeIndex];
         if (hole) {
-          // Calculate slot dimensions in actual pixels (not percentages)
-          const slotWidth = (hole.width / pngTemplate.dimensions.width) * 800; // 800px is our template width
-          const slotHeight = (hole.height / pngTemplate.dimensions.height) * (800 * pngTemplate.dimensions.height / pngTemplate.dimensions.width);
+          // Get the actual rendered template dimensions from the DOM
+          const templateElement = document.querySelector(`div[style*="aspect-ratio: ${pngTemplate.dimensions.width}/${pngTemplate.dimensions.height}"]`);
+          let actualTemplateWidth = 800; // fallback
+          
+          if (templateElement) {
+            const rect = templateElement.getBoundingClientRect();
+            actualTemplateWidth = rect.width;
+          }
+          
+          // Calculate actual slot dimensions based on rendered template size
+          const actualTemplateHeight = actualTemplateWidth * (pngTemplate.dimensions.height / pngTemplate.dimensions.width);
+          const slotWidth = (hole.width / pngTemplate.dimensions.width) * actualTemplateWidth;
+          const slotHeight = (hole.height / pngTemplate.dimensions.height) * actualTemplateHeight;
+          
+          console.log('🔍 Scale calculation debug:', {
+            photoName: selectedPhoto.name,
+            photoDimensions: `${img.naturalWidth}x${img.naturalHeight}`,
+            photoAspectRatio: (img.naturalWidth / img.naturalHeight).toFixed(2),
+            slotDimensions: `${slotWidth.toFixed(0)}x${slotHeight.toFixed(0)}`,
+            slotAspectRatio: (slotWidth / slotHeight).toFixed(2),
+            actualTemplateSize: `${actualTemplateWidth}x${actualTemplateHeight.toFixed(0)}`
+          });
           
           const fitScale = calculateFitScale(img.naturalWidth, img.naturalHeight, slotWidth, slotHeight);
+          console.log('🎯 Calculated fit scale:', fitScale.toFixed(3));
+          
           setInitialScale(fitScale);
           
-          // Set minScale to allow zooming out further than the fit scale
-          const dynamicMinScale = Math.min(0.1, fitScale * 0.5);
-          setMinScale(dynamicMinScale);
+          // Allow zooming out to a very small scale regardless of fitScale
+          setMinScale(0.05);
           
-          // Reset transform to center with new scale
-          if (transformRef.current) {
-            transformRef.current.resetTransform();
-          }
+          // Apply the scale immediately after setting it
+          setTimeout(() => {
+            if (transformRef.current) {
+              transformRef.current.setTransform(0, 0, fitScale);
+            }
+          }, 100);
         }
       }
     }
@@ -167,6 +232,12 @@ export default function FullscreenTemplateEditor({
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      
+      {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
+      <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
+        FullscreenTemplateEditor.tsx
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between p-4 text-white">
         <button
@@ -194,7 +265,16 @@ export default function FullscreenTemplateEditor({
 
       {/* Full Template Display */}
       <div className="flex-1 flex items-center justify-center p-2 min-h-0">
-        {!templateBlobUrl || !pngTemplate ? (
+        {!pngTemplate ? (
+          <div className="text-white text-center">
+            <div className="text-4xl mb-4">❌</div>
+            <p className="text-red-400 font-medium">No matching PNG template found</p>
+            <p className="text-gray-400 text-sm mt-2">
+              Looking for: {selectedSlot?.templateType} template with ID: {selectedSlot?.templateId?.split('_')[0]}
+            </p>
+            <p className="text-gray-400 text-xs mt-1">Available templates: {pngTemplates.length}</p>
+          </div>
+        ) : !templateBlobUrl ? (
           <div className="text-white text-center">
             <div className="text-4xl mb-4">📐</div>
             <p>Loading template...</p>
@@ -275,7 +355,7 @@ export default function FullscreenTemplateEditor({
                         limitToBounds={false}
                         wheel={{ 
                           step: 0.01,
-                          wheelDelta: 40,
+                          // wheelDelta: 40, // Remove unsupported property
                           activationDistance: 10,
                           smoothWheel: true
                         }}

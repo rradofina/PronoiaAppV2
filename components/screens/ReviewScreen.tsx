@@ -26,6 +26,10 @@ export default function ReviewScreen({
 }: ReviewScreenProps) {
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+      {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
+      <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
+        ReviewScreen.tsx
+      </div>
       {/* Header */}
       <div className="bg-white shadow-sm p-4 flex-shrink-0">
         <div className="text-center">

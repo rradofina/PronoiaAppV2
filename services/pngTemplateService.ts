@@ -41,63 +41,104 @@ export class PngTemplateService {
   private isLoading = false;
 
   /**
-   * Get template folder ID from settings (hybrid approach)
+   * Get template folder ID from settings (localStorage-first approach)
    */
   async getTemplateFolderId(): Promise<string> {
-    try {
-      // 1. Check database setting first
-      const { data } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'template_folder_id')
-        .single();
-
-      if (data?.value && data.value.trim() !== '') {
-        console.log('📁 Using template folder from database:', data.value);
-        return data.value;
-      }
-
-      // 2. Fall back to environment variable
-      const envFolderId = process.env.NEXT_PUBLIC_GOOGLE_DRIVE_TEMPLATE_FOLDER_ID;
-      if (envFolderId && envFolderId.trim() !== '') {
-        console.log('📁 Using template folder from environment:', envFolderId);
-        return envFolderId;
-      }
-
-      // 3. Fall back to the user's known template folder ID
-      const defaultFolderId = '1pHfB79tNFAOFXOo5sRCuZ_P7IaJ3LXsq'; // User's "Print Templates" folder
-      console.log('📁 Using default template folder:', defaultFolderId);
-      return defaultFolderId;
-    } catch (error) {
-      console.error('❌ Error getting template folder ID:', error);
-      throw error;
+    console.log('🔍 DEBUG: Starting getTemplateFolderId...');
+    
+    // 1. Check localStorage FIRST (most reliable)
+    const localFolderId = localStorage.getItem('template_folder_id');
+    console.log('🔍 DEBUG: localStorage value:', localFolderId);
+    if (localFolderId && localFolderId.trim() !== '') {
+      console.log('📁 Using template folder from localStorage:', localFolderId);
+      return localFolderId;
     }
+
+    // 2. Try database as secondary option
+    try {
+      const timestamp = new Date().getTime();
+      console.log('🔍 DEBUG: Querying database for template_folder_id...');
+      
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('*')
+        .eq('key', 'template_folder_id')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      console.log('🔍 DEBUG: Database query result - data:', data, 'error:', error);
+
+      if (data && data.length > 0 && data[0]?.value && data[0].value.trim() !== '') {
+        console.log(`📁 Using template folder from database (${timestamp}):`, data[0].value);
+        // Also save to localStorage for next time
+        localStorage.setItem('template_folder_id', data[0].value);
+        return data[0].value;
+      }
+      
+      console.log('🔍 DEBUG: No valid database record found, checking environment...');
+    } catch (error) {
+      console.warn('⚠️ Database check failed, trying environment:', (error as Error).message);
+    }
+
+    // 3. Fall back to environment variable
+    const envFolderId = process.env.NEXT_PUBLIC_GOOGLE_DRIVE_TEMPLATE_FOLDER_ID;
+    console.log('🔍 DEBUG: Environment variable value:', envFolderId);
+    if (envFolderId && envFolderId.trim() !== '') {
+      console.log('📁 Using template folder from environment:', envFolderId);
+      // Save to localStorage for next time
+      localStorage.setItem('template_folder_id', envFolderId);
+      return envFolderId;
+    }
+
+    // 4. Fall back to the user's known template folder ID (last resort)
+    const defaultFolderId = '1pHfB79tNFAOFXOo5sRCuZ_P7IaJ3LXsq'; // User's "Print Templates" folder
+    console.log('📁 Using default template folder (hardcoded):', defaultFolderId);
+    // Save to localStorage for next time
+    localStorage.setItem('template_folder_id', defaultFolderId);
+    return defaultFolderId;
   }
 
   /**
-   * Set template folder ID in database
+   * Set template folder ID (localStorage-first approach)
    */
   async setTemplateFolderId(folderId: string): Promise<void> {
+    console.log('✅ Setting template folder ID to localStorage:', folderId);
+    
+    // Save to localStorage (primary storage)
+    localStorage.setItem('template_folder_id', folderId);
+    console.log('✅ Template folder ID saved to localStorage successfully');
+    
+    // Try to save to database as backup (but don't fail if it doesn't work)
     try {
-      const { error } = await supabase
+      console.log('🔄 Attempting to save to database as backup...');
+      
+      // Delete old record
+      await supabase
         .from('app_settings')
-        .upsert({
+        .delete()
+        .eq('key', 'template_folder_id');
+
+      // Insert new record
+      const { error: insertError } = await supabase
+        .from('app_settings')
+        .insert({
           key: 'template_folder_id',
           value: folderId,
           description: 'Google Drive folder ID containing template subfolders'
         });
 
-      if (error) throw error;
-      
-      console.log('✅ Template folder ID saved:', folderId);
-      
-      // Clear cache and reload templates
-      await this.clearCache();
-      await this.loadTemplates();
+      if (insertError) {
+        console.warn('⚠️ Database backup failed (localStorage is primary):', insertError.message);
+      } else {
+        console.log('✅ Database backup successful');
+      }
     } catch (error) {
-      console.error('❌ Error saving template folder ID:', error);
-      throw error;
+      console.warn('⚠️ Database backup failed (localStorage is primary):', error);
     }
+    
+    // Clear cache to force reload
+    await this.clearCache();
+    console.log('✅ setTemplateFolderId completed successfully');
   }
 
   /**

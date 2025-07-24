@@ -8,7 +8,7 @@ interface SessionStore {
   session: Session | null;
   selectedPackage: Package | null;
   clientName: string;
-  packages: Package[];
+  // Legacy packages removed - now using manual package management
   currentStep: 'package' | 'template' | 'photos' | 'preview' | 'complete';
   userSessions: any[];
   
@@ -23,7 +23,7 @@ interface SessionStore {
   // Enhanced methods with Supabase
   createSessionWithSupabase: (userId: string, sessionData: {
     clientName: string;
-    packageType: 'A' | 'B' | 'C' | 'D';
+    packageId: string; // Now uses manual package UUID
     googleDriveFolderId: string;
     maxTemplates: number;
   }) => Promise<void>;
@@ -45,36 +45,7 @@ const useSessionStore = create<SessionStore>()(
         clientName: '',
         currentStep: 'package',
         userSessions: [],
-        packages: [
-          { 
-            id: 'A', 
-            name: 'Package A', 
-            templateCount: 1, 
-            price: 249,
-            description: 'Perfect for a single memorable print'
-          },
-          { 
-            id: 'B', 
-            name: 'Package B', 
-            templateCount: 2, 
-            price: 549,
-            description: 'Great for couples or small groups'
-          },
-          { 
-            id: 'C', 
-            name: 'Package C', 
-            templateCount: 5, 
-            price: 999,
-            description: 'Ideal for families and events'
-          },
-          { 
-            id: 'D', 
-            name: 'Package D', 
-            templateCount: 10, 
-            price: 1999,
-            description: 'Complete collection for special occasions'
-          },
-        ],
+        // Legacy packages removed - now using manual package management system
         
         setSession: (session) => set({ session }),
         updateSession: (updates) => set((state) => ({
@@ -134,7 +105,7 @@ const useSessionStore = create<SessionStore>()(
             const session = await supabaseService.createSession({
               user_id: userId,
               client_name: sessionData.clientName,
-              package_type: sessionData.packageType,
+              package_id: sessionData.packageId, // Updated to use manual package ID
               google_drive_folder_id: sessionData.googleDriveFolderId,
               max_templates: sessionData.maxTemplates,
             });

@@ -1,32 +1,6 @@
-import { PhotoStudioPackage, TemplateType, TemplateLayout } from '../types';
+import { TemplateType, TemplateLayout } from '../types';
 
-// Package definitions
-export const PACKAGES: PhotoStudioPackage[] = [
-  {
-    id: 'A',
-    name: 'Package A',
-    templateCount: 1,
-    description: 'Perfect for single template selection',
-  },
-  {
-    id: 'B',
-    name: 'Package B',
-    templateCount: 2,
-    description: 'Great for couples or small collections',
-  },
-  {
-    id: 'C',
-    name: 'Package C',
-    templateCount: 5,
-    description: 'Ideal for families and groups',
-  },
-  {
-    id: 'D',
-    name: 'Package D',
-    templateCount: 10,
-    description: 'Complete studio experience',
-  },
-];
+// Legacy packages removed - now using manual package management system
 
 // Template dimensions (4R size: 4x6 inches at 300 DPI)
 export const TEMPLATE_DIMENSIONS = {
@@ -253,9 +227,7 @@ export const calculatePhotoSlots = (templateType: TemplateType) => {
 };
 
 // Validation functions
-export const validatePackageSelection = (packageId: string): boolean => {
-  return PACKAGES.some(pkg => pkg.id === packageId);
-};
+// Package validation moved to manual package service
 
 export const validateTemplateType = (templateType: string): templateType is TemplateType => {
   return ['solo', 'collage', 'photocard', 'photostrip'].indexOf(templateType) !== -1;
@@ -326,7 +298,7 @@ export const TEMPLATE_TYPES = [
   { id: 'photostrip', name: 'Photo Strip Print', slots: 6, allowedSizes: ['4R'] },
 ];
 
-export const DEFAULT_TEMPLATE_CYCLE = ['solo', 'collage', 'photostrip', 'photocard'];
+// Legacy template cycling removed - now using configured package templates
 
 // Template Builder Constants
 export const TEMPLATE_BUILDER = {

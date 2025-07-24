@@ -3,6 +3,8 @@ import AdminLayout from '../../../components/admin/AdminLayout';
 import { PngTemplate, pngTemplateService } from '../../../services/pngTemplateService';
 import { PrintSize } from '../../../types';
 import { PRINT_SIZES } from '../../../utils/constants';
+import googleDriveService from '../../../services/googleDriveService';
+import useAuthStore from '../../../stores/authStore';
 
 interface PngTemplateCardProps {
   template: PngTemplate;
@@ -57,8 +59,40 @@ export default function PngTemplateManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [folderInfo, setFolderInfo] = useState<{id: string; name: string; url: string} | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  const { googleAuth } = useAuthStore();
+
+  // Initialize Google Drive service with stored authentication
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        // Check if we have stored authentication
+        const storedToken = localStorage.getItem('google_access_token');
+        
+        if (storedToken && googleAuth.isSignedIn) {
+          console.log('🔑 Initializing Google Drive service with stored token');
+          await googleDriveService.initialize();
+          googleDriveService.setAccessToken(storedToken);
+          setIsInitialized(true);
+        } else {
+          console.warn('⚠️ No stored authentication found - user needs to sign in first');
+          setError('Please sign in to Google Drive first from the main application');
+        }
+      } catch (error) {
+        console.error('Failed to initialize Google Drive service:', error);
+        setError('Failed to initialize Google Drive authentication');
+      }
+    };
+
+    initializeAuth();
+  }, [googleAuth]);
 
   const loadTemplates = async (forceRefresh = false) => {
+    if (!isInitialized) {
+      setError('Google Drive authentication not initialized');
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
@@ -93,8 +127,10 @@ export default function PngTemplateManagement() {
   };
 
   useEffect(() => {
-    loadTemplates();
-  }, [selectedPrintSize]);
+    if (isInitialized) {
+      loadTemplates();
+    }
+  }, [selectedPrintSize, isInitialized]);
 
   return (
     <AdminLayout>

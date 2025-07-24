@@ -104,6 +104,9 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 NEXT_PUBLIC_GOOGLE_API_KEY=your_google_api_key
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Email Access Control (optional - overrides hardcoded list)
+NEXT_PUBLIC_ALLOWED_EMAILS=user1@gmail.com,user2@company.com,user3@domain.org
 ```
 
 ## Architecture Overview
@@ -126,10 +129,10 @@ The application recently underwent a **major refactoring from monolithic to modu
 
 ### Backend Integration Architecture
 **Supabase Backend**: PostgreSQL database with real-time capabilities
-- **Database Tables**: `users`, `sessions`, `templates`, `photo_slots`, `generated_templates`, `custom_templates`, `template_categories`
+- **Database Tables**: `users`, `sessions`, `templates`, `photo_slots`, `generated_templates`, `custom_templates`, `template_categories`, `manual_templates`, `manual_packages`, `package_templates`, `manual_template_categories`
 - **Authentication Sync**: Google OAuth synced with Supabase user accounts
-- **Admin Features**: User management, custom template creation, analytics dashboard
-- **Data Persistence**: Session data, custom templates, and user preferences stored in Supabase
+- **Admin Features**: User management, custom template creation, manual template/package management, analytics dashboard
+- **Data Persistence**: Session data, custom templates, manual template configurations, and user preferences stored in Supabase
 
 ### Screen Flow Architecture
 The app follows a **linear multi-screen workflow** controlled by `currentScreen` state:
@@ -146,6 +149,8 @@ The app follows a **linear multi-screen workflow** controlled by `currentScreen`
 - **Admin Authentication** - Middleware protection via `middleware/adminAuth.ts`
 - **User Management** - View and manage registered users
 - **Custom Template Creation** - Admin-only template designer
+- **Manual Template Management** - Create and manage templates with precise configuration
+- **Package Management** - Configure template packages for different print sizes
 - **Session Analytics** - Track usage and performance metrics
 
 ### Template System Architecture
@@ -183,6 +188,132 @@ The app uses **orientation-aware responsive design**:
 
 Key service: `googleDriveService.ts` handles all Drive API interactions with proper error handling and retry logic.
 
+## CRITICAL FIX: Photo Loading CORS Issue
+
+### Problem
+Photos in PhotoSelectionScreen showed filenames but no images due to CORS blocking: `net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep`
+
+### Root Cause
+`next.config.js` had `Cross-Origin-Embedder-Policy: require-corp` which blocked Google Drive thumbnail URLs.
+
+### Solution (NEVER REVERT)
+**File: `next.config.js`**
+```javascript
+{
+  key: 'Cross-Origin-Embedder-Policy',
+  value: 'unsafe-none', // ← CRITICAL: Must be 'unsafe-none', NOT 'require-corp'
+}
+```
+
+**Also added comprehensive Google domains:**
+```javascript
+domains: [
+  'drive.google.com', 
+  'lh1.googleusercontent.com', 'lh2.googleusercontent.com', // ... lh1-lh9
+  'www.googleapis.com'
+],
+remotePatterns: [
+  { protocol: 'https', hostname: '**.googleusercontent.com' },
+  { protocol: 'https', hostname: 'drive.google.com' },
+  { protocol: 'https', hostname: 'www.googleapis.com', pathname: '/drive/**' }
+]
+```
+
+**Result:** Photos load instantly - filenames AND images display correctly.
+
+**WARNING:** If CORS policy is changed back to `require-corp`, photos will break again!
+
+## CRITICAL FIX: PNG Template Images Not Displaying in Template Bar
+
+### Problem
+PNG template backgrounds (with studio logos) were not showing in the template bar - only empty gray placeholders were visible.
+
+### Root Cause Analysis
+1. **Wrong property name**: PngTemplateVisual was looking for `pngTemplate.pngUrl` but hybrid templates store the URL in different properties
+2. **Incorrect URL format**: Google Drive sharing URLs need specific formatting to work as image sources
+3. **Property mapping**: Hybrid templates use `drive_file_id` (full Google Drive URL) instead of direct image URLs
+
+### Solution (NEVER REVERT)
+**File: `components/PngTemplateVisual.tsx`**
+
+**BEFORE (Broken):**
+```typescript
+<img src={pngTemplate.pngUrl} />  // ← pngUrl was always undefined
+```
+
+**AFTER (Fixed):**
+```typescript
+// Extract file ID from Google Drive sharing URL and use googleusercontent.com
+const fileId = pngTemplate.drive_file_id?.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+const pngUrl = pngTemplate.pngUrl || 
+               pngTemplate.thumbnail_url || 
+               pngTemplate.base64_preview ||
+               (fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : null);
+
+<img src={pngUrl} />
+```
+
+### Technical Details
+- **Input**: `https://drive.google.com/file/d/14HdljMAb-qEXmVkweDK8JczAc8P4LQvU/view?usp=sharing`
+- **Extracted File ID**: `14HdljMAb-qEXmVkweDK8JczAc8P4LQvU`  
+- **Working URL**: `https://lh3.googleusercontent.com/d/14HdljMAb-qEXmVkweDK8JczAc8P4LQvU`
+
+### Why This Format Works
+- `lh3.googleusercontent.com` bypasses CORS restrictions
+- Direct Google Drive `/uc?id=` URLs were being blocked
+- This format works with our existing CORS configuration
+
+**Result:** PNG templates with studio logos now display correctly in template bar!
+
+**WARNING:** If URL format is changed back to `/uc?id=` or direct Drive links, PNG templates will disappear again!
+
+## PHOTO TRANSFORM SYSTEM: How Cropping/Framing Works
+
+### Current Understanding
+The photo transform system has 3 layers that need to work together:
+
+1. **FullscreenTemplateEditor** (Large Canvas)
+   - Uses `react-zoom-pan-pinch` library
+   - User pans/zooms photo to desired framing
+   - Saves transforms as: `{ scale: 1.5, x: -100, y: 50 }` 
+   - These values are relative to the LARGE editor canvas
+
+2. **Template Bar Preview** (Small Thumbnails)
+   - Shows small template previews (~280px width)
+   - Currently uses `object-cover` which auto-scales to fill container
+   - **PROBLEM**: Transform values from large canvas don't work on small previews
+
+3. **Final Output Generation** (Print Resolution)
+   - Generates high-resolution prints (1200x1800px for 4R)
+   - Should use same transform values for consistent framing
+
+### The Transform Challenge
+```
+Large Editor: 800px container → transform: { scale: 1.5, x: -100, y: 50 }
+Small Preview: 200px container → Same values don't work!
+```
+
+**Root Issue**: Transform values are **absolute pixel values** but containers are **different sizes**
+
+### Solution Strategy
+Need to convert transforms **relative to container size**:
+
+```typescript
+// Convert absolute transforms to percentage-based
+const relativeTransform = {
+  scale: transform.scale, // Scale stays the same
+  x: (transform.x / originalContainerWidth) * 100,  // Convert to %
+  y: (transform.y / originalContainerHeight) * 100  // Convert to %
+}
+```
+
+### Why This Will Work
+- **Same scale factor** across all sizes
+- **Percentage-based positioning** adapts to any container
+- **Consistent framing** from editor → preview → final output
+
+**Next Step**: Implement relative transform conversion in PngTemplateVisual
+
 ## Key Files and Responsibilities
 
 ### Core Application
@@ -195,11 +326,18 @@ Key service: `googleDriveService.ts` handles all Drive API interactions with pro
 - `components/screens/PackageSelectionScreen.tsx` - Package selection interface
 - `components/screens/TemplateSelectionScreen.tsx` - Template type configuration
 
+### Admin Components
+- `components/admin/ManualTemplateManagerScreen.tsx` - Manual template creation and management interface
+- `components/admin/ManualPackageManagerScreen.tsx` - Package configuration and template association interface
+
 ### Core Services
 - `services/googleDriveService.ts` - Google Drive API integration with authentication and file operations
 - `services/templateGenerationService.ts` - Canvas-based template generation and export
 - `services/supabaseService.ts` - Database operations, user management, and session persistence
 - `services/loggerService.ts` - Centralized logging service with structured logging and category-based filtering
+- `services/manualTemplateService.ts` - Manual template CRUD operations and management
+- `services/manualPackageService.ts` - Package management with template associations
+- `services/hybridTemplateService.ts` - Unified template access combining manual and auto-detected templates
 
 ### State Management
 - `stores/useAppStore.ts` - Legacy monolithic store (preserved for compatibility)
@@ -307,6 +445,168 @@ WHERE email = 'your-email@gmail.com';
   - Template properties (name, description, category, tags)
   - Real-time preview and precise positioning
 - **Workflow**: Create custom photo layouts → Save to database → Available in main app
+
+## MAJOR ENHANCEMENT: Manual Template/Package System
+
+### Problem Solved
+The original auto-detection system for PNG templates was **unreliable and problematic**:
+- Complex template matching logic caused photocard templates to show for other types
+- Inconsistent hole detection and positioning
+- No admin control over template availability or configuration
+- Difficult to debug and maintain template issues
+
+### Solution: Gradual Migration Architecture
+Implemented a **hybrid system** that allows gradual migration from auto-detection to precise manual configuration:
+
+**Phase 1: Hybrid Coexistence**
+- Manual templates take precedence over auto-detected ones
+- Auto-detection continues working for templates not yet manually configured
+- Zero breaking changes to existing functionality
+
+**Phase 2: Complete Migration** (Future)
+- Eventually disable auto-detection entirely
+- Full admin control over all templates and packages
+- Reliable, predictable template behavior
+
+### Database Schema Enhancement
+**Migration File**: `lib/supabase/migrations/006_manual_template_system.sql`
+
+**New Tables Added:**
+```sql
+-- Core manual template configuration
+manual_templates (
+  id, name, description, template_type, print_size,
+  drive_file_id, holes_data, dimensions, thumbnail_url,
+  created_by, is_active, sort_order, created_at, updated_at
+)
+
+-- Admin-configured packages
+manual_packages (
+  id, name, description, thumbnail_url, print_size,
+  template_count, price, is_active, is_default, sort_order,
+  created_by, created_at, updated_at
+)
+
+-- Package-template relationships
+package_templates (
+  id, package_id, template_id, order_index, created_at
+)
+
+-- Template organization
+manual_template_categories (
+  id, name, description, color, icon, sort_order, is_active, created_at
+)
+```
+
+**Key Features:**
+- **Row Level Security (RLS)** policies for data protection
+- **Unique constraints** on drive_file_id and package-template relationships
+- **Audit trails** with created_at/updated_at timestamps
+- **Indexing** for performance on active templates and print sizes
+
+### Service Layer Architecture
+**New Services Added:**
+
+**`services/manualTemplateService.ts`**
+- Full CRUD operations for manual templates
+- Caching system (5-minute duration) for performance
+- Bulk import from auto-detection system
+- Search, filtering, and activation controls
+- Statistics and template management
+
+**`services/manualPackageService.ts`**
+- Package CRUD operations with template associations
+- Package-template relationship management (add/remove/reorder)
+- Default package designation per print size
+- Template counting and validation
+
+**`services/hybridTemplateService.ts`**
+- **Core Innovation**: Combines manual and auto-detected templates
+- **Precedence Rule**: Manual templates override auto-detected ones with same drive_file_id
+- **Unified Interface**: Single API for accessing all templates regardless of source
+- **Migration Tools**: Analysis and recommendations for converting auto to manual
+
+### Admin Interface System
+**Navigation Flow:**
+```
+PNG Template Management → Manual Templates → Package Manager
+```
+
+**`components/admin/ManualTemplateManagerScreen.tsx`**
+- Create/edit templates with precise hole positioning and dimensions
+- JSON editors for holes_data and dimensions configuration
+- Import functionality to convert auto-detected templates to manual
+- Template activation/deactivation controls
+- Bulk operations and template statistics
+
+**`components/admin/ManualPackageManagerScreen.tsx`**  
+- Create packages by selecting from available manual templates
+- Print size organization (4R, 5R, A4) with filtering
+- Package pricing, descriptions, and thumbnail support
+- Default package designation per print size
+- Template selection interface with checkbox management
+- Package details modal showing associated templates
+
+### Technical Implementation Details
+
+**Hybrid Template Loading:**
+```typescript
+// Manual templates take precedence over auto-detected ones
+const hybridTemplates = [...manualTemplates, ...filteredAutoTemplates];
+
+// Filter out auto-detected templates that have manual overrides
+const manualDriveFileIds = new Set(manualTemplates.map(t => t.drive_file_id));
+const filteredAuto = autoTemplates.filter(autoTemplate => 
+  !manualDriveFileIds.has(autoTemplate.drive_file_id)
+);
+```
+
+**Template Data Structure:**
+```typescript
+interface ManualTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  template_type: TemplateType; // 'solo' | 'collage' | 'photocard' | 'photostrip'
+  print_size: PrintSize; // '4R' | '5R' | 'A4'
+  drive_file_id: string; // Links to Google Drive PNG template
+  holes_data: ManualTemplateHole[]; // Precise hole positions
+  dimensions: { width: number; height: number };
+  thumbnail_url?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+```
+
+### Migration Strategy Benefits
+1. **Zero Downtime**: Existing auto-detection continues working
+2. **Gradual Transition**: Convert templates one-by-one as needed
+3. **Admin Control**: Precise configuration of template behavior
+4. **Reliability**: Eliminates complex template matching logic
+5. **Maintainability**: Database-driven instead of algorithmic detection
+6. **Scalability**: Easy to add new templates without code changes
+
+### Development Workflow
+**Creating Manual Templates:**
+1. Navigate to PNG Templates → Manual Templates
+2. Use "Import from Auto-Detection" to convert existing templates
+3. Or create new templates with precise hole positions and dimensions
+4. Edit template properties (name, description, type, print size)
+5. Activate templates to make them available in the main application
+
+**Managing Packages:**
+1. Navigate to Manual Templates → Package Manager
+2. Create packages by selecting templates for specific print sizes
+3. Set package properties (name, description, pricing)
+4. Designate default packages per print size
+5. Reorder templates within packages as needed
+
+**Integration Points:**
+- Templates from `hybridTemplateService` are used throughout the main application
+- Manual templates automatically override auto-detected ones with matching drive_file_id
+- Package configuration affects template availability in client sessions
+- Admin changes are immediately reflected in the main application (cache refresh)
 
 ## CRITICAL BUG FIX: Photo Cropping in FullscreenTemplateEditor
 
@@ -417,3 +717,258 @@ Used color-coding during debugging:
 - GREEN = Other slots
 
 This visual debugging helped identify that TransformWrapper was constraining interaction area to photo aspect ratio instead of using full slot dimensions.
+
+## Hole Detection Algorithm in Manual Template System
+
+### Overview
+The hole detection system uses **computer vision techniques** to automatically detect photo placeholder areas in PNG template files by scanning for **magenta-colored regions** (`#FF00FF`). This sophisticated algorithm enables automatic conversion of designer-created PNG templates into interactive photo templates without manual coordinate entry.
+
+### Core Algorithm Components
+
+#### 1. **Magenta Color Detection System**
+**File**: `services/templateDetectionService.ts:15-20`
+
+```typescript
+// Supported magenta colors with tolerance for compression artifacts
+private static readonly PLACEHOLDER_COLORS = [
+  [255, 0, 255], // #FF00FF - Pure magenta
+  [185, 82, 159] // #b9529f - Photoshop CMYK-converted magenta
+];
+private static readonly COLOR_TOLERANCE = 15;
+```
+
+The system detects two types of magenta colors:
+- **Pure RGB magenta** (`#FF00FF`) - standard digital magenta used in design software
+- **CMYK-converted magenta** (`#b9529f`) - handles Photoshop color space conversions
+- **Color tolerance of ±15** - accounts for JPEG compression artifacts and slight color variations
+
+#### 2. **Image Processing Pipeline**
+**File**: `services/templateDetectionService.ts:45-65`
+
+The main detection process follows this workflow:
+
+```typescript
+async analyzeTemplateByFileId(fileId: string): Promise<TemplateAnalysisResult> {
+  // 1. Download PNG from Google Drive as blob
+  const blobUrl = await this.createBlobUrlFromFileId(fileId);
+  
+  // 2. Load image into HTML Canvas for pixel manipulation
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  ctx.drawImage(img, 0, 0);
+  
+  // 3. Extract raw pixel data (RGBA array)
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  
+  // 4. Detect placeholder regions using flood fill algorithm
+  const holes = this.detectPlaceholderRegions(imageData);
+}
+```
+
+#### 3. **Flood Fill Algorithm for Region Detection**
+**File**: `services/templateDetectionService.ts:120-150`
+
+The core hole detection uses a **flood fill algorithm** to find connected placeholder regions:
+
+```typescript
+private floodFillBounds(imageData: ImageData, startX: number, startY: number, visited: Set<string>): Rectangle {
+  const stack: Point[] = [{ x: startX, y: startY }];
+  const bounds = { minX: startX, minY: startY, maxX: startX, maxY: startY };
+
+  while (stack.length > 0) {
+    const { x, y } = stack.pop()!;
+    
+    if (visited.has(`${x},${y}`) || !this.isPlaceholderPixel(data, x, y, width)) {
+      continue;
+    }
+    
+    visited.add(`${x},${y}`);
+    
+    // Update bounding rectangle
+    bounds.minX = Math.min(bounds.minX, x);
+    bounds.maxX = Math.max(bounds.maxX, x);
+    bounds.minY = Math.min(bounds.minY, y);
+    bounds.maxY = Math.max(bounds.maxY, y);
+    
+    // Add 4-connected neighbors to stack (up, down, left, right)
+    stack.push(
+      { x: x + 1, y }, { x: x - 1, y },
+      { x, y: y + 1 }, { x, y: y - 1 }
+    );
+  }
+  
+  return bounds;
+}
+```
+
+**How It Works:**
+1. **Stack-based traversal**: Uses a stack to explore connected placeholder pixels
+2. **4-connected neighborhood**: Checks up, down, left, right pixels
+3. **Visited tracking**: Prevents infinite loops and duplicate processing
+4. **Bounding box calculation**: Tracks min/max coordinates to define hole rectangle
+
+#### 4. **Precise Boundary Detection**
+**File**: `services/templateDetectionService.ts:180-205`
+
+After flood fill finds rough bounds, the system performs **pixel-perfect boundary detection**:
+
+```typescript
+private getPreciseHoleBounds(imageData: ImageData, roughBounds: Rectangle) {
+  let minX = roughBounds.maxX, maxX = roughBounds.minX;
+  let minY = roughBounds.maxY, maxY = roughBounds.minY;
+  
+  // Scan EVERY pixel in rough bounds for exact placeholder edges
+  for (let y = roughBounds.minY; y <= roughBounds.maxY; y++) {
+    for (let x = roughBounds.minX; x <= roughBounds.maxX; x++) {
+      if (this.isPlaceholderPixel(data, x, y, width)) {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+  
+  return {
+    x: minX, y: minY,
+    width: maxX - minX + 1,
+    height: maxY - minY + 1
+  };
+}
+```
+
+**Purpose**: Eliminates edge cases where flood fill might miss edge pixels or include non-magenta pixels in bounds.
+
+#### 5. **Photocard Layout Detection**
+**File**: `services/templateDetectionService.ts:250-280`
+
+The system includes special logic for **edge-to-edge photocard layouts**:
+
+```typescript
+private isPhotocardLayout(imageData: ImageData): boolean {
+  // Sample edge pixels to detect placeholder areas touching borders
+  const edgePixelsToCheck = [
+    // Top edge, bottom edge, left edge, right edge samples
+  ];
+  
+  // If >20% of edge samples are placeholder areas, likely a photocard
+  const edgePlaceholderRatio = edgePlaceholderPixels / edgePixelsToCheck.length;
+  return edgePlaceholderRatio > 0.2 && totalPlaceholderPixels > 100;
+}
+```
+
+For photocard layouts, it uses **grid-based detection** instead of flood fill:
+
+```typescript
+private detectPhotocardHoles(imageData: ImageData): TemplateHole[] {
+  const gridConfigs = [
+    {rows: 2, cols: 2}, // 2x2 grid
+    {rows: 2, cols: 3}, // 2x3 grid  
+    {rows: 3, cols: 2}, // 3x2 grid
+    // Additional grid configurations
+  ];
+  
+  // Test each grid configuration and pick best match
+  // Create holes based on calculated grid cells
+}
+```
+
+#### 6. **Cross-Region Splitting Algorithm**
+**File**: `services/templateDetectionService.ts:320-350`
+
+The algorithm can detect and split cross-shaped magenta regions into separate rectangular holes:
+
+```typescript
+private splitCrossRegion(bounds: Rectangle, imageData: ImageData) {
+  // Scans for separate magenta areas within a complex shape
+  // Returns multiple holes if cross-pattern detected
+  // Handles complex layouts where holes appear connected but should be separate
+}
+```
+
+### Data Structures
+
+#### **TemplateHole Interface**
+```typescript
+export interface TemplateHole {
+  id: string;           // "hole_1", "hole_2", etc.
+  x: number;           // Left edge pixel coordinate
+  y: number;           // Top edge pixel coordinate  
+  width: number;       // Width in pixels
+  height: number;      // Height in pixels
+}
+```
+
+#### **TemplateAnalysisResult Interface**  
+```typescript
+export interface TemplateAnalysisResult {
+  holes: TemplateHole[];                    // Detected photo areas
+  dimensions: { width: number; height: number }; // Template dimensions
+  hasInternalBranding: boolean;             // Whether text is inside photo areas
+  templateType: 'solo' | 'collage' | 'photocard' | 'photostrip'; // Inferred type
+}
+```
+
+### Advanced Features
+
+#### **Template Type Inference**
+**File**: `services/templateDetectionService.ts:400-430`
+
+```typescript
+private determineTemplateType(holes: TemplateHole[], filename?: string) {
+  // 1. First try filename keywords (solo, collage, photocard, strip)
+  // 2. Fallback to hole count: 1=solo, 4=collage/photocard, 6=photostrip
+  // 3. Use aspect ratio to distinguish collage vs photocard for 4-hole layouts
+}
+```
+
+#### **Validation System**
+**File**: `services/templateDetectionService.ts:450-470`
+
+```typescript
+validateTemplate(result: TemplateAnalysisResult) {
+  // Check minimum hole size (50px minimum)
+  // Detect overlapping holes (invalid layouts)
+  // Ensure at least one hole detected
+  // Validate hole positioning within template bounds
+}
+```
+
+### Performance Optimizations
+
+1. **Minimum hole size filtering** - Ignores regions smaller than 50px to eliminate noise
+2. **Sampling for photocard detection** - Tests every 10th pixel for performance on large images
+3. **Caching system** - Results stored in Supabase `template_cache` table to avoid reprocessing
+4. **Early termination** - Skips transparent pixels (alpha < 128) to improve scan speed
+5. **Memory management** - Properly disposes of canvas elements and blob URLs
+
+### Integration with Template System
+
+The detected holes are used throughout the application:
+
+1. **Template Creation** (`services/manualTemplateService.ts`) - Holes become `TemplateSlot` objects for photo assignment
+2. **Visual Rendering** (`components/PngTemplateVisual.tsx`) - Positions photos using hole coordinates  
+3. **Canvas Generation** (`services/templateGenerationService.ts`) - Uses holes for final output positioning
+4. **Template Editor** (`components/FullscreenTemplateEditor.tsx`) - Interactive photo placement using hole boundaries
+
+### Error Handling and Edge Cases
+
+1. **Invalid magenta detection** - Filters out noise and artifacts
+2. **Complex shapes** - Handles non-rectangular magenta regions by finding bounding boxes
+3. **Overlapping regions** - Validates and warns about invalid layouts
+4. **Empty templates** - Handles templates with no detectable holes gracefully
+5. **Large images** - Optimized processing for high-resolution templates
+
+### Usage in Manual Template Workflow
+
+**File**: `components/admin/ManualTemplateManagerScreen.tsx`
+
+When creating manual templates, the hole detection system:
+1. **Auto-detects holes** from PNG template files uploaded to Google Drive
+2. **Displays hole count** in template preview cards with overlay badges
+3. **Validates hole positioning** before saving to database
+4. **Provides feedback** to admin users about detection results
+
+This sophisticated hole detection system eliminates the need for manual coordinate entry and enables designers to create templates using familiar magenta placeholder regions in their design software.

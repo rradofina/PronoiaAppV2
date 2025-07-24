@@ -1,7 +1,7 @@
 // Updated: Types for the app.
 
 // Core types used throughout the application
-export type Screen = 'drive-setup' | 'folder-selection' | 'package' | 'template' | 'template-setup' | 'photos' | 'preview' | 'complete';
+export type Screen = 'drive-setup' | 'folder-selection' | 'package' | 'template' | 'template-setup' | 'photos' | 'preview' | 'complete' | 'png-template-management' | 'template-folder-selection' | 'manual-template-manager' | 'manual-package-manager';
 
 export interface DriveFolder {
   id: string;
@@ -65,13 +65,7 @@ export interface TemplateSlot {
   label?: string;
 }
 
-export interface PhotoStudioPackage {
-  id: 'A' | 'B' | 'C' | 'D';
-  name: string;
-  templateCount: number;
-  price?: number;
-  description?: string;
-}
+// Legacy PhotoStudioPackage removed - now using manual packages
 
 export interface Template {
   id: string;
@@ -149,7 +143,7 @@ export interface TemplateLayout {
 export interface Session {
   id: string;
   clientName: string;
-  packageType: PhotoStudioPackage['id'];
+  package_id: string; // Updated to use manual package UUID
   selectedTemplates: Template[];
   maxTemplates: number;
   usedTemplates: number;
@@ -241,7 +235,7 @@ export interface GeneratedTemplate {
 export interface ExportSummary {
   sessionId: string;
   clientName: string;
-  packageType: PhotoStudioPackage['id'];
+  package_id: string; // Updated to use manual package UUID
   generatedTemplates: GeneratedTemplate[];
   totalPhotosUsed: number;
   uniquePhotosUsed: number;
@@ -371,3 +365,146 @@ export interface TemplateCacheData {
   };
   has_internal_branding: boolean;
 } 
+
+// Manual Template/Package System Types
+export interface ManualTemplateHole {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface ManualTemplateDimensions {
+  width: number;
+  height: number;
+}
+
+export interface ManualTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  template_type: TemplateType;
+  print_size: PrintSize;
+  drive_file_id: string;
+  holes_data: ManualTemplateHole[];
+  dimensions: ManualTemplateDimensions;
+  thumbnail_url?: string;
+  base64_preview?: string; // Base64-encoded small preview for instant loading
+  category_id?: string;
+  created_by?: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PackageGroup {
+  id: string;
+  name: string;
+  description?: string;
+  sort_order: number;
+  is_active: boolean;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+  // Populated via joins
+  packages?: ManualPackage[];
+}
+
+export interface ManualPackage {
+  id: string;
+  name: string;
+  description?: string;
+  thumbnail_url?: string;
+  print_size: PrintSize;
+  template_count: number;
+  price?: number;
+  is_active: boolean;
+  is_default: boolean;
+  sort_order: number;
+  group_id?: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+  // Populated via joins
+  templates?: ManualTemplate[];
+  group?: PackageGroup;
+}
+
+export interface PackageTemplate {
+  id: string;
+  package_id: string;
+  template_id: string;
+  order_index: number;
+  created_at: string;
+  // Populated via joins
+  template?: ManualTemplate;
+}
+
+export interface ManualTemplateCategory {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  icon: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+// API Response types
+export interface ManualPackageWithTemplates extends ManualPackage {
+  package_templates: (PackageTemplate & { template: ManualTemplate })[];
+}
+
+export interface CreateManualTemplateRequest {
+  name: string;
+  description?: string;
+  template_type: TemplateType;
+  print_size: PrintSize;
+  drive_file_id: string;
+  holes_data: ManualTemplateHole[];
+  dimensions: ManualTemplateDimensions;
+  thumbnail_url?: string;
+  base64_preview?: string; // Base64-encoded small preview for instant loading
+  category_id?: string;
+}
+
+export interface CreateManualPackageRequest {
+  name: string;
+  description?: string;
+  thumbnail_url?: string;
+  print_size: PrintSize;
+  template_count: number;
+  price?: number;
+  group_id?: string;
+  template_ids: string[]; // Templates to include in package
+}
+
+export interface CreatePackageGroupRequest {
+  name: string;
+  description?: string;
+  sort_order?: number;
+}
+
+// Service layer types
+export interface ManualTemplateService {
+  getAllTemplates(): Promise<ManualTemplate[]>;
+  getTemplatesByPrintSize(printSize: PrintSize): Promise<ManualTemplate[]>;
+  getTemplate(id: string): Promise<ManualTemplate | null>;
+  createTemplate(template: CreateManualTemplateRequest): Promise<ManualTemplate>;
+  updateTemplate(id: string, updates: Partial<ManualTemplate>): Promise<ManualTemplate>;
+  deleteTemplate(id: string): Promise<void>;
+  getActiveTemplates(): Promise<ManualTemplate[]>;
+}
+
+export interface ManualPackageService {
+  getAllPackages(): Promise<ManualPackage[]>;
+  getActivePackages(): Promise<ManualPackage[]>;
+  getPackageWithTemplates(id: string): Promise<ManualPackageWithTemplates | null>;
+  createPackage(packageData: CreateManualPackageRequest): Promise<ManualPackage>;
+  updatePackage(id: string, updates: Partial<ManualPackage>): Promise<ManualPackage>;
+  deletePackage(id: string): Promise<void>;
+  getPackagesByPrintSize(printSize: PrintSize): Promise<ManualPackage[]>;
+}

@@ -103,6 +103,10 @@ export default function TemplateSelection() {
 
   return (
     <div className="container-tablet py-8">
+      {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
+      <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
+        TemplateSelection.tsx
+      </div>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}

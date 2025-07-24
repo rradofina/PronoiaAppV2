@@ -32,7 +32,7 @@ interface Rectangle {
 }
 
 export class TemplateDetectionService {
-  private static readonly MAGENTA_COLORS = [
+  private static readonly PLACEHOLDER_COLORS = [
     [255, 0, 255], // #FF00FF - Pure magenta
     [185, 82, 159] // #b9529f - Photoshop CMYK-converted magenta
   ];
@@ -65,7 +65,7 @@ export class TemplateDetectionService {
             ctx.drawImage(img, 0, 0);
             
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const holes = this.detectMagentaRegions(imageData);
+            const holes = this.detectPlaceholderRegions(imageData);
             const templateType = this.determineTemplateType(holes, filename);
             const hasInternalBranding = this.detectInternalBranding(imageData, holes);
             
@@ -137,10 +137,21 @@ export class TemplateDetectionService {
   }
 
   /**
-   * Detect magenta regions and convert them to hole coordinates
+   * Detect placeholder regions and convert them to hole coordinates
    */
-  private detectMagentaRegions(imageData: ImageData): TemplateHole[] {
+  private detectPlaceholderRegions(imageData: ImageData): TemplateHole[] {
     const { width, height, data } = imageData;
+    
+    // First, try to detect if this is a photocard layout (edge-to-edge placeholder areas)
+    // Temporarily disable photocard detection to test if it's interfering
+    const ENABLE_PHOTOCARD_DETECTION = false; // Set to true to enable
+    
+    if (ENABLE_PHOTOCARD_DETECTION && this.isPhotocardLayout(imageData)) {
+      console.log('🎴 Detected photocard layout - using grid-based detection');
+      return this.detectPhotocardHoles(imageData);
+    }
+    
+    // Use regular flood-fill detection for other layouts
     const visited = new Set<string>();
     const holes: TemplateHole[] = [];
 
@@ -150,10 +161,10 @@ export class TemplateDetectionService {
         const key = `${x},${y}`;
         if (visited.has(key)) continue;
 
-        if (this.isMagentaPixel(data, x, y, width)) {
+        if (this.isPlaceholderPixel(data, x, y, width)) {
           const bounds = this.floodFillBounds(imageData, x, y, visited);
           
-          // Get precise hole dimensions by finding the actual magenta boundaries
+          // Get precise hole dimensions by finding the actual placeholder boundaries
           const preciseBounds = this.getPreciseHoleBounds(imageData, bounds);
           const holeWidth = preciseBounds.width;
           const holeHeight = preciseBounds.height;
@@ -221,13 +232,167 @@ export class TemplateDetectionService {
   }
 
   /**
-   * Split a cross-shaped region into separate rectangular holes by finding individual magenta areas
+   * Detect if this is a photocard layout (edge-to-edge placeholder areas touching borders)
+   */
+  private isPhotocardLayout(imageData: ImageData): boolean {
+    const { width, height, data } = imageData;
+    
+    // Check if there are significant placeholder areas touching the edges
+    let edgePlaceholderPixels = 0;
+    let totalPlaceholderPixels = 0;
+    
+    // Sample edge pixels
+    const edgePixelsToCheck = [
+      // Top edge
+      ...Array.from({length: Math.min(width, 100)}, (_, i) => ({x: i * Math.floor(width/100), y: 0})),
+      // Bottom edge  
+      ...Array.from({length: Math.min(width, 100)}, (_, i) => ({x: i * Math.floor(width/100), y: height-1})),
+      // Left edge
+      ...Array.from({length: Math.min(height, 100)}, (_, i) => ({x: 0, y: i * Math.floor(height/100)})),
+      // Right edge
+      ...Array.from({length: Math.min(height, 100)}, (_, i) => ({x: width-1, y: i * Math.floor(height/100)})),
+    ];
+    
+    // Count placeholder pixels on edges
+    for (const {x, y} of edgePixelsToCheck) {
+      if (this.isPlaceholderPixel(data, x, y, width)) {
+        edgePlaceholderPixels++;
+      }
+    }
+    
+    // Sample total placeholder pixels (every 10th pixel for performance)
+    for (let y = 0; y < height; y += 10) {
+      for (let x = 0; x < width; x += 10) {
+        if (this.isPlaceholderPixel(data, x, y, width)) {
+          totalPlaceholderPixels++;
+        }
+      }
+    }
+    
+    // If more than 20% of edge samples are placeholder areas, likely a photocard
+    const edgePlaceholderRatio = edgePlaceholderPixels / edgePixelsToCheck.length;
+    const isPhotocard = edgePlaceholderRatio > 0.2 && totalPlaceholderPixels > 100;
+    
+    console.log('🎴 Photocard detection:', {
+      edgePlaceholderPixels,
+      totalEdgePixels: edgePixelsToCheck.length,
+      edgePlaceholderRatio: edgePlaceholderRatio.toFixed(3),
+      totalPlaceholderPixels,
+      isPhotocard
+    });
+    
+    return isPhotocard;
+  }
+
+  /**
+   * Detect holes in photocard layout using grid-based approach
+   */
+  private detectPhotocardHoles(imageData: ImageData): TemplateHole[] {
+    const { width, height, data } = imageData;
+    const holes: TemplateHole[] = [];
+    
+    // Try different grid configurations (2x2, 2x3, 3x2, etc.)
+    const gridConfigs = [
+      {rows: 2, cols: 2}, // 2x2 grid
+      {rows: 2, cols: 3}, // 2x3 grid
+      {rows: 3, cols: 2}, // 3x2 grid
+      {rows: 1, cols: 4}, // 1x4 strip
+      {rows: 4, cols: 1}, // 4x1 strip
+    ];
+    
+    let bestConfig = null;
+    let bestScore = 0;
+    
+    // Test each grid configuration
+    for (const config of gridConfigs) {
+      const score = this.testGridConfiguration(imageData, config);
+      if (score > bestScore) {
+        bestScore = score;
+        bestConfig = config;
+      }
+    }
+    
+    if (bestConfig && bestScore > 0.5) {
+      console.log(`🎯 Best grid configuration: ${bestConfig.rows}x${bestConfig.cols} (score: ${bestScore.toFixed(3)})`);
+      
+      // Create holes based on the best grid
+      const cellWidth = width / bestConfig.cols;
+      const cellHeight = height / bestConfig.rows;
+      
+      for (let row = 0; row < bestConfig.rows; row++) {
+        for (let col = 0; col < bestConfig.cols; col++) {
+          const x = Math.round(col * cellWidth);
+          const y = Math.round(row * cellHeight);
+          const w = Math.round(cellWidth);
+          const h = Math.round(cellHeight);
+          
+          holes.push({
+            id: `hole_${holes.length + 1}`,
+            x: x,
+            y: y,
+            width: w,
+            height: h
+          });
+          
+          console.log(`🎴 Photocard hole ${holes.length}: (${x},${y}) ${w}×${h}px`);
+        }
+      }
+    }
+    
+    return holes;
+  }
+
+  /**
+   * Test how well a grid configuration fits the placeholder regions
+   */
+  private testGridConfiguration(imageData: ImageData, config: {rows: number, cols: number}): number {
+    const { width, height, data } = imageData;
+    const cellWidth = width / config.cols;
+    const cellHeight = height / config.rows;
+    
+    let placeholderInCells = 0;
+    let totalSamples = 0;
+    
+    // Sample the center of each grid cell
+    for (let row = 0; row < config.rows; row++) {
+      for (let col = 0; col < config.cols; col++) {
+        const centerX = Math.round(col * cellWidth + cellWidth / 2);
+        const centerY = Math.round(row * cellHeight + cellHeight / 2);
+        
+        // Sample multiple points around the center
+        const samplePoints = [
+          {x: centerX, y: centerY},
+          {x: centerX - 20, y: centerY},
+          {x: centerX + 20, y: centerY},
+          {x: centerX, y: centerY - 20},
+          {x: centerX, y: centerY + 20},
+        ];
+        
+        for (const point of samplePoints) {
+          if (point.x >= 0 && point.x < width && point.y >= 0 && point.y < height) {
+            totalSamples++;
+            if (this.isPlaceholderPixel(data, point.x, point.y, width)) {
+              placeholderInCells++;
+            }
+          }
+        }
+      }
+    }
+    
+    const score = totalSamples > 0 ? placeholderInCells / totalSamples : 0;
+    console.log(`🧪 Grid ${config.rows}x${config.cols}: ${placeholderInCells}/${totalSamples} = ${score.toFixed(3)}`);
+    
+    return score;
+  }
+
+  /**
+   * Split a cross-shaped region into separate rectangular holes by finding individual placeholder areas
    */
   private splitCrossRegion(bounds: Rectangle, imageData: ImageData): Array<{x: number; y: number; width: number; height: number}> {
     const { data, width } = imageData;
     const { minX, minY, maxX, maxY } = bounds;
     
-    // Check if this region has a cross shape by analyzing the magenta distribution
+    // Check if this region has a cross shape by analyzing the placeholder distribution
     const regionWidth = maxX - minX;
     const regionHeight = maxY - minY;
     
@@ -236,18 +401,18 @@ export class TemplateDetectionService {
       return []; // Return empty to use original bounds
     }
     
-    // Find individual holes by scanning for separate magenta regions within the bounds
+    // Find individual holes by scanning for separate placeholder regions within the bounds
     const foundHoles: Array<{x: number; y: number; width: number; height: number}> = [];
     const visited = new Set<string>();
     
-    // Scan the entire region for separate magenta areas
+    // Scan the entire region for separate placeholder areas
     for (let y = minY; y <= maxY; y += 10) { // Sample every 10 pixels for performance
       for (let x = minX; x <= maxX; x += 10) {
         const key = `${x},${y}`;
         if (visited.has(key)) continue;
         
-        if (this.isMagentaPixel(data, x, y, width)) {
-          // Found a magenta pixel, flood fill to find this individual hole
+        if (this.isPlaceholderPixel(data, x, y, width)) {
+          // Found a placeholder pixel, flood fill to find this individual hole
           const holeBounds = this.floodFillBounds(imageData, x, y, visited);
           const preciseHole = this.getPreciseHoleBounds(imageData, holeBounds);
           
@@ -265,7 +430,7 @@ export class TemplateDetectionService {
   }
 
   /**
-   * Get precise hole bounds by scanning pixel by pixel for exact magenta boundaries
+   * Get precise hole bounds by scanning pixel by pixel for exact placeholder boundaries
    */
   private getPreciseHoleBounds(imageData: ImageData, roughBounds: Rectangle): {x: number; y: number; width: number; height: number} {
     const { data, width } = imageData;
@@ -276,10 +441,10 @@ export class TemplateDetectionService {
     let minY = roughBounds.maxY;
     let maxY = roughBounds.minY;
     
-    // Scan EVERY pixel in the rough bounds to find exact magenta edges
+    // Scan EVERY pixel in the rough bounds to find exact placeholder edges
     for (let y = roughBounds.minY; y <= roughBounds.maxY; y++) {
       for (let x = roughBounds.minX; x <= roughBounds.maxX; x++) {
-        if (this.isMagentaPixel(data, x, y, width)) {
+        if (this.isPlaceholderPixel(data, x, y, width)) {
           minX = Math.min(minX, x);
           maxX = Math.max(maxX, x);
           minY = Math.min(minY, y);
@@ -311,7 +476,7 @@ export class TemplateDetectionService {
   /**
    * Check if a pixel is magenta within tolerance (supports multiple magenta colors)
    */
-  private isMagentaPixel(data: Uint8ClampedArray, x: number, y: number, width: number): boolean {
+  private isPlaceholderPixel(data: Uint8ClampedArray, x: number, y: number, width: number): boolean {
     const index = (y * width + x) * 4;
     const r = data[index];
     const g = data[index + 1];
@@ -324,7 +489,7 @@ export class TemplateDetectionService {
     const tolerance = TemplateDetectionService.COLOR_TOLERANCE;
 
     // Check against all supported magenta colors
-    return TemplateDetectionService.MAGENTA_COLORS.some(([targetR, targetG, targetB]) => {
+    return TemplateDetectionService.PLACEHOLDER_COLORS.some(([targetR, targetG, targetB]) => {
       return (
         Math.abs(r - targetR) <= tolerance &&
         Math.abs(g - targetG) <= tolerance &&
@@ -334,7 +499,7 @@ export class TemplateDetectionService {
   }
 
   /**
-   * Flood fill to find the bounds of a magenta region
+   * Flood fill to find the bounds of a placeholder region
    */
   private floodFillBounds(
     imageData: ImageData, 
@@ -359,7 +524,7 @@ export class TemplateDetectionService {
         continue;
       }
 
-      if (!this.isMagentaPixel(data, x, y, width)) {
+      if (!this.isPlaceholderPixel(data, x, y, width)) {
         continue;
       }
 

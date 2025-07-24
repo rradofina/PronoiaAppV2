@@ -26,7 +26,10 @@
       "Bash(wc:*)",
       "Bash(npx supabase:*)",
       "Bash(find:*)",
-      "Bash(timeout 30s npm run dev)"
+      "Bash(timeout 30s npm run dev)",
+      "Bash(npm start)",
+      "Bash(git fetch:*)",
+      "Bash(git stash:*)"
     ],
     "deny": []
   }

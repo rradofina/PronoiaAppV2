@@ -1,5 +1,5 @@
 import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType } from '../../types';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PRINT_SIZES, TEMPLATE_TYPES } from '../../utils/constants';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
@@ -10,153 +10,100 @@ import FullscreenTemplateEditor from '../FullscreenTemplateEditor';
 import FullscreenTemplateSelector from '../FullscreenTemplateSelector';
 import PhotoSelectionMode from '../PhotoSelectionMode';
 import SlidingTemplateBar from '../SlidingTemplateBar';
+import { hybridTemplateService, HybridTemplate } from '../../services/hybridTemplateService';
+import { templateCacheService } from '../../services/templateCacheService';
+import PngTemplateVisual from '../PngTemplateVisual';
 
-// PNG Template Visual Component  
+// PROPER TemplateVisual - Uses PNG template data from window.pngTemplates
 const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: any) => {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  
-  // Get PNG templates from window (stored during package selection)
+  // Get the actual PNG template data from window
   const pngTemplates = (window as any).pngTemplates || [];
   
-  // Find the matching PNG template
-  const pngTemplate = pngTemplates.find((t: any) => 
-    t.templateType === template.id || 
-    t.name.toLowerCase().includes(template.id) ||
-    t.id === template.id.split('_')[0]
-  );
+  // Debug: Check if templates are loaded at all
+  if (pngTemplates.length === 0) {
+    console.warn('⚠️ No PNG templates found in window.pngTemplates - templates may not be loaded yet');
+  }
   
-
-  // Download PNG as blob to avoid CORS issues
-  useEffect(() => {
-    if (pngTemplate) {
-      const downloadAsBlob = async () => {
-        try {
-          const { googleDriveService } = await import('../../services/googleDriveService');
-          console.log('🔍 Attempting to download template:', {
-            id: pngTemplate.id,
-            driveFileId: pngTemplate.driveFileId,
-            name: pngTemplate.name
-          });
-          
-          // Try driveFileId first, then fallback to id
-          const fileId = pngTemplate.driveFileId || pngTemplate.id;
-          const blob = await googleDriveService.downloadTemplate(fileId);
-          const url = URL.createObjectURL(blob);
-          setBlobUrl(url);
-        } catch (error) {
-          console.error('Failed to download PNG template:', error);
-          setBlobUrl(null); // Show fallback UI
-        }
-      };
-      downloadAsBlob();
-    }
-    
-    return () => {
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
-    };
-  }, [pngTemplate]);
-
-  const getPhotoUrl = (photoId?: string | null) => {
-    if (!photoId) return null;
-    const photo = photos.find((p: any) => p.id === photoId);
-    console.log('🔍 getPhotoUrl lookup:', { photoId, found: !!photo, photoUrl: photo?.url });
-    return photo?.url || null;
-  };
-
-  if (!pngTemplate) {
-    console.warn('⚠️ PNG template not found for:', template.id, 'Available:', pngTemplates.length);
-    return (
-      <div className="bg-white p-3 rounded-lg shadow-md w-full h-full flex items-center justify-center">
-        <div className="text-center text-gray-500">
-          <div className="text-lg font-medium">{template.name}</div>
-          <div className="text-sm">{slots.length} photos</div>
-          <div className="text-xs mt-1 text-red-500">PNG not found</div>
-        </div>
-      </div>
-    );
+  // Find the PNG template that matches this template ID
+  let pngTemplate = pngTemplates.find((t: any) => {
+    // Match by template type and first slot's templateId
+    const templateId = slots[0]?.templateId || '';
+    return templateId.includes(t.id) || 
+           t.template_type === template.id ||
+           t.id.includes(template.id) ||
+           template.id.includes(t.template_type);
+  });
+  
+  // TEMP DEBUG: If no match found, use the first available PNG template of same type
+  if (!pngTemplate && pngTemplates.length > 0) {
+    pngTemplate = pngTemplates.find((t: any) => t.template_type === template.id) || pngTemplates[0];
+    console.log('🔧 Using fallback PNG template:', pngTemplate?.name);
   }
 
-  if (!blobUrl) {
-    return (
-      <div className="bg-white p-3 rounded-lg shadow-md w-full h-full flex items-center justify-center">
-        <div className="text-center text-gray-500">
-          <div className="text-lg font-medium">{template.name}</div>
-          <div className="text-sm">{slots.length} photos</div>
-          <div className="text-xs mt-1">Loading template...</div>
-        </div>
-      </div>
-    );
-  }
+  console.log('🎨 TemplateVisual render:', {
+    templateId: template.id,
+    templateName: template.name,
+    slotsCount: slots.length,
+    pngTemplatesAvailable: pngTemplates.length,
+    foundPngTemplate: !!pngTemplate,
+    pngTemplateName: pngTemplate?.name,
+    firstSlotTemplateId: slots[0]?.templateId,
+    pngTemplateKeys: pngTemplate ? Object.keys(pngTemplate) : [],
+    fullPngTemplate: pngTemplate,
+    availablePngTemplates: pngTemplates.map((t: any) => ({ id: t.id, type: t.template_type, name: t.name }))
+  });
 
-  return (
-    <div className="relative w-full bg-white" 
-         style={{ 
-           aspectRatio: `${pngTemplate.dimensions.width}/${pngTemplate.dimensions.height}`,
-         }}>
-      {/* Background PNG Template - FULL template including branding */}
-      <img 
-        src={blobUrl}
-        alt={pngTemplate.name}
-        className="w-full h-full object-contain"
+  if (pngTemplate) {
+    // Use the proper PNG template visual
+    return (
+      <PngTemplateVisual
+        pngTemplate={pngTemplate}
+        templateSlots={slots}
+        onSlotClick={onSlotClick}
+        photos={photos}
+        selectedSlot={selectedSlot}
       />
+    );
+  }
+
+  // Fallback for when PNG template not found
+  return (
+    <div className="bg-white p-3 rounded-lg shadow-md w-full h-full">
+      <div className="text-center text-gray-500 mb-2">
+        <div className="text-lg font-medium">{template.name}</div>
+        <div className="text-sm">{slots.length} photos</div>
+        <div className="text-xs text-red-500">PNG template not found</div>
+      </div>
       
-      {/* Photo Holes Overlay */}
-      {pngTemplate.holes.map((hole: any, holeIndex: number) => {
-        const slot = slots[holeIndex];
-        if (!slot) return null;
-        
-        const photoUrl = getPhotoUrl(slot.photoId);
-        const isSelected = selectedSlot?.id === slot.id;
-        
-        // Debug slot data
-        console.log(`🔍 Slot ${holeIndex} data:`, {
-          slotId: slot.id,
-          photoId: slot.photoId,
-          hasTransform: !!slot.transform,
-          transform: slot.transform,
-          photoUrl,
-          hasPhoto: !!photoUrl
-        });
-        
-        return (
-          <div
-            key={hole.id}
-            className="absolute cursor-pointer transition-all duration-200"
-            style={{
-              left: `${(hole.x / pngTemplate.dimensions.width) * 100}%`,
-              top: `${(hole.y / pngTemplate.dimensions.height) * 100}%`,
-              width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
-              height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
-              border: isSelected ? '4px solid #3b82f6' : 'none',
-              boxSizing: 'border-box',
-              zIndex: isSelected ? 10 : 1
-            }}
-            onClick={() => onSlotClick(slot)}
-          >
-            {photoUrl ? (
-              <>
-                {console.log(`✅ Rendering photo for slot ${holeIndex}:`, photoUrl)}
+      {/* Simple grid for photos as fallback */}
+      <div className="grid grid-cols-2 gap-2 h-32">
+        {slots.slice(0, 4).map((slot: any, index: number) => {
+          const photo = photos.find((p: any) => p.id === slot.photoId);
+          const isSelected = selectedSlot?.id === slot.id;
+          
+          return (
+            <div
+              key={slot.id || index}
+              className={`border-2 border-dashed cursor-pointer transition-all duration-200 ${
+                isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+              }`}
+              onClick={() => onSlotClick(slot)}
+            >
+              {photo?.url ? (
                 <img
-                  src={photoUrl}
-                  alt={`Photo ${holeIndex + 1}`}
+                  src={photo.url}
+                  alt={`Photo ${index + 1}`}
                   className="w-full h-full object-cover"
-                  onLoad={() => console.log(`🖼️ Photo loaded in slot ${holeIndex}`)}
-                  onError={() => console.log(`❌ Photo failed to load in slot ${holeIndex}:`, photoUrl)}
                 />
-              </>
-            ) : (
-              <div className="w-full h-full bg-gray-200 flex items-center justify-center relative" 
-                   style={{ outline: '2px dashed #9ca3af', outlineOffset: '-2px' }}>
-                <span className="text-gray-500 text-xs font-medium">
-                  {holeIndex + 1}
-                </span>
-              </div>
-            )}
-          </div>
-        );
-      })}
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                  {/* Remove fallback numbers for cleaner look */}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -194,12 +141,20 @@ export default function PhotoSelectionScreen({
   setSelectedSlot,
   setTemplateSlots,
 }: PhotoSelectionScreenProps) {
+  console.log('📷 PhotoSelectionScreen rendered with:', {
+    photosCount: photos.length,
+    clientName,
+    templateSlotsCount: templateSlots.length,
+    firstPhotoSample: photos[0] ? { id: photos[0].id, name: photos[0].name, url: photos[0].url } : 'No photos'
+  });
+  
   const [editingTemplate, setEditingTemplate] = useState<TemplateSlot[] | null>(null);
   const [showAddPrintModal, setShowAddPrintModal] = useState(false);
   const [selectedType, setSelectedType] = useState<TemplateType | null>(null);
   const [selectedSize, setSelectedSize] = useState<'4R' | '5R' | 'A4'>('4R');
   const [addPrintQuantity, setAddPrintQuantity] = useState(1);
   const [hasScrolled, setHasScrolled] = useState(false);
+  const [availableTemplates, setAvailableTemplates] = useState<HybridTemplate[]>([]);
   
   // New workflow states
   const [viewMode, setViewMode] = useState<'normal' | 'photo-viewer' | 'sliding-templates' | 'template-editor' | 'template-first' | 'photo-selection'>('normal');
@@ -207,6 +162,22 @@ export default function PhotoSelectionScreen({
   const [selectedPhotoForTemplate, setSelectedPhotoForTemplate] = useState<Photo | null>(null);
   const [selectedTemplateForViewer, setSelectedTemplateForViewer] = useState<string | null>(null);
   const [selectedSlotForEditor, setSelectedSlotForEditor] = useState<TemplateSlot | null>(null);
+
+  // Load available templates for add print modal
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        // Get package-configured templates (from manual packages only)
+        const packageTemplates = (window as any).pngTemplates || [];
+        
+        console.log('📋 Using package-configured templates for Add Print modal');
+        setAvailableTemplates(packageTemplates);
+      } catch (error) {
+        console.error('❌ Error loading templates for add print modal:', error);
+      }
+    };
+    loadTemplates();
+  }, [selectedPackage]);
 
   // Auto-select first empty placeholder when entering screen
   useEffect(() => {
@@ -254,11 +225,9 @@ export default function PhotoSelectionScreen({
 
   const handleConfirmAddPrint = () => {
     if (selectedType) {
-      // Get PNG templates from window
-      const pngTemplates = (window as any).pngTemplates || [];
-      const template = pngTemplates.find((t: any) => 
-        t.templateType === selectedType || 
-        t.name.toLowerCase().includes(selectedType.toLowerCase())
+      // Find template from hybrid templates
+      const template = availableTemplates.find((t: HybridTemplate) => 
+        t.template_type === selectedType && t.print_size === selectedSize
       );
       
       if (template) {
@@ -283,6 +252,8 @@ export default function PhotoSelectionScreen({
           }
         }
         setTemplateSlots([...templateSlots, ...newSlotsToAdd]);
+      } else {
+        console.error('❌ Template not found for type:', selectedType, 'size:', selectedSize);
       }
     }
     setShowAddPrintModal(false);
@@ -344,28 +315,86 @@ export default function PhotoSelectionScreen({
 
   // Template editor
   const handleApplyPhotoToSlot = (slotId: string, photoId: string, transform?: { scale: number; x: number; y: number }) => {
-    console.log('🔧 Apply button clicked:', { slotId, photoId, transform });
-    console.log('🔧 Current templateSlots before update:', templateSlots);
+    console.log('🔧 FULLSCREEN EDITOR - Apply button clicked:', { slotId, photoId, transform });
+    console.log('🔧 Current templateSlots before update:', templateSlots.map(s => ({ id: s.id, photoId: s.photoId, hasTransform: !!s.transform })));
     
-    const updatedSlots = templateSlots.map(s =>
-      s.id === slotId ? { ...s, photoId, transform } : s
-    );
-    
-    console.log('🔧 Updated slots after applying photo:', updatedSlots);
-    
-    // Check if photo exists in photos array
+    // Verify photo exists in photos array BEFORE updating
     const photo = photos.find(p => p.id === photoId);
-    console.log('🔧 Photo found in photos array:', photo);
+    if (!photo) {
+      console.error('❌ CRITICAL ERROR: Photo not found in photos array!', {
+        requestedPhotoId: photoId,
+        availablePhotoIds: photos.map(p => p.id),
+        photosArrayLength: photos.length
+      });
+      return; // Don't proceed if photo doesn't exist
+    }
+    console.log('✅ Photo found in photos array:', photo.name, photo.url);
     
+    // Create completely new array to ensure React detects the change
+    const updatedSlots = templateSlots.map(s => {
+      if (s.id === slotId) {
+        // Create a completely new slot object to ensure React detects the change
+        const newSlot = {
+          ...s,
+          photoId: photoId, // Ensure the photoId is properly set
+          transform: transform || s.transform // Keep existing transform if none provided
+        };
+        console.log('🔧 Creating new slot object:', newSlot);
+        return newSlot;
+      }
+      return { ...s }; // Create new object references for all slots to force re-render
+    });
+    
+    console.log('🔧 Updated slots after applying photo:', updatedSlots.map(s => ({ id: s.id, photoId: s.photoId, hasTransform: !!s.transform })));
+    
+    // Verify the slot that was updated
+    const updatedSlot = updatedSlots.find(s => s.id === slotId);
+    console.log('🔧 Slot that was updated:', updatedSlot);
+    
+    // Validate that the update actually took place
+    if (updatedSlot?.photoId !== photoId) {
+      console.error('❌ CRITICAL: Slot update failed! photoId not set correctly');
+      console.error('Expected photoId:', photoId, 'Actual photoId:', updatedSlot?.photoId);
+      return; // Don't proceed with state update if it failed
+    } else {
+      console.log('✅ Slot update successful - photoId set correctly');
+    }
+    
+    // Force component to re-render by also updating a dummy counter
+    console.log('🔧 FORCING COMPONENT RE-RENDER - Calling setTemplateSlots');
     setTemplateSlots(updatedSlots);
+    
+    // Force immediate re-render check
+    const immediateCheck = () => {
+      console.log('🔧 IMMEDIATE CHECK - templateSlots should be updated now');
+      // Force a re-render by updating the state again if needed
+      const verification = updatedSlots.find(s => s.id === slotId);
+      if (verification?.photoId === photoId) {
+        console.log('✅ VERIFICATION PASSED: Updated slots array contains correct photoId');
+      } else {
+        console.error('❌ VERIFICATION FAILED: Updated slots array does not contain correct photoId');
+      }
+    };
+    
+    // Check immediately and after a brief delay
+    immediateCheck();
+    setTimeout(() => {
+      console.log('🔧 DELAYED CHECK - Verifying templateSlots state after React update cycle');
+      // This will still show the old state due to closure, but the TemplateVisual should have re-rendered
+      const currentSlots = templateSlots; // This will be the old state due to closure
+      console.log('Current templateSlots (closure - will be old):', currentSlots.map(s => ({ id: s.id, photoId: s.photoId })));
+      console.log('Updated templateSlots (what we set):', updatedSlots.map(s => ({ id: s.id, photoId: s.photoId })));
+    }, 50);
     
     // Auto-select next empty slot
     const nextEmptySlot = updatedSlots.find(slot => !slot.photoId && slot.id !== slotId);
     if (nextEmptySlot) {
+      console.log('🔧 Auto-selecting next empty slot:', nextEmptySlot.id);
       setSelectedSlot(nextEmptySlot);
     }
     
     // Reset states and return to normal view
+    console.log('🔧 Resetting view states and closing fullscreen editor');
     resetViewStates();
   };
 
@@ -379,6 +408,11 @@ export default function PhotoSelectionScreen({
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ touchAction: 'manipulation' }}>
+      
+      {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
+      <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
+        PhotoSelectionScreen.tsx
+      </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
@@ -480,7 +514,7 @@ export default function PhotoSelectionScreen({
                     <h3 className="font-semibold mb-2 text-center text-xs leading-tight truncate px-1">{templateName}</h3>
                     <div className="w-full rounded-lg overflow-hidden border border-gray-200">
                       <TemplateVisual
-                        key={`${templateId}-${slots.map(s => `${s.photoId}-${s.transform?.scale || 0}`).join('-')}`} // Force re-render when photos or transforms change
+                        key={`${templateId}-${slots.map(s => `${s.photoId || 'empty'}-${s.transform?.scale || 0}-${s.transform?.x || 0}-${s.transform?.y || 0}`).join('-')}`} // Force re-render when photos or transforms change
                         template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
                         slots={slots}
                         onSlotClick={handleSlotSelectFromTemplate} // Direct slot selection - go straight to photo list
@@ -550,7 +584,7 @@ export default function PhotoSelectionScreen({
                   <h3 className="font-semibold mb-2 text-center text-sm">{templateName}</h3>
                   <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '400px' }}>
                     <TemplateVisual
-                      key={`${templateId}-${slots.map(s => `${s.photoId}-${s.transform?.scale || 0}`).join('-')}`} // Force re-render when photos or transforms change
+                      key={`${templateId}-${slots.map(s => `${s.photoId || 'empty'}-${s.transform?.scale || 0}-${s.transform?.x || 0}-${s.transform?.y || 0}`).join('-')}`} // Force re-render when photos or transforms change
                       template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
                       slots={slots}
                       onSlotClick={handleSlotSelectFromTemplate} // Direct slot selection - go straight to photo list
@@ -635,12 +669,12 @@ export default function PhotoSelectionScreen({
                       value={selectedType || ''}
                       onChange={(e) => setSelectedType(e.target.value as TemplateType)}
                     >
-                      <option value="">Select PNG template</option>
-                      {((window as any).pngTemplates || [])
-                        .filter((t: any) => t.printSize === selectedSize)
-                        .map((t: any) => (
-                          <option key={t.id} value={t.templateType}>
-                            {t.name} ({t.holes.length} slots)
+                      <option value="">Select template</option>
+                      {availableTemplates
+                        .filter((t: HybridTemplate) => t.print_size === selectedSize)
+                        .map((t: HybridTemplate) => (
+                          <option key={t.id} value={t.template_type}>
+                            {t.name} ({t.holes.length} slots) - {t.source}
                           </option>
                         ))}
                     </select>
@@ -771,79 +805,13 @@ export default function PhotoSelectionScreen({
   );
 }
 
-// Separate PhotoCard component to handle image loading properly
+// Simple PhotoCard component
 function PhotoCard({ photo, onSelect }: { photo: Photo; onSelect: () => void }) {
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
-  const [fallbackUrls] = useState(() => {
-    // Generate fallback URLs for this photo
-    const fallbacks = [];
-    
-    // If we have a thumbnail, use higher resolution for better quality on modern displays
-    if (photo.thumbnailUrl) {
-      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s400')); // =s400 (better quality for grid)
-      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s600')); // =s600 (high quality fallback)
-      fallbacks.push(photo.thumbnailUrl); // =s220 (original size as fallback)
-    }
-    
-    // Try direct Google Drive link
-    fallbacks.push(`https://drive.google.com/uc?id=${photo.googleDriveId}&export=view`);
-    
-    // Use the original URL as final fallback
-    if (photo.url && !fallbacks.includes(photo.url)) {
-      fallbacks.push(photo.url);
-    }
-    
-    return fallbacks.filter(Boolean);
+  console.log(`📷 PhotoCard rendering: ${photo.name}`, {
+    url: photo.url,
+    thumbnailUrl: photo.thumbnailUrl,
+    googleDriveId: photo.googleDriveId
   });
-
-  const getCurrentUrl = () => {
-    if (currentUrlIndex < fallbackUrls.length) {
-      return fallbackUrls[currentUrlIndex];
-    }
-    return photo.url; // Final fallback
-  };
-
-  const handleImageLoad = () => {
-    console.log(`✅ Image loaded successfully: ${photo.name} (URL ${currentUrlIndex + 1}/${fallbackUrls.length})`);
-    setImageLoaded(true);
-    setImageError(false);
-  };
-
-  const handleImageError = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    const imgElement = event.currentTarget;
-    console.error(`❌ Failed to load ${photo.name} with URL ${currentUrlIndex + 1}/${fallbackUrls.length}:`, {
-      url: getCurrentUrl(),
-      naturalWidth: imgElement.naturalWidth,
-      naturalHeight: imgElement.naturalHeight,
-      complete: imgElement.complete
-    });
-
-    // Try next fallback URL
-    if (currentUrlIndex < fallbackUrls.length - 1) {
-      console.log(`🔄 Trying fallback URL ${currentUrlIndex + 2}/${fallbackUrls.length} for ${photo.name}`);
-      setCurrentUrlIndex(prev => prev + 1);
-      setImageLoaded(false);
-      setImageError(false);
-    } else {
-      // All URLs failed
-      console.error(`💥 All URLs failed for ${photo.name}`);
-      setImageError(true);
-      setErrorMessage('All sources failed');
-      setImageLoaded(false);
-    }
-  };
-
-  const handleRetry = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    console.log(`🔄 Manual retry for ${photo.name}`);
-    setCurrentUrlIndex(0);
-    setImageError(false);
-    setImageLoaded(false);
-    setErrorMessage('');
-  };
 
   return (
     <div
@@ -852,37 +820,15 @@ function PhotoCard({ photo, onSelect }: { photo: Photo; onSelect: () => void }) 
     >
       <div className="w-full relative" style={{ aspectRatio: '2/3' }}>
         <img 
-          key={`${photo.id}-${currentUrlIndex}`} // Force re-render on URL change
-          src={getCurrentUrl()} 
+          src={photo.url} 
           alt={photo.name} 
           className="w-full h-full object-cover"
-          onLoad={handleImageLoad}
-          onError={handleImageError}
-          style={{ display: imageLoaded && !imageError ? 'block' : 'none' }}
-          crossOrigin="anonymous"
+          onLoad={() => console.log(`✅ Image loaded: ${photo.name}`)}
+          onError={(e) => {
+            console.error(`❌ Image failed: ${photo.name}`, photo.url);
+            e.currentTarget.style.display = 'none';
+          }}
         />
-        
-        {/* Loading/Error placeholder */}
-        {(!imageLoaded || imageError) && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 text-gray-400">
-            <div className="text-center p-2">
-              <div className="text-2xl mb-1">
-                {imageError ? '❌' : '⏳'}
-              </div>
-              <div className="text-xs px-2">
-                {imageError ? errorMessage : `Loading... (${currentUrlIndex + 1}/${fallbackUrls.length})`}
-              </div>
-              {imageError && (
-                <button 
-                  onClick={handleRetry}
-                  className="text-xs text-blue-600 hover:text-blue-800 mt-1 underline"
-                >
-                  Retry
-                </button>
-              )}
-            </div>
-          </div>
-        )}
         
         {/* Filename overlay at bottom */}
         <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white px-2 py-1">

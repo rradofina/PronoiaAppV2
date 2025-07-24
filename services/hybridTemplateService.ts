@@ -28,6 +28,7 @@ export interface HybridTemplate {
     height: number;
   };
   thumbnail_url?: string;
+  base64_preview?: string; // Base64-encoded small preview for instant loading
   source: 'manual' | 'auto'; // Track source for debugging/migration
   is_active?: boolean;
 }
@@ -190,6 +191,7 @@ class HybridTemplateServiceImpl {
       holes: template.holes_data,
       dimensions: template.dimensions,
       thumbnail_url: template.thumbnail_url,
+      base64_preview: template.base64_preview, // Include base64 preview for instant loading
       source: 'manual' as const,
       is_active: template.is_active
     }));

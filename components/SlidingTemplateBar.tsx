@@ -50,6 +50,11 @@ export default function SlidingTemplateBar({
         isVisible ? 'bg-transparent' : 'bg-transparent pointer-events-none'
       }`}
     >
+      
+      {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
+      <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
+        SlidingTemplateBar.tsx
+      </div>
       {/* Background overlay */}
       <div 
         className="absolute inset-0" 
@@ -105,7 +110,6 @@ export default function SlidingTemplateBar({
                 >
                   {/* Template info */}
                   <div className="mb-3">
-                    <h4 className="font-semibold text-gray-800 text-center mb-1">{templateName}</h4>
                     <div className="flex items-center justify-center space-x-2 text-xs text-gray-500">
                       <span>{templateType.charAt(0).toUpperCase() + templateType.slice(1)}</span>
                       <span>•</span>
@@ -114,7 +118,7 @@ export default function SlidingTemplateBar({
                   </div>
 
                   {/* Template preview */}
-                  <div className="aspect-[2/3] bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200 mb-3">
+                  <div className="aspect-[2/3] bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200 mb-3 relative">
                     <TemplateVisual
                       template={{ 
                         id: templateType, 

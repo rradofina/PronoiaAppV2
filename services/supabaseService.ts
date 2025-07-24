@@ -83,7 +83,7 @@ export class SupabaseService {
     return {
       id: data.id,
       clientName: data.client_name,
-      packageType: data.package_type as any,
+      package_id: data.package_id, // Updated to use manual package ID
       selectedTemplates: [], // Will be loaded separately
       maxTemplates: data.max_templates,
       usedTemplates: data.used_templates,

@@ -30,6 +30,10 @@ export default function InlineTemplateEditor({
 
   return (
     <div className="fixed inset-0 z-20 bg-black bg-opacity-75 flex flex-col items-center justify-center p-4 overflow-hidden">
+      {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
+      <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
+        InlineTemplateEditor.tsx
+      </div>
       {/* Mobile/Portrait: Vertical layout */}
       <div className="lg:hidden w-full max-w-3xl flex flex-col h-full">
         {/* Photo gallery at the top */}

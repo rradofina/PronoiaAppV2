@@ -64,8 +64,10 @@ class GoogleDriveService {
   // Set access token from external auth (Google Identity Services)
   setAccessToken(token: string): void {
     this.accessToken = token;
+    console.log('🔑 Access token set in GoogleDriveService:', token ? 'Token provided' : 'No token');
     if (window.gapi && window.gapi.client) {
       window.gapi.client.setToken({ access_token: token });
+      console.log('🔑 Token also set in gapi.client');
     }
   }
 
@@ -93,9 +95,12 @@ class GoogleDriveService {
 
   async getFolderContents(folderId: string): Promise<GoogleDriveFolder> {
     try {
+      console.log(`📁 Getting folder contents for: ${folderId}`);
       if (!this.isSignedIn()) {
+        console.error('❌ Not signed in to Google Drive');
         throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
       }
+      console.log('✅ Google Drive authentication verified');
 
       // Get folder info
       const folderResponse = await window.gapi.client.drive.files.get({
@@ -125,6 +130,7 @@ class GoogleDriveService {
         });
 
         for (const file of filesResponse.result.files || []) {
+          console.log(`📄 Found file: ${file.name}`, { mimeType: file.mimeType, hasThumb: !!file.thumbnailLink });
           logger.drive.debug(`Found file: ${file.name}`, { mimeType: file.mimeType, thumbnailLink: file.thumbnailLink });
           
           if (file.mimeType === 'application/vnd.google-apps.folder') {
@@ -138,6 +144,11 @@ class GoogleDriveService {
               folders: [],
             });
           } else if (this.isImageFile(file.mimeType || '')) {
+            console.log(`🖼️ Adding image: ${file.name}`, { 
+              thumbnailLink: file.thumbnailLink,
+              webContentLink: file.webContentLink,
+              mimeType: file.mimeType 
+            });
             logger.drive.debug(`Added as image: ${file.name}`);
             files.push({
               id: file.id || '',
@@ -177,18 +188,21 @@ class GoogleDriveService {
     try {
       const folder = await this.getFolderContents(folderId);
       const files = folder.files || [];
-      console.log(`Found ${files.length} files in folder`);
+      console.log(`📁 Found ${files.length} files in folder: ${folder.name}`);
       
-      // Create photos with multiple URL strategies
-      const photos = await Promise.all(files.map(async (file) => {
-        const urls = await this.generatePhotoUrls(file);
+      // Fast: Use thumbnail URLs directly
+      const photos = files.map((file) => {
+        let photoUrl = file.thumbnailLink || '';
         
-        console.log(`Generated URLs for ${file.name}:`, urls);
+        // Make thumbnail larger if possible
+        if (file.thumbnailLink && file.thumbnailLink.includes('=s220')) {
+          photoUrl = file.thumbnailLink.replace('=s220', '=s400');
+        }
         
         return {
           id: file.id,
-          url: urls.primary,
-          thumbnailUrl: urls.thumbnail,
+          url: photoUrl,
+          thumbnailUrl: file.thumbnailLink || '',
           name: file.name,
           mimeType: file.mimeType,
           size: parseInt(file.size) || 0,
@@ -198,12 +212,26 @@ class GoogleDriveService {
           createdTime: file.createdTime,
           modifiedTime: file.modifiedTime,
         };
-      }));
+      });
 
-      console.log(`Returning ${photos.length} photos`);
+      console.log(`✅ Returning ${photos.length} photos instantly`);
       return photos;
     } catch (error) {
-      console.error('Failed to get photos from folder:', error);
+      console.error('❌ Failed to get photos from folder:', error);
+      throw error;
+    }
+  }
+
+  // New method: Create blob URL on demand (for when user actually needs the photo)
+  async createPhotoBlob(photoId: string): Promise<string> {
+    try {
+      if (!this.accessToken) {
+        throw new Error('No access token available');
+      }
+      
+      return await this.createBlobUrlForImage(photoId);
+    } catch (error) {
+      console.warn('Failed to create photo blob:', error);
       throw error;
     }
   }
@@ -219,7 +247,7 @@ class GoogleDriveService {
       fallbacks: [] as string[]
     };
 
-    // Strategy 1: Use thumbnail URLs first (fast, no download)
+    // Strategy 1: Use thumbnail URLs first (fast, no download) - GitHub approach
     if (file.thumbnailLink) {
       const thumbUrl = file.thumbnailLink.replace('=s220', '=s400');
       urls.primary = thumbUrl;
@@ -252,11 +280,11 @@ class GoogleDriveService {
       console.log(`Using thumbnail URL for ${file.name}: ${thumbUrl}`);
     }
 
-    // Strategy 3: Google Drive direct link
+    // Strategy 4: Google Drive direct link
     const directUrl = `https://drive.google.com/uc?id=${file.id}&export=view`;
     urls.fallbacks.push(directUrl);
 
-    // Strategy 4: API endpoint with token
+    // Strategy 5: API endpoint with token
     if (this.accessToken) {
       const apiUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&access_token=${this.accessToken}`;
       urls.fallbacks.push(apiUrl);
@@ -397,6 +425,38 @@ class GoogleDriveService {
     }
   }
 
+  async getFileMetadata(fileId: string): Promise<any> {
+    try {
+      if (!this.isSignedIn()) {
+        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
+      }
+
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,mimeType,size,permissions`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('File not found');
+        } else if (response.status === 403) {
+          throw new Error('Permission denied');
+        } else {
+          throw new Error(`Failed to get file metadata: ${response.status}`);
+        }
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to get file metadata:', error);
+      throw error;
+    }
+  }
+
   async downloadPhoto(photoId: string): Promise<Blob> {
     try {
       if (!this.isSignedIn()) {
@@ -413,7 +473,21 @@ class GoogleDriveService {
       );
 
       if (!response.ok) {
-        throw new Error('Failed to download photo');
+        console.error('Google Drive API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url
+        });
+        
+        if (response.status === 404) {
+          throw new Error('File not found - please check the file ID is correct');
+        } else if (response.status === 403) {
+          throw new Error('Permission denied - make sure the file is shared or public');
+        } else if (response.status === 401) {
+          throw new Error('Authentication failed - please sign in to Google Drive again');
+        } else {
+          throw new Error(`Failed to download photo (${response.status}: ${response.statusText})`);
+        }
       }
 
       return await response.blob();
@@ -426,27 +500,97 @@ class GoogleDriveService {
   // Download PNG template files with better error handling
   async downloadTemplate(templateId: string): Promise<Blob> {
     try {
+      // Validate and clean template ID first
+      if (!templateId || typeof templateId !== 'string') {
+        throw new Error('Invalid template ID: must be a non-empty string');
+      }
+      
+      // Handle legacy URLs stored as template IDs (extract file ID from URL)
+      let cleanFileId = templateId;
+      if (templateId.includes('drive.google.com') || templateId.includes('http')) {
+        console.log('🔧 Legacy URL detected, extracting file ID:', templateId);
+        
+        const patterns = [
+          /\/file\/d\/([a-zA-Z0-9-_]+)/,  // /file/d/FILE_ID
+          /id=([a-zA-Z0-9-_]+)/,          // id=FILE_ID
+          /\/d\/([a-zA-Z0-9-_]+)/,        // /d/FILE_ID
+        ];
+        
+        let extracted = false;
+        for (const pattern of patterns) {
+          const match = templateId.match(pattern);
+          if (match && match[1]) {
+            cleanFileId = match[1];
+            extracted = true;
+            console.log('✅ Extracted file ID from legacy URL:', cleanFileId);
+            break;
+          }
+        }
+        
+        if (!extracted) {
+          throw new Error(`Could not extract file ID from legacy URL: ${templateId}`);
+        }
+      }
+      
+      // Validate the clean file ID
+      if (cleanFileId.length < 15 || cleanFileId.length > 100) {
+        throw new Error(`Invalid template ID length: ${cleanFileId.length} characters (expected 15-100)`);
+      }
+      
+      if (!/^[a-zA-Z0-9-_]+$/.test(cleanFileId)) {
+        throw new Error(`Invalid template ID format: "${cleanFileId}" contains invalid characters`);
+      }
+      
       if (!this.isSignedIn()) {
         throw new Error('Not authenticated with Google Drive');
       }
 
-      console.log(`📥 Downloading template: ${templateId}`);
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${templateId}?alt=media`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-          },
+      console.log(`📥 Downloading template: ${cleanFileId}${cleanFileId !== templateId ? ` (extracted from legacy URL: ${templateId})` : ''}`);
+      
+      // Add timeout and better error handling for network issues
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      try {
+        const response = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${cleanFileId}?alt=media`,
+          {
+            headers: {
+              Authorization: `Bearer ${this.accessToken}`,
+            },
+            signal: controller.signal,
+          }
+        );
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          console.error(`❌ Template download failed: ${response.status} ${response.statusText}`);
+          if (response.status === 404) {
+            throw new Error('Template file not found - it may have been deleted or moved');
+          } else if (response.status === 403) {
+            throw new Error('Permission denied - template file is not accessible');
+          } else if (response.status === 401) {
+            throw new Error('Authentication expired - please sign in again');
+          } else {
+            throw new Error(`Failed to download template: ${response.status} ${response.statusText}`);
+          }
         }
-      );
-
-      if (!response.ok) {
-        console.error(`❌ Template download failed: ${response.status} ${response.statusText}`);
-        throw new Error(`Failed to download template: ${response.status} ${response.statusText}`);
+        
+        const blob = await response.blob();
+        console.log(`✅ Template downloaded successfully: ${cleanFileId}${cleanFileId !== templateId ? ` (extracted from legacy URL: ${templateId})` : ''}`);
+        return blob;
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Template download timed out - please try again');
+        } else if (fetchError instanceof TypeError && fetchError.message === 'Failed to fetch') {
+          throw new Error('Network error - please check your internet connection and try again');
+        } else {
+          throw fetchError;
+        }
       }
-
-      console.log(`✅ Template downloaded successfully: ${templateId}`);
-      return await response.blob();
     } catch (error) {
       console.error('❌ Template download error:', error);
       throw new Error(`Template download failed: ${error instanceof Error ? error.message : String(error)}`);
