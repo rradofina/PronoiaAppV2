@@ -354,10 +354,7 @@ export default function FullscreenTemplateEditor({
                         centerOnInit={true}
                         limitToBounds={false}
                         wheel={{ 
-                          step: 0.01,
-                          // wheelDelta: 40, // Remove unsupported property
-                          activationDistance: 10,
-                          smoothWheel: true
+                          step: 0.01
                         }}
                         doubleClick={{ 
                           disabled: false, 
