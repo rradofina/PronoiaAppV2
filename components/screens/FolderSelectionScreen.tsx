@@ -51,7 +51,7 @@ export default function FolderSelectionScreen({
       
       // Flatten all packages from all groups and add ungrouped packages
       const allPackages = groups.flatMap(group => 
-        group.packages.map(pkg => ({
+        (group.packages || []).map(pkg => ({
           id: pkg.id,
           name: pkg.name,
           templateCount: pkg.template_count,
