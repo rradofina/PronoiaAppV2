@@ -56,7 +56,6 @@ export default function Home() {
   const {
     selectedPackage,
     clientName,
-    packages,
     setSelectedPackage,
     setClientName,
     clearSession,
