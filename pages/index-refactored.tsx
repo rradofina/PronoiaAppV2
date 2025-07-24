@@ -456,7 +456,6 @@ export default function Home() {
             clientName={clientName}
             selectedClientFolder={selectedClientFolder}
             photos={photos}
-            packages={packages}
             selectedPackage={selectedPackage}
             setSelectedPackage={setSelectedPackage}
             handleBack={handleBack}
