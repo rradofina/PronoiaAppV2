@@ -782,7 +782,7 @@ export default function Home() {
         setCurrentScreen('photos');
       } catch (error) {
         console.error('Error loading package templates:', error);
-        alert(`Failed to load templates: ${error.message || 'Please check your template configuration.'}`);
+        alert(`Failed to load templates: ${error instanceof Error ? error.message : 'Please check your template configuration.'}`);
       }
     }
   };
