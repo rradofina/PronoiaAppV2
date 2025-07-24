@@ -67,7 +67,7 @@ export class SupabaseService {
   async createSession(sessionData: {
     user_id: string;
     client_name: string;
-    package_type: 'A' | 'B' | 'C' | 'D';
+    package_id: string; // Updated to use manual package UUID
     google_drive_folder_id: string;
     max_templates: number;
   }): Promise<Session> {
