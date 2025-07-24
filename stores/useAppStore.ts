@@ -7,7 +7,7 @@ import {
   Template, 
   Photo, 
   PhotoSlot, 
-  PhotoStudioPackage,
+  Package,
   TemplateType,
   UIState,
   LoadingState,
@@ -16,10 +16,9 @@ import {
   GoogleAuth,
   DriveFolder,
   TemplateSlot,
-  Package,
   TemplateTypeInfo
 } from '../types';
-import { STORAGE_KEYS, PACKAGES } from '../utils/constants';
+import { STORAGE_KEYS } from '../utils/constants';
 
 interface AppStore extends AppState {
   // Event Log for debugging
@@ -73,7 +72,7 @@ interface AppStore extends AppState {
   setMainSessionsFolder: (folder: { id: string; name: string } | null) => void;
   
   // Package actions
-  selectPackage: (packageId: PhotoStudioPackage['id'], clientName: string, sessionFolderId: string) => void;
+  selectPackage: (packageId: Package['id'], clientName: string, sessionFolderId: string) => void;
   
   // Template actions
   addTemplate: (templateType: TemplateType) => void;
@@ -329,13 +328,14 @@ const useAppStore = create<AppStore>()(
 
         // Package actions
         selectPackage: (packageId, clientName, sessionFolderId) => {
-          const selectedPackage = PACKAGES.find(pkg => pkg.id === packageId);
+          const state = get();
+          const selectedPackage = state.packages.find(pkg => pkg.id === packageId);
           if (!selectedPackage) return;
 
           const session: Session = {
             id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             clientName,
-            packageType: packageId,
+            package_id: packageId,
             selectedTemplates: [],
             maxTemplates: selectedPackage.templateCount,
             usedTemplates: 0,
