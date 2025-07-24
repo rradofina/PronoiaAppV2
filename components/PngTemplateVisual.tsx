@@ -29,18 +29,19 @@ export default function PngTemplateVisual({
   );
 
   // Get the PNG URL from the correct property
-  const fileId = pngTemplate.drive_file_id?.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+  const driveFileId = (pngTemplate as any).drive_file_id || pngTemplate.driveFileId;
+  const fileId = driveFileId?.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
   const pngUrl = pngTemplate.pngUrl || 
-                 pngTemplate.thumbnail_url || 
-                 pngTemplate.base64_preview ||
+                 (pngTemplate as any).thumbnail_url || 
+                 (pngTemplate as any).base64_preview ||
                  (fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : null);
   
   console.log('🖼️ PngTemplateVisual DEBUG:', {
     templateName: pngTemplate.name,
     finalPngUrl: pngUrl,
-    base64_preview: pngTemplate.base64_preview,
-    drive_file_id: pngTemplate.drive_file_id,
-    thumbnail_url: pngTemplate.thumbnail_url,
+    base64_preview: (pngTemplate as any).base64_preview,
+    drive_file_id: driveFileId,
+    thumbnail_url: (pngTemplate as any).thumbnail_url,
     allTemplateProperties: Object.keys(pngTemplate),
     fullTemplate: pngTemplate
   });
