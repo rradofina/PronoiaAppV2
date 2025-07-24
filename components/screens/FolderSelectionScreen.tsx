@@ -14,7 +14,7 @@ interface FolderSelectionScreenProps {
   onChangeMainFolder: () => void;
   // New props for package selection
   selectedPackage: Package | null;
-  setSelectedPackage: (pkg: Package) => void;
+  setSelectedPackage: (pkg: Package | null) => void;
   handleContinue: () => void;
   // New prop for template management
   onManageTemplates: () => void;
