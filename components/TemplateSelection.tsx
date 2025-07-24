@@ -120,8 +120,6 @@ export default function TemplateSelection() {
           Choose up to {session.maxTemplates} template types for {session.clientName}
         </p>
         <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
-          <span>📦 {session.packageType}</span>
-          <span>•</span>
           <span>🎯 {templates.length} / {session.maxTemplates} selected</span>
           <span>•</span>
           <span>📋 {getRemainingTemplates()} remaining</span>
