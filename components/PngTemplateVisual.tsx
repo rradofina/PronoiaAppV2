@@ -23,10 +23,26 @@ export default function PngTemplateVisual({
     return photos.find(p => p.id === photoId)?.url || null;
   };
 
-  // Find all slots for this template
-  const thisTemplateSlots = templateSlots.filter(slot => 
-    slot.templateId.startsWith(pngTemplate.id)
-  );
+  // Since TemplateVisual already filtered and passed only relevant slots, use them directly
+  const thisTemplateSlots = templateSlots;
+  
+  console.log('🔍 PngTemplateVisual slot mapping:', {
+    pngTemplateId: pngTemplate.id,
+    pngTemplateType: pngTemplate.template_type,
+    pngTemplateName: pngTemplate.name,
+    slotsReceived: templateSlots.length,
+    slotsToRender: thisTemplateSlots.length,
+    holesAvailable: pngTemplate.holes?.length || 0,
+    slotIds: thisTemplateSlots.map(s => s.id),
+    slotTemplateTypes: [...new Set(templateSlots.map(s => s.templateType))],
+    firstSlotData: templateSlots[0] ? {
+      id: templateSlots[0].id,
+      templateId: templateSlots[0].templateId,
+      templateType: templateSlots[0].templateType,
+      slotIndex: templateSlots[0].slotIndex,
+      hasPhoto: !!templateSlots[0].photoId
+    } : null
+  });
 
   // Get the PNG URL from the correct property
   const driveFileId = (pngTemplate as any).drive_file_id || pngTemplate.driveFileId;
@@ -38,12 +54,15 @@ export default function PngTemplateVisual({
   
   console.log('🖼️ PngTemplateVisual DEBUG:', {
     templateName: pngTemplate.name,
+    templateType: pngTemplate.template_type,
     finalPngUrl: pngUrl,
     base64_preview: (pngTemplate as any).base64_preview,
     drive_file_id: driveFileId,
     thumbnail_url: (pngTemplate as any).thumbnail_url,
     allTemplateProperties: Object.keys(pngTemplate),
-    fullTemplate: pngTemplate
+    slotsConnected: thisTemplateSlots.length,
+    firstSlotTemplateType: thisTemplateSlots[0]?.templateType,
+    holesCount: pngTemplate.holes?.length
   });
 
   return (
@@ -97,8 +116,12 @@ export default function PngTemplateVisual({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full bg-gray-200 flex items-center justify-center relative overflow-hidden">
-                {/* Completely clean placeholder - no outline or icons */}
+              <div className="w-full h-full bg-gray-200 flex items-center justify-center relative overflow-hidden border-2 border-dashed border-gray-400">
+                {/* Visible placeholder with icon */}
+                <div className="text-center text-gray-500">
+                  <div className="text-lg mb-1">+</div>
+                  <div className="text-xs font-medium">Tap to Add</div>
+                </div>
               </div>
             )}
           </div>

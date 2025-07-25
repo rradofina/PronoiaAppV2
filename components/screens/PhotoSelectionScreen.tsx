@@ -25,37 +25,86 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
     console.warn('⚠️ No PNG templates found in window.pngTemplates - templates may not be loaded yet');
   }
   
-  // Find the PNG template that matches this template ID
+  // Find the PNG template that matches this template type
   let pngTemplate = pngTemplates.find((t: any) => {
-    // Match by template type and first slot's templateId
+    // Primary match: exact template type match
+    if (t.template_type === template.id) {
+      console.log('🎯 Found exact template_type match:', t.name, 'for', template.id);
+      return true;
+    }
+    
+    // Secondary match: check if template name contains the type
+    if (t.name && template.id && t.name.toLowerCase().includes(template.id.toLowerCase())) {
+      console.log('🎯 Found name match:', t.name, 'for', template.id);
+      return true;
+    }
+    
+    // Legacy fallback matches
     const templateId = slots[0]?.templateId || '';
-    return templateId.includes(t.id) || 
-           t.template_type === template.id ||
-           t.id.includes(template.id) ||
-           template.id.includes(t.template_type);
+    const fallbackMatch = templateId.includes(t.id) || 
+                         t.id.includes(template.id) ||
+                         template.id.includes(t.template_type);
+    
+    if (fallbackMatch) {
+      console.log('🎯 Found fallback match:', t.name, 'for', template.id);
+    }
+    
+    return fallbackMatch;
   });
   
-  // TEMP DEBUG: If no match found, use the first available PNG template of same type
+  // ENHANCED: If no exact match found, try finding by template type first
   if (!pngTemplate && pngTemplates.length > 0) {
-    pngTemplate = pngTemplates.find((t: any) => t.template_type === template.id) || pngTemplates[0];
-    console.log('🔧 Using fallback PNG template:', pngTemplate?.name);
+    // First try to find by exact template type
+    pngTemplate = pngTemplates.find((t: any) => t.template_type === template.id);
+    
+    if (!pngTemplate) {
+      // If still no match, try finding by slots template type (this handles swapped templates)
+      const slotTemplateType = slots[0]?.templateType;
+      if (slotTemplateType) {
+        pngTemplate = pngTemplates.find((t: any) => t.template_type === slotTemplateType);
+        console.log('🔄 Found PNG template using slot templateType:', slotTemplateType, '→', pngTemplate?.name);
+      }
+    }
+    
+    if (!pngTemplate) {
+      // Last resort - use first available template
+      pngTemplate = pngTemplates[0];
+      console.log('🔧 Using first available PNG template as fallback:', pngTemplate?.name);
+    } else {
+      console.log('✅ Successfully matched PNG template:', pngTemplate?.name);
+    }
   }
 
   console.log('🎨 TemplateVisual render:', {
     templateId: template.id,
     templateName: template.name,
     slotsCount: slots.length,
+    firstSlotTemplateType: slots[0]?.templateType,
     pngTemplatesAvailable: pngTemplates.length,
     foundPngTemplate: !!pngTemplate,
     pngTemplateName: pngTemplate?.name,
+    pngTemplateType: pngTemplate?.template_type,
     firstSlotTemplateId: slots[0]?.templateId,
-    pngTemplateKeys: pngTemplate ? Object.keys(pngTemplate) : [],
-    fullPngTemplate: pngTemplate,
-    availablePngTemplates: pngTemplates.map((t: any) => ({ id: t.id, type: t.template_type, name: t.name }))
+    availablePngTemplates: pngTemplates.map((t: any) => ({ id: t.id, type: t.template_type, name: t.name })),
+    matchingLogic: {
+      templateIdForMatching: template.id,
+      availableTypes: pngTemplates.map((t: any) => t.template_type),
+      exactTypeMatch: pngTemplates.find((t: any) => t.template_type === template.id)?.name || 'None'
+    }
   });
 
   if (pngTemplate) {
     // Use the proper PNG template visual
+    console.log('✅ RENDERING PngTemplateVisual with:', {
+      pngTemplateName: pngTemplate.name,
+      pngTemplateType: pngTemplate.template_type,
+      pngTemplateId: pngTemplate.id,
+      holesCount: pngTemplate.holes?.length || 0,
+      slotsCount: slots.length,
+      templateId: template.id,
+      pngTemplateDriveFileId: pngTemplate.drive_file_id
+    });
+    
     return (
       <PngTemplateVisual
         pngTemplate={pngTemplate}
@@ -65,6 +114,8 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
         selectedSlot={selectedSlot}
       />
     );
+  } else {
+    console.log('❌ No PNG template found, using fallback for:', template.id);
   }
 
   // Fallback for when PNG template not found
@@ -519,9 +570,25 @@ export default function PhotoSelectionScreen({
   };
 
   const handleSwapTemplate = (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => {
-    console.log('🚀 handleSwapTemplate called with:', {
+    // Calculate the EXACT print number from template position
+    const allTemplateGroups = Object.values(
+      templateSlots.reduce((acc, slot) => {
+        if (!acc[slot.templateId]) {
+          acc[slot.templateId] = { templateId: slot.templateId, templateName: slot.templateName, slots: [] };
+        }
+        acc[slot.templateId].slots.push(slot);
+        return acc;
+      }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
+    );
+    
+    const currentGroupIndex = allTemplateGroups.findIndex(group => group.templateId === template.templateId);
+    const exactPrintNumber = currentGroupIndex + 1;
+    
+    console.log('🚀 handleSwapTemplate called:', {
       templateId: template.templateId,
       templateName: template.templateName,
+      exactPrintNumber: exactPrintNumber,
+      totalTemplates: allTemplateGroups.length,
       availableTemplatesCount: availableTemplates.length
     });
     
@@ -531,29 +598,62 @@ export default function PhotoSelectionScreen({
     // Force auto-selection immediately after modal opens
     setTimeout(() => {
       console.log('⏰ Forcing auto-selection check...');
+      console.log('🎯 Current template analysis:', {
+        templateId: template.templateId,
+        templateName: template.templateName,
+        templateType: template.slots[0]?.templateType,
+        printSize: template.slots[0]?.printSize || '4R',
+        slotsCount: template.slots.length
+      });
+      
       if (availableTemplates.length > 0) {
-        const cleanTemplateName = template.templateName.replace(' (Additional)', '');
+        // Get current template info from the first slot
+        const currentTemplateType = template.slots[0]?.templateType || template.templateId.split('_')[0];
+        const currentPrintSize = template.slots[0]?.printSize || '4R';
+        
+        console.log('🔍 Looking for match:', {
+          currentTemplateType,
+          currentPrintSize,
+          availableCount: availableTemplates.length
+        });
+        
+        // Find template that matches BOTH type and print size
         const currentTemplate = availableTemplates.find(t => {
-          const nameMatch = t.name === cleanTemplateName;
-          const typeMatch = t.template_type === template.templateId.split('_')[0];
+          const typeMatch = t.template_type === currentTemplateType;
+          const sizeMatch = t.print_size === currentPrintSize;
+          const exactMatch = typeMatch && sizeMatch;
           
-          console.log('🔍 Force checking template:', {
-            availableTemplate: { id: t.id, name: t.name, type: t.template_type },
-            cleanTemplateName,
-            nameMatch,
-            typeMatch
+          console.log('🔍 Checking template:', {
+            templateName: t.name,
+            templateType: t.template_type,
+            printSize: t.print_size,
+            typeMatch,
+            sizeMatch,
+            exactMatch
           });
           
-          return nameMatch || typeMatch;
+          return exactMatch;
         });
         
         if (currentTemplate) {
-          console.log('✅ Force setting selectedNewTemplate to:', currentTemplate.name);
+          console.log('✅ FOUND EXACT MATCH! Auto-selecting:', {
+            id: currentTemplate.id,
+            name: currentTemplate.name,
+            type: currentTemplate.template_type,
+            size: currentTemplate.print_size
+          });
           setSelectedNewTemplate(currentTemplate);
           setPreviewSlots(template.slots);
         } else {
-          console.log('❌ No match found, using first available');
-          setSelectedNewTemplate(availableTemplates[0]);
+          console.log('❌ No exact match found. Trying type-only fallback...');
+          const fallbackTemplate = availableTemplates.find(t => t.template_type === currentTemplateType);
+          if (fallbackTemplate) {
+            console.log('⚠️ Using type-only fallback:', fallbackTemplate.name);
+            setSelectedNewTemplate(fallbackTemplate);
+          } else {
+            console.log('❌ No fallback found, using first available');
+            setSelectedNewTemplate(availableTemplates[0]);
+          }
           setPreviewSlots(template.slots);
         }
       }
@@ -565,13 +665,13 @@ export default function PhotoSelectionScreen({
     
     // Update ONLY the preview slots for the template bar display
     if (templateToSwap && selectedTemplate) {
-      // Create new slots based on the selected template
+      // Create new slots based on the selected template 
       const newSlotCount = selectedTemplate.holes?.length || 1;
       const newPreviewSlots: TemplateSlot[] = Array.from({ length: newSlotCount }, (_, index) => ({
         id: `preview_${selectedTemplate.id}_${Date.now()}_${index}`,
         templateId: templateToSwap.templateId, // Keep same templateId to maintain position
         templateName: `${selectedTemplate.name || selectedTemplate.template_type}`,
-        templateType: selectedTemplate.template_type,
+        templateType: selectedTemplate.template_type, // This is key - use new template type for PNG matching
         slotIndex: index,
         photoId: templateToSwap.slots[index]?.photoId || undefined, // Keep existing photos if possible
         transform: templateToSwap.slots[index]?.transform || undefined, // Keep transforms if possible
@@ -587,62 +687,121 @@ export default function PhotoSelectionScreen({
   const getDisplaySlots = () => {
     if (showTemplateSwapper && templateToSwap && previewSlots.length > 0) {
       // During template swap modal, replace the swapping template with preview
+      console.log('🔄 getDisplaySlots: Using preview slots during swap modal', {
+        templateToSwapId: templateToSwap.templateId,
+        previewSlotsCount: previewSlots.length,
+        previewSlotTypes: previewSlots.map(s => s.templateType)
+      });
+      
       return templateSlots.map(slot => {
         if (slot.templateId === templateToSwap.templateId) {
           // Find matching preview slot by slot index
-          return previewSlots.find(preview => preview.slotIndex === slot.slotIndex) || slot;
+          const previewSlot = previewSlots.find(preview => preview.slotIndex === slot.slotIndex);
+          if (previewSlot) {
+            console.log('🔄 Replacing slot with preview:', {
+              originalType: slot.templateType,
+              previewType: previewSlot.templateType,
+              slotIndex: slot.slotIndex
+            });
+          }
+          return previewSlot || slot;
         }
         return slot;
       });
     }
     // Normal case - return original slots
+    console.log('🔄 getDisplaySlots: Using normal templateSlots (no preview)');
     return templateSlots;
   };
 
   const confirmTemplateSwap = () => {
     if (!templateToSwap || !selectedNewTemplate) return;
 
+    console.log('🔄 Confirming template swap:', {
+      from: templateToSwap.templateName,
+      to: selectedNewTemplate.name,
+      newType: selectedNewTemplate.template_type
+    });
+
+    // Calculate the EXACT print number from template position
+    const allTemplateGroups = Object.values(
+      templateSlots.reduce((acc, slot) => {
+        if (!acc[slot.templateId]) {
+          acc[slot.templateId] = { templateId: slot.templateId, templateName: slot.templateName, slots: [] };
+        }
+        acc[slot.templateId].slots.push(slot);
+        return acc;
+      }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
+    );
+    
+    const currentGroupIndex = allTemplateGroups.findIndex(group => group.templateId === templateToSwap.templateId);
+    const printNumber = currentGroupIndex + 1;
+    const firstSlotIndex = templateSlots.findIndex(slot => slot.templateId === templateToSwap.templateId);
+    const isAdditional = templateToSwap.templateName.includes('(Additional)');
+    
+    // Create new template name with proper format: "Type (Print #X)" or "Type (Additional Print #X)"
+    const newTemplateName = isAdditional 
+      ? `${selectedNewTemplate.name} (Additional Print #${printNumber})`
+      : `${selectedNewTemplate.name} (Print #${printNumber})`;
+
+    console.log('📝 Template naming:', {
+      printNumber,
+      isAdditional,
+      newTemplateName,
+      originalSlotIndex: firstSlotIndex
+    });
+
     // Create new slots based on the new template
     const newSlots: TemplateSlot[] = Array.from({ length: selectedNewTemplate.holes?.length || 1 }, (_, index) => ({
       id: `${selectedNewTemplate.id}_${Date.now()}_${index}`,
-      templateId: `${selectedNewTemplate.template_type}_${Date.now()}`,
-      templateName: `${selectedNewTemplate.name || selectedNewTemplate.template_type}`,
-      templateType: selectedNewTemplate.template_type,
+      templateId: templateToSwap.templateId, // KEEP SAME templateId to maintain position
+      templateName: newTemplateName,
+      templateType: selectedNewTemplate.template_type, // This is the key - update templateType for PNG matching
       slotIndex: index,
       photoId: templateToSwap.slots[index]?.photoId || undefined, // Keep existing photos if possible
       transform: templateToSwap.slots[index]?.transform || undefined, // Keep transforms if possible
+      printSize: templateToSwap.slots[0]?.printSize || '4R', // Keep same print size
     }));
 
-    // Update template slots - replace old template with new one
-    const updatedSlots = templateSlots.filter(slot => 
-      slot.templateId !== templateToSwap.templateId
-    ).concat(newSlots);
+    console.log('🔄 Created new slots after swap:', {
+      originalTemplateType: templateToSwap.slots[0]?.templateType,
+      newTemplateType: selectedNewTemplate.template_type,
+      newSlotsTemplateType: newSlots[0]?.templateType,
+      newSlotsLength: newSlots.length,
+      selectedTemplateName: selectedNewTemplate.name,
+      newTemplateName
+    });
 
+    // Replace slots at the EXACT same position to maintain print order
+    const updatedSlots = [...templateSlots];
+    
+    // Remove old slots (backwards to avoid index issues)
+    for (let i = updatedSlots.length - 1; i >= 0; i--) {
+      if (updatedSlots[i].templateId === templateToSwap.templateId) {
+        updatedSlots.splice(i, 1);
+      }
+    }
+    
+    // Insert new slots at the original position
+    updatedSlots.splice(firstSlotIndex, 0, ...newSlots);
+
+    console.log('✅ Template swap complete - position maintained');
     setTemplateSlots(updatedSlots);
     
     // Close modal and reset state
     setShowTemplateSwapper(false);
     setTemplateToSwap(null);
     setSelectedNewTemplate(null);
+    setPreviewSlots([]);
   };
 
   const cancelTemplateSwap = () => {
-    // Just restore the original template selection and preview
-    if (templateToSwap) {
-      // Find the current template in available templates to auto-select it again
-      const currentTemplate = availableTemplates.find(t => 
-        t.name === templateToSwap.templateName.replace(' (Additional)', '') || 
-        t.template_type === templateToSwap.templateId.split('_')[0]
-      );
-      if (currentTemplate) {
-        setSelectedNewTemplate(currentTemplate);
-      }
-      // Reset preview to original slots
-      setPreviewSlots(templateToSwap.slots);
-    } else {
-      setSelectedNewTemplate(null);
-      setPreviewSlots([]);
-    }
+    console.log('❌ User cancelled template swap - returning to photo selection');
+    // Close modal and return to photo selection like nothing happened
+    setShowTemplateSwapper(false);
+    setTemplateToSwap(null);
+    setSelectedNewTemplate(null);
+    setPreviewSlots([]);
   };
 
   const closeTemplateSwapper = () => {
@@ -787,8 +946,8 @@ export default function PhotoSelectionScreen({
                     <h3 className="font-semibold mb-2 text-center text-xs leading-tight truncate px-1 relative z-20">{templateName}</h3>
                     <div className="w-full rounded-lg overflow-hidden border border-gray-200">
                       <TemplateVisual
-                        key={`${templateId}-${slots.map(s => `${s.photoId || 'empty'}-${s.transform?.scale || 0}-${s.transform?.x || 0}-${s.transform?.y || 0}`).join('-')}`} // Force re-render when photos or transforms change
-                        template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
+                        key={`${templateId}-${slots[0]?.templateType || 'unknown'}-${templateSlots.length}-${slots.map(s => `${s.photoId || 'empty'}-${s.templateType || 'unknown'}`).join('|')}`} // Force re-render when template type or photos change
+                        template={{ id: slots[0]?.templateType || templateId.split('_')[0], name: templateName, slots: slots.length }}
                         slots={slots}
                         onSlotClick={handleSlotSelectFromTemplate} // Direct slot selection - go straight to photo list
                         photos={photos}
@@ -883,8 +1042,8 @@ export default function PhotoSelectionScreen({
                   <h3 className="font-semibold mb-2 text-center text-sm relative z-20">{templateName}</h3>
                   <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '400px' }}>
                     <TemplateVisual
-                      key={`${templateId}-${slots.map(s => `${s.photoId || 'empty'}-${s.transform?.scale || 0}-${s.transform?.x || 0}-${s.transform?.y || 0}`).join('-')}`} // Force re-render when photos or transforms change
-                      template={{ id: templateId.split('_')[0], name: templateName, slots: slots.length }}
+                      key={`${templateId}-${slots[0]?.templateType || 'unknown'}-${templateSlots.length}-${slots.map(s => `${s.photoId || 'empty'}-${s.templateType || 'unknown'}`).join('|')}`} // Force re-render when template type or photos change
+                      template={{ id: slots[0]?.templateType || templateId.split('_')[0], name: templateName, slots: slots.length }}
                       slots={slots}
                       onSlotClick={handleSlotSelectFromTemplate} // Direct slot selection - go straight to photo list
                       photos={photos}
@@ -1356,16 +1515,6 @@ function PhotoCard({ photo, onSelect }: { photo: Photo; onSelect: () => void }) 
     googleDriveId: photo.googleDriveId
   });
 
-  // Use higher resolution thumbnail for better quality
-  // Google Drive thumbnail sizes: s220, s400, s600, s800
-  let imageUrl = photo.thumbnailUrl || photo.url;
-  
-  // Upgrade thumbnail size for better quality (s220 -> s600)
-  if (imageUrl && imageUrl.includes('=s220')) {
-    imageUrl = imageUrl.replace('=s220', '=s600');
-  } else if (imageUrl && imageUrl.includes('=s400')) {
-    imageUrl = imageUrl.replace('=s400', '=s600');
-  }
 
   return (
     <div
@@ -1374,19 +1523,13 @@ function PhotoCard({ photo, onSelect }: { photo: Photo; onSelect: () => void }) 
     >
       <div className="w-full relative" style={{ aspectRatio: '2/3' }}>
         <img 
-          src={imageUrl} 
+          src={photo.url} 
           alt={photo.name} 
           className="w-full h-full object-cover"
           onLoad={() => console.log(`✅ Image loaded: ${photo.name}`)}
           onError={(e) => {
             console.error(`❌ Image failed: ${photo.name}`, photo.url);
-            // Try fallback URL if thumbnail fails
-            const fallbackUrl = photo.url !== imageUrl ? photo.url : null;
-            if (fallbackUrl) {
-              e.currentTarget.src = fallbackUrl;
-            } else {
-              e.currentTarget.style.display = 'none';
-            }
+            e.currentTarget.style.display = 'none';
           }}
         />
         
