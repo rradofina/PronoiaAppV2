@@ -36,6 +36,7 @@ interface PackageFormData {
   price: string; // String for form input
   number_of_prints: number;
   photo_limit: number; // Maximum number of photos client can select
+  is_unlimited_photos: boolean; // When true, ignores photo_limit and allows unlimited photos
   group_id?: string;
   print_positions: PrintPosition[];
 }
@@ -48,6 +49,7 @@ const EMPTY_FORM: PackageFormData = {
   price: '',
   number_of_prints: 1,
   photo_limit: 20, // Default to 20 photos
+  is_unlimited_photos: false, // Default to limited photos
   group_id: undefined,
   print_positions: [{
     position: 1,
@@ -262,6 +264,7 @@ export default function ManualPackageManagerScreen({
           price: pkg.price?.toString() || '',
           number_of_prints: printPositions.length || 1,
           photo_limit: pkg.photo_limit || 20,
+          is_unlimited_photos: pkg.is_unlimited_photos || false,
           group_id: pkg.group_id,
           print_positions: printPositions.length > 0 ? printPositions : [{
             position: 1,
@@ -286,6 +289,7 @@ export default function ManualPackageManagerScreen({
         template_count: formData.number_of_prints,
         price: formData.price ? parseFloat(formData.price) : undefined,
         photo_limit: formData.photo_limit,
+        is_unlimited_photos: formData.is_unlimited_photos,
         group_id: formData.group_id,
         template_ids: formData.print_positions
           .filter(p => p.default_template_id)
@@ -299,7 +303,9 @@ export default function ManualPackageManagerScreen({
           description: packageData.description,
           thumbnail_url: packageData.thumbnail_url,
           print_size: packageData.print_size,
-          price: packageData.price
+          price: packageData.price,
+          photo_limit: packageData.photo_limit,
+          is_unlimited_photos: packageData.is_unlimited_photos
         });
 
         // Update template associations by removing all and adding new ones
@@ -669,7 +675,7 @@ export default function ManualPackageManagerScreen({
                                         </span>
                                         <span>{pkg.template_count} templates</span>
                                         <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                                          {pkg.photo_limit} photos max
+                                          {pkg.is_unlimited_photos ? 'Unlimited photos' : `${pkg.photo_limit} photos max`}
                                         </span>
                                         {pkg.price && <span>₱{pkg.price}</span>}
                                       </div>
@@ -810,7 +816,7 @@ export default function ManualPackageManagerScreen({
                                       </span>
                                       <span>{pkg.template_count} templates</span>
                                       <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                                        {pkg.photo_limit} photos max
+                                        {pkg.is_unlimited_photos ? 'Unlimited photos' : `${pkg.photo_limit} photos max`}
                                       </span>
                                       {pkg.price && <span>₱{pkg.price}</span>}
                                       <select
@@ -1104,6 +1110,28 @@ export default function ManualPackageManagerScreen({
                       </div>
 
                       <div>
+                        <div className="mb-3">
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={formData.is_unlimited_photos}
+                              onChange={(e) => setFormData(prev => ({ 
+                                ...prev, 
+                                is_unlimited_photos: e.target.checked,
+                                // Reset photo_limit to 20 when toggling off unlimited
+                                photo_limit: e.target.checked ? prev.photo_limit : 20
+                              }))}
+                              className="mr-2"
+                            />
+                            <span className="text-sm font-medium text-gray-700">
+                              Unlimited Photos (Student/All Soft Copies Package)
+                            </span>
+                          </label>
+                          <div className="text-xs text-gray-500 mt-1">
+                            When enabled, clients can select unlimited photos without restriction
+                          </div>
+                        </div>
+
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Photo Limit *
                         </label>
@@ -1113,15 +1141,21 @@ export default function ManualPackageManagerScreen({
                           min="1"
                           max="500"
                           value={formData.photo_limit}
+                          disabled={formData.is_unlimited_photos}
                           onChange={(e) => setFormData(prev => ({ 
                             ...prev, 
                             photo_limit: parseInt(e.target.value) || 20 
                           }))}
-                          className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className={`w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                            formData.is_unlimited_photos ? 'bg-gray-100 text-gray-500' : ''
+                          }`}
                           placeholder="20"
                         />
                         <div className="text-xs text-gray-500 mt-1">
-                          Max photos client can select
+                          {formData.is_unlimited_photos 
+                            ? 'Photo limit is ignored when unlimited photos is enabled'
+                            : 'Max photos client can select'
+                          }
                         </div>
                       </div>
 
@@ -1279,7 +1313,7 @@ export default function ManualPackageManagerScreen({
                     <span className="font-medium">Template Count:</span> {packageDetails.template_count}
                   </div>
                   <div>
-                    <span className="font-medium">Photo Limit:</span> {packageDetails.photo_limit} photos max
+                    <span className="font-medium">Photo Limit:</span> {packageDetails.is_unlimited_photos ? 'Unlimited photos' : `${packageDetails.photo_limit} photos max`}
                   </div>
                   <div>
                     <span className="font-medium">Price:</span> {packageDetails.price ? `₱${packageDetails.price}` : 'Free'}

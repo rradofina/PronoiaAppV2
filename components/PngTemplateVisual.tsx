@@ -80,7 +80,7 @@ export default function PngTemplateVisual({
           <div
             key={hole.id}
             className={`absolute cursor-pointer transition-all duration-200 ${
-              isSelected ? 'ring-4 ring-blue-500 ring-opacity-75' : 'hover:ring-2 hover:ring-blue-300'
+              isSelected ? 'border-4 border-blue-500 border-opacity-90 z-10' : 'hover:border-2 hover:border-blue-300 hover:border-opacity-60'
             }`}
             style={{
               left: `${(hole.x / pngTemplate.dimensions.width) * 100}%`,

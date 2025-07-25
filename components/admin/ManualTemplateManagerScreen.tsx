@@ -26,6 +26,7 @@ interface TemplateFormData {
   holes_data: string; // JSON string for editing
   dimensions: string; // JSON string for editing
   thumbnail_url: string;
+  sample_image_url: string; // Sample image showing template filled with photos
 }
 
 const TEMPLATE_TYPES: { value: TemplateType; label: string }[] = [
@@ -49,7 +50,8 @@ const EMPTY_FORM: TemplateFormData = {
   drive_file_id: '',
   holes_data: '[]',
   dimensions: '{"width": 1200, "height": 1800}',
-  thumbnail_url: ''
+  thumbnail_url: '',
+  sample_image_url: ''
 };
 
 export default function ManualTemplateManagerScreen({
@@ -232,7 +234,8 @@ export default function ManualTemplateManagerScreen({
       drive_file_id: template.drive_file_id,
       holes_data: JSON.stringify(template.holes_data, null, 2),
       dimensions: JSON.stringify(template.dimensions, null, 2),
-      thumbnail_url: template.thumbnail_url || ''
+      thumbnail_url: template.thumbnail_url || '',
+      sample_image_url: template.sample_image_url || ''
     });
     setEditingTemplate(template);
     
@@ -290,7 +293,8 @@ export default function ManualTemplateManagerScreen({
         drive_file_id: formData.drive_file_id.trim(),
         holes_data: holesData,
         dimensions: dimensionsData,
-        thumbnail_url: formData.thumbnail_url.trim() || undefined
+        thumbnail_url: formData.thumbnail_url.trim() || undefined,
+        sample_image_url: formData.sample_image_url.trim() || undefined
       };
 
       if (editingTemplate) {
@@ -860,6 +864,70 @@ export default function ManualTemplateManagerScreen({
                 className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Optional preview image URL"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sample Image URL
+              </label>
+              <div className="flex space-x-2">
+                <input
+                  type="url"
+                  value={formData.sample_image_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sample_image_url: e.target.value }))}
+                  className="flex-1 p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Sample image showing template filled with photos (Google Drive link)"
+                />
+                {formData.sample_image_url && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Convert Google Drive URL and test it
+                      let testUrl = formData.sample_image_url;
+                      if (testUrl.includes('drive.google.com')) {
+                        const fileId = testUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+                        if (fileId) {
+                          testUrl = `https://lh3.googleusercontent.com/d/${fileId}`;
+                        }
+                      }
+                      window.open(testUrl, '_blank');
+                    }}
+                    className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                    title="Test/Preview Sample Image"
+                  >
+                    👁️ Test
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                💡 Upload a sample image to Google Drive showing what this template looks like with photos, then paste the sharing link here. Use the "Test" button to verify the link works.
+              </p>
+              
+              {/* Show preview if URL exists */}
+              {formData.sample_image_url && (
+                <div className="mt-2 p-2 border border-gray-200 rounded">
+                  <p className="text-xs text-gray-600 mb-2">Preview:</p>
+                  <img
+                    src={(() => {
+                      let url = formData.sample_image_url;
+                      if (url.includes('drive.google.com')) {
+                        const fileId = url.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+                        if (fileId) {
+                          url = `https://lh3.googleusercontent.com/d/${fileId}`;
+                        }
+                      }
+                      return url;
+                    })()}
+                    alt="Sample preview"
+                    className="w-32 h-48 object-cover rounded border"
+                    onError={(e) => {
+                      e.currentTarget.src = '/api/placeholder/128/192';
+                      e.currentTarget.alt = 'Failed to load - check URL';
+                      e.currentTarget.className = 'w-32 h-48 object-cover rounded border border-red-300 bg-red-50';
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-end space-x-3 pt-4">

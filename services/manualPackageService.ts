@@ -118,6 +118,8 @@ class ManualPackageServiceImpl implements IManualPackageService {
           print_size: packageData.print_size,
           template_count: packageData.template_count,
           price: packageData.price,
+          photo_limit: packageData.photo_limit,
+          is_unlimited_photos: packageData.is_unlimited_photos,
           is_active: true,
           is_default: false,
           sort_order: 999 // Will be updated by trigger

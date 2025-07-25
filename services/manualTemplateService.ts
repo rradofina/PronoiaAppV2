@@ -94,6 +94,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
           holes_data: templateData.holes_data,
           dimensions: templateData.dimensions,
           thumbnail_url: templateData.thumbnail_url,
+          sample_image_url: templateData.sample_image_url,
           category_id: templateData.category_id,
           created_by: await this.getCurrentUserEmail(),
         })

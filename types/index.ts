@@ -390,6 +390,7 @@ export interface ManualTemplate {
   holes_data: ManualTemplateHole[];
   dimensions: ManualTemplateDimensions;
   thumbnail_url?: string;
+  sample_image_url?: string; // Sample image showing template filled with photos
   base64_preview?: string; // Base64-encoded small preview for instant loading
   category_id?: string;
   created_by?: string;
@@ -421,6 +422,7 @@ export interface ManualPackage {
   template_count: number;
   price?: number;
   photo_limit: number; // Maximum number of photos client can select
+  is_unlimited_photos: boolean; // When true, ignores photo_limit and allows unlimited photos
   is_active: boolean;
   is_default: boolean;
   sort_order: number;
@@ -468,6 +470,7 @@ export interface CreateManualTemplateRequest {
   holes_data: ManualTemplateHole[];
   dimensions: ManualTemplateDimensions;
   thumbnail_url?: string;
+  sample_image_url?: string; // Sample image showing template filled with photos
   base64_preview?: string; // Base64-encoded small preview for instant loading
   category_id?: string;
 }
@@ -480,6 +483,7 @@ export interface CreateManualPackageRequest {
   template_count: number;
   price?: number;
   photo_limit: number; // Maximum number of photos client can select
+  is_unlimited_photos: boolean; // When true, ignores photo_limit and allows unlimited photos
   group_id?: string;
   template_ids: string[]; // Templates to include in package
 }
