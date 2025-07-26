@@ -1,4 +1,4 @@
-import { GoogleAuth, DriveFolder, Package } from '../../types';
+import { GoogleAuth, DriveFolder, Package, PackageGroup, ManualPackage } from '../../types';
 import HeaderNavigation from '../HeaderNavigation';
 import { useState, useEffect } from 'react';
 import { manualPackageService } from '../../services/manualPackageService';
@@ -38,35 +38,110 @@ export default function FolderSelectionScreen({
 }: FolderSelectionScreenProps) {
   const [selectedFolder, setSelectedFolder] = useState<DriveFolder | null>(null);
   const [showPackageSelection, setShowPackageSelection] = useState(false);
-  const [packages, setPackages] = useState<any[]>([]);
+  const [groups, setGroups] = useState<PackageGroup[]>([]);
+  const [groupedPackages, setGroupedPackages] = useState<{ [groupId: string]: ManualPackage[] }>({});
+  const [ungroupedPackages, setUngroupedPackages] = useState<ManualPackage[]>([]);
   const [isLoadingPackages, setIsLoadingPackages] = useState(false);
   const [packageError, setPackageError] = useState<string | null>(null);
+
+  // Utility function to transform Google Drive URLs to direct image URLs
+  const transformGoogleDriveUrl = (url: string): string => {
+    if (!url) return url;
+    
+    // Check if it's a Google Drive share URL
+    const driveMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (driveMatch) {
+      const fileId = driveMatch[1];
+      return `https://lh3.googleusercontent.com/d/${fileId}`;
+    }
+    
+    return url;
+  };
+
+  // Get thumbnail URL for package
+  const getPackageThumbnailUrl = (pkg: ManualPackage): string | null => {
+    if (!pkg.thumbnail_url) return null;
+    return transformGoogleDriveUrl(pkg.thumbnail_url);
+  };
+
+  // Package Icon Component
+  const PackageIcon = ({ pkg, size = "w-16 h-16", isUngrouped = false }: { 
+    pkg: ManualPackage; 
+    size?: string; 
+    isUngrouped?: boolean; 
+  }) => {
+    const thumbnailUrl = getPackageThumbnailUrl(pkg);
+    const [imageError, setImageError] = useState(false);
+
+    if (thumbnailUrl && !imageError) {
+      return (
+        <div className={`${size} rounded-full overflow-hidden border-2 border-white shadow-sm mr-4 flex-shrink-0`}>
+          <img
+            src={thumbnailUrl}
+            alt={`${pkg.name} thumbnail`}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        </div>
+      );
+    }
+
+    // Fallback to icon
+    const iconColors = isUngrouped 
+      ? "from-gray-400 to-gray-600" 
+      : "from-blue-400 to-blue-600";
+
+    return (
+      <div className={`${size} bg-gradient-to-br ${iconColors} rounded-full flex items-center justify-center mr-4 flex-shrink-0`}>
+        <span className="text-white font-bold">📦</span>
+      </div>
+    );
+  };
 
   // Load dynamic packages from manual package service
   const loadPackages = async () => {
     setIsLoadingPackages(true);
     setPackageError(null);
     try {
-      const groups = await packageGroupService.getGroupsWithPackages();
+      // Load groups and packages separately
+      const allGroups = await packageGroupService.getActiveGroups();
+      const allPackages = await manualPackageService.getActivePackages();
       
-      // Flatten all packages from all groups and add ungrouped packages
-      const allPackages = groups.flatMap(group => 
-        (group.packages || []).map(pkg => ({
-          id: pkg.id,
-          name: pkg.name,
-          templateCount: pkg.template_count,
-          price: pkg.price,
-          description: pkg.description || `${pkg.template_count} template${pkg.template_count === 1 ? '' : 's'}`
-        }))
-      );
+      setGroups(allGroups);
       
-      setPackages(allPackages);
+      // Organize packages by group
+      const grouped: { [groupId: string]: ManualPackage[] } = {};
+      const ungrouped: ManualPackage[] = [];
+
+      allPackages.forEach(pkg => {
+        if (pkg.group_id) {
+          if (!grouped[pkg.group_id]) {
+            grouped[pkg.group_id] = [];
+          }
+          grouped[pkg.group_id].push(pkg);
+        } else {
+          ungrouped.push(pkg);
+        }
+      });
+
+      // Sort packages within each group by sort_order
+      Object.keys(grouped).forEach(groupId => {
+        grouped[groupId].sort((a, b) => a.sort_order - b.sort_order);
+      });
+      
+      ungrouped.sort((a, b) => a.sort_order - b.sort_order);
+
+      setGroupedPackages(grouped);
+      setUngroupedPackages(ungrouped);
+      
       console.log('✅ Loaded', allPackages.length, 'packages from manual package service');
     } catch (error: any) {
       console.error('❌ Error loading packages:', error);
       setPackageError(error.message || 'Failed to load packages');
-      // Fallback to empty array
-      setPackages([]);
+      // Fallback to empty arrays
+      setGroups([]);
+      setGroupedPackages({});
+      setUngroupedPackages([]);
     } finally {
       setIsLoadingPackages(false);
     }
@@ -223,45 +298,159 @@ export default function FolderSelectionScreen({
                 </div>
               )}
 
-              {/* Packages Grid */}
+              {/* Grouped Packages Display */}
               {!isLoadingPackages && !packageError && (
                 <>
-                  {packages.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      {packages.map((pkg) => (
-                  <div
-                    key={pkg.id}
-                    onClick={() => setSelectedPackage(pkg)}
-                    className={`bg-white rounded-xl p-6 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md ${
-                      selectedPackage?.id === pkg.id
-                        ? 'ring-2 ring-blue-500 bg-blue-50'
-                        : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="text-center">
-                      <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <span className="text-lg font-bold text-white">📦</span>
-                      </div>
-                      <h3 className="text-xl font-bold text-gray-800 mb-2">
-                        {pkg.name}
-                      </h3>
-                      {pkg.price && (
-                        <div className="text-2xl font-bold text-green-600 mb-2">
-                          ₱{pkg.price.toLocaleString()}
+                  {(groups.length > 0 || ungroupedPackages.length > 0) ? (
+                    <div className="space-y-8">
+                      {/* Display Groups */}
+                      {groups.map((group) => (
+                        <div key={group.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                          {/* Group Header */}
+                          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                            <h3 className="text-lg font-semibold text-gray-800">{group.name}</h3>
+                            {group.description && (
+                              <p className="text-sm text-gray-600 mt-1">{group.description}</p>
+                            )}
+                            <div className="text-xs text-gray-500 mt-1">
+                              {groupedPackages[group.id]?.length || 0} package{(groupedPackages[group.id]?.length || 0) === 1 ? '' : 's'}
+                            </div>
+                          </div>
+
+                          {/* Packages in Group */}
+                          <div className="p-4">
+                            {groupedPackages[group.id]?.length > 0 ? (
+                              <div className="space-y-3">
+                                {groupedPackages[group.id].map((pkg) => (
+                                  <div
+                                    key={pkg.id}
+                                    onClick={() => {
+                                      const packageData = {
+                                        id: pkg.id,
+                                        name: pkg.name,
+                                        templateCount: pkg.template_count || 1,
+                                        price: pkg.price || 0,
+                                        description: pkg.description || `${pkg.template_count || 1} template${(pkg.template_count || 1) === 1 ? '' : 's'}`
+                                      };
+                                      setSelectedPackage(packageData);
+                                      handlePackageContinue();
+                                    }}
+                                    className={`flex items-center p-4 rounded-lg cursor-pointer transition-all duration-200 border ${
+                                      selectedPackage?.id === pkg.id
+                                        ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-200'
+                                        : 'hover:bg-gray-50 border-gray-200 bg-white'
+                                    }`}
+                                  >
+                                    {/* Package Icon */}
+                                    <PackageIcon pkg={pkg} />
+                                    
+                                    {/* Package Info */}
+                                    <div className="flex-1">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <h4 className="text-lg font-bold text-gray-800">{pkg.name}</h4>
+                                          <p className="text-sm text-gray-600 mt-1">
+                                            {pkg.description || `${pkg.template_count} template${pkg.template_count === 1 ? '' : 's'}`}
+                                          </p>
+                                        </div>
+                                        
+                                        {/* Package Details */}
+                                        <div className="text-right flex-shrink-0 ml-4">
+                                          {pkg.price && (
+                                            <div className="text-xl font-bold text-green-600">
+                                              ₱{pkg.price.toLocaleString()}
+                                            </div>
+                                          )}
+                                          <div className="text-sm text-blue-600 font-medium">
+                                            {pkg.template_count} Print{pkg.template_count > 1 ? 's' : ''}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {pkg.is_unlimited_photos ? 'Unlimited photos' : `${pkg.photo_limit} photos`}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8 text-gray-500">
+                                <div className="text-4xl mb-2">📦</div>
+                                <p className="text-sm">No packages in this group</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Ungrouped Packages */}
+                      {ungroupedPackages.length > 0 && (
+                        <div className="bg-white rounded-lg border border-dashed border-gray-300 overflow-hidden">
+                          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                            <h3 className="text-lg font-semibold text-gray-600">Other Packages</h3>
+                            <p className="text-sm text-gray-500 mt-1">Additional package options</p>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {ungroupedPackages.length} package{ungroupedPackages.length === 1 ? '' : 's'}
+                            </div>
+                          </div>
+                          
+                          <div className="p-4">
+                            <div className="space-y-3">
+                              {ungroupedPackages.map((pkg) => (
+                                <div
+                                  key={pkg.id}
+                                  onClick={() => {
+                                    const packageData = {
+                                      id: pkg.id,
+                                      name: pkg.name,
+                                      templateCount: pkg.template_count || 1,
+                                      price: pkg.price || 0,
+                                      description: pkg.description || `${pkg.template_count || 1} template${(pkg.template_count || 1) === 1 ? '' : 's'}`
+                                    };
+                                    setSelectedPackage(packageData);
+                                    handlePackageContinue();
+                                  }}
+                                  className={`flex items-center p-4 rounded-lg cursor-pointer transition-all duration-200 border ${
+                                    selectedPackage?.id === pkg.id
+                                      ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-200'
+                                      : 'hover:bg-gray-50 border-gray-200 bg-white'
+                                  }`}
+                                >
+                                  {/* Package Icon */}
+                                  <PackageIcon pkg={pkg} isUngrouped={true} />
+                                  
+                                  {/* Package Info */}
+                                  <div className="flex-1">
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <h4 className="text-lg font-bold text-gray-800">{pkg.name}</h4>
+                                        <p className="text-sm text-gray-600 mt-1">
+                                          {pkg.description || `${pkg.template_count} template${pkg.template_count === 1 ? '' : 's'}`}
+                                        </p>
+                                      </div>
+                                      
+                                      {/* Package Details */}
+                                      <div className="text-right flex-shrink-0 ml-4">
+                                        {pkg.price && (
+                                          <div className="text-xl font-bold text-green-600">
+                                            ₱{pkg.price.toLocaleString()}
+                                          </div>
+                                        )}
+                                        <div className="text-sm text-blue-600 font-medium">
+                                          {pkg.template_count} Print{pkg.template_count > 1 ? 's' : ''}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                          {pkg.is_unlimited_photos ? 'Unlimited photos' : `${pkg.photo_limit} photos`}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       )}
-                      <div className="text-3xl font-bold text-blue-600 mb-2">
-                        {pkg.templateCount}
-                      </div>
-                      <p className="text-sm text-gray-500 mb-4">
-                        {pkg.description}
-                      </p>
-                      <div className="text-xs text-blue-600 font-medium">
-                        {pkg.templateCount} Template{pkg.templateCount > 1 ? 's' : ''}
-                      </div>
-                    </div>
-                  </div>
-                      ))}
                     </div>
                   ) : (
                     <div className="text-center py-12">
@@ -281,16 +470,6 @@ export default function FolderSelectionScreen({
                 </>
               )}
 
-              {selectedPackage && !isLoadingPackages && (
-                <div className="mt-8 text-center">
-                  <button
-                    onClick={handlePackageContinue}
-                    className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-md"
-                  >
-                    Continue with {selectedPackage.name}
-                  </button>
-                </div>
-              )}
             </>
           )}
         </div>

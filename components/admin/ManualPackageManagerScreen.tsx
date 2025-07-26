@@ -81,6 +81,85 @@ export default function ManualPackageManagerScreen({
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [showPackageDetails, setShowPackageDetails] = useState<string | null>(null);
   const [packageDetails, setPackageDetails] = useState<ManualPackageWithTemplates | null>(null);
+  const [thumbnailValidation, setThumbnailValidation] = useState<{
+    isValidating: boolean;
+    isValid: boolean | null;
+    error: string | null;
+    transformedUrl: string | null;
+  }>({ isValidating: false, isValid: null, error: null, transformedUrl: null });
+
+  // Utility function to transform Google Drive URLs
+  const transformGoogleDriveUrl = (url: string): string => {
+    if (!url) return url;
+    
+    // Check if it's a Google Drive share URL
+    const driveMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (driveMatch) {
+      const fileId = driveMatch[1];
+      return `https://lh3.googleusercontent.com/d/${fileId}`;
+    }
+    
+    return url;
+  };
+
+  // Validate thumbnail URL
+  const validateThumbnailUrl = async (url: string) => {
+    if (!url.trim()) {
+      setThumbnailValidation({ isValidating: false, isValid: null, error: null, transformedUrl: null });
+      return;
+    }
+
+    setThumbnailValidation({ isValidating: true, isValid: null, error: null, transformedUrl: null });
+
+    try {
+      // Basic URL format validation
+      new URL(url);
+      
+      // Transform Google Drive URLs
+      const transformedUrl = transformGoogleDriveUrl(url);
+      
+      // Test if image loads
+      const img = new Image();
+      
+      const loadPromise = new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = transformedUrl;
+      });
+
+      // Add timeout
+      const timeoutPromise = new Promise<void>((_, reject) => {
+        setTimeout(() => reject(new Error('Image load timeout')), 10000);
+      });
+
+      await Promise.race([loadPromise, timeoutPromise]);
+      
+      setThumbnailValidation({ 
+        isValidating: false, 
+        isValid: true, 
+        error: null, 
+        transformedUrl: transformedUrl !== url ? transformedUrl : null 
+      });
+    } catch (error: any) {
+      setThumbnailValidation({ 
+        isValidating: false, 
+        isValid: false, 
+        error: error.message || 'Invalid URL or image cannot be loaded', 
+        transformedUrl: null 
+      });
+    }
+  };
+
+  // Debounced validation effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (formData.thumbnail_url) {
+        validateThumbnailUrl(formData.thumbnail_url);
+      }
+    }, 1000); // Wait 1 second after user stops typing
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.thumbnail_url]);
 
   // Load packages, groups, and templates on mount
   useEffect(() => {
@@ -192,6 +271,7 @@ export default function ManualPackageManagerScreen({
   const handleCreateNew = async () => {
     setFormData(EMPTY_FORM);
     setEditingPackage(null);
+    setThumbnailValidation({ isValidating: false, isValid: null, error: null, transformedUrl: null });
     setShowCreateForm(true);
     
     // Load templates after a small delay to ensure DOM is ready
@@ -240,6 +320,7 @@ export default function ManualPackageManagerScreen({
 
   const handleEdit = (pkg: ManualPackage) => {
     setEditingPackage(pkg);
+    setThumbnailValidation({ isValidating: false, isValid: null, error: null, transformedUrl: null });
     setShowCreateForm(true);
     loadTemplates(); // Load all templates
     
@@ -333,6 +414,7 @@ export default function ManualPackageManagerScreen({
       setShowCreateForm(false);
       setEditingPackage(null);
       setFormData(EMPTY_FORM);
+      setThumbnailValidation({ isValidating: false, isValid: null, error: null, transformedUrl: null });
       await loadPackages();
     } catch (err: any) {
       setError(err.message || 'Failed to save package');
@@ -486,6 +568,27 @@ export default function ManualPackageManagerScreen({
     }
   };
 
+  const handleReorderGroups = async (newOrder: PackageGroup[]) => {
+    // Update local state immediately for smooth UX
+    setGroups(newOrder);
+    
+    try {
+      // Update sort_order in database for each group
+      const groupOrder = newOrder.map((group, index) => ({
+        group_id: group.id,
+        sort_order: index + 1
+      }));
+      
+      await packageGroupService.reorderGroups(groupOrder);
+      console.log('✅ Group order updated successfully');
+    } catch (error) {
+      console.error('❌ Error updating group order:', error);
+      // Revert to original order on error
+      await loadGroups();
+      setError('Failed to update group order');
+    }
+  };
+
   const filteredPackages = packages;
 
   return (
@@ -568,41 +671,73 @@ export default function ManualPackageManagerScreen({
               {packages.length > 0 ? (
                 <div className="max-w-4xl mx-auto space-y-6">
                   <div className="mb-4 text-sm text-gray-600 text-center">
-                    💡 Drag packages to reorder them within groups
+                    💡 Drag groups to reorder them, or drag packages to reorder within groups
                   </div>
 
                   {/* Display Groups */}
-                  {groups.map((group) => (
-                    <div key={group.id} className="bg-white rounded-lg border-2 border-gray-200">
-                      {/* Group Header */}
-                      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-800">{group.name}</h3>
-                          {group.description && (
-                            <p className="text-sm text-gray-600 mt-1">{group.description}</p>
-                          )}
-                          <div className="text-xs text-gray-500 mt-1">
-                            {groupedPackages[group.id]?.length || 0} package{(groupedPackages[group.id]?.length || 0) === 1 ? '' : 's'}
+                  <Reorder.Group
+                    axis="y"
+                    values={groups}
+                    onReorder={handleReorderGroups}
+                    className="space-y-6"
+                  >
+                    {groups.map((group) => (
+                      <Reorder.Item
+                        key={group.id}
+                        value={group}
+                        className="cursor-move"
+                        whileDrag={{ 
+                          scale: 1.02, 
+                          boxShadow: "0 8px 25px rgba(0,0,0,0.15)",
+                          zIndex: 50 
+                        }}
+                      >
+                        <div className="bg-white rounded-lg border-2 border-gray-200">
+                          {/* Group Header */}
+                          <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+                            <div className="flex items-center space-x-3 flex-1">
+                              {/* Drag Handle for Group */}
+                              <div className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                  <circle cx="4" cy="4" r="1"/>
+                                  <circle cx="4" cy="8" r="1"/>
+                                  <circle cx="4" cy="12" r="1"/>
+                                  <circle cx="8" cy="4" r="1"/>
+                                  <circle cx="8" cy="8" r="1"/>
+                                  <circle cx="8" cy="12" r="1"/>
+                                  <circle cx="12" cy="4" r="1"/>
+                                  <circle cx="12" cy="8" r="1"/>
+                                  <circle cx="12" cy="12" r="1"/>
+                                </svg>
+                              </div>
+                              <div>
+                                <h3 className="text-lg font-semibold text-gray-800">{group.name}</h3>
+                                {group.description && (
+                                  <p className="text-sm text-gray-600 mt-1">{group.description}</p>
+                                )}
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {groupedPackages[group.id]?.length || 0} package{(groupedPackages[group.id]?.length || 0) === 1 ? '' : 's'}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleEditGroup(group)}
+                                className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
+                                title="Edit Group"
+                              >
+                                ✏️ Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteGroup(group)}
+                                className="px-3 py-1 text-xs bg-red-100 text-red-800 rounded hover:bg-red-200 transition-colors"
+                                title="Delete Group"
+                              >
+                                🗑️ Delete
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleEditGroup(group)}
-                            className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
-                            title="Edit Group"
-                          >
-                            ✏️ Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteGroup(group)}
-                            className="px-3 py-1 text-xs bg-red-100 text-red-800 rounded hover:bg-red-200 transition-colors"
-                            title="Delete Group"
-                          >
-                            🗑️ Delete
-                          </button>
-                        </div>
-                      </div>
 
                       {/* Packages in Group */}
                       <div className="p-4">
@@ -734,9 +869,11 @@ export default function ManualPackageManagerScreen({
                             <p className="text-xs mt-1">Create a package and assign it to this group</p>
                           </div>
                         )}
-                      </div>
-                    </div>
-                  ))}
+                        </div>
+                        </div>
+                      </Reorder.Item>
+                    ))}
+                  </Reorder.Group>
 
                   {/* Ungrouped Packages */}
                   {ungroupedPackages.length > 0 && (
@@ -1015,7 +1152,10 @@ export default function ManualPackageManagerScreen({
                   {editingPackage ? 'Edit Package' : 'Create New Package'}
                 </h2>
                 <button
-                  onClick={() => setShowCreateForm(false)}
+                  onClick={() => {
+                    setShowCreateForm(false);
+                    setThumbnailValidation({ isValidating: false, isValid: null, error: null, transformedUrl: null });
+                  }}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   ✕
@@ -1179,13 +1319,82 @@ export default function ManualPackageManagerScreen({
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Thumbnail URL
                       </label>
-                      <input
-                        type="url"
-                        value={formData.thumbnail_url}
-                        onChange={(e) => setFormData(prev => ({ ...prev, thumbnail_url: e.target.value }))}
-                        className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="https://..."
-                      />
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <input
+                            type="url"
+                            value={formData.thumbnail_url}
+                            onChange={(e) => {
+                              setFormData(prev => ({ ...prev, thumbnail_url: e.target.value }));
+                              // Reset validation when user types
+                              if (e.target.value !== formData.thumbnail_url) {
+                                setThumbnailValidation({ isValidating: false, isValid: null, error: null, transformedUrl: null });
+                              }
+                            }}
+                            className={`w-full p-2 pr-10 border rounded focus:outline-none focus:ring-2 ${
+                              thumbnailValidation.isValid === true
+                                ? 'border-green-300 focus:ring-green-500'
+                                : thumbnailValidation.isValid === false
+                                ? 'border-red-300 focus:ring-red-500'
+                                : 'border-gray-300 focus:ring-blue-500'
+                            }`}
+                            placeholder="https://... or Google Drive share URL"
+                          />
+                          
+                          {/* Validation indicator */}
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                            {thumbnailValidation.isValidating && (
+                              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            )}
+                            {thumbnailValidation.isValid === true && (
+                              <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                            {thumbnailValidation.isValid === false && (
+                              <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Validation messages */}
+                        {thumbnailValidation.transformedUrl && (
+                          <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                            <strong>Auto-transformed:</strong> Google Drive URL converted to direct image link
+                          </div>
+                        )}
+                        
+                        {thumbnailValidation.error && (
+                          <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                            <strong>Error:</strong> {thumbnailValidation.error}
+                          </div>
+                        )}
+
+                        {/* Image preview */}
+                        {thumbnailValidation.isValid && formData.thumbnail_url && (
+                          <div className="border border-gray-200 rounded p-3 bg-gray-50">
+                            <div className="text-xs text-gray-600 mb-2">Preview:</div>
+                            <img
+                              src={thumbnailValidation.transformedUrl || formData.thumbnail_url}
+                              alt="Thumbnail preview"
+                              className="w-24 h-24 object-cover rounded border"
+                              onError={() => {
+                                setThumbnailValidation(prev => ({ 
+                                  ...prev, 
+                                  isValid: false, 
+                                  error: 'Image failed to load in preview' 
+                                }));
+                              }}
+                            />
+                          </div>
+                        )}
+                        
+                        <div className="text-xs text-gray-500">
+                          💡 Supports direct image URLs and Google Drive share links
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -1266,7 +1475,10 @@ export default function ManualPackageManagerScreen({
                 <div className="flex items-center justify-end space-x-3 pt-4 border-t">
                   <button
                     type="button"
-                    onClick={() => setShowCreateForm(false)}
+                    onClick={() => {
+                      setShowCreateForm(false);
+                      setThumbnailValidation({ isValidating: false, isValid: null, error: null, transformedUrl: null });
+                    }}
                     className="px-4 py-2 text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
                     disabled={isSubmitting}
                   >
