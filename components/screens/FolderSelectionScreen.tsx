@@ -150,6 +150,7 @@ export default function FolderSelectionScreen({
   // Load packages when component mounts or when showing package selection
   useEffect(() => {
     if (showPackageSelection) {
+      setSelectedPackage(null); // Reset selected package when entering package selection
       loadPackages();
     }
   }, [showPackageSelection]);
