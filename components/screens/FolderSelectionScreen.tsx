@@ -333,8 +333,14 @@ export default function FolderSelectionScreen({
                                         price: pkg.price || 0,
                                         description: pkg.description || `${pkg.template_count || 1} template${(pkg.template_count || 1) === 1 ? '' : 's'}`
                                       };
-                                      setSelectedPackage(packageData);
-                                      handlePackageContinue();
+                                      
+                                      // If already selected, continue to next screen
+                                      if (selectedPackage?.id === pkg.id) {
+                                        handlePackageContinue();
+                                      } else {
+                                        // First click: just select the package
+                                        setSelectedPackage(packageData);
+                                      }
                                     }}
                                     className={`flex items-center p-4 rounded-lg cursor-pointer transition-all duration-200 border ${
                                       selectedPackage?.id === pkg.id
@@ -371,6 +377,17 @@ export default function FolderSelectionScreen({
                                         </div>
                                       </div>
                                     </div>
+                                    
+                                    {/* Continue Arrow - only show when selected */}
+                                    {selectedPackage?.id === pkg.id && (
+                                      <div className="ml-4 flex items-center">
+                                        <div className="bg-blue-500 text-white rounded-full p-2 animate-pulse">
+                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                          </svg>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -408,8 +425,14 @@ export default function FolderSelectionScreen({
                                       price: pkg.price || 0,
                                       description: pkg.description || `${pkg.template_count || 1} template${(pkg.template_count || 1) === 1 ? '' : 's'}`
                                     };
-                                    setSelectedPackage(packageData);
-                                    handlePackageContinue();
+                                    
+                                    // If already selected, continue to next screen
+                                    if (selectedPackage?.id === pkg.id) {
+                                      handlePackageContinue();
+                                    } else {
+                                      // First click: just select the package
+                                      setSelectedPackage(packageData);
+                                    }
                                   }}
                                   className={`flex items-center p-4 rounded-lg cursor-pointer transition-all duration-200 border ${
                                     selectedPackage?.id === pkg.id
@@ -445,6 +468,17 @@ export default function FolderSelectionScreen({
                                         </div>
                                       </div>
                                     </div>
+                                    
+                                    {/* Continue Arrow - only show when selected */}
+                                    {selectedPackage?.id === pkg.id && (
+                                      <div className="ml-4 flex items-center">
+                                        <div className="bg-blue-500 text-white rounded-full p-2 animate-pulse">
+                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                          </svg>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               ))}
