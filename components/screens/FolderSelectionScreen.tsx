@@ -383,7 +383,7 @@ export default function FolderSelectionScreen({
                                       <div className="ml-4 flex items-center">
                                         <div className="bg-blue-500 text-white rounded-full p-2 animate-pulse">
                                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 18l6-6-6-6" />
                                           </svg>
                                         </div>
                                       </div>
@@ -474,7 +474,7 @@ export default function FolderSelectionScreen({
                                       <div className="ml-4 flex items-center">
                                         <div className="bg-blue-500 text-white rounded-full p-2 animate-pulse">
                                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 18l6-6-6-6" />
                                           </svg>
                                         </div>
                                       </div>
