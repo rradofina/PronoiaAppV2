@@ -380,12 +380,10 @@ export default function FolderSelectionScreen({
                                     
                                     {/* Continue Arrow - only show when selected */}
                                     {selectedPackage?.id === pkg.id && (
-                                      <div className="ml-4 flex items-center">
-                                        <div className="bg-blue-500 text-white rounded-full p-2">
-                                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
-                                          </svg>
-                                        </div>
+                                      <div className="ml-3 flex items-center text-blue-500">
+                                        <svg className="w-4 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                          <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
+                                        </svg>
                                       </div>
                                     )}
                                   </div>
@@ -471,12 +469,10 @@ export default function FolderSelectionScreen({
                                     
                                     {/* Continue Arrow - only show when selected */}
                                     {selectedPackage?.id === pkg.id && (
-                                      <div className="ml-4 flex items-center">
-                                        <div className="bg-blue-500 text-white rounded-full p-2">
-                                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
-                                          </svg>
-                                        </div>
+                                      <div className="ml-3 flex items-center text-blue-500">
+                                        <svg className="w-4 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                          <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
+                                        </svg>
                                       </div>
                                     )}
                                   </div>
