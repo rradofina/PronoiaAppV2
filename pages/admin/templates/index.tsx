@@ -5,6 +5,8 @@ import { PrintSize } from '../../../types';
 import { PRINT_SIZES } from '../../../utils/constants';
 import googleDriveService from '../../../services/googleDriveService';
 import useAuthStore from '../../../stores/authStore';
+import TemplateExportModal from '../../../components/TemplateExportModal';
+import TemplateImportModal from '../../../components/TemplateImportModal';
 
 interface PngTemplateCardProps {
   template: PngTemplate;
@@ -60,6 +62,8 @@ export default function PngTemplateManagement() {
   const [error, setError] = useState<string | null>(null);
   const [folderInfo, setFolderInfo] = useState<{id: string; name: string; url: string} | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   
   const { googleAuth } = useAuthStore();
 
@@ -145,6 +149,24 @@ export default function PngTemplateManagement() {
           </div>
           
           <div className="flex space-x-3">
+            <button
+              onClick={() => setShowExportModal(true)}
+              disabled={isLoading}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+            >
+              <span>📤</span>
+              <span>Export Templates</span>
+            </button>
+            
+            <button
+              onClick={() => setShowImportModal(true)}
+              disabled={isLoading}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+            >
+              <span>📥</span>
+              <span>Import Templates</span>
+            </button>
+            
             <button
               onClick={handleRefreshTemplates}
               disabled={isLoading}
@@ -275,6 +297,24 @@ export default function PngTemplateManagement() {
             </div>
           </div>
         )}
+
+        {/* Export Modal */}
+        <TemplateExportModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+        />
+
+        {/* Import Modal */}
+        <TemplateImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onImportComplete={(result) => {
+            if (result.importedCount > 0) {
+              // Refresh templates after successful import
+              handleRefreshTemplates();
+            }
+          }}
+        />
       </div>
     </AdminLayout>
   );

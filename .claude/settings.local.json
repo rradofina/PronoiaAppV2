@@ -29,7 +29,10 @@
       "Bash(timeout 30s npm run dev)",
       "Bash(npm start)",
       "Bash(git fetch:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(git clean:*)",
+      "Bash(git checkout:*)",
+      "Bash(git rm:*)"
     ],
     "deny": []
   }

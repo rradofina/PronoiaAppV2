@@ -49,6 +49,124 @@ export interface Package {
   description?: string;
 }
 
+// Legacy container-relative transform (for backward compatibility)
+export interface ContainerTransform {
+  scale: number;
+  x: number;
+  y: number;
+}
+
+// New photo-centric transform (preferred format)
+export interface PhotoTransform {
+  photoScale: number;    // Scale relative to photo's "fit" size (1.0 = fit perfectly in hole)
+  photoCenterX: number;  // Center point as fraction of photo width (0.0 = left edge, 1.0 = right edge)
+  photoCenterY: number;  // Center point as fraction of photo height (0.0 = top edge, 1.0 = bottom edge)
+  version: 'photo-centric'; // Version marker to distinguish from legacy transforms
+}
+
+// Transform type guards and utilities
+export function isPhotoTransform(transform: ContainerTransform | PhotoTransform | undefined): transform is PhotoTransform {
+  return transform !== undefined && 'version' in transform && transform.version === 'photo-centric';
+}
+
+export function isContainerTransform(transform: ContainerTransform | PhotoTransform | undefined): transform is ContainerTransform {
+  return transform !== undefined && !('version' in transform);
+}
+
+// Calculate zoom-aware bounds for photo center coordinates
+// At 1x zoom: allows 0 to 1 (entire photo visible)
+// At 2x zoom: allows -0.5 to 1.5 (can access all parts of enlarged photo)
+// At 4x zoom: allows -1.5 to 2.5 (can access all parts of heavily enlarged photo)
+export function getPhotoTransformBounds(photoScale: number): { min: number; max: number } {
+  const halfExtraRange = (photoScale - 1) / 2;
+  return {
+    min: 0 - halfExtraRange,
+    max: 1 + halfExtraRange
+  };
+}
+
+// Create a photo-centric transform with zoom-aware bounds
+export function createPhotoTransform(photoScale: number, photoCenterX: number, photoCenterY: number): PhotoTransform {
+  const clampedScale = Math.max(0.01, Math.min(10, photoScale)); // Clamp scale
+  const bounds = getPhotoTransformBounds(clampedScale);
+  
+  return {
+    photoScale: clampedScale,
+    photoCenterX: Math.max(bounds.min, Math.min(bounds.max, photoCenterX)), // Zoom-aware clamp
+    photoCenterY: Math.max(bounds.min, Math.min(bounds.max, photoCenterY)), // Zoom-aware clamp
+    version: 'photo-centric'
+  };
+}
+
+// Migration utilities for legacy transforms
+export function migrateContainerToPhotoTransform(
+  containerTransform: ContainerTransform,
+  photoWidth: number,
+  photoHeight: number,
+  holeWidth: number,
+  holeHeight: number
+): PhotoTransform {
+  try {
+    // This is a best-effort migration - we can't perfectly convert without knowing the original context
+    // But we can make reasonable assumptions
+    
+    // Calculate the "fit" scale
+    const fitScaleX = holeWidth / photoWidth;
+    const fitScaleY = holeHeight / photoHeight;
+    const fitScale = Math.min(fitScaleX, fitScaleY);
+    
+    // Estimate photo scale relative to fit
+    const photoScale = containerTransform.scale / fitScale;
+    
+    // Estimate center point based on translation
+    // This is approximate since we don't know the original container dimensions
+    const photoCenterX = 0.5 - (containerTransform.x / holeWidth);
+    const photoCenterY = 0.5 - (containerTransform.y / holeHeight);
+    
+    console.log('📈 Migrating container transform to photo-centric:', {
+      original: containerTransform,
+      estimated: { photoScale, photoCenterX, photoCenterY },
+      context: { photoWidth, photoHeight, holeWidth, holeHeight, fitScale }
+    });
+    
+    return createPhotoTransform(photoScale, photoCenterX, photoCenterY);
+  } catch (error) {
+    console.error('🚨 Migration error - using default photo transform:', error);
+    return createPhotoTransform(1, 0.5, 0.5);
+  }
+}
+
+// Check if migration is needed for a template slot
+export function needsMigration(slot: TemplateSlot): boolean {
+  return slot.transform !== undefined && isContainerTransform(slot.transform);
+}
+
+// Migrate a single template slot
+export function migrateTemplateSlot(
+  slot: TemplateSlot,
+  photoWidth: number,
+  photoHeight: number,
+  holeWidth: number,
+  holeHeight: number
+): TemplateSlot {
+  if (!needsMigration(slot)) {
+    return slot; // Already migrated or no transform
+  }
+  
+  const migratedTransform = migrateContainerToPhotoTransform(
+    slot.transform as ContainerTransform,
+    photoWidth,
+    photoHeight,
+    holeWidth,
+    holeHeight
+  );
+  
+  return {
+    ...slot,
+    transform: migratedTransform
+  };
+}
+
 export interface TemplateSlot {
   id: string;
   templateId: string;
@@ -57,11 +175,7 @@ export interface TemplateSlot {
   printSize?: '4R' | '5R' | 'A4';
   slotIndex: number;
   photoId?: string;
-  transform?: {
-    scale: number;
-    x: number;
-    y: number;
-  };
+  transform?: ContainerTransform | PhotoTransform; // Support both formats
   label?: string;
 }
 
@@ -513,4 +627,115 @@ export interface ManualPackageService {
   updatePackage(id: string, updates: Partial<ManualPackage>): Promise<ManualPackage>;
   deletePackage(id: string): Promise<void>;
   getPackagesByPrintSize(printSize: PrintSize): Promise<ManualPackage[]>;
+}
+
+// Template Export System Types
+export interface ExportedTemplateHole {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface ExportedTemplateDimensions {
+  width: number;
+  height: number;
+}
+
+export interface ExportedTemplate {
+  // Core Template Data
+  id: string;
+  name: string;
+  templateType: TemplateType;
+  printSize: PrintSize;
+  
+  // PNG File Data
+  pngUrl?: string;
+  driveFileId?: string;
+  base64Data?: string; // For offline use
+  
+  // Configuration Data
+  holes: ExportedTemplateHole[];
+  dimensions: ExportedTemplateDimensions;
+  
+  // Metadata
+  hasInternalBranding?: boolean;
+  createdAt: Date;
+  lastUpdated: Date;
+  source: 'auto-detected' | 'manual';
+  
+  // Additional Manual Template Data (if applicable)
+  description?: string;
+  categoryId?: string;
+  thumbnailUrl?: string;
+  sampleImageUrl?: string;
+  isActive?: boolean;
+  
+  // Export-specific metadata
+  exportedAt: Date;
+  exportVersion: string;
+}
+
+export interface TemplateExportMetadata {
+  exportId: string;
+  exportedAt: Date;
+  exportVersion: string;
+  totalTemplates: number;
+  templateSources: ('auto-detected' | 'manual')[];
+  filters?: {
+    templateType?: TemplateType;
+    printSize?: PrintSize;
+    source?: 'auto-detected' | 'manual';
+  };
+  includesPngFiles: boolean;
+  includesBase64Data: boolean;
+}
+
+export interface TemplateExportPackage {
+  metadata: TemplateExportMetadata;
+  templates: ExportedTemplate[];
+  categories?: TemplateCategory[]; // If manual templates with categories
+}
+
+export interface TemplateImportResult {
+  success: boolean;
+  importedCount: number;
+  skippedCount: number;
+  errorCount: number;
+  errors: Array<{
+    templateId: string;
+    templateName: string;
+    error: string;
+  }>;
+  duplicates: Array<{
+    templateId: string;
+    templateName: string;
+    action: 'skipped' | 'updated' | 'renamed';
+  }>;
+}
+
+export interface TemplateExportOptions {
+  format: 'json' | 'zip';
+  includePngFiles: boolean;
+  includeBase64Data: boolean;
+  templateTypes?: TemplateType[];
+  printSizes?: PrintSize[];
+  sources?: ('auto-detected' | 'manual')[];
+  activeOnly?: boolean;
+  filters?: {
+    templateType?: TemplateType;
+    printSize?: PrintSize;
+    source?: 'auto-detected' | 'manual';
+  };
+}
+
+export interface TemplateExportService {
+  exportSingleTemplate(id: string, options?: Partial<TemplateExportOptions>): Promise<Blob>;
+  exportTemplatesByType(type: TemplateType, options?: Partial<TemplateExportOptions>): Promise<Blob>;
+  exportTemplatesBySize(size: PrintSize, options?: Partial<TemplateExportOptions>): Promise<Blob>;
+  exportAllTemplates(options?: Partial<TemplateExportOptions>): Promise<Blob>;
+  exportToJSON(templates: ExportedTemplate[]): Promise<string>;
+  importFromExport(file: File): Promise<TemplateImportResult>;
+  validateExportFile(file: File): Promise<{ valid: boolean; errors: string[] }>;
 }

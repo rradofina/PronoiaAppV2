@@ -1,110 +1,66 @@
-import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType } from '../../types';
-import { useState, useEffect, useRef } from 'react';
-import { PRINT_SIZES, TEMPLATE_TYPES } from '../../utils/constants';
+import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, ManualPackage } from '../../types';
+import { useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import InlineTemplateEditor from '../InlineTemplateEditor';
 import FullscreenPhotoViewer from '../FullscreenPhotoViewer';
-import TemplateSelector from '../TemplateSelector';
 import FullscreenTemplateEditor from '../FullscreenTemplateEditor';
+import PhotoRenderer from '../PhotoRenderer';
 import FullscreenTemplateSelector from '../FullscreenTemplateSelector';
 import PhotoSelectionMode from '../PhotoSelectionMode';
 import SlidingTemplateBar from '../SlidingTemplateBar';
-import { hybridTemplateService, HybridTemplate } from '../../services/hybridTemplateService';
+import { HybridTemplate } from '../../services/hybridTemplateService';
 import { manualTemplateService } from '../../services/manualTemplateService';
-import { templateCacheService } from '../../services/templateCacheService';
 import PngTemplateVisual from '../PngTemplateVisual';
+import PhotoGrid from '../PhotoGrid';
+import TemplateGrid from '../TemplateGrid';
+import TemplateSwapModal from '../TemplateSwapModal';
+import FavoritesBar from '../FavoritesBar';
 
-// PROPER TemplateVisual - Uses PNG template data from window.pngTemplates
+
+// Simplified TemplateVisual component
 const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: any) => {
-  // Get the actual PNG template data from window
   const pngTemplates = (window as any).pngTemplates || [];
   
-  // Debug: Check if templates are loaded at all
-  if (pngTemplates.length === 0) {
-    console.warn('⚠️ No PNG templates found in window.pngTemplates - templates may not be loaded yet');
-  }
+  // Find PNG template using slot's templateType for better accuracy after swaps
+  const templateType = slots[0]?.templateType || template.id;
   
-  // Find the PNG template that matches this template type
-  let pngTemplate = pngTemplates.find((t: any) => {
-    // Primary match: exact template type match
-    if (t.template_type === template.id) {
-      console.log('🎯 Found exact template_type match:', t.name, 'for', template.id);
-      return true;
-    }
-    
-    // Secondary match: check if template name contains the type
-    if (t.name && template.id && t.name.toLowerCase().includes(template.id.toLowerCase())) {
-      console.log('🎯 Found name match:', t.name, 'for', template.id);
-      return true;
-    }
-    
-    // Legacy fallback matches
-    const templateId = slots[0]?.templateId || '';
-    const fallbackMatch = templateId.includes(t.id) || 
-                         t.id.includes(template.id) ||
-                         template.id.includes(t.template_type);
-    
-    if (fallbackMatch) {
-      console.log('🎯 Found fallback match:', t.name, 'for', template.id);
-    }
-    
-    return fallbackMatch;
-  });
-  
-  // ENHANCED: If no exact match found, try finding by template type first
-  if (!pngTemplate && pngTemplates.length > 0) {
-    // First try to find by exact template type
-    pngTemplate = pngTemplates.find((t: any) => t.template_type === template.id);
-    
-    if (!pngTemplate) {
-      // If still no match, try finding by slots template type (this handles swapped templates)
-      const slotTemplateType = slots[0]?.templateType;
-      if (slotTemplateType) {
-        pngTemplate = pngTemplates.find((t: any) => t.template_type === slotTemplateType);
-        console.log('🔄 Found PNG template using slot templateType:', slotTemplateType, '→', pngTemplate?.name);
-      }
-    }
-    
-    if (!pngTemplate) {
-      // Last resort - use first available template
-      pngTemplate = pngTemplates[0];
-      console.log('🔧 Using first available PNG template as fallback:', pngTemplate?.name);
-    } else {
-      console.log('✅ Successfully matched PNG template:', pngTemplate?.name);
-    }
-  }
-
-  console.log('🎨 TemplateVisual render:', {
+  console.log('🔍 TemplateVisual matching debug:', {
+    templateType,
     templateId: template.id,
-    templateName: template.name,
-    slotsCount: slots.length,
-    firstSlotTemplateType: slots[0]?.templateType,
-    pngTemplatesAvailable: pngTemplates.length,
-    foundPngTemplate: !!pngTemplate,
-    pngTemplateName: pngTemplate?.name,
-    pngTemplateType: pngTemplate?.template_type,
-    firstSlotTemplateId: slots[0]?.templateId,
-    availablePngTemplates: pngTemplates.map((t: any) => ({ id: t.id, type: t.template_type, name: t.name })),
-    matchingLogic: {
-      templateIdForMatching: template.id,
-      availableTypes: pngTemplates.map((t: any) => t.template_type),
-      exactTypeMatch: pngTemplates.find((t: any) => t.template_type === template.id)?.name || 'None'
-    }
+    availableTemplates: pngTemplates.map((t: any) => ({ 
+      id: t.id, 
+      name: t.name, 
+      template_type: t.template_type,
+      templateType: t.templateType 
+    })),
+    slotsTemplateTypes: slots.map((s: any) => s.templateType),
+    slotsDetails: slots.map((s: any) => ({ 
+      id: s.id, 
+      templateId: s.templateId, 
+      templateType: s.templateType, 
+      photoId: s.photoId 
+    }))
   });
+  
+  const pngTemplate = pngTemplates.find((t: any) => t.template_type === templateType) || 
+                     pngTemplates.find((t: any) => t.templateType === templateType) ||
+                     pngTemplates.find((t: any) => t.template_type === template.id) ||
+                     pngTemplates.find((t: any) => t.id === templateType) ||
+                     pngTemplates[0];
+
+  console.log('🎯 TemplateVisual matched template:', pngTemplate ? {
+    id: pngTemplate.id,
+    name: pngTemplate.name,
+    template_type: pngTemplate.template_type,
+    templateType: pngTemplate.templateType,
+    matchedBy: pngTemplates.find((t: any) => t.template_type === templateType) ? 'template_type===templateType' :
+               pngTemplates.find((t: any) => t.templateType === templateType) ? 'templateType===templateType' :
+               pngTemplates.find((t: any) => t.template_type === template.id) ? 'template_type===template.id' :
+               pngTemplates.find((t: any) => t.id === templateType) ? 'id===templateType' : 'fallback'
+  } : 'NO MATCH FOUND');
 
   if (pngTemplate) {
-    // Use the proper PNG template visual
-    console.log('✅ RENDERING PngTemplateVisual with:', {
-      pngTemplateName: pngTemplate.name,
-      pngTemplateType: pngTemplate.template_type,
-      pngTemplateId: pngTemplate.id,
-      holesCount: pngTemplate.holes?.length || 0,
-      slotsCount: slots.length,
-      templateId: template.id,
-      pngTemplateDriveFileId: pngTemplate.drive_file_id
-    });
-    
     return (
       <PngTemplateVisual
         pngTemplate={pngTemplate}
@@ -114,20 +70,15 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
         selectedSlot={selectedSlot}
       />
     );
-  } else {
-    console.log('❌ No PNG template found, using fallback for:', template.id);
   }
 
-  // Fallback for when PNG template not found
+  // Simple fallback
   return (
     <div className="bg-white p-3 rounded-lg shadow-md w-full h-full">
       <div className="text-center text-gray-500 mb-2">
         <div className="text-lg font-medium">{template.name}</div>
         <div className="text-sm">{slots.length} photos</div>
-        <div className="text-xs text-red-500">PNG template not found</div>
       </div>
-      
-      {/* Simple grid for photos as fallback */}
       <div className="grid grid-cols-2 gap-2 h-32">
         {slots.slice(0, 4).map((slot: any, index: number) => {
           const photo = photos.find((p: any) => p.id === slot.photoId);
@@ -142,15 +93,15 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
               onClick={() => onSlotClick(slot)}
             >
               {photo?.url ? (
-                <img
-                  src={photo.url}
-                  alt={`Photo ${index + 1}`}
-                  className="w-full h-full object-cover"
+                <PhotoRenderer
+                  photoUrl={photo.url}
+                  photoAlt={`Photo ${index + 1}`}
+                  transform={slot.transform}
+                  interactive={false}
+                  className="w-full h-full"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                  {/* Remove fallback numbers for cleaner look */}
-                </div>
+                <div className="w-full h-full flex items-center justify-center bg-gray-100" />
               )}
             </div>
           );
@@ -162,7 +113,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
 
 interface PhotoSelectionScreenProps {
   clientName: string;
-  selectedPackage: Package | null;
+  selectedPackage: Package | ManualPackage | null;
   googleAuth: GoogleAuth;
   templateSlots: TemplateSlot[];
   selectedSlot: TemplateSlot | null;
@@ -208,32 +159,27 @@ export default function PhotoSelectionScreen({
   const [hasScrolled, setHasScrolled] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<HybridTemplate[]>([]);
   
-  // New workflow states
-  const [viewMode, setViewMode] = useState<'normal' | 'photo-viewer' | 'sliding-templates' | 'template-editor' | 'template-first' | 'photo-selection'>('normal');
+  // Two-mode system for photo selection
+  const [selectionMode, setSelectionMode] = useState<'photo' | 'print'>('photo'); // Default to photo selection mode
+  const [favoritedPhotos, setFavoritedPhotos] = useState<Set<string>>(new Set()); // Photo IDs that are favorited
+  
+  // Simplified workflow states
+  const [viewMode, setViewMode] = useState<'normal' | 'photo-viewer' | 'sliding-templates' | 'template-editor' | 'template-first' | 'photo-selection' | 'template-viewer'>('normal');
   const [selectedPhotoForViewer, setSelectedPhotoForViewer] = useState<Photo | null>(null);
   const [selectedPhotoForTemplate, setSelectedPhotoForTemplate] = useState<Photo | null>(null);
   const [selectedTemplateForViewer, setSelectedTemplateForViewer] = useState<string | null>(null);
   const [selectedSlotForEditor, setSelectedSlotForEditor] = useState<TemplateSlot | null>(null);
   
-  // Template management states
-  const [showTemplateViewer, setShowTemplateViewer] = useState(false);
+  // Template management states (simplified)
   const [showTemplateSwapper, setShowTemplateSwapper] = useState(false);
-  const [templateToView, setTemplateToView] = useState<{ templateId: string; templateName: string; slots: TemplateSlot[] } | null>(null);
   const [templateToSwap, setTemplateToSwap] = useState<{ templateId: string; templateName: string; slots: TemplateSlot[] } | null>(null);
-  const [selectedNewTemplate, setSelectedNewTemplate] = useState<any>(null);
-  
-  // Separate state for preview - don't touch main templateSlots
-  const [previewSlots, setPreviewSlots] = useState<TemplateSlot[]>([]);
+  const [templateToView, setTemplateToView] = useState<{ templateId: string; templateName: string; slots: TemplateSlot[] } | null>(null);
 
-  // Load available templates for add print modal and template swapping
+  // Load available templates
   useEffect(() => {
     const loadTemplates = async () => {
       try {
-        // For template swapping, we need ALL manual templates from database
         const allManualTemplates = await manualTemplateService.getAllTemplates();
-        
-        console.log('📋 Loaded manual templates for swapping:', allManualTemplates.length);
-        console.log('📋 Manual template names:', allManualTemplates.map(t => `${t.name}(${t.template_type})`));
         setAvailableTemplates(allManualTemplates.map(manual => ({
           id: manual.id,
           name: manual.name,
@@ -252,103 +198,24 @@ export default function PhotoSelectionScreen({
         })));
       } catch (error) {
         console.error('❌ Error loading templates:', error);
-        // Fallback to package templates if hybrid service fails
-        const packageTemplates = (window as any).pngTemplates || [];
-        setAvailableTemplates(packageTemplates);
+        setAvailableTemplates([]);
       }
     };
     loadTemplates();
-  }, [selectedPackage]);
+  }, []);
 
-  // Auto-select current template when swap modal opens
-  useEffect(() => {
-    console.log('🔄 Auto-select useEffect triggered:', {
-      showTemplateSwapper,
-      hasTemplateToSwap: !!templateToSwap,
-      availableTemplatesCount: availableTemplates.length,
-      templateToSwapData: templateToSwap ? {
-        templateId: templateToSwap.templateId,
-        templateName: templateToSwap.templateName,
-        slotsCount: templateToSwap.slots.length
-      } : null
-    });
-
-    if (showTemplateSwapper && templateToSwap && availableTemplates.length > 0) {
-      console.log('🔍 Starting template matching process...');
-      console.log('📋 Available templates:', availableTemplates.map(t => ({
-        id: t.id,
-        name: t.name,
-        template_type: t.template_type,
-        print_size: t.print_size
-      })));
-
-      console.log('🎯 Template to match:', {
-        originalName: templateToSwap.templateName,
-        templateId: templateToSwap.templateId,
-        templateIdParts: templateToSwap.templateId.split('_'),
-        templateType: templateToSwap.templateId.split('_')[0]
-      });
-
-      // Try to find the current template by name first, then by type
-      const currentTemplate = availableTemplates.find(t => {
-        // Remove "(Additional)" suffix for matching
-        const cleanTemplateName = templateToSwap.templateName.replace(' (Additional)', '');
-        const nameMatch = t.name === cleanTemplateName;
-        const typeMatch = t.template_type === templateToSwap.templateId.split('_')[0];
-        
-        console.log('🔍 Checking template:', {
-          availableTemplate: { id: t.id, name: t.name, type: t.template_type },
-          cleanTemplateName,
-          nameMatch,
-          typeMatch,
-          willMatch: nameMatch || typeMatch
-        });
-        
-        return nameMatch || typeMatch;
-      });
-      
-      console.log('🎯 Matching result:', currentTemplate ? {
-        matched: true,
-        template: { id: currentTemplate.id, name: currentTemplate.name, type: currentTemplate.template_type }
-      } : { matched: false });
-
-      if (currentTemplate) {
-        console.log('✅ Setting selectedNewTemplate to:', currentTemplate.name);
-        setSelectedNewTemplate(currentTemplate);
-        setPreviewSlots(templateToSwap.slots);
-      } else {
-        console.log('❌ No match found, using first available template');
-        if (availableTemplates.length > 0) {
-          setSelectedNewTemplate(availableTemplates[0]);
-          setPreviewSlots(templateToSwap.slots);
-        }
-      }
-    } else if (!showTemplateSwapper) {
-      console.log('🔄 Resetting template swapper states');
-      setPreviewSlots([]);
-      setSelectedNewTemplate(null);
-    } else {
-      console.log('⏳ Waiting for conditions:', {
-        showTemplateSwapper,
-        hasTemplateToSwap: !!templateToSwap,
-        availableTemplatesCount: availableTemplates.length
-      });
-    }
-  }, [showTemplateSwapper, templateToSwap, availableTemplates]);
-
-  // Auto-select first empty placeholder when entering screen
+  // Auto-select first empty slot when entering screen
   useEffect(() => {
     if (!selectedSlot && templateSlots.length > 0) {
-      // Find the first empty slot (no photo assigned)
       const firstEmptySlot = templateSlots.find(slot => !slot.photoId);
       if (firstEmptySlot) {
         setSelectedSlot(firstEmptySlot);
       } else {
-        // If all slots have photos, select the first slot anyway
         setSelectedSlot(templateSlots[0]);
       }
     }
   }, [templateSlots, selectedSlot, setSelectedSlot]);
+
 
   const onSlotSelect = (slot: TemplateSlot) => {
     setSelectedSlot(slot);
@@ -434,8 +301,16 @@ export default function PhotoSelectionScreen({
   
   // Photo-first workflow
   const handlePhotoClick = (photo: Photo) => {
-    setSelectedPhotoForViewer(photo);
-    setViewMode('photo-viewer');
+    // In print mode with a selected slot, skip photo viewer and go directly to template editor
+    if (selectionMode === 'print' && selectedSlot) {
+      setSelectedPhotoForTemplate(photo);
+      setSelectedSlotForEditor(selectedSlot);
+      setViewMode('template-editor');
+    } else {
+      // In photo mode or print mode without selected slot, show photo viewer
+      setSelectedPhotoForViewer(photo);
+      setViewMode('photo-viewer');
+    }
   };
 
   const handleAddToTemplate = (photo: Photo) => {
@@ -471,7 +346,7 @@ export default function PhotoSelectionScreen({
   };
 
   // Template editor
-  const handleApplyPhotoToSlot = (slotId: string, photoId: string, transform?: { scale: number; x: number; y: number }) => {
+  const handleApplyPhotoToSlot = (slotId: string, photoId: string, transform?: PhotoTransform | ContainerTransform) => {
     console.log('🔧 FULLSCREEN EDITOR - Apply button clicked:', { slotId, photoId, transform });
     console.log('🔧 Current templateSlots before update:', templateSlots.map(s => ({ id: s.id, photoId: s.photoId, hasTransform: !!s.transform })));
     
@@ -563,254 +438,121 @@ export default function PhotoSelectionScreen({
     setSelectedSlotForEditor(null);
   };
 
+  // Favorites management
+  const handleToggleFavorite = (photoId: string) => {
+    setFavoritedPhotos(prev => {
+      const newFavorites = new Set(prev);
+      if (newFavorites.has(photoId)) {
+        newFavorites.delete(photoId);
+      } else {
+        newFavorites.add(photoId);
+      }
+      return newFavorites;
+    });
+  };
+
+  // Mode toggling
+  const handleModeToggle = () => {
+    setSelectionMode(prev => prev === 'photo' ? 'print' : 'photo');
+  };
+
+  // Get photos used in templates
+  const getUsedPhotoIds = () => {
+    const usedIds = new Set<string>();
+    templateSlots.forEach(slot => {
+      if (slot.photoId) {
+        usedIds.add(slot.photoId);
+      }
+    });
+    return usedIds;
+  };
+
+  // Get favorited photos that aren't used in templates
+  const getUnusedFavorites = () => {
+    const usedIds = getUsedPhotoIds();
+    return photos.filter(photo => 
+      favoritedPhotos.has(photo.id) && !usedIds.has(photo.id)
+    );
+  };
+
+  // Calculate dynamic photo limit
+  const calculatePhotoLimit = () => {
+    // Check if selectedPackage has photo_limit (ManualPackage) or use default
+    const baseLimit = (selectedPackage as ManualPackage)?.photo_limit || 10;
+    const templatePhotoCount = templateSlots.length;
+    return Math.max(baseLimit, templatePhotoCount);
+  };
+
+  // Get photos for display (only favorites in print mode)
+  const getDisplayPhotos = () => {
+    if (selectionMode === 'print') {
+      // In print mode, only show favorited photos that aren't already used
+      const usedIds = getUsedPhotoIds();
+      return photos.filter(photo => 
+        favoritedPhotos.has(photo.id) && !usedIds.has(photo.id)
+      );
+    }
+    return photos; // Photo mode shows all photos normally
+  };
+
   // Template management handlers
   const handleViewTemplate = (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => {
     setTemplateToView(template);
-    setShowTemplateViewer(true);
+    // Find the first photo slot to auto-select, or fallback to first slot
+    const firstPhotoSlot = template.slots.find(slot => slot.photoId) || template.slots[0];
+    if (firstPhotoSlot) {
+      setSelectedSlotForEditor(firstPhotoSlot);
+      // If the slot has a photo, also set it for template editor
+      if (firstPhotoSlot.photoId) {
+        const photo = photos.find(p => p.id === firstPhotoSlot.photoId);
+        if (photo) {
+          setSelectedPhotoForTemplate(photo);
+        }
+      }
+    }
+    setViewMode('template-viewer'); // New view mode for template viewing
   };
 
   const handleSwapTemplate = (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => {
-    // Calculate the EXACT print number from template position
-    const allTemplateGroups = Object.values(
-      templateSlots.reduce((acc, slot) => {
-        if (!acc[slot.templateId]) {
-          acc[slot.templateId] = { templateId: slot.templateId, templateName: slot.templateName, slots: [] };
-        }
-        acc[slot.templateId].slots.push(slot);
-        return acc;
-      }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
-    );
-    
-    const currentGroupIndex = allTemplateGroups.findIndex(group => group.templateId === template.templateId);
-    const exactPrintNumber = currentGroupIndex + 1;
-    
-    console.log('🚀 handleSwapTemplate called:', {
-      templateId: template.templateId,
-      templateName: template.templateName,
-      exactPrintNumber: exactPrintNumber,
-      totalTemplates: allTemplateGroups.length,
-      availableTemplatesCount: availableTemplates.length
-    });
-    
     setTemplateToSwap(template);
     setShowTemplateSwapper(true);
+  };
+
+  const handleConfirmTemplateSwap = (newTemplate: HybridTemplate, updatedSlots: TemplateSlot[]) => {
+    console.log('🔄 PhotoSelectionScreen - Template swap confirmed:', {
+      newTemplate: {
+        id: newTemplate.id,
+        name: newTemplate.name,
+        template_type: newTemplate.template_type
+      },
+      updatedSlotsCount: updatedSlots.length,
+      updatedSlots: updatedSlots.map(s => ({ 
+        id: s.id, 
+        templateId: s.templateId, 
+        templateType: s.templateType, 
+        photoId: s.photoId 
+      }))
+    });
     
-    // Force auto-selection immediately after modal opens
+    // Force React to detect the change by creating completely new array with new object references
+    const forceUpdatedSlots = updatedSlots.map(slot => ({ ...slot }));
+    
+    console.log('🔄 PhotoSelectionScreen - Setting template slots with forced new references');
+    setTemplateSlots(forceUpdatedSlots);
+    setTemplateToSwap(null);
+    
+    // Force a small delay to ensure state update is processed
     setTimeout(() => {
-      console.log('⏰ Forcing auto-selection check...');
-      console.log('🎯 Current template analysis:', {
-        templateId: template.templateId,
-        templateName: template.templateName,
-        templateType: template.slots[0]?.templateType,
-        printSize: template.slots[0]?.printSize || '4R',
-        slotsCount: template.slots.length
-      });
-      
-      if (availableTemplates.length > 0) {
-        // Get current template info from the first slot
-        const currentTemplateType = template.slots[0]?.templateType || template.templateId.split('_')[0];
-        const currentPrintSize = template.slots[0]?.printSize || '4R';
-        
-        console.log('🔍 Looking for match:', {
-          currentTemplateType,
-          currentPrintSize,
-          availableCount: availableTemplates.length
-        });
-        
-        // Find template that matches BOTH type and print size
-        const currentTemplate = availableTemplates.find(t => {
-          const typeMatch = t.template_type === currentTemplateType;
-          const sizeMatch = t.print_size === currentPrintSize;
-          const exactMatch = typeMatch && sizeMatch;
-          
-          console.log('🔍 Checking template:', {
-            templateName: t.name,
-            templateType: t.template_type,
-            printSize: t.print_size,
-            typeMatch,
-            sizeMatch,
-            exactMatch
-          });
-          
-          return exactMatch;
-        });
-        
-        if (currentTemplate) {
-          console.log('✅ FOUND EXACT MATCH! Auto-selecting:', {
-            id: currentTemplate.id,
-            name: currentTemplate.name,
-            type: currentTemplate.template_type,
-            size: currentTemplate.print_size
-          });
-          setSelectedNewTemplate(currentTemplate);
-          setPreviewSlots(template.slots);
-        } else {
-          console.log('❌ No exact match found. Trying type-only fallback...');
-          const fallbackTemplate = availableTemplates.find(t => t.template_type === currentTemplateType);
-          if (fallbackTemplate) {
-            console.log('⚠️ Using type-only fallback:', fallbackTemplate.name);
-            setSelectedNewTemplate(fallbackTemplate);
-          } else {
-            console.log('❌ No fallback found, using first available');
-            setSelectedNewTemplate(availableTemplates[0]);
-          }
-          setPreviewSlots(template.slots);
-        }
-      }
+      console.log('🔄 PhotoSelectionScreen - Template swap state update completed');
     }, 100);
   };
 
-  const handleTemplateSelect = (selectedTemplate: any) => {
-    setSelectedNewTemplate(selectedTemplate);
-    
-    // Update ONLY the preview slots for the template bar display
-    if (templateToSwap && selectedTemplate) {
-      // Create new slots based on the selected template 
-      const newSlotCount = selectedTemplate.holes?.length || 1;
-      const newPreviewSlots: TemplateSlot[] = Array.from({ length: newSlotCount }, (_, index) => ({
-        id: `preview_${selectedTemplate.id}_${Date.now()}_${index}`,
-        templateId: templateToSwap.templateId, // Keep same templateId to maintain position
-        templateName: `${selectedTemplate.name || selectedTemplate.template_type}`,
-        templateType: selectedTemplate.template_type, // This is key - use new template type for PNG matching
-        slotIndex: index,
-        photoId: templateToSwap.slots[index]?.photoId || undefined, // Keep existing photos if possible
-        transform: templateToSwap.slots[index]?.transform || undefined, // Keep transforms if possible
-        printSize: templateToSwap.slots[0]?.printSize || '4R', // Keep same print size
-      }));
-
-      // Update ONLY the preview state - don't touch main templateSlots
-      setPreviewSlots(newPreviewSlots);
-    }
-  };
-
-  // Function to get the correct slots to display - use preview if available
-  const getDisplaySlots = () => {
-    if (showTemplateSwapper && templateToSwap && previewSlots.length > 0) {
-      // During template swap modal, replace the swapping template with preview
-      console.log('🔄 getDisplaySlots: Using preview slots during swap modal', {
-        templateToSwapId: templateToSwap.templateId,
-        previewSlotsCount: previewSlots.length,
-        previewSlotTypes: previewSlots.map(s => s.templateType)
-      });
-      
-      return templateSlots.map(slot => {
-        if (slot.templateId === templateToSwap.templateId) {
-          // Find matching preview slot by slot index
-          const previewSlot = previewSlots.find(preview => preview.slotIndex === slot.slotIndex);
-          if (previewSlot) {
-            console.log('🔄 Replacing slot with preview:', {
-              originalType: slot.templateType,
-              previewType: previewSlot.templateType,
-              slotIndex: slot.slotIndex
-            });
-          }
-          return previewSlot || slot;
-        }
-        return slot;
-      });
-    }
-    // Normal case - return original slots
-    console.log('🔄 getDisplaySlots: Using normal templateSlots (no preview)');
-    return templateSlots;
-  };
-
-  const confirmTemplateSwap = () => {
-    if (!templateToSwap || !selectedNewTemplate) return;
-
-    console.log('🔄 Confirming template swap:', {
-      from: templateToSwap.templateName,
-      to: selectedNewTemplate.name,
-      newType: selectedNewTemplate.template_type
-    });
-
-    // Calculate the EXACT print number from template position
-    const allTemplateGroups = Object.values(
-      templateSlots.reduce((acc, slot) => {
-        if (!acc[slot.templateId]) {
-          acc[slot.templateId] = { templateId: slot.templateId, templateName: slot.templateName, slots: [] };
-        }
-        acc[slot.templateId].slots.push(slot);
-        return acc;
-      }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
-    );
-    
-    const currentGroupIndex = allTemplateGroups.findIndex(group => group.templateId === templateToSwap.templateId);
-    const printNumber = currentGroupIndex + 1;
-    const firstSlotIndex = templateSlots.findIndex(slot => slot.templateId === templateToSwap.templateId);
-    const isAdditional = templateToSwap.templateName.includes('(Additional)');
-    
-    // Create new template name with proper format: "Type (Print #X)" or "Type (Additional Print #X)"
-    const newTemplateName = isAdditional 
-      ? `${selectedNewTemplate.name} (Additional Print #${printNumber})`
-      : `${selectedNewTemplate.name} (Print #${printNumber})`;
-
-    console.log('📝 Template naming:', {
-      printNumber,
-      isAdditional,
-      newTemplateName,
-      originalSlotIndex: firstSlotIndex
-    });
-
-    // Create new slots based on the new template
-    const newSlots: TemplateSlot[] = Array.from({ length: selectedNewTemplate.holes?.length || 1 }, (_, index) => ({
-      id: `${selectedNewTemplate.id}_${Date.now()}_${index}`,
-      templateId: templateToSwap.templateId, // KEEP SAME templateId to maintain position
-      templateName: newTemplateName,
-      templateType: selectedNewTemplate.template_type, // This is the key - update templateType for PNG matching
-      slotIndex: index,
-      photoId: templateToSwap.slots[index]?.photoId || undefined, // Keep existing photos if possible
-      transform: templateToSwap.slots[index]?.transform || undefined, // Keep transforms if possible
-      printSize: templateToSwap.slots[0]?.printSize || '4R', // Keep same print size
-    }));
-
-    console.log('🔄 Created new slots after swap:', {
-      originalTemplateType: templateToSwap.slots[0]?.templateType,
-      newTemplateType: selectedNewTemplate.template_type,
-      newSlotsTemplateType: newSlots[0]?.templateType,
-      newSlotsLength: newSlots.length,
-      selectedTemplateName: selectedNewTemplate.name,
-      newTemplateName
-    });
-
-    // Replace slots at the EXACT same position to maintain print order
-    const updatedSlots = [...templateSlots];
-    
-    // Remove old slots (backwards to avoid index issues)
-    for (let i = updatedSlots.length - 1; i >= 0; i--) {
-      if (updatedSlots[i].templateId === templateToSwap.templateId) {
-        updatedSlots.splice(i, 1);
-      }
-    }
-    
-    // Insert new slots at the original position
-    updatedSlots.splice(firstSlotIndex, 0, ...newSlots);
-
-    console.log('✅ Template swap complete - position maintained');
-    setTemplateSlots(updatedSlots);
-    
-    // Close modal and reset state
+  const handleCloseTemplateSwap = () => {
     setShowTemplateSwapper(false);
     setTemplateToSwap(null);
-    setSelectedNewTemplate(null);
-    setPreviewSlots([]);
   };
 
-  const cancelTemplateSwap = () => {
-    console.log('❌ User cancelled template swap - returning to photo selection');
-    // Close modal and return to photo selection like nothing happened
-    setShowTemplateSwapper(false);
-    setTemplateToSwap(null);
-    setSelectedNewTemplate(null);
-    setPreviewSlots([]);
-  };
 
-  const closeTemplateSwapper = () => {
-    // Just close modal and reset states - template slots remain unchanged
-    setShowTemplateSwapper(false);
-    setTemplateToSwap(null);
-    setSelectedNewTemplate(null);
-    setPreviewSlots([]);
-  };
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ touchAction: 'manipulation' }}>
@@ -824,236 +566,197 @@ export default function PhotoSelectionScreen({
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Photo Grid Section */}
         <div className="flex-1 flex flex-col overflow-hidden">
-
-          {/* Photo Grid - Scrollable area */}
-          <div className="flex-1 overflow-y-auto p-3 sm:p-4" onScroll={() => setHasScrolled(true)}>
-            {!selectedSlot && !hasScrolled && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                <p className="text-yellow-800 text-center font-medium text-sm">
-                  👉 Select a print slot {/* Changed from down arrow to right arrow for desktop */}
-                  <span className="lg:hidden">below</span>
-                  <span className="hidden lg:inline">on the right</span>
-                  {' '}to start choosing photos
-                </p>
+          {/* Mode Header with Toggle */}
+          <div className="bg-white border-b p-3 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <h2 className="font-medium text-gray-800">
+                {selectionMode === 'photo' ? 'Select Your Favorite Photos' : 'Fill Your Print Templates'}
+              </h2>
+              <div className="text-sm text-gray-600">
+                {selectionMode === 'photo' 
+                  ? `${favoritedPhotos.size} favorites • ${calculatePhotoLimit() - getUsedPhotoIds().size} photos available`
+                  : `${getDisplayPhotos().length} favorites available • ${getUsedPhotoIds().size} of ${calculatePhotoLimit()} photos used`
+                }
               </div>
-            )}
-
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-0 pb-4">
-              {photos.map((photo) => (
-                <PhotoCard 
-                  key={photo.id}
-                  photo={photo}
-                  onSelect={() => handlePhotoClick(photo)}
-                />
-              ))}
             </div>
+            
+            <button
+              onClick={handleModeToggle}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                selectionMode === 'photo'
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              {selectionMode === 'photo' ? '📷 Ready to Fill Prints' : '⭐ Back to Photo Selection'}
+            </button>
           </div>
+
+          <PhotoGrid
+            photos={getDisplayPhotos()}
+            onPhotoClick={handlePhotoClick}
+            showScrollHint={selectionMode === 'print' && !selectedSlot}
+            hasScrolled={hasScrolled}
+            onScroll={() => setHasScrolled(true)}
+            favoritedPhotos={favoritedPhotos}
+            onToggleFavorite={handleToggleFavorite}
+            usedPhotoIds={getUsedPhotoIds()}
+          />
         </div>
 
-        {/* Print Templates - Different layouts for mobile vs desktop */}
-        {/* Mobile/Tablet: Horizontal bottom section */}
-        <div className="lg:hidden bg-white shadow-lg border-t flex-shrink-0" style={{ height: '380px', touchAction: 'pan-x' }}>
-          <div className="p-2 sm:p-3 h-full flex flex-col">
-            <div className="flex-shrink-0 mb-2">
-              <div className="flex items-center justify-between mb-1">
-                <button
-                  onClick={handleBack}
-                  className="flex items-center space-x-1 px-2 py-1 rounded-lg font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all duration-200 text-xs"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span>Back</span>
-                </button>
-                
-                <button 
-                  onClick={openAddPrintModal} 
-                  className="bg-green-600 text-white px-2 py-1 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 text-xs"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                  </svg>
-                  <span>Add</span>
-                </button>
+        {/* Two-Mode Bottom Section - Mobile/Tablet */}
+        <div className="lg:hidden bg-white shadow-lg border-t flex-shrink-0" style={{ 
+          height: selectionMode === 'photo' ? '120px' : '380px', 
+          touchAction: selectionMode === 'photo' ? 'pan-x' : 'pan-x' 
+        }}>
+          {selectionMode === 'photo' ? (
+            // Photo Selection Mode: Show Favorites Bar
+            <FavoritesBar
+              favoritedPhotos={getUnusedFavorites()}
+              onPhotoClick={handlePhotoClick}
+              onRemoveFavorite={handleToggleFavorite}
+            />
+          ) : (
+            // Print Filling Mode: Show Template Grid
+            <div className="p-2 sm:p-3 h-full flex flex-col">
+              <div className="flex-shrink-0 mb-2">
+                <div className="flex items-center justify-between mb-1">
+                  <button
+                    onClick={handleBack}
+                    className="flex items-center space-x-1 px-2 py-1 rounded-lg font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all duration-200 text-xs"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>Back</span>
+                  </button>
+                  
+                  <button 
+                    onClick={openAddPrintModal} 
+                    className="bg-green-600 text-white px-2 py-1 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 text-xs"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                    </svg>
+                    <span>Add</span>
+                  </button>
 
-                <button
-                  onClick={handlePhotoContinue}
-                  className="bg-blue-600 text-white px-3 py-1 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 text-xs"
-                >
-                  Done
-                </button>
-              </div>
-              <h2 className="text-sm font-bold text-gray-800 text-center">📷 {clientName} • {selectedPackage?.name} • {totalAllowedPrints} print(s)</h2>
-              {selectedSlot && (
-                <div className="mt-1 text-xs text-white bg-blue-600 px-2 py-0.5 rounded-full text-center">
-                  📍 Selecting: {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
+                  <button
+                    onClick={handlePhotoContinue}
+                    className="bg-blue-600 text-white px-3 py-1 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 text-xs"
+                  >
+                    Done
+                  </button>
                 </div>
-              )}
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <div className="flex space-x-2 sm:space-x-3 overflow-x-auto h-full pb-2" style={{ touchAction: 'pan-x' }}>
-                {Object.values(
-                  getDisplaySlots().reduce((acc, slot) => {
-                    if (!acc[slot.templateId]) {
-                      acc[slot.templateId] = {
-                        templateId: slot.templateId,
-                        templateName: slot.templateName,
-                        slots: [],
-                      };
-                    }
-                    acc[slot.templateId].slots.push(slot);
-                    return acc;
-                  }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
-                ).map(({ templateId, templateName, slots }) => (
-                  <div key={templateId} className="flex-shrink-0 relative pt-4" style={{ width: '180px' }}>
-                    {/* Action buttons row */}
-                    <div className="absolute top-0 left-0 right-0 flex justify-end items-center z-30">
-                      {/* View and Swap icons on right */}
-                      <div className="flex space-x-1">
-                        <button
-                          onClick={() => handleViewTemplate({ templateId, templateName, slots })}
-                          title="View Template"
-                          className="bg-blue-600 text-white rounded-full p-1 shadow-lg hover:bg-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleSwapTemplate({ templateId, templateName, slots })}
-                          title="Change Template"
-                          className="bg-green-600 text-white rounded-full p-1 shadow-lg hover:bg-green-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                          </svg>
-                        </button>
-                        {/* Delete button (only for additional prints) */}
-                        {templateName.includes('(Additional)') && (
-                          <button
-                            onClick={() => handleDeletePrint(templateId)}
-                            title="Delete Print"
-                            className="bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <h3 className="font-semibold mb-2 text-center text-xs leading-tight truncate px-1 relative z-20">{templateName}</h3>
-                    <div className="w-full rounded-lg overflow-hidden border border-gray-200">
-                      <TemplateVisual
-                        key={`${templateId}-${slots[0]?.templateType || 'unknown'}-${templateSlots.length}-${slots.map(s => `${s.photoId || 'empty'}-${s.templateType || 'unknown'}`).join('|')}`} // Force re-render when template type or photos change
-                        template={{ id: slots[0]?.templateType || templateId.split('_')[0], name: templateName, slots: slots.length }}
-                        slots={slots}
-                        onSlotClick={handleSlotSelectFromTemplate} // Direct slot selection - go straight to photo list
-                        photos={photos}
-                        selectedSlot={selectedSlot}
-                      />
-                    </div>
+                <h2 className="text-sm font-bold text-gray-800 text-center">📷 {clientName} • {selectedPackage?.name} • {totalAllowedPrints} print(s)</h2>
+                {selectedSlot && (
+                  <div className="mt-1 text-xs text-white bg-blue-600 px-2 py-0.5 rounded-full text-center">
+                    📍 Selecting: {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
                   </div>
-                ))}
+                )}
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <TemplateGrid
+                  templateSlots={templateSlots}
+                  photos={photos}
+                  selectedSlot={selectedSlot}
+                  onSlotClick={handleSlotSelectFromTemplate}
+                  onViewTemplate={handleViewTemplate}
+                  onSwapTemplate={handleSwapTemplate}
+                  onDeleteTemplate={handleDeletePrint}
+                  TemplateVisual={TemplateVisual}
+                  layout="horizontal"
+                />
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Desktop: Vertical right sidebar */}
         <div className="hidden lg:flex bg-white shadow-lg border-l flex-shrink-0 flex-col" style={{ width: '320px' }}>
-          {/* Desktop Header in Sidebar */}
-          <div className="p-2 border-b">
-            <div className="flex items-center justify-between mb-2">
-              <button 
-                onClick={openAddPrintModal} 
-                className="bg-green-600 text-white px-2 py-1 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 text-xs"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                </svg>
-                <span>Add</span>
-              </button>
-            </div>
-            <h2 className="text-sm font-bold text-gray-800 text-center">📷 {clientName} Templates</h2>
-            <div className="text-xs text-gray-600 text-center">{selectedPackage?.name} • {totalAllowedPrints} print(s)</div>
-            {selectedSlot && (
-              <div className="mt-1 text-xs text-white bg-blue-600 px-2 py-0.5 rounded-full text-center">
-                📍 Selecting: {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
-              </div>
-            )}
-          </div>
-
-          {/* Templates List */}
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-2">
-              {Object.values(
-                getDisplaySlots().reduce((acc, slot) => {
-                  if (!acc[slot.templateId]) {
-                    acc[slot.templateId] = {
-                      templateId: slot.templateId,
-                      templateName: slot.templateName,
-                      slots: [],
-                    };
-                  }
-                  acc[slot.templateId].slots.push(slot);
-                  return acc;
-                }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
-              ).map(({ templateId, templateName, slots }) => (
-                <div key={templateId} className="relative">
-                  {/* Action buttons row */}
-                  <div className="absolute top-0 left-0 right-0 flex justify-end items-center z-30">
-                    {/* View and Swap icons on right */}
-                    <div className="flex space-x-1">
-                      <button
-                        onClick={() => handleViewTemplate({ templateId, templateName, slots })}
-                        title="View Template"
-                        className="bg-blue-600 text-white rounded-full p-1 shadow-lg hover:bg-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleSwapTemplate({ templateId, templateName, slots })}
-                        title="Change Template"
-                        className="bg-green-600 text-white rounded-full p-1 shadow-lg hover:bg-green-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                        </svg>
-                      </button>
-                      {/* Delete button (only for additional prints) */}
-                      {templateName.includes('(Additional)') && (
-                        <button
-                          onClick={() => handleDeletePrint(templateId)}
-                          title="Delete Print"
-                          className="bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <h3 className="font-semibold mb-2 text-center text-sm relative z-20">{templateName}</h3>
-                  <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={{ height: '400px' }}>
-                    <TemplateVisual
-                      key={`${templateId}-${slots[0]?.templateType || 'unknown'}-${templateSlots.length}-${slots.map(s => `${s.photoId || 'empty'}-${s.templateType || 'unknown'}`).join('|')}`} // Force re-render when template type or photos change
-                      template={{ id: slots[0]?.templateType || templateId.split('_')[0], name: templateName, slots: slots.length }}
-                      slots={slots}
-                      onSlotClick={handleSlotSelectFromTemplate} // Direct slot selection - go straight to photo list
-                      photos={photos}
-                      selectedSlot={selectedSlot}
-                    />
-                  </div>
+          {selectionMode === 'photo' ? (
+            // Photo Selection Mode: Show Favorites
+            <>
+              <div className="p-4 border-b">
+                <h2 className="text-sm font-bold text-gray-800 text-center">⭐ Your Favorites</h2>
+                <div className="text-xs text-gray-600 text-center">
+                  {favoritedPhotos.size} favorites • {calculatePhotoLimit() - getUsedPhotoIds().size} photos available
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="grid grid-cols-3 gap-2">
+                  {getUnusedFavorites().map((photo) => (
+                    <div
+                      key={photo.id}
+                      className="relative aspect-square cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => handlePhotoClick(photo)}
+                    >
+                      <img
+                        src={photo.thumbnailUrl || photo.url}
+                        alt={photo.name}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleFavorite(photo.id);
+                        }}
+                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                        title="Remove from favorites"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {getUnusedFavorites().length === 0 && (
+                  <div className="text-center text-gray-500 py-8">
+                    <div className="text-2xl mb-2">⭐</div>
+                    <p className="text-sm">No favorites yet</p>
+                    <p className="text-xs text-gray-400">Star photos to add them here</p>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            // Print Filling Mode: Show Templates
+            <>
+              <div className="p-2 border-b">
+                <div className="flex items-center justify-between mb-2">
+                  <button 
+                    onClick={openAddPrintModal} 
+                    className="bg-green-600 text-white px-2 py-1 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 text-xs"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                    </svg>
+                    <span>Add</span>
+                  </button>
+                </div>
+                <h2 className="text-sm font-bold text-gray-800 text-center">📷 {clientName} Templates</h2>
+                <div className="text-xs text-gray-600 text-center">{selectedPackage?.name} • {totalAllowedPrints} print(s)</div>
+                {selectedSlot && (
+                  <div className="mt-1 text-xs text-white bg-blue-600 px-2 py-0.5 rounded-full text-center">
+                    📍 Selecting: {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4">
+                <TemplateGrid
+                  templateSlots={templateSlots}
+                  photos={photos}
+                  selectedSlot={selectedSlot}
+                  onSlotClick={handleSlotSelectFromTemplate}
+                  onViewTemplate={handleViewTemplate}
+                  onSwapTemplate={handleSwapTemplate}
+                  onDeleteTemplate={handleDeletePrint}
+                  TemplateVisual={TemplateVisual}
+                  layout="vertical"
+                />
+              </div>
+            </>
+          )}
 
           {/* Desktop Navigation in Sidebar */}
           <div className="p-4 border-t bg-gray-50">
@@ -1211,11 +914,14 @@ export default function PhotoSelectionScreen({
       {/* Fullscreen Photo Viewer */}
       <FullscreenPhotoViewer
         photo={selectedPhotoForViewer!}
-        photos={photos}
+        photos={getDisplayPhotos()} // Use filtered photos based on mode
         onClose={resetViewStates}
         onAddToTemplate={handleAddToTemplate}
         isVisible={(viewMode === 'photo-viewer' || viewMode === 'sliding-templates') && !!selectedPhotoForViewer}
         isDimmed={viewMode === 'sliding-templates'}
+        selectionMode={selectionMode}
+        favoritedPhotos={favoritedPhotos}
+        onToggleFavorite={handleToggleFavorite}
       />
 
       {/* Sliding Template Bar (from photo) */}
@@ -1260,284 +966,51 @@ export default function PhotoSelectionScreen({
         isVisible={viewMode === 'template-editor' && !!selectedSlotForEditor && !!selectedPhotoForTemplate}
       />
 
-      {/* Template Viewer Modal */}
-      <Transition appear show={showTemplateViewer} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={() => setShowTemplateViewer(false)}>
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-black bg-opacity-75" />
-          </Transition.Child>
-
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4">
-              <Transition.Child
-                as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 scale-95"
-                enterTo="opacity-100 scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 scale-100"
-                leaveTo="opacity-0 scale-95"
-              >
-                <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-                  <div className="flex justify-between items-center mb-4">
-                    <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900">
-                      {templateToView?.templateName}
-                    </Dialog.Title>
-                    <button
-                      onClick={() => setShowTemplateViewer(false)}
-                      className="bg-gray-200 hover:bg-gray-300 rounded-full p-2 text-gray-600"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  {templateToView && (
-                    <div className="flex justify-center">
-                      <div style={{ width: '600px', height: '800px' }}>
-                        <TemplateVisual
-                          template={{ id: templateToView.templateId.split('_')[0], name: templateToView.templateName, slots: templateToView.slots.length }}
-                          slots={templateToView.slots}
-                          onSlotClick={() => {}} // No slot interaction in viewer
-                          photos={photos}
-                          selectedSlot={null}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </Dialog.Panel>
-              </Transition.Child>
-            </div>
-          </div>
-        </Dialog>
-      </Transition>
+      {/* Unified Template Viewer/Editor */}
+      {templateToView && (selectedSlotForEditor || templateToView.slots[0]) && (
+        <FullscreenTemplateEditor
+          templateSlots={templateToView.slots}
+          selectedSlot={selectedSlotForEditor || templateToView.slots[0]}
+          selectedPhoto={selectedPhotoForTemplate}
+          photos={photos}
+          onApply={handleApplyPhotoToSlot}
+          onClose={resetViewStates}
+          isVisible={viewMode === 'template-viewer'}
+          viewMode="multi-slot" // New prop to enable multi-slot viewing
+          templateToView={templateToView}
+          onSlotSelect={(slot) => {
+            setSelectedSlotForEditor(slot);
+            // Auto-set photo if slot has one
+            if (slot.photoId) {
+              const photo = photos.find(p => p.id === slot.photoId);
+              if (photo) {
+                setSelectedPhotoForTemplate(photo);
+              }
+            } else {
+              setSelectedPhotoForTemplate(null);
+            }
+          }}
+          onRemovePhoto={(slot) => {
+            const updatedSlots = templateSlots.map(s =>
+              s.id === slot.id ? { ...s, photoId: undefined, transform: undefined } : s
+            );
+            setTemplateSlots(updatedSlots);
+          }}
+        />
+      )}
 
       {/* Template Swapper Modal */}
-      <Transition appear show={showTemplateSwapper} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={closeTemplateSwapper}>
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-black bg-opacity-75" />
-          </Transition.Child>
-
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4">
-              <Transition.Child
-                as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 scale-95"
-                enterTo="opacity-100 scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 scale-100"
-                leaveTo="opacity-0 scale-95"
-              >
-                <Dialog.Panel className="w-full max-w-6xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-                  <div className="flex justify-between items-center mb-4">
-                    <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900">
-                      Change Template: {templateToSwap?.templateName}
-                    </Dialog.Title>
-                    <button
-                      onClick={closeTemplateSwapper}
-                      className="bg-gray-200 hover:bg-gray-300 rounded-full p-2 text-gray-600"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  {templateToSwap && (
-                    <div>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Select a new template of the same print size to replace "{templateToSwap.templateName}". Photos will be preserved where possible.
-                      </p>
-                      
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 max-h-[75vh] overflow-y-auto p-3">
-                        {availableTemplates
-                          .filter(template => {
-                            // Get current template's print size from slots
-                            const currentSlot = templateToSwap.slots[0];
-                            if (!currentSlot) return false;
-                            
-                            // Get print size from current slot (should have printSize or default to 4R)
-                            const currentPrintSize = currentSlot.printSize || '4R';
-                            
-                            console.log('🔍 Filtering templates:', {
-                              templateName: template.name,
-                              templatePrintSize: template.print_size,
-                              currentPrintSize: currentPrintSize,
-                              matches: template.print_size === currentPrintSize
-                            });
-                            
-                            // Only show templates with same print size
-                            return template.print_size === currentPrintSize;
-                          })
-                          .map((template) => {
-                            const isSelected = selectedNewTemplate?.id === template.id;
-                            console.log('🎨 Rendering template:', {
-                              templateId: template.id,
-                              templateName: template.name,
-                              selectedNewTemplateId: selectedNewTemplate?.id,
-                              selectedNewTemplateName: selectedNewTemplate?.name,
-                              isSelected,
-                              className: isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300 cursor-pointer'
-                            });
-                            
-                            return (
-                            <div
-                              key={template.id}
-                              className={`border rounded-lg p-3 md:p-4 transition-colors ${
-                                isSelected
-                                  ? 'border-blue-500 bg-blue-50' 
-                                  : 'border-gray-200 hover:border-blue-300 cursor-pointer'
-                              }`}
-                              onClick={() => !isSelected ? handleTemplateSelect(template) : null}
-                            >
-                              <h4 className="font-medium text-sm md:text-base mb-2 md:mb-3 text-center">{template.name}</h4>
-                              <div className="w-full bg-gray-100 rounded overflow-hidden relative flex items-center justify-center h-64 md:h-80 lg:h-64">
-                                {template.sample_image_url ? (
-                                  // Show sample image if available
-                                  <img
-                                    src={(() => {
-                                      let url = template.sample_image_url;
-                                      // Convert Google Drive sharing URL to direct image URL
-                                      if (url.includes('drive.google.com')) {
-                                        const fileId = url.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
-                                        if (fileId) {
-                                          url = `https://lh3.googleusercontent.com/d/${fileId}`;
-                                        }
-                                      }
-                                      console.log('🖼️ Loading sample image:', template.name, url);
-                                      return url;
-                                    })()}
-                                    alt={`${template.name} sample`}
-                                    className="max-w-full max-h-full object-contain"
-                                    onLoad={() => console.log('✅ Sample image loaded:', template.name)}
-                                    onError={(e) => {
-                                      console.log('❌ Sample image failed:', template.name);
-                                      // Fallback to template visual if sample image fails to load
-                                      e.currentTarget.style.display = 'none';
-                                      const fallback = e.currentTarget.parentElement?.querySelector('.template-fallback') as HTMLElement;
-                                      if (fallback) fallback.style.display = 'block';
-                                    }}
-                                  />
-                                ) : null}
-                                {/* Fallback template visual */}
-                                <div className={`template-fallback w-full h-full flex items-center justify-center ${template.sample_image_url ? "hidden" : "block"}`}>
-                                  <TemplateVisual
-                                    template={{ id: template.template_type, name: template.name, slots: template.holes?.length || 1 }}
-                                    slots={Array.from({ length: template.holes?.length || 1 }, (_, index) => ({
-                                      id: `preview_${index}`,
-                                      templateId: template.template_type,
-                                      templateName: template.name,
-                                      templateType: template.template_type,
-                                      slotIndex: index,
-                                      photoId: undefined,
-                                    }))}
-                                    onSlotClick={() => {}} // No interaction in preview
-                                    photos={[]}
-                                    selectedSlot={null}
-                                  />
-                                </div>
-                              </div>
-                              <p className="text-xs md:text-sm text-gray-500 text-center mt-1 md:mt-2">
-                                {template.print_size} • {template.holes?.length || 1} photos
-                                {template.sample_image_url && <span className="text-green-600"> • Sample</span>}
-                              </p>
-                              
-                              {/* Show confirmation buttons when this template is selected */}
-                              {isSelected && (
-                                <div className="mt-3 md:mt-4 pt-2 md:pt-3 border-t border-gray-200">
-                                  <p className="text-xs md:text-sm text-gray-700 text-center mb-2 md:mb-3">
-                                    Replace "<span className="font-medium">{templateToSwap.templateName}</span>" with "<span className="font-medium">{template.name}</span>"?
-                                  </p>
-                                  <div className="flex justify-center space-x-2 md:space-x-3">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        cancelTemplateSwap();
-                                      }}
-                                      className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                                    >
-                                      Cancel
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        confirmTemplateSwap();
-                                      }}
-                                      className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                      Use This Template
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  )}
-                </Dialog.Panel>
-              </Transition.Child>
-            </div>
-          </div>
-        </Dialog>
-      </Transition>
+      <TemplateSwapModal
+        isOpen={showTemplateSwapper}
+        onClose={handleCloseTemplateSwap}
+        templateToSwap={templateToSwap}
+        templateSlots={templateSlots}
+        photos={photos}
+        onConfirmSwap={handleConfirmTemplateSwap}
+        TemplateVisual={TemplateVisual}
+      />
 
     </div>
   );
 }
-
-// Simple PhotoCard component
-function PhotoCard({ photo, onSelect }: { photo: Photo; onSelect: () => void }) {
-  console.log(`📷 PhotoCard rendering: ${photo.name}`, {
-    url: photo.url,
-    thumbnailUrl: photo.thumbnailUrl,
-    googleDriveId: photo.googleDriveId
-  });
-
-
-  return (
-    <div
-      onClick={onSelect}
-      className="relative overflow-hidden cursor-pointer hover:opacity-90 transition-opacity duration-200"
-    >
-      <div className="w-full relative" style={{ aspectRatio: '2/3' }}>
-        <img 
-          src={photo.url} 
-          alt={photo.name} 
-          className="w-full h-full object-cover"
-          onLoad={() => console.log(`✅ Image loaded: ${photo.name}`)}
-          onError={(e) => {
-            console.error(`❌ Image failed: ${photo.name}`, photo.url);
-            e.currentTarget.style.display = 'none';
-          }}
-        />
-        
-        {/* Filename overlay at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white px-2 py-1">
-          <p className="text-xs truncate">{photo.name}</p>
-        </div>
-      </div>
-    </div>
-  );
-} 
+ 

@@ -1,6 +1,7 @@
 import React from 'react';
-import { TemplateSlot, Photo } from '../types';
+import { TemplateSlot, Photo, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform } from '../types';
 import { PngTemplate } from '../services/pngTemplateService';
+import PhotoRenderer from './PhotoRenderer';
 
 interface PngTemplateVisualProps {
   pngTemplate: PngTemplate;
@@ -9,6 +10,7 @@ interface PngTemplateVisualProps {
   photos: Photo[];
   selectedSlot: TemplateSlot | null;
 }
+
 
 export default function PngTemplateVisual({
   pngTemplate,
@@ -28,7 +30,7 @@ export default function PngTemplateVisual({
   
   console.log('🔍 PngTemplateVisual slot mapping:', {
     pngTemplateId: pngTemplate.id,
-    pngTemplateType: pngTemplate.template_type,
+    pngTemplateType: pngTemplate.templateType,
     pngTemplateName: pngTemplate.name,
     slotsReceived: templateSlots.length,
     slotsToRender: thisTemplateSlots.length,
@@ -54,11 +56,12 @@ export default function PngTemplateVisual({
   
   console.log('🖼️ PngTemplateVisual DEBUG:', {
     templateName: pngTemplate.name,
-    templateType: pngTemplate.template_type,
+    templateType: pngTemplate.templateType,
     finalPngUrl: pngUrl,
-    base64_preview: (pngTemplate as any).base64_preview,
+    base64_preview: (pngTemplate as any).base64_preview?.substring(0, 50) + '...',
     drive_file_id: driveFileId,
     thumbnail_url: (pngTemplate as any).thumbnail_url,
+    extractedFileId: fileId,
     allTemplateProperties: Object.keys(pngTemplate),
     slotsConnected: thisTemplateSlots.length,
     firstSlotTemplateType: thisTemplateSlots[0]?.templateType,
@@ -87,12 +90,21 @@ export default function PngTemplateVisual({
         
         // Debug transform values
         if (slot.transform) {
-          console.log(`🔧 Slot ${holeIndex} transform:`, {
-            scale: slot.transform.scale,
-            x: slot.transform.x,
-            y: slot.transform.y,
-            photoUrl: photoUrl?.substring(0, 50) + '...'
-          });
+          if (isPhotoTransform(slot.transform)) {
+            console.log(`🔧 Slot ${holeIndex} photo-centric transform:`, {
+              photoScale: slot.transform.photoScale,
+              photoCenterX: slot.transform.photoCenterX,
+              photoCenterY: slot.transform.photoCenterY,
+              photoUrl: photoUrl?.substring(0, 50) + '...'
+            });
+          } else if (isContainerTransform(slot.transform)) {
+            console.log(`🔧 Slot ${holeIndex} container transform:`, {
+              scale: slot.transform.scale,
+              x: slot.transform.x,
+              y: slot.transform.y,
+              photoUrl: photoUrl?.substring(0, 50) + '...'
+            });
+          }
         }
         
         return (
@@ -110,10 +122,12 @@ export default function PngTemplateVisual({
             onClick={() => onSlotClick(slot)}
           >
             {photoUrl ? (
-              <img
-                src={photoUrl}
-                alt={`Photo ${holeIndex + 1}`}
-                className="w-full h-full object-cover"
+              <PhotoRenderer
+                photoUrl={photoUrl}
+                photoAlt={`Photo ${holeIndex + 1}`}
+                transform={slot.transform}
+                interactive={false}
+                className="w-full h-full"
               />
             ) : (
               <div className="w-full h-full bg-gray-200 flex items-center justify-center relative overflow-hidden border-2 border-dashed border-gray-400">

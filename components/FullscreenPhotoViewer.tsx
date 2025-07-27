@@ -8,6 +8,10 @@ interface FullscreenPhotoViewerProps {
   onAddToTemplate: (photo: Photo) => void;
   isVisible: boolean;
   isDimmed?: boolean; // New prop to control dimming when template bar is open
+  // New props for mode-aware functionality
+  selectionMode?: 'photo' | 'print';
+  favoritedPhotos?: Set<string>; // Pass the entire favorites set instead of individual status
+  onToggleFavorite?: (photoId: string) => void;
 }
 
 export default function FullscreenPhotoViewer({
@@ -16,7 +20,10 @@ export default function FullscreenPhotoViewer({
   onClose,
   onAddToTemplate,
   isVisible,
-  isDimmed = false
+  isDimmed = false,
+  selectionMode = 'photo',
+  favoritedPhotos = new Set(),
+  onToggleFavorite
 }: FullscreenPhotoViewerProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(() => 
     photo ? photos.findIndex(p => p.id === photo.id) : 0
@@ -41,6 +48,13 @@ export default function FullscreenPhotoViewer({
     setImageLoaded(false);
     setImageError(false);
   }, [currentPhotoIndex]);
+
+  // Handle favorite toggle
+  const handleToggleFavorite = () => {
+    if (onToggleFavorite && currentPhoto) {
+      onToggleFavorite(currentPhoto.id);
+    }
+  };
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
@@ -85,6 +99,9 @@ export default function FullscreenPhotoViewer({
 
   // Use photo from array at currentPhotoIndex, fallback to originally selected photo
   const currentPhoto = photos[currentPhotoIndex] || photo;
+  
+  // Calculate current photo's favorite status
+  const currentPhotoFavorited = currentPhoto ? favoritedPhotos.has(currentPhoto.id) : false;
   
   // Ensure currentPhotoIndex is within valid bounds
   if (currentPhotoIndex < 0 || currentPhotoIndex >= photos.length) {
@@ -138,7 +155,24 @@ export default function FullscreenPhotoViewer({
           <p className="text-sm text-gray-300">{currentPhotoIndex + 1} of {photos.length}</p>
         </div>
         
-        <div className="w-6" /> {/* Spacer */}
+        {/* Favorites Button - Mode Aware */}
+        {onToggleFavorite && (
+          <button
+            onClick={handleToggleFavorite}
+            className={`p-2 rounded-full transition-all duration-200 ${
+              currentPhotoFavorited 
+                ? 'bg-yellow-500 text-white shadow-lg' 
+                : 'bg-black bg-opacity-50 text-white hover:bg-opacity-70'
+            }`}
+            title={currentPhotoFavorited ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <span className="text-xl">
+              {currentPhotoFavorited ? '⭐' : '☆'}
+            </span>
+          </button>
+        )}
+        
+        {!onToggleFavorite && <div className="w-6" />} {/* Spacer when no favorites button */}
       </div>
 
       {/* Photo Display */}
@@ -244,15 +278,31 @@ export default function FullscreenPhotoViewer({
         </button>
       </div>
 
-      {/* Bottom Actions - Fixed height - Hide when dimmed */}
+      {/* Bottom Actions - Mode Aware - Hide when dimmed */}
       {!isDimmed && (
         <div className="p-4 flex-shrink-0">
-          <button
-            onClick={() => onAddToTemplate(currentPhoto)}
-            className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-md"
-          >
-            Add to Print Template
-          </button>
+          {/* Show Add to Template button only in print mode AND only for favorited photos */}
+          {selectionMode === 'print' && currentPhotoFavorited && (
+            <button
+              onClick={() => onAddToTemplate(currentPhoto)}
+              className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-md"
+            >
+              Add to Print Template
+            </button>
+          )}
+          
+          {/* Show instruction text in photo mode or when photo is not favorited in print mode */}
+          {selectionMode === 'photo' && (
+            <div className="text-center text-gray-300 py-3">
+              <p className="text-sm">Tap the star above to add this photo to your favorites</p>
+            </div>
+          )}
+          
+          {selectionMode === 'print' && !currentPhotoFavorited && (
+            <div className="text-center text-gray-300 py-3">
+              <p className="text-sm">Add to favorites to include in your print templates</p>
+            </div>
+          )}
         </div>
       )}
     </div>

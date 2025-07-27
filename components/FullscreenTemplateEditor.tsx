@@ -1,15 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { TemplateSlot, Photo } from '../types';
+import { TemplateSlot, Photo, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, createPhotoTransform } from '../types';
+import PhotoRenderer from './PhotoRenderer';
+import { getBestPhotoUrl, addCacheBuster, getHighResPhotoUrls } from '../utils/photoUrlUtils';
+import { photoCacheService } from '../services/photoCacheService';
 
 interface FullscreenTemplateEditorProps {
   templateSlots: TemplateSlot[];
   selectedSlot: TemplateSlot;
-  selectedPhoto: Photo;
+  selectedPhoto?: Photo | null;
   photos: Photo[];
-  onApply: (slotId: string, photoId: string, transform?: { scale: number; x: number; y: number }) => void;
+  onApply: (slotId: string, photoId: string, transform?: PhotoTransform | ContainerTransform) => void;
   onClose: () => void;
   isVisible: boolean;
+  // New props for multi-slot viewing mode
+  viewMode?: 'single-slot' | 'multi-slot';
+  templateToView?: { templateId: string; templateName: string; slots: TemplateSlot[] } | null;
+  onSlotSelect?: (slot: TemplateSlot) => void;
+  onRemovePhoto?: (slot: TemplateSlot) => void;
 }
 
 export default function FullscreenTemplateEditor({
@@ -19,48 +26,148 @@ export default function FullscreenTemplateEditor({
   photos,
   onApply,
   onClose,
-  isVisible
+  isVisible,
+  viewMode = 'single-slot',
+  templateToView,
+  onSlotSelect,
+  onRemovePhoto
 }: FullscreenTemplateEditorProps) {
-  const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
   const [templateBlobUrl, setTemplateBlobUrl] = useState<string | null>(null);
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
-  const [initialScale, setInitialScale] = useState(0.8);
-  const [minScale, setMinScale] = useState(0.1);
-  const transformRef = useRef<any>();
-  const imageRef = useRef<HTMLImageElement>(null);
+  const [currentTransform, setCurrentTransform] = useState<PhotoTransform>(createPhotoTransform(1, 0.5, 0.5));
+  const [currentPhotoId, setCurrentPhotoId] = useState<string | null>(null);
+  const [photoKey, setPhotoKey] = useState<string>(''); // Force re-render key
+  
+  // Cleanup function for blob URLs
+  const cleanupPhotoUrl = () => {
+    if (selectedPhotoUrl && selectedPhotoUrl.startsWith('blob:')) {
+      console.log('🧹 Cleaning up blob URL:', selectedPhotoUrl);
+      URL.revokeObjectURL(selectedPhotoUrl);
+    }
+  };
+  
+  // State for multi-slot viewing mode
+  const [originalTransforms, setOriginalTransforms] = useState<Record<string, PhotoTransform | ContainerTransform | undefined>>({});
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Reset transform when selectedSlot or selectedPhoto changes
+  // Initialize original transforms for multi-slot mode
   useEffect(() => {
-    setTransform({ scale: 1, x: 0, y: 0 });
-    setInitialScale(0.8);
-    setMinScale(0.1);
-  }, [selectedSlot?.id, selectedPhoto?.id]);
+    if (viewMode === 'multi-slot' && templateToView && isVisible) {
+      const initialTransforms: Record<string, PhotoTransform | ContainerTransform | undefined> = {};
+      templateToView.slots.forEach(slot => {
+        initialTransforms[slot.id] = slot.transform;
+      });
+      setOriginalTransforms(initialTransforms);
+      setHasUnsavedChanges(false);
+      console.log('🔧 Multi-slot mode - Captured original transforms:', initialTransforms);
+    }
+  }, [viewMode, templateToView, isVisible]);
+
+  // Handle transform changes from PhotoRenderer
+  const handleTransformChange = (newTransform: PhotoTransform) => {
+    setCurrentTransform(newTransform);
+    
+    // Check if this differs from original for unsaved changes detection
+    if (viewMode === 'multi-slot' && selectedSlot) {
+      const original = originalTransforms[selectedSlot.id];
+      const isDifferent = !original || 
+        (isPhotoTransform(original) && isPhotoTransform(newTransform) && 
+         (original.photoScale !== newTransform.photoScale || 
+          original.photoCenterX !== newTransform.photoCenterX || 
+          original.photoCenterY !== newTransform.photoCenterY));
+      
+      if (isDifferent !== hasUnsavedChanges) {
+        setHasUnsavedChanges(isDifferent);
+      }
+    }
+    
+    console.log('🔧 FullscreenTemplateEditor - Transform updated:', newTransform);
+  };
+
+  // Initialize transform when selectedSlot changes
+  useEffect(() => {
+    console.log('🔧 TRANSFORM DEBUG - useEffect triggered for slot change:', {
+      slotId: selectedSlot?.id,
+      hasExistingTransform: !!selectedSlot?.transform,
+      existingTransform: selectedSlot?.transform
+    });
+    
+    // Cleanup previous photo URL to prevent memory leaks
+    cleanupPhotoUrl();
+    
+    // Force re-render with new key to clear any cached images
+    setPhotoKey(`slot-${selectedSlot?.id}-${Date.now()}`);
+    
+    // If the slot already has a transform, use it; otherwise use default
+    if (selectedSlot?.transform && isPhotoTransform(selectedSlot.transform)) {
+      console.log('✅ TRANSFORM DEBUG - Using existing photo-centric transform');
+      setCurrentTransform(selectedSlot.transform);
+    } else if (selectedSlot?.transform && isContainerTransform(selectedSlot.transform)) {
+      console.log('🔧 TRANSFORM DEBUG - Found legacy transform, using defaults for now');
+      // Legacy transforms can't be easily converted without photo dimensions
+      // Let PhotoRenderer handle it with backward compatibility
+      setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+    } else {
+      console.log('🔄 TRANSFORM DEBUG - No existing transform, using defaults');
+      setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+    }
+  }, [selectedSlot?.id, selectedPhotoUrl]);
+
+  // Handle photo changes - preserve transform for same photo, reset for different photos
+  useEffect(() => {
+    const newPhotoId = selectedPhoto?.id || null;
+    const slotPhotoId = selectedSlot?.photoId || null;
+    
+    console.log('🔧 TRANSFORM DEBUG - Photo change detected:', {
+      newPhotoId,
+      currentPhotoId,
+      slotPhotoId,
+      isReEditingSameSlotPhoto: newPhotoId === slotPhotoId,
+      hasSlotTransform: !!selectedSlot?.transform
+    });
+
+    // If re-editing the same photo that's already in the slot, preserve its transform
+    if (newPhotoId === slotPhotoId && selectedSlot?.transform && isPhotoTransform(selectedSlot.transform)) {
+      console.log('✅ TRANSFORM DEBUG - Re-editing same photo, preserving transform');
+      setCurrentTransform(selectedSlot.transform);
+    }
+    // If it's a different photo, reset to default
+    else if (newPhotoId !== currentPhotoId && newPhotoId !== null) {
+      console.log('🔄 TRANSFORM DEBUG - Different photo selected, resetting transform');
+      setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+    }
+    
+    setCurrentPhotoId(newPhotoId);
+  }, [selectedPhoto?.id, selectedSlot?.photoId, selectedSlot?.transform, currentPhotoId]);
 
   // Get PNG templates and find the one for this slot (with null checks)
   const pngTemplates = (window as any).pngTemplates || [];
   const templateId = selectedSlot?.templateId?.split('_')[0]; // Get base template ID
   const pngTemplate = selectedSlot ? pngTemplates.find((t: any) => {
-    // First priority: exact ID match
+    // First priority: exact template type match (this handles swapped templates correctly)
+    const typeMatch = t.template_type === selectedSlot.templateType;
+    
+    // Second priority: exact ID match (for backward compatibility)
     const idMatch = t.id === templateId;
     
-    // Second priority: exact template type AND similar ID/name
-    const typeMatch = t.templateType === selectedSlot.templateType;
-    const nameMatch = t.name && t.name.toLowerCase().includes(templateId?.toLowerCase() || '');
+    // Third priority: template type matches legacy templateType property
+    const legacyTypeMatch = t.templateType === selectedSlot.templateType;
     
-    console.log('🔍 Template matching debug:', { 
+    console.log('🔍 Template matching debug (prioritizing templateType):', { 
       templateId, 
       slotTemplateType: selectedSlot.templateType,
       pngTemplateId: t.id, 
-      pngTemplateType: t.templateType,
+      pngTemplateType: t.template_type,
+      pngTemplateLegacyType: t.templateType,
       pngTemplateName: t.name,
-      idMatch,
       typeMatch,
-      nameMatch,
-      finalMatch: idMatch || (typeMatch && nameMatch)
+      idMatch,
+      legacyTypeMatch,
+      finalMatch: typeMatch || legacyTypeMatch || idMatch
     });
     
-    // Be more strict: only match if ID matches OR (type matches AND name matches)
-    return idMatch || (typeMatch && nameMatch);
+    // Prioritize template type matches (handles swapped templates correctly)
+    return typeMatch || legacyTypeMatch || idMatch;
   }) : null;
 
   // Debug: log what template was matched
@@ -69,7 +176,7 @@ export default function FullscreenTemplateEditor({
     matchedTemplate: pngTemplate ? {
       id: pngTemplate.id,
       name: pngTemplate.name,
-      type: pngTemplate.templateType
+      type: pngTemplate.template_type
     } : 'NO MATCH FOUND'
   });
 
@@ -102,34 +209,41 @@ export default function FullscreenTemplateEditor({
     };
   }, [pngTemplate, isVisible]);
 
-  // Load selected photo URL - use blob to avoid CORS issues
+  // Load selected photo URL with instant display and cache optimization
   useEffect(() => {
-    // Clear the photo URL immediately when selectedPhoto changes to prevent flashing
-    setSelectedPhotoUrl(null);
-    
     if (selectedPhoto && isVisible) {
-      const loadPhoto = async () => {
+      // Set immediate URL for instant display (no loading state)
+      const immediateUrl = photoCacheService.getImmediateUrl(selectedPhoto);
+      setSelectedPhotoUrl(immediateUrl);
+      
+      console.log('🚀 Instant display with immediate URL for', selectedPhoto.name);
+      
+      // Load high-quality blob in background and update when ready
+      const loadOptimalPhoto = async () => {
         try {
-          const { googleDriveService } = await import('../services/googleDriveService');
-          const photoId = selectedPhoto.googleDriveId || selectedPhoto.id;
-          const blob = await googleDriveService.downloadPhoto(photoId);
-          const url = URL.createObjectURL(blob);
-          setSelectedPhotoUrl(url);
+          console.log('🔄 Loading optimal blob for template editor...');
+          const blobUrl = await photoCacheService.getBlobUrl(selectedPhoto);
+          
+          // Only update if this is still the current photo
+          if (selectedPhoto && isVisible) {
+            setSelectedPhotoUrl(blobUrl);
+            console.log('✅ Upgraded to optimal blob URL for', selectedPhoto.name);
+          }
         } catch (error) {
-          console.error('Failed to download selected photo:', error);
-          // Fallback to original URL
-          setSelectedPhotoUrl(selectedPhoto.url);
+          console.error('❌ Failed to load optimal photo:', error);
+          // Keep the immediate URL that's already displayed
         }
       };
-      loadPhoto();
+      
+      // Start loading optimal version (don't await to avoid blocking)
+      loadOptimalPhoto();
+    } else {
+      setSelectedPhotoUrl(null);
     }
-
-    return () => {
-      if (selectedPhotoUrl && selectedPhotoUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(selectedPhotoUrl);
-      }
-    };
-  }, [selectedPhoto, isVisible]);
+    
+    // Update photo key for forcing re-render
+    setPhotoKey(`photo-${selectedPhoto?.id}-${Date.now()}`);
+  }, [selectedPhoto?.id, isVisible]);
 
   // Debug photos array and templateSlots
   console.log('🔍 FullscreenTemplateEditor state:', {
@@ -141,20 +255,78 @@ export default function FullscreenTemplateEditor({
     templateSlots: templateSlots.map(s => ({ id: s.id, photoId: s.photoId }))
   });
 
+  // New handlers for multi-slot mode
+  const handleApplyAll = () => {
+    if (viewMode === 'multi-slot' && selectedSlot && selectedPhoto) {
+      // Apply the current photo and transform to the selected slot
+      onApply(selectedSlot.id, selectedPhoto.id, currentTransform);
+      
+      // Update original transforms to current state (no longer has unsaved changes)
+      setOriginalTransforms(prev => ({
+        ...prev,
+        [selectedSlot.id]: currentTransform
+      }));
+      setHasUnsavedChanges(false);
+    } else if (selectedSlot && selectedPhoto) {
+      // Standard single-slot apply
+      onApply(selectedSlot.id, selectedPhoto.id, currentTransform);
+    }
+  };
+
+  const handleCancel = () => {
+    if (viewMode === 'multi-slot' && selectedSlot) {
+      // Revert to original transform
+      const original = originalTransforms[selectedSlot.id];
+      if (original && isPhotoTransform(original)) {
+        setCurrentTransform(original);
+        setHasUnsavedChanges(false);
+      }
+    }
+  };
+
+  const handleRemove = () => {
+    if (viewMode === 'multi-slot' && selectedSlot && onRemovePhoto) {
+      if (window.confirm('Remove this photo from the template?')) {
+        onRemovePhoto(selectedSlot);
+        setHasUnsavedChanges(false);
+      }
+    }
+  };
+
+  const handleSlotClick = (slot: TemplateSlot) => {
+    if (viewMode === 'multi-slot' && onSlotSelect) {
+      onSlotSelect(slot);
+    }
+  };
+
   // Early return after all hooks
   if (!isVisible || !selectedSlot) return null;
 
   const handleApply = () => {
-    onApply(selectedSlot.id, selectedPhoto.id, transform);
+    try {
+      // Validate required props
+      if (!selectedSlot?.id || !selectedPhoto?.id) {
+        console.error('🚨 TRANSFORM FALLBACK - Missing required IDs:', { slotId: selectedSlot?.id, photoId: selectedPhoto?.id });
+        return;
+      }
+
+      console.log('🔧 FullscreenTemplateEditor - Saving photo-centric transform:', {
+        transform: currentTransform,
+        photoId: selectedPhoto.id,
+        slotId: selectedSlot.id
+      });
+      
+      // Simply save the current photo-centric transform
+      onApply(selectedSlot.id, selectedPhoto.id, currentTransform);
+    } catch (error) {
+      console.error('🚨 TRANSFORM FALLBACK - Error in handleApply:', error);
+      // Fallback to basic photo-centric transform - only if we have valid IDs
+      if (selectedSlot?.id && selectedPhoto?.id) {
+        onApply(selectedSlot.id, selectedPhoto.id, createPhotoTransform(1, 0.5, 0.5));
+      }
+    }
   };
 
-  const handleTransformChange = (ref: any, state: any) => {
-    setTransform({
-      scale: state.scale,
-      x: state.positionX,
-      y: state.positionY
-    });
-  };
 
   const getPhotoUrl = (photoId?: string | null) => {
     if (!photoId) return null;
@@ -163,72 +335,6 @@ export default function FullscreenTemplateEditor({
     return photo?.url || null;
   };
 
-  // Calculate scale to fit photo within slot - prioritize fitting to height for landscape/square
-  const calculateFitScale = (imgWidth: number, imgHeight: number, slotWidth: number, slotHeight: number) => {
-    const photoAspectRatio = imgWidth / imgHeight;
-    const slotAspectRatio = slotWidth / slotHeight;
-    
-    // For landscape or square photos, prioritize fitting to slot height
-    if (photoAspectRatio >= 1) {
-      // Photo is landscape or square - fit to height first
-      return slotHeight / imgHeight;
-    } else {
-      // Photo is portrait - use traditional contain logic
-      const scaleX = slotWidth / imgWidth;
-      const scaleY = slotHeight / imgHeight;
-      return Math.min(scaleX, scaleY);
-    }
-  };
-
-  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    const img = e.currentTarget;
-    if (selectedSlot && pngTemplate) {
-      const slot = thisTemplateSlots.find(s => s.id === selectedSlot.id);
-      if (slot) {
-        const holeIndex = thisTemplateSlots.indexOf(slot);
-        const hole = pngTemplate.holes[holeIndex];
-        if (hole) {
-          // Get the actual rendered template dimensions from the DOM
-          const templateElement = document.querySelector(`div[style*="aspect-ratio: ${pngTemplate.dimensions.width}/${pngTemplate.dimensions.height}"]`);
-          let actualTemplateWidth = 800; // fallback
-          
-          if (templateElement) {
-            const rect = templateElement.getBoundingClientRect();
-            actualTemplateWidth = rect.width;
-          }
-          
-          // Calculate actual slot dimensions based on rendered template size
-          const actualTemplateHeight = actualTemplateWidth * (pngTemplate.dimensions.height / pngTemplate.dimensions.width);
-          const slotWidth = (hole.width / pngTemplate.dimensions.width) * actualTemplateWidth;
-          const slotHeight = (hole.height / pngTemplate.dimensions.height) * actualTemplateHeight;
-          
-          console.log('🔍 Scale calculation debug:', {
-            photoName: selectedPhoto.name,
-            photoDimensions: `${img.naturalWidth}x${img.naturalHeight}`,
-            photoAspectRatio: (img.naturalWidth / img.naturalHeight).toFixed(2),
-            slotDimensions: `${slotWidth.toFixed(0)}x${slotHeight.toFixed(0)}`,
-            slotAspectRatio: (slotWidth / slotHeight).toFixed(2),
-            actualTemplateSize: `${actualTemplateWidth}x${actualTemplateHeight.toFixed(0)}`
-          });
-          
-          const fitScale = calculateFitScale(img.naturalWidth, img.naturalHeight, slotWidth, slotHeight);
-          console.log('🎯 Calculated fit scale:', fitScale.toFixed(3));
-          
-          setInitialScale(fitScale);
-          
-          // Allow zooming out to a very small scale regardless of fitScale
-          setMinScale(0.05);
-          
-          // Apply the scale immediately after setting it
-          setTimeout(() => {
-            if (transformRef.current) {
-              transformRef.current.setTransform(0, 0, fitScale);
-            }
-          }, 100);
-        }
-      }
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
@@ -238,29 +344,75 @@ export default function FullscreenTemplateEditor({
         FullscreenTemplateEditor.tsx
       </div>
 
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 text-white">
-        <button
-          onClick={onClose}
-          className="flex items-center space-x-2 text-white hover:text-gray-300"
-        >
-          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-          <span>Close</span>
-        </button>
-        
-        <div className="text-center">
-          <h3 className="font-medium">{selectedSlot.templateName}</h3>
-          <p className="text-sm text-gray-300">Editing Slot {selectedSlot.slotIndex + 1}</p>
+      {/* Header - Top-Bottom Split Layout */}
+      <div className="p-4 text-white">
+        {/* Top Row: Title and Close */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-center flex-1">
+            <h3 className="font-medium">
+              {viewMode === 'multi-slot' && templateToView 
+                ? templateToView.templateName 
+                : selectedSlot.templateName}
+            </h3>
+            <p className="text-sm text-gray-300">
+              {viewMode === 'multi-slot' 
+                ? `Slot ${selectedSlot.slotIndex + 1} of ${templateSlots.length}` 
+                : `Editing Slot ${selectedSlot.slotIndex + 1}`}
+            </p>
+          </div>
+          
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-white hover:text-gray-300 bg-black bg-opacity-30 rounded-full p-2"
+            title="Close"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        
-        <button
-          onClick={handleApply}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700"
-        >
-          Apply Photo
-        </button>
+
+        {/* Action Buttons Row */}
+        <div className="flex justify-center space-x-3">
+          {viewMode === 'multi-slot' ? (
+            // Multi-slot mode buttons
+            <>
+              <button
+                onClick={handleApplyAll}
+                disabled={!selectedPhoto}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
+              >
+                Apply
+              </button>
+              
+              {hasUnsavedChanges && (
+                <button
+                  onClick={handleCancel}
+                  className="bg-gray-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+              )}
+              
+              {selectedSlot.photoId && (
+                <button
+                  onClick={handleRemove}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700"
+                >
+                  Remove
+                </button>
+              )}
+            </>
+          ) : (
+            // Single-slot mode button (original)
+            <button
+              onClick={handleApply}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700"
+            >
+              Apply Photo
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Full Template Display */}
@@ -333,87 +485,47 @@ export default function FullscreenTemplateEditor({
                 <div
                   key={hole.id}
                   className={`absolute transition-all duration-200 overflow-hidden ${
-                    isEditingSlot ? 'ring-4 ring-yellow-400' : ''
+                    isEditingSlot ? 'ring-4 ring-yellow-400' : 
+                    viewMode === 'multi-slot' ? 'cursor-pointer hover:ring-2 hover:ring-blue-400' : ''
                   }`}
                   style={{
                     left: `${(hole.x / pngTemplate.dimensions.width) * 100}%`,
                     top: `${(hole.y / pngTemplate.dimensions.height) * 100}%`,
                     width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
                     height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
-                    // backgroundColor: isEditingSlot ? 'rgba(255, 0, 0, 0.2)' : 'rgba(0, 255, 0, 0.1)', // Debug colors removed
                   }}
+                  onClick={() => viewMode === 'multi-slot' && !isEditingSlot ? handleSlotClick(slot) : undefined}
                 >
                   {isEditingSlot ? (
-                    // Editing slot - fills the exact hole area
+                    // Editing slot - interactive PhotoRenderer
                     selectedPhotoUrl ? (
-                      <TransformWrapper
-                        ref={transformRef}
-                        initialScale={initialScale}
-                        minScale={minScale}
-                        maxScale={10}
-                        centerOnInit={true}
-                        limitToBounds={false}
-                        wheel={{ 
-                          step: 0.01
-                        }}
-                        doubleClick={{ 
-                          disabled: false, 
-                          step: 0.5,
-                          animationTime: 200
-                        }}
-                        panning={{
-                          excluded: [],
-                          velocityDisabled: false,
-                          lockAxisX: false,
-                          lockAxisY: false
-                        }}
-                        onTransformed={handleTransformChange}
-                      >
-                        <TransformComponent>
-                          <img
-                            ref={imageRef}
-                            src={selectedPhotoUrl}
-                            alt={selectedPhoto.name}
-                            onLoad={handleImageLoad}
-                            style={{ 
-                              maxWidth: 'none',
-                              maxHeight: 'none', 
-                              width: 'auto',
-                              height: 'auto',
-                              display: 'block',
-                              // border: '2px solid magenta' // Debug border removed
-                            }}
-                          />
-                        </TransformComponent>
-                      </TransformWrapper>
+                      <PhotoRenderer
+                        key={photoKey} // Force re-render when photo or slot changes
+                        photoUrl={selectedPhotoUrl}
+                        photoAlt={selectedPhoto?.name || 'Selected photo'}
+                        transform={currentTransform}
+                        interactive={true}
+                        onTransformChange={handleTransformChange}
+                        className="w-full h-full"
+                        debug={false} // Disable visual overlay but keep console logging
+                        fallbackUrls={selectedPhoto ? getHighResPhotoUrls(selectedPhoto) : []}
+                      />
                     ) : (
                       <div className="w-full h-full bg-gray-200 border border-gray-300 border-dashed flex items-center justify-center">
                         <span className="text-gray-500 text-xs">Loading...</span>
                       </div>
                     )
                   ) : (
-                    // Other slots - show existing photos or placeholder
+                    // Other slots - non-interactive PhotoRenderer for consistency
                     slot.photoId ? (
-                      <img
-                        src={photos.find(p => p.id === slot.photoId)?.url || ''}
-                        alt={`Photo ${holeIndex + 1}`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          console.log('❌ Image failed to load:', { 
-                            slotId: slot.id, 
-                            photoId: slot.photoId, 
-                            photoUrl,
-                            originalUrl: photos.find(p => p.id === slot.photoId)?.url,
-                            errorTarget: e.currentTarget.src
-                          });
-                        }}
-                        onLoad={() => {
-                          console.log('✅ Image loaded successfully:', {
-                            slotId: slot.id,
-                            photoId: slot.photoId,
-                            url: photos.find(p => p.id === slot.photoId)?.url
-                          });
-                        }}
+                      <PhotoRenderer
+                        key={`slot-${slot.id}-${slot.photoId}`} // Unique key for each slot-photo combo
+                        photoUrl={photoCacheService.getImmediateUrl(photos.find(p => p.id === slot.photoId) || { url: '', thumbnailUrl: '', googleDriveId: '' } as Photo)}
+                        fallbackUrls={getHighResPhotoUrls(photos.find(p => p.id === slot.photoId) || { url: '', thumbnailUrl: '', googleDriveId: '' } as Photo)}
+                        photoAlt={`Photo ${holeIndex + 1}`}
+                        transform={slot.transform}
+                        interactive={false}
+                        className="w-full h-full"
                       />
                     ) : (
                       <div className="w-full h-full bg-gray-200 border border-gray-300 border-dashed flex items-center justify-center">
@@ -432,7 +544,7 @@ export default function FullscreenTemplateEditor({
       {/* Instructions */}
       <div className="p-4 border-t border-gray-800">
         <div className="text-center text-gray-400 text-sm">
-          <p className="font-medium text-yellow-400">📝 {selectedPhoto.name}</p>
+          <p className="font-medium text-yellow-400">📝 {selectedPhoto?.name || 'No photo selected'}</p>
           <p>Pinch to zoom • Drag to position • Yellow border shows your editing area</p>
         </div>
       </div>
