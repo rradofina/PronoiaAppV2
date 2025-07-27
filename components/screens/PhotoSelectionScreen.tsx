@@ -575,7 +575,7 @@ export default function PhotoSelectionScreen({
               <div className="text-sm text-gray-600">
                 {selectionMode === 'photo' 
                   ? `${favoritedPhotos.size} favorites • ${calculatePhotoLimit() - getUsedPhotoIds().size} photos available`
-                  : `${getDisplayPhotos().length} favorites available • ${getUsedPhotoIds().size} of ${calculatePhotoLimit()} photos used`
+                  : `Templates: ${getUsedPhotoIds().size} of ${calculatePhotoLimit()} slots filled • ${getDisplayPhotos().length} favorites available`
                 }
               </div>
             </div>
@@ -592,22 +592,51 @@ export default function PhotoSelectionScreen({
             </button>
           </div>
 
-          <PhotoGrid
-            photos={getDisplayPhotos()}
-            onPhotoClick={handlePhotoClick}
-            showScrollHint={selectionMode === 'print' && !selectedSlot}
-            hasScrolled={hasScrolled}
-            onScroll={() => setHasScrolled(true)}
-            favoritedPhotos={favoritedPhotos}
-            onToggleFavorite={handleToggleFavorite}
-            usedPhotoIds={getUsedPhotoIds()}
-          />
+          {selectionMode === 'photo' ? (
+            <PhotoGrid
+              photos={getDisplayPhotos()}
+              onPhotoClick={handlePhotoClick}
+              showScrollHint={false}
+              hasScrolled={hasScrolled}
+              onScroll={() => setHasScrolled(true)}
+              favoritedPhotos={favoritedPhotos}
+              onToggleFavorite={handleToggleFavorite}
+              usedPhotoIds={getUsedPhotoIds()}
+            />
+          ) : (
+            // Print mode: Show templates in main area
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-4 text-center bg-gray-50 border-b">
+                <h3 className="text-lg font-medium text-gray-800 mb-1">Your Print Templates</h3>
+                <p className="text-sm text-gray-600">
+                  Click on template slots to fill them with your favorite photos
+                </p>
+                {selectedSlot && (
+                  <div className="mt-2 text-sm text-white bg-blue-600 px-3 py-1 rounded-full inline-block">
+                    📍 Selected: {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
+                  </div>
+                )}
+              </div>
+              <TemplateGrid
+                templateSlots={templateSlots}
+                photos={photos}
+                selectedSlot={selectedSlot}
+                onSlotClick={handleSlotSelectFromTemplate}
+                onViewTemplate={handleViewTemplate}
+                onSwapTemplate={handleSwapTemplate}
+                onDeleteTemplate={handleDeletePrint}
+                TemplateVisual={TemplateVisual}
+                layout="main"
+                showActions={true}
+              />
+            </div>
+          )}
         </div>
 
         {/* Two-Mode Bottom Section - Mobile/Tablet */}
         <div className="lg:hidden bg-white shadow-lg border-t flex-shrink-0" style={{ 
-          height: selectionMode === 'photo' ? '120px' : '380px', 
-          touchAction: selectionMode === 'photo' ? 'pan-x' : 'pan-x' 
+          height: '140px', // Consistent height for both modes
+          touchAction: 'pan-x' 
         }}>
           {selectionMode === 'photo' ? (
             // Photo Selection Mode: Show Favorites Bar
@@ -617,9 +646,9 @@ export default function PhotoSelectionScreen({
               onRemoveFavorite={handleToggleFavorite}
             />
           ) : (
-            // Print Filling Mode: Show Template Grid
-            <div className="p-2 sm:p-3 h-full flex flex-col">
-              <div className="flex-shrink-0 mb-2">
+            // Print Filling Mode: Show Favorites Bar with controls
+            <div className="h-full flex flex-col">
+              <div className="flex-shrink-0 p-2 border-b bg-gray-50">
                 <div className="flex items-center justify-between mb-1">
                   <button
                     onClick={handleBack}
@@ -648,24 +677,13 @@ export default function PhotoSelectionScreen({
                     Done
                   </button>
                 </div>
-                <h2 className="text-sm font-bold text-gray-800 text-center">📷 {clientName} • {selectedPackage?.name} • {totalAllowedPrints} print(s)</h2>
-                {selectedSlot && (
-                  <div className="mt-1 text-xs text-white bg-blue-600 px-2 py-0.5 rounded-full text-center">
-                    📍 Selecting: {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
-                  </div>
-                )}
+                <h2 className="text-xs font-bold text-gray-800 text-center">⭐ Your Favorites • {getDisplayPhotos().length} available</h2>
               </div>
               <div className="flex-1 overflow-hidden">
-                <TemplateGrid
-                  templateSlots={templateSlots}
-                  photos={photos}
-                  selectedSlot={selectedSlot}
-                  onSlotClick={handleSlotSelectFromTemplate}
-                  onViewTemplate={handleViewTemplate}
-                  onSwapTemplate={handleSwapTemplate}
-                  onDeleteTemplate={handleDeletePrint}
-                  TemplateVisual={TemplateVisual}
-                  layout="horizontal"
+                <FavoritesBar
+                  favoritedPhotos={getDisplayPhotos()}
+                  onPhotoClick={handlePhotoClick}
+                  onRemoveFavorite={handleToggleFavorite}
                 />
               </div>
             </div>
@@ -719,9 +737,9 @@ export default function PhotoSelectionScreen({
               </div>
             </>
           ) : (
-            // Print Filling Mode: Show Templates
+            // Print Filling Mode: Show Favorites instead of templates
             <>
-              <div className="p-2 border-b">
+              <div className="p-4 border-b">
                 <div className="flex items-center justify-between mb-2">
                   <button 
                     onClick={openAddPrintModal} 
@@ -730,30 +748,48 @@ export default function PhotoSelectionScreen({
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
                     </svg>
-                    <span>Add</span>
+                    <span>Add Template</span>
                   </button>
                 </div>
-                <h2 className="text-sm font-bold text-gray-800 text-center">📷 {clientName} Templates</h2>
-                <div className="text-xs text-gray-600 text-center">{selectedPackage?.name} • {totalAllowedPrints} print(s)</div>
-                {selectedSlot && (
-                  <div className="mt-1 text-xs text-white bg-blue-600 px-2 py-0.5 rounded-full text-center">
-                    📍 Selecting: {selectedSlot.templateName} - Slot {selectedSlot.slotIndex + 1}
-                  </div>
-                )}
+                <h2 className="text-sm font-bold text-gray-800 text-center">⭐ Your Favorites</h2>
+                <div className="text-xs text-gray-600 text-center">
+                  {getDisplayPhotos().length} available • Drag to template slots
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4">
-                <TemplateGrid
-                  templateSlots={templateSlots}
-                  photos={photos}
-                  selectedSlot={selectedSlot}
-                  onSlotClick={handleSlotSelectFromTemplate}
-                  onViewTemplate={handleViewTemplate}
-                  onSwapTemplate={handleSwapTemplate}
-                  onDeleteTemplate={handleDeletePrint}
-                  TemplateVisual={TemplateVisual}
-                  layout="vertical"
-                />
+                <div className="grid grid-cols-3 gap-2">
+                  {getDisplayPhotos().map((photo) => (
+                    <div
+                      key={photo.id}
+                      className="relative aspect-square cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => handlePhotoClick(photo)}
+                    >
+                      <img
+                        src={photo.thumbnailUrl || photo.url}
+                        alt={photo.name}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleFavorite(photo.id);
+                        }}
+                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                        title="Remove from favorites"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {getDisplayPhotos().length === 0 && (
+                  <div className="text-center text-gray-500 py-8">
+                    <div className="text-2xl mb-2">⭐</div>
+                    <p className="text-sm">No favorites selected</p>
+                    <p className="text-xs text-gray-400">Switch to photo mode to select favorites</p>
+                  </div>
+                )}
               </div>
             </>
           )}

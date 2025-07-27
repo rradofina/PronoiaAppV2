@@ -10,7 +10,7 @@ interface TemplateGridProps {
   onSwapTemplate: (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => void;
   onDeleteTemplate?: (templateId: string) => void;
   TemplateVisual: React.ComponentType<any>;
-  layout?: 'horizontal' | 'vertical';
+  layout?: 'horizontal' | 'vertical' | 'main';
   showActions?: boolean;
 }
 
@@ -44,10 +44,14 @@ export default function TemplateGrid({
 
   const containerClasses = layout === 'horizontal' 
     ? "flex space-x-2 sm:space-x-3 overflow-x-auto h-full pb-2" 
+    : layout === 'main'
+    ? "grid grid-cols-1 md:grid-cols-2 gap-6 p-4"
     : "space-y-2";
 
   const itemClasses = layout === 'horizontal' 
     ? "flex-shrink-0 relative pt-4" 
+    : layout === 'main'
+    ? "relative bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow"
     : "relative";
 
   const itemStyle = layout === 'horizontal' 
@@ -56,6 +60,8 @@ export default function TemplateGrid({
 
   const visualHeight = layout === 'horizontal' 
     ? undefined 
+    : layout === 'main'
+    ? { height: '500px' }
     : { height: '400px' };
 
   return (
