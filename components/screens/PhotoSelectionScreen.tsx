@@ -604,12 +604,12 @@ export default function PhotoSelectionScreen({
               usedPhotoIds={getUsedPhotoIds()}
             />
           ) : (
-            // Print mode: Show templates in main area
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-4 text-center bg-gray-50 border-b">
+            // Print mode: Show templates in Cover Flow
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-4 text-center bg-gray-50 border-b flex-shrink-0">
                 <h3 className="text-lg font-medium text-gray-800 mb-1">Your Print Templates</h3>
                 <p className="text-sm text-gray-600">
-                  Click on template slots to fill them with your favorite photos
+                  Click templates or use arrow keys to navigate • Click slots to fill with photos
                 </p>
                 {selectedSlot && (
                   <div className="mt-2 text-sm text-white bg-blue-600 px-3 py-1 rounded-full inline-block">
@@ -617,18 +617,20 @@ export default function PhotoSelectionScreen({
                   </div>
                 )}
               </div>
-              <TemplateGrid
-                templateSlots={templateSlots}
-                photos={photos}
-                selectedSlot={selectedSlot}
-                onSlotClick={handleSlotSelectFromTemplate}
-                onViewTemplate={handleViewTemplate}
-                onSwapTemplate={handleSwapTemplate}
-                onDeleteTemplate={handleDeletePrint}
-                TemplateVisual={TemplateVisual}
-                layout="main"
-                showActions={true}
-              />
+              <div className="flex-1 relative">
+                <TemplateGrid
+                  templateSlots={templateSlots}
+                  photos={photos}
+                  selectedSlot={selectedSlot}
+                  onSlotClick={handleSlotSelectFromTemplate}
+                  onViewTemplate={handleViewTemplate}
+                  onSwapTemplate={handleSwapTemplate}
+                  onDeleteTemplate={handleDeletePrint}
+                  TemplateVisual={TemplateVisual}
+                  layout="coverflow"
+                  showActions={true}
+                />
+              </div>
             </div>
           )}
         </div>
