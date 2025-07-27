@@ -16,6 +16,7 @@ import PhotoGrid from '../PhotoGrid';
 import TemplateGrid from '../TemplateGrid';
 import TemplateSwapModal from '../TemplateSwapModal';
 import FavoritesBar from '../FavoritesBar';
+import OriginalTemplateVisual from '../TemplateVisual';
 
 
 // Simplified TemplateVisual component
@@ -25,9 +26,70 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
   // Find PNG template using slot's templateType for better accuracy after swaps
   const templateType = slots[0]?.templateType || template.id;
   
-  console.log('🔍 TemplateVisual matching debug:', {
+  // STATE GUARD: Prevent rendering with mismatched template data during navigation
+  const isDataConsistent = slots.every((slot: any) => {
+    const slotTemplateType = slot.templateType || slot.templateId?.split('_')[0];
+    return !slotTemplateType || slotTemplateType === templateType || slotTemplateType === template.id;
+  });
+  
+  if (!isDataConsistent) {
+    console.warn('🛡️ STATE GUARD - Blocking render due to mismatched template data:', {
+      expectedTemplateType: templateType,
+      templateId: template.id,
+      slotTemplateTypes: slots.map((s: any) => s.templateType),
+      reason: 'Template data mismatch during navigation - waiting for consistent state'
+    });
+    // Return a simple loading state instead of rendering with wrong data
+    return <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded">
+      <div className="text-gray-500">Loading...</div>
+    </div>;
+  }
+  
+  // NAVIGATION DEBUG: Track what we receive each time this component renders
+  console.log('🔄 NAVIGATION DEBUG - TemplateVisual render:', {
+    timestamp: new Date().toISOString(),
+    templateId: template.id,
+    templateName: template.name,
+    derivedTemplateType: templateType,
+    slotsCount: slots.length,
+    slotsData: slots.map((s: any) => ({
+      id: s.id,
+      templateId: s.templateId,
+      templateType: s.templateType,
+      templateName: s.templateName,
+      hasPhoto: !!s.photoId,
+      slotIndex: s.slotIndex
+    })),
+    pngTemplatesAvailable: pngTemplates.length,
+    isSoloTemplate: templateType === 'solo' || template.id === 'solo',
+    // Track where templateType comes from
+    templateTypeSource: slots[0]?.templateType ? 'slots[0].templateType' : 'template.id',
+    slots0TemplateType: slots[0]?.templateType,
+    templateIdValue: template.id
+  });
+  
+  // Safety check to ensure window.pngTemplates is populated
+  if (pngTemplates.length === 0) {
+    console.warn('🚨 SOLO TEMPLATE DEBUG - No PNG templates found in window.pngTemplates');
+  } else {
+    console.log('✅ SOLO TEMPLATE DEBUG - PNG templates loaded:', {
+      totalCount: pngTemplates.length,
+      soloTemplates: pngTemplates.filter((t: any) => t.template_type === 'solo' || t.templateType === 'solo'),
+      allTemplateTypes: [...new Set(pngTemplates.map((t: any) => t.template_type || t.templateType))],
+      firstFewTemplates: pngTemplates.slice(0, 3).map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        template_type: t.template_type,
+        templateType: t.templateType,
+        holesCount: t.holes?.length || 0
+      }))
+    });
+  }
+  
+  console.log('🔍 SOLO TEMPLATE DEBUG - TemplateVisual matching:', {
     templateType,
     templateId: template.id,
+    isSolo: templateType === 'solo' || template.id === 'solo',
     availableTemplates: pngTemplates.map((t: any) => ({ 
       id: t.id, 
       name: t.name, 
@@ -43,24 +105,86 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
     }))
   });
   
-  const pngTemplate = pngTemplates.find((t: any) => t.template_type === templateType) || 
-                     pngTemplates.find((t: any) => t.templateType === templateType) ||
-                     pngTemplates.find((t: any) => t.template_type === template.id) ||
-                     pngTemplates.find((t: any) => t.id === templateType) ||
-                     pngTemplates[0];
+  // Enhanced template matching logic with multiple fallback strategies
+  // NAVIGATION PROTECTION: Only proceed with matching if we have consistent data
+  let pngTemplate = null;
+  
+  if (pngTemplates.length > 0 && templateType) {
+    pngTemplate = 
+      // 1. Exact match on template_type field
+      pngTemplates.find((t: any) => t.template_type === templateType) || 
+      // 2. Exact match on templateType field  
+      pngTemplates.find((t: any) => t.templateType === templateType) ||
+      // 3. Match template.id (for legacy compatibility)
+      pngTemplates.find((t: any) => t.template_type === template.id) ||
+      // 4. Match by ID
+      pngTemplates.find((t: any) => t.id === templateType);
+  } else {
+    console.warn('🛡️ NAVIGATION PROTECTION - Skipping PNG template matching due to invalid state:', {
+      pngTemplatesCount: pngTemplates.length,
+      templateType: templateType,
+      hasValidTemplateType: !!templateType
+    });
+  }
+    
+  // 5. For solo templates, find any solo PNG template as fallback
+  if (!pngTemplate && (templateType === 'solo' || template.id === 'solo')) {
+    console.log('🔍 SOLO TEMPLATE DEBUG - Looking for solo PNG templates...', {
+      availableSoloTemplates: pngTemplates.filter((t: any) => t.template_type === 'solo' || t.templateType === 'solo'),
+      searchingFor: 'template_type or templateType === "solo"'
+    });
+    pngTemplate = pngTemplates.find((t: any) => t.template_type === 'solo' || t.templateType === 'solo');
+    
+    if (pngTemplate) {
+      console.log('✅ SOLO TEMPLATE DEBUG - Found solo PNG template:', {
+        id: pngTemplate.id,
+        name: pngTemplate.name,
+        template_type: pngTemplate.template_type,
+        templateType: pngTemplate.templateType,
+        holesCount: pngTemplate.holes?.length || 0
+      });
+    } else {
+      console.warn('❌ SOLO TEMPLATE DEBUG - No solo PNG templates found, will use legacy fallback');
+    }
+  }
+  
+  // 6. For solo templates, use ANY available PNG template rather than falling back to legacy
+  if (!pngTemplate && (templateType === 'solo' || template.id === 'solo') && pngTemplates.length > 0) {
+    console.log('🔄 SOLO TEMPLATE DEBUG - No exact solo PNG template found, using first available PNG template to avoid legacy fallback');
+    pngTemplate = pngTemplates[0];
+  }
+  
+  // 7. Use first available template only if we have templates loaded (for non-solo templates)
+  if (!pngTemplate && pngTemplates.length > 0 && templateType !== 'solo' && template.id !== 'solo') {
+    pngTemplate = pngTemplates[0];
+  }
 
-  console.log('🎯 TemplateVisual matched template:', pngTemplate ? {
+  // NAVIGATION DEBUG: Track the final decision
+  const matchResult = pngTemplate ? {
     id: pngTemplate.id,
     name: pngTemplate.name,
     template_type: pngTemplate.template_type,
     templateType: pngTemplate.templateType,
+    holesCount: pngTemplate.holes?.length || 0,
     matchedBy: pngTemplates.find((t: any) => t.template_type === templateType) ? 'template_type===templateType' :
                pngTemplates.find((t: any) => t.templateType === templateType) ? 'templateType===templateType' :
                pngTemplates.find((t: any) => t.template_type === template.id) ? 'template_type===template.id' :
-               pngTemplates.find((t: any) => t.id === templateType) ? 'id===templateType' : 'fallback'
-  } : 'NO MATCH FOUND');
+               pngTemplates.find((t: any) => t.id === templateType) ? 'id===templateType' :
+               (templateType === 'solo' || template.id === 'solo') && 
+               pngTemplates.find((t: any) => t.template_type === 'solo' || t.templateType === 'solo') ? 'solo-fallback' : 'first-available'
+  } : `NO PNG TEMPLATE FOUND - Will use legacy fallback for ${templateType}`;
+
+  console.log('🎯 NAVIGATION DEBUG - Template matching result:', {
+    searchedFor: templateType,
+    templateId: template.id,
+    isSolo: templateType === 'solo' || template.id === 'solo',
+    result: matchResult,
+    willUsePngTemplateVisual: !!pngTemplate,
+    willUseLegacyFallback: !pngTemplate
+  });
 
   if (pngTemplate) {
+    console.log('✅ NAVIGATION DEBUG - Using PngTemplateVisual for:', templateType, 'with template:', pngTemplate.name);
     return (
       <PngTemplateVisual
         pngTemplate={pngTemplate}
@@ -72,42 +196,32 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
     );
   }
 
-  // Simple fallback
+  // For solo templates, if PNG templates are available but none matched, this should not happen
+  if ((templateType === 'solo' || template.id === 'solo') && pngTemplates.length > 0) {
+    console.error('🚨 NAVIGATION DEBUG - Solo template should have found a PNG template but didn\'t. This indicates a logic error.');
+    console.log('🔧 NAVIGATION DEBUG - Emergency fallback: Using first available PNG template for solo');
+    // Force use first available PNG template
+    return (
+      <PngTemplateVisual
+        pngTemplate={pngTemplates[0]}
+        templateSlots={slots}
+        onSlotClick={onSlotClick}
+        photos={photos}
+        selectedSlot={selectedSlot}
+      />
+    );
+  }
+
+  // Fallback to legacy TemplateVisual only when no PNG templates are available
+  console.log('❌ NAVIGATION DEBUG - Using legacy TemplateVisual fallback for:', templateType, '(No PNG templates available)');
   return (
-    <div className="bg-white p-3 rounded-lg shadow-md w-full h-full">
-      <div className="text-center text-gray-500 mb-2">
-        <div className="text-lg font-medium">{template.name}</div>
-        <div className="text-sm">{slots.length} photos</div>
-      </div>
-      <div className="grid grid-cols-2 gap-2 h-32">
-        {slots.slice(0, 4).map((slot: any, index: number) => {
-          const photo = photos.find((p: any) => p.id === slot.photoId);
-          const isSelected = selectedSlot?.id === slot.id;
-          
-          return (
-            <div
-              key={slot.id || index}
-              className={`border-2 border-dashed cursor-pointer transition-all duration-200 ${
-                isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-              }`}
-              onClick={() => onSlotClick(slot)}
-            >
-              {photo?.url ? (
-                <PhotoRenderer
-                  photoUrl={photo.url}
-                  photoAlt={`Photo ${index + 1}`}
-                  transform={slot.transform}
-                  interactive={false}
-                  className="w-full h-full"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-100" />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <OriginalTemplateVisual
+      template={template}
+      slots={slots}
+      onSlotClick={onSlotClick}
+      photos={photos}
+      selectedSlot={selectedSlot}
+    />
   );
 };
 

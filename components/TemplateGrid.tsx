@@ -197,7 +197,7 @@ export default function TemplateGrid({
           
           <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={visualHeight}>
             <TemplateVisual
-              key={`template-${templateId}-type-${slots[0]?.templateType || 'unknown'}-name-${templateName.replace(/\s+/g, '-')}-slots-${slots.map(s => `${s.id}-${s.photoId || 'empty'}-${s.templateType || 'unknown'}`).join('|')}`}
+              key={`template-visual-${templateId}-${slots[0]?.templateType || templateId.split('_')[0]}`}
               template={{ id: slots[0]?.templateType || templateId.split('_')[0], name: templateName, slots: slots.length }}
               slots={slots}
               onSlotClick={onSlotClick}

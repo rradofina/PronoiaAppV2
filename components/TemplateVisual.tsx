@@ -45,12 +45,12 @@ const TemplateVisual: React.FC<TemplateVisualProps> = ({
   const printAspectRatio = '2/3'; // CSS aspect-ratio for 4x6 print
 
   if (template.id === 'solo') {
-    // Solo Template - Single large photo with border for 4R print
+    // Solo Template - Single large photo with proper padding/border for 4R print
     return (
-      <div className="bg-white p-3 rounded-lg shadow-md w-full h-full" style={{ aspectRatio: printAspectRatio, minHeight: '200px' }}>
+      <div className="bg-white p-4 rounded-lg shadow-md w-full h-full" style={{ aspectRatio: printAspectRatio, minHeight: '200px' }}>
         <div 
-          className={`w-full h-full cursor-pointer transition-all duration-200 ${
-            selectedSlot === slots[0] ? 'ring-2 ring-blue-500 ring-inset' : ''
+          className={`w-full h-full cursor-pointer transition-all duration-200 border-2 border-gray-200 rounded ${
+            selectedSlot === slots[0] ? 'ring-2 ring-blue-500 ring-offset-2' : 'hover:border-gray-300'
           }`}
           onClick={() => onSlotClick(slots[0])}
           style={{ 
@@ -61,7 +61,7 @@ const TemplateVisual: React.FC<TemplateVisualProps> = ({
           }}
         >
           {!getPhotoUrl(slots[0]?.photoId) && (
-            <div className="w-full h-full flex items-center justify-center text-gray-500 border-2 border-dashed border-gray-300">
+            <div className="w-full h-full flex items-center justify-center text-gray-500">
               <div className="text-center">
                 <div className="text-3xl mb-2">+</div>
                 <div className="text-xs font-medium">Tap to Add Photo</div>
