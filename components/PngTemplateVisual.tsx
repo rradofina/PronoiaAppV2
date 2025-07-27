@@ -69,13 +69,19 @@ export default function PngTemplateVisual({
   });
 
   return (
-    <div className="relative w-full h-full">
+    <div 
+      className="relative w-full h-full overflow-hidden"
+      style={{ 
+        aspectRatio: `${pngTemplate.dimensions.width}/${pngTemplate.dimensions.height}`,
+        maxWidth: '100%',
+        maxHeight: '100%'
+      }}
+    >
       {/* Background PNG Template */}
       <img 
         src={pngUrl}
         alt={pngTemplate.name}
-        className="w-full h-full object-contain"
-        style={{ aspectRatio: `${pngTemplate.dimensions.width}/${pngTemplate.dimensions.height}` }}
+        className="absolute inset-0 w-full h-full object-fill"
         onLoad={() => console.log('✅ PNG loaded successfully:', pngTemplate.name)}
         onError={() => console.error('❌ PNG failed to load:', pngUrl)}
       />

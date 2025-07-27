@@ -95,7 +95,7 @@ export default function TemplateGrid({
     : layout === 'main'
     ? { height: '500px' }
     : layout === 'coverflow'
-    ? { height: '400px' }
+    ? { height: '600px' }  // Increased from 400px to 600px for better space utilization
     : { height: '400px' };
 
   // Cover Flow item positioning and styling
@@ -105,10 +105,10 @@ export default function TemplateGrid({
     const offset = index - currentIndex;
     const absOffset = Math.abs(offset);
     
-    // Responsive sizing
+    // Responsive sizing - improved for better template display
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-    const baseWidth = isMobile ? 300 : 400;
-    const spacing = isMobile ? 140 : 180;
+    const baseWidth = isMobile ? 300 : 450;  // Increased from 400 to 450 for desktop
+    const spacing = isMobile ? 140 : 200;    // Increased spacing from 180 to 200
     
     // Center item
     if (offset === 0) {
