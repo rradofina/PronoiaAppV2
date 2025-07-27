@@ -1,6 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Photo } from '../types';
-import { getBestPhotoUrl } from '../utils/photoUrlUtils';
 import { photoCacheService } from '../services/photoCacheService';
 
 interface PhotoCardProps {
@@ -13,6 +12,32 @@ interface PhotoCardProps {
 
 function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isUsedInTemplate = false }: PhotoCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
+  const [fallbackUrls] = useState(() => {
+    // Generate fallback URLs for this photo (restored from working version)
+    const fallbacks = [];
+    
+    // If we have a thumbnail, use higher resolution for better quality on modern displays
+    if (photo.thumbnailUrl) {
+      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s400')); // =s400 (better quality for grid)
+      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s600')); // =s600 (high quality fallback)
+      fallbacks.push(photo.thumbnailUrl); // =s220 (original size as fallback)
+    }
+    
+    // Try direct Google Drive link
+    if (photo.googleDriveId) {
+      fallbacks.push(`https://drive.google.com/uc?id=${photo.googleDriveId}&export=view`);
+    }
+    
+    // Use the original URL as final fallback
+    if (photo.url && !fallbacks.includes(photo.url)) {
+      fallbacks.push(photo.url);
+    }
+    
+    return fallbacks.filter(Boolean);
+  });
 
   // Preload photo when card comes into view or on hover
   useEffect(() => {
@@ -42,6 +67,33 @@ function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isU
     };
   }, [photo]);
 
+  const getCurrentUrl = () => {
+    if (currentUrlIndex < fallbackUrls.length) {
+      return fallbackUrls[currentUrlIndex];
+    }
+    return photo.url; // Final fallback
+  };
+
+  const handleImageLoad = () => {
+    console.log(`✅ PhotoGrid image loaded successfully: ${photo.name} (URL ${currentUrlIndex + 1}/${fallbackUrls.length})`);
+    setImageLoaded(true);
+    setImageError(false);
+  };
+
+  const handleImageError = () => {
+    console.error(`❌ PhotoGrid image failed: ${photo.name} with URL ${currentUrlIndex + 1}/${fallbackUrls.length}:`, getCurrentUrl());
+    
+    // Try next fallback URL
+    if (currentUrlIndex < fallbackUrls.length - 1) {
+      console.log(`🔄 Trying next fallback URL for ${photo.name} (${currentUrlIndex + 2}/${fallbackUrls.length})`);
+      setCurrentUrlIndex(prev => prev + 1);
+      setImageError(false); // Reset error state to try next URL
+    } else {
+      console.error(`❌ All fallback URLs failed for ${photo.name}`);
+      setImageError(true);
+    }
+  };
+
   const handleMouseEnter = () => {
     // Aggressively preload on hover for faster template editor loading
     photoCacheService.preloadPhoto(photo);
@@ -55,20 +107,26 @@ function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isU
       className="relative overflow-hidden cursor-pointer hover:opacity-90 transition-opacity duration-200"
     >
       <div className="w-full relative" style={{ aspectRatio: '2/3' }}>
-        <img 
-          src={getBestPhotoUrl(photo)} 
-          alt={photo.name} 
-          className="w-full h-full object-cover"
-          style={{
-            imageRendering: 'auto',
-            backfaceVisibility: 'hidden'
-          }}
-          onLoad={() => console.log(`✅ PhotoGrid high-res image loaded: ${photo.name}`)}
-          onError={(e) => {
-            console.error(`❌ PhotoGrid high-res image failed: ${photo.name}`, getBestPhotoUrl(photo));
-            e.currentTarget.style.display = 'none';
-          }}
-        />
+        {!imageError ? (
+          <img 
+            src={getCurrentUrl()} 
+            alt={photo.name} 
+            className="w-full h-full object-cover"
+            style={{
+              imageRendering: 'auto',
+              backfaceVisibility: 'hidden'
+            }}
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gray-100">
+            <div className="text-center text-gray-500">
+              <div className="text-2xl mb-1">📷</div>
+              <div className="text-xs">Failed to load</div>
+            </div>
+          </div>
+        )}
         
         {/* Star button for favorites */}
         {onToggleFavorite && (
