@@ -32,6 +32,12 @@ export default function DriveSetupScreen({
 
   const loadFolders = async (parentId: string | null = null) => {
     try {
+      // Safety check: Ensure Google API client is available
+      if (!window.gapi?.client?.drive) {
+        console.warn('Google API client not yet available');
+        return;
+      }
+      
       const q = parentId 
         ? `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
         : `mimeType='application/vnd.google-apps.folder' and 'root' in parents and trashed=false`;

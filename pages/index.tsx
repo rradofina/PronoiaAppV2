@@ -953,6 +953,12 @@ export default function Home() {
         return;
       }
 
+      // Double-check authentication state
+      if (!googleAuth.isSignedIn) {
+        console.log('⚠️ User not signed in, skipping template loading');
+        return;
+      }
+
       try {
         console.log('🔄 Loading PNG templates on app startup...');
         // Use hybrid template service for better reliability and manual template support
@@ -972,11 +978,9 @@ export default function Home() {
       }
     };
 
-    // Only load if we have authentication, API is ready, and not restoring
-    if (googleAuth.isSignedIn && !isRestoringAuth && window.gapi?.client?.drive) {
-      // Add a small delay to ensure API is fully initialized
-      setTimeout(loadPngTemplatesOnStartup, 1000);
-    }
+    // Skip loading templates on startup to avoid authentication issues
+    // Templates will be loaded when needed during package selection
+    console.log('⏭️ Skipping PNG template loading on startup - will load when needed');
   }, [googleAuth.isSignedIn, isRestoringAuth, isGapiLoaded]);
 
   const renderScreen = () => {

@@ -2,6 +2,7 @@ import React from 'react';
 import { TemplateSlot, Photo, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform } from '../types';
 import { PngTemplate } from '../services/pngTemplateService';
 import PhotoRenderer from './PhotoRenderer';
+import InlinePhotoEditor from './InlinePhotoEditor';
 
 interface PngTemplateVisualProps {
   pngTemplate: PngTemplate;
@@ -9,6 +10,11 @@ interface PngTemplateVisualProps {
   onSlotClick: (slot: TemplateSlot) => void;
   photos: Photo[];
   selectedSlot: TemplateSlot | null;
+  // Inline editing props
+  inlineEditingSlot?: TemplateSlot | null;
+  inlineEditingPhoto?: Photo | null;
+  onInlineApply?: (slotId: string, photoId: string, transform: PhotoTransform) => void;
+  onInlineCancel?: () => void;
 }
 
 
@@ -17,7 +23,11 @@ export default function PngTemplateVisual({
   templateSlots,
   onSlotClick,
   photos,
-  selectedSlot
+  selectedSlot,
+  inlineEditingSlot,
+  inlineEditingPhoto,
+  onInlineApply,
+  onInlineCancel
 }: PngTemplateVisualProps) {
   
   const getPhotoUrl = (photoId?: string | null) => {
@@ -93,6 +103,8 @@ export default function PngTemplateVisual({
         
         const photoUrl = getPhotoUrl(slot.photoId);
         const isSelected = selectedSlot?.id === slot.id;
+        const isInlineEditing = inlineEditingSlot?.id === slot.id;
+        const hasInlinePhoto = isInlineEditing && inlineEditingPhoto;
         
         // Debug transform values
         if (slot.transform) {
@@ -116,8 +128,12 @@ export default function PngTemplateVisual({
         return (
           <div
             key={hole.id}
-            className={`absolute cursor-pointer transition-all duration-200 ${
-              isSelected ? 'border-4 border-blue-500 border-opacity-90 z-10' : 'hover:border-2 hover:border-blue-300 hover:border-opacity-60'
+            className={`absolute transition-all duration-200 overflow-hidden ${
+              isInlineEditing 
+                ? 'border-4 border-yellow-400 shadow-lg shadow-yellow-400/50 z-50 ring-2 ring-yellow-300' // Enhanced highlighting for inline editing
+                : isSelected 
+                ? 'border-4 border-blue-500 border-opacity-90 z-10 cursor-pointer shadow-md' 
+                : 'hover:border-2 hover:border-blue-300 hover:border-opacity-60 cursor-pointer'
             }`}
             style={{
               left: `${(hole.x / pngTemplate.dimensions.width) * 100}%`,
@@ -125,9 +141,20 @@ export default function PngTemplateVisual({
               width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
               height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
             }}
-            onClick={() => onSlotClick(slot)}
+            onClick={() => !isInlineEditing && onSlotClick(slot)}
           >
-            {photoUrl ? (
+            {hasInlinePhoto && onInlineApply && onInlineCancel ? (
+              // Inline editing mode - show InlinePhotoEditor
+              <InlinePhotoEditor
+                slot={slot}
+                photo={inlineEditingPhoto}
+                photos={photos}
+                onApply={onInlineApply}
+                onCancel={onInlineCancel}
+                className="w-full h-full"
+              />
+            ) : photoUrl ? (
+              // Normal mode - show photo
               <PhotoRenderer
                 photoUrl={photoUrl}
                 photoAlt={`Photo ${holeIndex + 1}`}
@@ -136,11 +163,26 @@ export default function PngTemplateVisual({
                 className="w-full h-full"
               />
             ) : (
-              <div className="w-full h-full bg-gray-200 flex items-center justify-center relative overflow-hidden border-2 border-dashed border-gray-400">
+              // Empty slot - show placeholder with enhanced highlighting when selected
+              <div className={`w-full h-full flex items-center justify-center relative overflow-hidden border-2 border-dashed ${
+                isInlineEditing 
+                  ? 'bg-yellow-50 border-yellow-400 animate-pulse shadow-lg shadow-yellow-400/30' // Enhanced highlighting for inline editing
+                  : isSelected 
+                  ? 'bg-blue-50 border-blue-400' 
+                  : 'bg-gray-200 border-gray-400'
+              }`}>
                 {/* Visible placeholder with icon */}
-                <div className="text-center text-gray-500">
+                <div className={`text-center ${
+                  isInlineEditing 
+                    ? 'text-yellow-600 font-bold' 
+                    : isSelected 
+                    ? 'text-blue-600 font-semibold' 
+                    : 'text-gray-500'
+                }`}>
                   <div className="text-lg mb-1">+</div>
-                  <div className="text-xs font-medium">Tap to Add</div>
+                  <div className="text-xs font-medium">
+                    {isInlineEditing ? 'Select Photo Below' : 'Tap to Add'}
+                  </div>
                 </div>
               </div>
             )}

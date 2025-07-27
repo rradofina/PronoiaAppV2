@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import InlineTemplateEditor from '../InlineTemplateEditor';
+import InlinePhotoEditor from '../InlinePhotoEditor';
 import FullscreenPhotoViewer from '../FullscreenPhotoViewer';
-import FullscreenTemplateEditor from '../FullscreenTemplateEditor';
 import PhotoRenderer from '../PhotoRenderer';
 import FullscreenTemplateSelector from '../FullscreenTemplateSelector';
 import PhotoSelectionMode from '../PhotoSelectionMode';
@@ -20,7 +20,7 @@ import OriginalTemplateVisual from '../TemplateVisual';
 
 
 // Simplified TemplateVisual component
-const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: any) => {
+const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel }: any) => {
   const pngTemplates = (window as any).pngTemplates || [];
   
   // Find PNG template using slot's templateType for better accuracy after swaps
@@ -110,6 +110,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
   let pngTemplate = null;
   
   if (pngTemplates.length > 0 && templateType) {
+    // Primary matching strategy with better solo template handling
     pngTemplate = 
       // 1. Exact match on template_type field
       pngTemplates.find((t: any) => t.template_type === templateType) || 
@@ -119,44 +120,58 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
       pngTemplates.find((t: any) => t.template_type === template.id) ||
       // 4. Match by ID
       pngTemplates.find((t: any) => t.id === templateType);
+      
+    // 5. Enhanced solo template fallback - try multiple properties and patterns
+    if (!pngTemplate && (templateType === 'solo' || template.id === 'solo')) {
+      console.log('🔍 SOLO TEMPLATE DEBUG - Enhanced solo template search...', {
+        totalTemplates: pngTemplates.length,
+        searchingFor: 'solo templates with various property patterns'
+      });
+      
+      // Try multiple solo template patterns
+      pngTemplate = 
+        // Try template_type === 'solo'
+        pngTemplates.find((t: any) => t.template_type === 'solo') ||
+        // Try templateType === 'solo' 
+        pngTemplates.find((t: any) => t.templateType === 'solo') ||
+        // Try id === 'solo'
+        pngTemplates.find((t: any) => t.id === 'solo') ||
+        // Try name containing 'solo' (case insensitive)
+        pngTemplates.find((t: any) => t.name?.toLowerCase().includes('solo')) ||
+        // Try templates with single hole (solo characteristic)
+        pngTemplates.find((t: any) => t.holes?.length === 1) ||
+        // Last resort - use first available template for solo
+        pngTemplates[0];
+      
+      if (pngTemplate) {
+        console.log('✅ SOLO TEMPLATE DEBUG - Found solo template using enhanced search:', {
+          id: pngTemplate.id,
+          name: pngTemplate.name,
+          template_type: pngTemplate.template_type,
+          templateType: pngTemplate.templateType,
+          holesCount: pngTemplate.holes?.length || 0,
+          matchedBy: 
+            pngTemplate.template_type === 'solo' ? 'template_type=solo' :
+            pngTemplate.templateType === 'solo' ? 'templateType=solo' :
+            pngTemplate.id === 'solo' ? 'id=solo' :
+            pngTemplate.name?.toLowerCase().includes('solo') ? 'name contains solo' :
+            pngTemplate.holes?.length === 1 ? 'single hole template' :
+            'first available template'
+        });
+      }
+    }
+    
+    // 6. Fallback for other template types
+    if (!pngTemplate && templateType !== 'solo' && template.id !== 'solo') {
+      pngTemplate = pngTemplates[0];
+      console.log('🔄 Using first available template for non-solo type:', templateType);
+    }
   } else {
     console.warn('🛡️ NAVIGATION PROTECTION - Skipping PNG template matching due to invalid state:', {
       pngTemplatesCount: pngTemplates.length,
       templateType: templateType,
       hasValidTemplateType: !!templateType
     });
-  }
-    
-  // 5. For solo templates, find any solo PNG template as fallback
-  if (!pngTemplate && (templateType === 'solo' || template.id === 'solo')) {
-    console.log('🔍 SOLO TEMPLATE DEBUG - Looking for solo PNG templates...', {
-      availableSoloTemplates: pngTemplates.filter((t: any) => t.template_type === 'solo' || t.templateType === 'solo'),
-      searchingFor: 'template_type or templateType === "solo"'
-    });
-    pngTemplate = pngTemplates.find((t: any) => t.template_type === 'solo' || t.templateType === 'solo');
-    
-    if (pngTemplate) {
-      console.log('✅ SOLO TEMPLATE DEBUG - Found solo PNG template:', {
-        id: pngTemplate.id,
-        name: pngTemplate.name,
-        template_type: pngTemplate.template_type,
-        templateType: pngTemplate.templateType,
-        holesCount: pngTemplate.holes?.length || 0
-      });
-    } else {
-      console.warn('❌ SOLO TEMPLATE DEBUG - No solo PNG templates found, will use legacy fallback');
-    }
-  }
-  
-  // 6. For solo templates, use ANY available PNG template rather than falling back to legacy
-  if (!pngTemplate && (templateType === 'solo' || template.id === 'solo') && pngTemplates.length > 0) {
-    console.log('🔄 SOLO TEMPLATE DEBUG - No exact solo PNG template found, using first available PNG template to avoid legacy fallback');
-    pngTemplate = pngTemplates[0];
-  }
-  
-  // 7. Use first available template only if we have templates loaded (for non-solo templates)
-  if (!pngTemplate && pngTemplates.length > 0 && templateType !== 'solo' && template.id !== 'solo') {
-    pngTemplate = pngTemplates[0];
   }
 
   // NAVIGATION DEBUG: Track the final decision
@@ -192,27 +207,39 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
         onSlotClick={onSlotClick}
         photos={photos}
         selectedSlot={selectedSlot}
+        inlineEditingSlot={inlineEditingSlot}
+        inlineEditingPhoto={inlineEditingPhoto}
+        onInlineApply={onInlineApply}
+        onInlineCancel={onInlineCancel}
       />
     );
   }
 
-  // For solo templates, if PNG templates are available but none matched, this should not happen
-  if ((templateType === 'solo' || template.id === 'solo') && pngTemplates.length > 0) {
-    console.error('🚨 NAVIGATION DEBUG - Solo template should have found a PNG template but didn\'t. This indicates a logic error.');
-    console.log('🔧 NAVIGATION DEBUG - Emergency fallback: Using first available PNG template for solo');
-    // Force use first available PNG template
+  // Emergency fallback for solo templates - should not be needed with enhanced matching above
+  if ((templateType === 'solo' || template.id === 'solo') && pngTemplates.length > 0 && !pngTemplate) {
+    console.warn('🚨 EMERGENCY FALLBACK - Solo template matching failed, using first available PNG template');
+    pngTemplate = pngTemplates[0];
+  }
+
+  // If we now have a PNG template (including from emergency fallback), use it
+  if (pngTemplate) {
+    console.log('✅ NAVIGATION DEBUG - Using PngTemplateVisual with fallback template:', pngTemplate.name);
     return (
       <PngTemplateVisual
-        pngTemplate={pngTemplates[0]}
+        pngTemplate={pngTemplate}
         templateSlots={slots}
         onSlotClick={onSlotClick}
         photos={photos}
         selectedSlot={selectedSlot}
+        inlineEditingSlot={inlineEditingSlot}
+        inlineEditingPhoto={inlineEditingPhoto}
+        onInlineApply={onInlineApply}
+        onInlineCancel={onInlineCancel}
       />
     );
   }
 
-  // Fallback to legacy TemplateVisual only when no PNG templates are available
+  // Fallback to legacy TemplateVisual only when no PNG templates are available at all
   console.log('❌ NAVIGATION DEBUG - Using legacy TemplateVisual fallback for:', templateType, '(No PNG templates available)');
   return (
     <OriginalTemplateVisual
@@ -278,11 +305,15 @@ export default function PhotoSelectionScreen({
   const [favoritedPhotos, setFavoritedPhotos] = useState<Set<string>>(new Set()); // Photo IDs that are favorited
   
   // Simplified workflow states
-  const [viewMode, setViewMode] = useState<'normal' | 'photo-viewer' | 'sliding-templates' | 'template-editor' | 'template-first' | 'photo-selection' | 'template-viewer'>('normal');
+  const [viewMode, setViewMode] = useState<'normal' | 'photo-viewer' | 'sliding-templates' | 'template-first' | 'photo-selection' | 'inline-editing'>('normal');
   const [selectedPhotoForViewer, setSelectedPhotoForViewer] = useState<Photo | null>(null);
   const [selectedPhotoForTemplate, setSelectedPhotoForTemplate] = useState<Photo | null>(null);
   const [selectedTemplateForViewer, setSelectedTemplateForViewer] = useState<string | null>(null);
   const [selectedSlotForEditor, setSelectedSlotForEditor] = useState<TemplateSlot | null>(null);
+  
+  // Inline editing states
+  const [inlineEditingSlot, setInlineEditingSlot] = useState<TemplateSlot | null>(null);
+  const [inlineEditingPhoto, setInlineEditingPhoto] = useState<Photo | null>(null);
   
   // Template management states (simplified)
   const [showTemplateSwapper, setShowTemplateSwapper] = useState(false);
@@ -341,13 +372,6 @@ export default function PhotoSelectionScreen({
     setEditingTemplate(null);
   };
 
-  const handleInlinePhotoSelect = (photo: Photo, slotId: string) => {
-    const updatedSlots = templateSlots.map(s =>
-      s.id === slotId ? { ...s, photoId: photo.id } : s
-    );
-    setTemplateSlots(updatedSlots);
-    setEditingTemplate(updatedSlots.filter(s => s.templateId === editingTemplate?.[0].templateId));
-  };
 
   const handleInlineTransformChange = (slotId: string, transform: { scale: number; x: number; y: number }) => {
     const updatedSlots = templateSlots.map(s =>
@@ -415,13 +439,32 @@ export default function PhotoSelectionScreen({
   
   // Photo-first workflow
   const handlePhotoClick = (photo: Photo) => {
-    // In print mode with a selected slot, skip photo viewer and go directly to template editor
+    console.log('🔧 handlePhotoClick called:', {
+      photoId: photo.id,
+      photoName: photo.name,
+      currentViewMode: viewMode,
+      currentSelectionMode: selectionMode,
+      hasSelectedSlot: !!selectedSlot,
+      selectedSlotId: selectedSlot?.id,
+      isInlineEditing: viewMode === 'inline-editing'
+    });
+
+    // Check if we're in inline editing mode first
+    if (viewMode === 'inline-editing') {
+      console.log('🔧 Photo clicked in inline editing mode - delegating to handleInlinePhotoSelect');
+      handleInlinePhotoSelect(photo);
+      return;
+    }
+    
+    // In print mode with a selected slot, start inline editing
     if (selectionMode === 'print' && selectedSlot) {
-      setSelectedPhotoForTemplate(photo);
-      setSelectedSlotForEditor(selectedSlot);
-      setViewMode('template-editor');
+      console.log('🔧 Starting inline editing - print mode with selected slot:', selectedSlot.id);
+      setInlineEditingSlot(selectedSlot);
+      setInlineEditingPhoto(photo);
+      setViewMode('inline-editing');
     } else {
       // In photo mode or print mode without selected slot, show photo viewer
+      console.log('🔧 Opening photo viewer - photo mode or no selected slot');
       setSelectedPhotoForViewer(photo);
       setViewMode('photo-viewer');
     }
@@ -430,9 +473,10 @@ export default function PhotoSelectionScreen({
   const handleAddToTemplate = (photo: Photo) => {
     setSelectedPhotoForTemplate(photo);
     if (selectedSlot) {
-      // If we have a selected slot, go directly to template editor
-      setSelectedSlotForEditor(selectedSlot);
-      setViewMode('template-editor');
+      // If we have a selected slot, start inline editing
+      setInlineEditingSlot(selectedSlot);
+      setInlineEditingPhoto(photo);
+      setViewMode('inline-editing');
     } else {
       // Fallback to sliding templates if no slot selected
       setViewMode('sliding-templates');
@@ -440,8 +484,8 @@ export default function PhotoSelectionScreen({
   };
 
   const handleSlotSelectFromSlidingBar = (slot: TemplateSlot) => {
-    setSelectedSlotForEditor(slot);
-    setViewMode('template-editor');
+    setInlineEditingSlot(slot);
+    setViewMode('inline-editing');
   };
 
   // Template-first workflow  
@@ -451,12 +495,20 @@ export default function PhotoSelectionScreen({
   };
 
   const handleSlotSelectFromTemplate = (slot: TemplateSlot) => {
-    setSelectedSlot(slot); // Just highlight the slot, stay in normal view
+    // Check if slot is empty - if so, start inline editing
+    if (!slot.photoId) {
+      console.log('🔧 Starting inline editing for empty slot:', slot.id);
+      setInlineEditingSlot(slot);
+      setViewMode('inline-editing');
+    } else {
+      setSelectedSlot(slot); // Just highlight the slot for filled slots
+    }
   };
 
   const handlePhotoSelectForSlot = (photo: Photo) => {
+    // This function might not be needed anymore with inline editing
     setSelectedPhotoForTemplate(photo);
-    setViewMode('template-editor');
+    // Could potentially start inline editing here if we have a slot context
   };
 
   // Template editor
@@ -545,11 +597,50 @@ export default function PhotoSelectionScreen({
   };
 
   const resetViewStates = () => {
+    console.log('🔧 Resetting all view states to normal mode');
     setViewMode('normal');
     setSelectedPhotoForViewer(null);
     setSelectedPhotoForTemplate(null);
     setSelectedTemplateForViewer(null);
     setSelectedSlotForEditor(null);
+    setInlineEditingSlot(null);
+    setInlineEditingPhoto(null);
+  };
+
+  // Inline editing handlers
+  const handleInlinePhotoSelect = (photo: Photo) => {
+    console.log('🔧 handleInlinePhotoSelect called:', {
+      photoId: photo.id,
+      photoName: photo.name,
+      currentViewMode: viewMode,
+      hasInlineEditingSlot: !!inlineEditingSlot,
+      inlineEditingSlotId: inlineEditingSlot?.id
+    });
+
+    if (viewMode === 'inline-editing' && inlineEditingSlot) {
+      console.log('✅ Setting photo for inline editing - conditions met');
+      setInlineEditingPhoto(photo);
+    } else {
+      console.warn('❌ Cannot set photo for inline editing - conditions not met:', {
+        isInlineEditingMode: viewMode === 'inline-editing',
+        hasInlineEditingSlot: !!inlineEditingSlot
+      });
+    }
+  };
+
+  const handleInlineApply = (slotId: string, photoId: string, transform: PhotoTransform) => {
+    console.log('🔧 Inline apply:', { slotId, photoId, transform });
+    handleApplyPhotoToSlot(slotId, photoId, transform);
+    setViewMode('normal');
+    setInlineEditingSlot(null);
+    setInlineEditingPhoto(null);
+  };
+
+  const handleInlineCancel = () => {
+    console.log('🔧 Inline editing cancelled');
+    setViewMode('normal');
+    setInlineEditingSlot(null);
+    setInlineEditingPhoto(null);
   };
 
   // Favorites management
@@ -624,7 +715,7 @@ export default function PhotoSelectionScreen({
         }
       }
     }
-    setViewMode('template-viewer'); // New view mode for template viewing
+    setViewMode('normal'); // Return to normal view since we removed template-viewer
   };
 
   const handleSwapTemplate = (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => {
@@ -670,6 +761,48 @@ export default function PhotoSelectionScreen({
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ touchAction: 'manipulation' }}>
+      
+      {/* Inline Editing Overlay */}
+      {viewMode === 'inline-editing' && (
+        <>
+          {/* Mobile/Tablet: Only darken the top portion (header + photo grid area) */}
+          <div 
+            className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-black bg-opacity-70 pointer-events-none"
+            style={{ 
+              bottom: '60vh' // Only darken top 40% of screen, leave template area and favorites clear
+            }}
+          />
+          
+          {/* Desktop: darken only the header area, leave template area and sidebar clear */}
+          <div 
+            className="hidden lg:block fixed top-0 left-0 z-30 bg-black bg-opacity-70 pointer-events-none"
+            style={{ 
+              right: '320px', // Leave space for desktop sidebar (320px wide)
+              height: '80px' // Only darken the header area, leave template area visible
+            }}
+          />
+          
+          {/* Clickable overlay for canceling - only on darkened areas */}
+          {/* Mobile clickable area */}
+          <div 
+            className="lg:hidden fixed top-0 left-0 right-0 z-25"
+            style={{ 
+              bottom: '60vh' // Match the darkened area on mobile
+            }}
+            onClick={handleInlineCancel}
+          />
+          
+          {/* Desktop clickable area - only header */}
+          <div 
+            className="hidden lg:block fixed top-0 left-0 z-25"
+            style={{ 
+              right: '320px', // Match the darkened area width
+              height: '80px' // Match the darkened area height
+            }}
+            onClick={handleInlineCancel}
+          />
+        </>
+      )}
       
       {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
       <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
@@ -740,7 +873,15 @@ export default function PhotoSelectionScreen({
                   onViewTemplate={handleViewTemplate}
                   onSwapTemplate={handleSwapTemplate}
                   onDeleteTemplate={handleDeletePrint}
-                  TemplateVisual={TemplateVisual}
+                  TemplateVisual={(props: any) => (
+                    <TemplateVisual
+                      {...props}
+                      inlineEditingSlot={inlineEditingSlot}
+                      inlineEditingPhoto={inlineEditingPhoto}
+                      onInlineApply={handleInlineApply}
+                      onInlineCancel={handleInlineCancel}
+                    />
+                  )}
                   layout="coverflow"
                   showActions={true}
                 />
@@ -760,11 +901,14 @@ export default function PhotoSelectionScreen({
               favoritedPhotos={getUnusedFavorites()}
               onPhotoClick={handlePhotoClick}
               onRemoveFavorite={handleToggleFavorite}
+              isActiveInteractionArea={false}
+              layout="horizontal"
+              showRemoveButtons={true}
             />
           ) : (
             // Print Filling Mode: Show Favorites Bar with controls
             <div className="h-full flex flex-col">
-              <div className="flex-shrink-0 p-2 border-b bg-gray-50">
+              <div className="flex-shrink-0 p-2 border-b bg-gray-50 relative">
                 <div className="flex items-center justify-between mb-1">
                   <button
                     onClick={handleBack}
@@ -795,11 +939,14 @@ export default function PhotoSelectionScreen({
                 </div>
                 <h2 className="text-xs font-bold text-gray-800 text-center">⭐ Your Favorites • {getDisplayPhotos().length} available</h2>
               </div>
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-hidden relative">
                 <FavoritesBar
                   favoritedPhotos={getDisplayPhotos()}
                   onPhotoClick={handlePhotoClick}
                   onRemoveFavorite={handleToggleFavorite}
+                  isActiveInteractionArea={viewMode === 'inline-editing'}
+                  layout="horizontal"
+                  showRemoveButtons={false}
                 />
               </div>
             </div>
@@ -807,9 +954,9 @@ export default function PhotoSelectionScreen({
         </div>
 
         {/* Desktop: Vertical right sidebar */}
-        <div className="hidden lg:flex bg-white shadow-lg border-l flex-shrink-0 flex-col" style={{ width: '320px' }}>
+        <div className="hidden lg:flex bg-white shadow-lg border-l flex-shrink-0 flex-col relative" style={{ width: '320px' }}>
           {selectionMode === 'photo' ? (
-            // Photo Selection Mode: Show Favorites
+            // Photo Selection Mode: Show Favorites using unified component
             <>
               <div className="p-4 border-b">
                 <h2 className="text-sm font-bold text-gray-800 text-center">⭐ Your Favorites</h2>
@@ -817,43 +964,19 @@ export default function PhotoSelectionScreen({
                   {favoritedPhotos.size} favorites • {calculatePhotoLimit() - getUsedPhotoIds().size} photos available
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-4">
-                <div className="grid grid-cols-3 gap-2">
-                  {getUnusedFavorites().map((photo) => (
-                    <div
-                      key={photo.id}
-                      className="relative aspect-square cursor-pointer hover:opacity-90 transition-opacity"
-                      onClick={() => handlePhotoClick(photo)}
-                    >
-                      <img
-                        src={photo.thumbnailUrl || photo.url}
-                        alt={photo.name}
-                        className="w-full h-full object-cover rounded-lg"
-                      />
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleFavorite(photo.id);
-                        }}
-                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                        title="Remove from favorites"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {getUnusedFavorites().length === 0 && (
-                  <div className="text-center text-gray-500 py-8">
-                    <div className="text-2xl mb-2">⭐</div>
-                    <p className="text-sm">No favorites yet</p>
-                    <p className="text-xs text-gray-400">Star photos to add them here</p>
-                  </div>
-                )}
+              <div className="flex-1 overflow-hidden">
+                <FavoritesBar
+                  favoritedPhotos={getUnusedFavorites()}
+                  onPhotoClick={handlePhotoClick}
+                  onRemoveFavorite={handleToggleFavorite}
+                  isActiveInteractionArea={viewMode === 'inline-editing'}
+                  layout="vertical"
+                  showRemoveButtons={true}
+                />
               </div>
             </>
           ) : (
-            // Print Filling Mode: Show Favorites instead of templates
+            // Print Filling Mode: Show Favorites using unified component
             <>
               <div className="p-4 border-b">
                 <div className="flex items-center justify-between mb-2">
@@ -869,43 +992,19 @@ export default function PhotoSelectionScreen({
                 </div>
                 <h2 className="text-sm font-bold text-gray-800 text-center">⭐ Your Favorites</h2>
                 <div className="text-xs text-gray-600 text-center">
-                  {getDisplayPhotos().length} available • Drag to template slots
+                  {getDisplayPhotos().length} available • Tap to fill slots
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4">
-                <div className="grid grid-cols-3 gap-2">
-                  {getDisplayPhotos().map((photo) => (
-                    <div
-                      key={photo.id}
-                      className="relative aspect-square cursor-pointer hover:opacity-90 transition-opacity"
-                      onClick={() => handlePhotoClick(photo)}
-                    >
-                      <img
-                        src={photo.thumbnailUrl || photo.url}
-                        alt={photo.name}
-                        className="w-full h-full object-cover rounded-lg"
-                      />
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleFavorite(photo.id);
-                        }}
-                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                        title="Remove from favorites"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {getDisplayPhotos().length === 0 && (
-                  <div className="text-center text-gray-500 py-8">
-                    <div className="text-2xl mb-2">⭐</div>
-                    <p className="text-sm">No favorites selected</p>
-                    <p className="text-xs text-gray-400">Switch to photo mode to select favorites</p>
-                  </div>
-                )}
+              <div className="flex-1 overflow-hidden">
+                <FavoritesBar
+                  favoritedPhotos={getDisplayPhotos()}
+                  onPhotoClick={handlePhotoClick}
+                  onRemoveFavorite={handleToggleFavorite}
+                  isActiveInteractionArea={viewMode === 'inline-editing'}
+                  layout="vertical"
+                  showRemoveButtons={false}
+                />
               </div>
             </>
           )}
@@ -1107,49 +1206,6 @@ export default function PhotoSelectionScreen({
         isVisible={viewMode === 'photo-selection' && !!selectedSlotForEditor}
       />
 
-      {/* Fullscreen Template Editor */}
-      <FullscreenTemplateEditor
-        templateSlots={templateSlots}
-        selectedSlot={selectedSlotForEditor!}
-        selectedPhoto={selectedPhotoForTemplate!}
-        photos={photos}
-        onApply={handleApplyPhotoToSlot}
-        onClose={resetViewStates}
-        isVisible={viewMode === 'template-editor' && !!selectedSlotForEditor && !!selectedPhotoForTemplate}
-      />
-
-      {/* Unified Template Viewer/Editor */}
-      {templateToView && (selectedSlotForEditor || templateToView.slots[0]) && (
-        <FullscreenTemplateEditor
-          templateSlots={templateToView.slots}
-          selectedSlot={selectedSlotForEditor || templateToView.slots[0]}
-          selectedPhoto={selectedPhotoForTemplate}
-          photos={photos}
-          onApply={handleApplyPhotoToSlot}
-          onClose={resetViewStates}
-          isVisible={viewMode === 'template-viewer'}
-          viewMode="multi-slot" // New prop to enable multi-slot viewing
-          templateToView={templateToView}
-          onSlotSelect={(slot) => {
-            setSelectedSlotForEditor(slot);
-            // Auto-set photo if slot has one
-            if (slot.photoId) {
-              const photo = photos.find(p => p.id === slot.photoId);
-              if (photo) {
-                setSelectedPhotoForTemplate(photo);
-              }
-            } else {
-              setSelectedPhotoForTemplate(null);
-            }
-          }}
-          onRemovePhoto={(slot) => {
-            const updatedSlots = templateSlots.map(s =>
-              s.id === slot.id ? { ...s, photoId: undefined, transform: undefined } : s
-            );
-            setTemplateSlots(updatedSlots);
-          }}
-        />
-      )}
 
       {/* Template Swapper Modal */}
       <TemplateSwapModal
