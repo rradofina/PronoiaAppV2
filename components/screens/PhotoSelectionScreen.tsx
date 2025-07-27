@@ -349,15 +349,16 @@ export default function PhotoSelectionScreen({
     loadTemplates();
   }, []);
 
-  // Auto-select first empty slot when entering screen
+  // Auto-select first empty slot when entering screen (but respect completed templates)
   useEffect(() => {
     if (!selectedSlot && templateSlots.length > 0) {
       const firstEmptySlot = templateSlots.find(slot => !slot.photoId);
       if (firstEmptySlot) {
+        // Only auto-select if we have empty slots (not all templates are complete)
         setSelectedSlot(firstEmptySlot);
-      } else {
-        setSelectedSlot(templateSlots[0]);
       }
+      // Don't auto-select anything if all slots are filled (templates complete)
+      // This allows for clean view when templates are completed
     }
   }, [templateSlots, selectedSlot, setSelectedSlot]);
 
@@ -511,6 +512,22 @@ export default function PhotoSelectionScreen({
     // Could potentially start inline editing here if we have a slot context
   };
 
+  // Handle background clicks to deselect when all templates are complete
+  const handleBackgroundClick = (event: React.MouseEvent) => {
+    // Only deselect if clicking directly on the background (not on child elements)
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    // Check if all templates are complete (all slots have photos)
+    const allSlotsHavePhotos = templateSlots.every(slot => slot.photoId);
+    
+    if (allSlotsHavePhotos && selectedSlot) {
+      console.log('🔧 Background clicked - deselecting for clean view');
+      setSelectedSlot(null);
+    }
+  };
+
   // Template editor
   const handleApplyPhotoToSlot = (slotId: string, photoId: string, transform?: PhotoTransform | ContainerTransform) => {
     console.log('🔧 FULLSCREEN EDITOR - Apply button clicked:', { slotId, photoId, transform });
@@ -584,11 +601,30 @@ export default function PhotoSelectionScreen({
       console.log('Updated templateSlots (what we set):', updatedSlots.map(s => ({ id: s.id, photoId: s.photoId })));
     }, 50);
     
-    // Auto-select next empty slot
-    const nextEmptySlot = updatedSlots.find(slot => !slot.photoId && slot.id !== slotId);
-    if (nextEmptySlot) {
-      console.log('🔧 Auto-selecting next empty slot:', nextEmptySlot.id);
-      setSelectedSlot(nextEmptySlot);
+    // Simple template completion check and deselect
+    const currentSlot = updatedSlots.find(slot => slot.id === slotId);
+    if (currentSlot) {
+      // Get all slots in the same template
+      const sameTemplateSlots = updatedSlots.filter(slot => slot.templateId === currentSlot.templateId);
+      
+      // Count how many slots in this template now have photos
+      const filledSlotsCount = sameTemplateSlots.filter(slot => slot.photoId).length;
+      const totalSlotsInTemplate = sameTemplateSlots.length;
+      
+      console.log(`🔧 Template ${currentSlot.templateId}: ${filledSlotsCount}/${totalSlotsInTemplate} slots filled`);
+      
+      if (filledSlotsCount === totalSlotsInTemplate) {
+        // Template is complete - deselect for clean view
+        console.log('🔧 Template completed - deselecting for clean view');
+        setSelectedSlot(null);
+      } else {
+        // Template not complete - auto-select next empty slot in same template
+        const nextEmptySlot = sameTemplateSlots.find(slot => !slot.photoId);
+        if (nextEmptySlot) {
+          console.log('🔧 Auto-selecting next empty slot in same template:', nextEmptySlot.id);
+          setSelectedSlot(nextEmptySlot);
+        }
+      }
     }
     
     // Reset states and return to normal view
@@ -691,37 +727,13 @@ export default function PhotoSelectionScreen({
   // Get photos for display (only favorites in print mode)
   const getDisplayPhotos = () => {
     if (selectionMode === 'print') {
-      // In print mode, only show favorited photos that aren't already used
-      const usedIds = getUsedPhotoIds();
-      return photos.filter(photo => 
-        favoritedPhotos.has(photo.id) && !usedIds.has(photo.id)
-      );
+      // In print mode, show all favorited photos (including used ones for reuse)
+      return photos.filter(photo => favoritedPhotos.has(photo.id));
     }
     return photos; // Photo mode shows all photos normally
   };
 
   // Template management handlers
-  const handleViewTemplate = (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => {
-    setTemplateToView(template);
-    // Find the first photo slot to auto-select, or fallback to first slot
-    const firstPhotoSlot = template.slots.find(slot => slot.photoId) || template.slots[0];
-    if (firstPhotoSlot) {
-      setSelectedSlotForEditor(firstPhotoSlot);
-      // If the slot has a photo, also set it for template editor
-      if (firstPhotoSlot.photoId) {
-        const photo = photos.find(p => p.id === firstPhotoSlot.photoId);
-        if (photo) {
-          setSelectedPhotoForTemplate(photo);
-        }
-      }
-    }
-    setViewMode('normal'); // Return to normal view since we removed template-viewer
-  };
-
-  const handleSwapTemplate = (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => {
-    setTemplateToSwap(template);
-    setShowTemplateSwapper(true);
-  };
 
   const handleConfirmTemplateSwap = (newTemplate: HybridTemplate, updatedSlots: TemplateSlot[]) => {
     console.log('🔄 PhotoSelectionScreen - Template swap confirmed:', {
@@ -853,10 +865,10 @@ export default function PhotoSelectionScreen({
           ) : (
             // Print mode: Show templates in Cover Flow
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="p-4 text-center bg-gray-50 border-b flex-shrink-0">
+              <div className="p-4 text-center bg-gray-50 border-b flex-shrink-0" onClick={handleBackgroundClick}>
                 <h3 className="text-lg font-medium text-gray-800 mb-1">Your Print Templates</h3>
                 <p className="text-sm text-gray-600">
-                  Click templates or use arrow keys to navigate • Click slots to fill with photos
+                  Click templates or use arrow keys to navigate • Click slots to fill with photos • Click empty space to deselect
                 </p>
                 {selectedSlot && (
                   <div className="mt-2 text-sm text-white bg-blue-600 px-3 py-1 rounded-full inline-block">
@@ -864,14 +876,12 @@ export default function PhotoSelectionScreen({
                   </div>
                 )}
               </div>
-              <div className="flex-1 relative">
+              <div className="flex-1 relative" onClick={handleBackgroundClick}>
                 <TemplateGrid
                   templateSlots={templateSlots}
                   photos={photos}
                   selectedSlot={selectedSlot}
                   onSlotClick={handleSlotSelectFromTemplate}
-                  onViewTemplate={handleViewTemplate}
-                  onSwapTemplate={handleSwapTemplate}
                   onDeleteTemplate={handleDeletePrint}
                   TemplateVisual={(props: any) => (
                     <TemplateVisual
@@ -904,6 +914,7 @@ export default function PhotoSelectionScreen({
               isActiveInteractionArea={false}
               layout="horizontal"
               showRemoveButtons={true}
+              usedPhotoIds={getUsedPhotoIds()}
             />
           ) : (
             // Print Filling Mode: Show Favorites Bar with controls
@@ -947,6 +958,7 @@ export default function PhotoSelectionScreen({
                   isActiveInteractionArea={viewMode === 'inline-editing'}
                   layout="horizontal"
                   showRemoveButtons={false}
+                  usedPhotoIds={getUsedPhotoIds()}
                 />
               </div>
             </div>
@@ -972,6 +984,7 @@ export default function PhotoSelectionScreen({
                   isActiveInteractionArea={viewMode === 'inline-editing'}
                   layout="vertical"
                   showRemoveButtons={true}
+                  usedPhotoIds={getUsedPhotoIds()}
                 />
               </div>
             </>
@@ -1004,6 +1017,7 @@ export default function PhotoSelectionScreen({
                   isActiveInteractionArea={viewMode === 'inline-editing'}
                   layout="vertical"
                   showRemoveButtons={false}
+                  usedPhotoIds={getUsedPhotoIds()}
                 />
               </div>
             </>

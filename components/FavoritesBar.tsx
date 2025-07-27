@@ -8,6 +8,7 @@ interface FavoritesBarProps {
   isActiveInteractionArea?: boolean; // New prop to indicate when this is the active area
   layout?: 'horizontal' | 'vertical'; // New prop to control layout
   showRemoveButtons?: boolean; // New prop to control remove button visibility
+  usedPhotoIds?: Set<string>; // New prop to track which photos are already used
 }
 
 export default function FavoritesBar({
@@ -16,7 +17,8 @@ export default function FavoritesBar({
   onRemoveFavorite,
   isActiveInteractionArea = false,
   layout = 'horizontal',
-  showRemoveButtons = true
+  showRemoveButtons = true,
+  usedPhotoIds = new Set()
 }: FavoritesBarProps) {
   
   if (favoritedPhotos.length === 0) {
@@ -63,23 +65,38 @@ export default function FavoritesBar({
           
           <div className="flex-1 overflow-x-auto">
             <div className="flex space-x-2 px-2 py-2" style={{ touchAction: 'pan-x' }}>
-              {favoritedPhotos.map((photo) => (
-                <div
-                  key={photo.id}
-                  className="flex-shrink-0 relative group cursor-pointer"
-                  onClick={() => onPhotoClick(photo)}
-                >
-                  <div className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-all duration-200 ${
-                    isActiveInteractionArea 
-                      ? 'border-yellow-400 hover:border-yellow-500 shadow-md hover:shadow-lg hover:scale-105' 
-                      : 'border-gray-200 hover:border-blue-400'
-                  }`}>
-                    <img
-                      src={photo.thumbnailUrl || photo.url}
-                      alt={photo.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+              {favoritedPhotos.map((photo) => {
+                const isUsed = usedPhotoIds.has(photo.id);
+                return (
+                  <div
+                    key={photo.id}
+                    className="flex-shrink-0 relative group cursor-pointer"
+                    onClick={() => onPhotoClick(photo)}
+                  >
+                    <div className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-all duration-200 ${
+                      isUsed
+                        ? 'border-green-400 shadow-md' // Used photos get green border
+                        : isActiveInteractionArea 
+                        ? 'border-yellow-400 hover:border-yellow-500 shadow-md hover:shadow-lg hover:scale-105' 
+                        : 'border-gray-200 hover:border-blue-400'
+                    }`}>
+                      <img
+                        src={photo.thumbnailUrl || photo.url}
+                        alt={photo.name}
+                        className={`w-full h-full object-cover transition-opacity duration-200 ${
+                          isUsed ? 'opacity-60' : 'opacity-100'
+                        }`}
+                      />
+                      
+                      {/* Used indicator overlay */}
+                      {isUsed && (
+                        <div className="absolute inset-0 bg-green-600 bg-opacity-20 flex items-center justify-center">
+                          <div className="bg-green-600 text-white text-xs px-1 rounded font-medium">
+                            Used
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   
                   {/* Remove button on hover - conditional */}
                   {showRemoveButtons && (
@@ -99,8 +116,9 @@ export default function FavoritesBar({
                   <div className="absolute bottom-0 right-0 bg-yellow-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
                     ⭐
                   </div>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -115,23 +133,38 @@ export default function FavoritesBar({
           : 'bg-white'
       }`}>
         <div className="grid grid-cols-3 gap-2 p-4">
-          {favoritedPhotos.map((photo) => (
-            <div
-              key={photo.id}
-              className="relative aspect-square cursor-pointer group transition-all duration-200"
-              onClick={() => onPhotoClick(photo)}
-            >
-              <div className={`w-full h-full rounded-lg overflow-hidden border-2 transition-all duration-200 ${
-                isActiveInteractionArea 
-                  ? 'border-yellow-400 hover:border-yellow-500 shadow-md hover:shadow-lg hover:scale-105' 
-                  : 'border-gray-200 hover:border-blue-400'
-              }`}>
-                <img
-                  src={photo.thumbnailUrl || photo.url}
-                  alt={photo.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+          {favoritedPhotos.map((photo) => {
+            const isUsed = usedPhotoIds.has(photo.id);
+            return (
+              <div
+                key={photo.id}
+                className="relative aspect-square cursor-pointer group transition-all duration-200"
+                onClick={() => onPhotoClick(photo)}
+              >
+                <div className={`w-full h-full rounded-lg overflow-hidden border-2 transition-all duration-200 ${
+                  isUsed
+                    ? 'border-green-400 shadow-md' // Used photos get green border
+                    : isActiveInteractionArea 
+                    ? 'border-yellow-400 hover:border-yellow-500 shadow-md hover:shadow-lg hover:scale-105' 
+                    : 'border-gray-200 hover:border-blue-400'
+                }`}>
+                  <img
+                    src={photo.thumbnailUrl || photo.url}
+                    alt={photo.name}
+                    className={`w-full h-full object-cover transition-opacity duration-200 ${
+                      isUsed ? 'opacity-60' : 'opacity-100'
+                    }`}
+                  />
+                  
+                  {/* Used indicator overlay */}
+                  {isUsed && (
+                    <div className="absolute inset-0 bg-green-600 bg-opacity-20 flex items-center justify-center">
+                      <div className="bg-green-600 text-white text-xs px-1 rounded font-medium">
+                        Used
+                      </div>
+                    </div>
+                  )}
+                </div>
               
               {/* Remove button on hover - conditional */}
               {showRemoveButtons && (
@@ -151,8 +184,9 @@ export default function FavoritesBar({
               <div className="absolute bottom-0 right-0 bg-yellow-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
                 ⭐
               </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       </div>
     );

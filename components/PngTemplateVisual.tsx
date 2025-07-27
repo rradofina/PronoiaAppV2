@@ -3,6 +3,7 @@ import { TemplateSlot, Photo, PhotoTransform, ContainerTransform, isPhotoTransfo
 import { PngTemplate } from '../services/pngTemplateService';
 import PhotoRenderer from './PhotoRenderer';
 import InlinePhotoEditor from './InlinePhotoEditor';
+import { getHighResPhotoUrls } from '../utils/photoUrlUtils';
 
 interface PngTemplateVisualProps {
   pngTemplate: PngTemplate;
@@ -32,7 +33,13 @@ export default function PngTemplateVisual({
   
   const getPhotoUrl = (photoId?: string | null) => {
     if (!photoId) return null;
-    return photos.find(p => p.id === photoId)?.url || null;
+    const photo = photos.find(p => p.id === photoId);
+    if (!photo) return null;
+    
+    // Use the same high-resolution URL strategy as InlinePhotoEditor
+    // This ensures consistent quality between editing and display modes
+    const highResUrls = getHighResPhotoUrls(photo);
+    return highResUrls[0] || photo.url;
   };
 
   // Since TemplateVisual already filtered and passed only relevant slots, use them directly
@@ -154,13 +161,14 @@ export default function PngTemplateVisual({
                 className="w-full h-full"
               />
             ) : photoUrl ? (
-              // Normal mode - show photo
+              // Normal mode - show photo with high-resolution fallbacks
               <PhotoRenderer
                 photoUrl={photoUrl}
                 photoAlt={`Photo ${holeIndex + 1}`}
                 transform={slot.transform}
                 interactive={false}
                 className="w-full h-full"
+                fallbackUrls={photos.find(p => p.id === slot.photoId) ? getHighResPhotoUrls(photos.find(p => p.id === slot.photoId)!) : []}
               />
             ) : (
               // Empty slot - show placeholder with enhanced highlighting when selected
