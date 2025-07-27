@@ -96,7 +96,11 @@ export default function SlidingTemplateBar({
           <div 
             ref={scrollRef}
             className="flex space-x-4 overflow-x-auto h-full p-4 pb-6"
-            style={{ scrollBehavior: 'smooth' }}
+            style={{ 
+              scrollBehavior: 'smooth',
+              touchAction: 'pan-x', // Enable horizontal touch scrolling
+              WebkitOverflowScrolling: 'touch' // Enable momentum scrolling on iOS
+            }}
           >
             {templates.map(({ templateId, templateName, templateType, slots }) => {
               const filledSlots = getFilledSlots(slots);

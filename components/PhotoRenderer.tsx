@@ -79,6 +79,10 @@ export default function PhotoRenderer({
   const [isDragging, setIsDragging] = useState(false);
   const [lastPointer, setLastPointer] = useState<{ x: number; y: number } | null>(null);
   
+  // Touch handling state for pinch-to-zoom
+  const [lastTouchDistance, setLastTouchDistance] = useState<number>(0);
+  const [isTouching, setIsTouching] = useState(false);
+  
   // URL fallback management
   const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
@@ -164,6 +168,99 @@ export default function PhotoRenderer({
     ? convertLegacyToCSS(transform)
     : convertPhotoToCSS(currentTransform);
 
+  // Touch helper functions for pinch-to-zoom
+  const getTouchDistance = (touches: TouchList): number => {
+    if (touches.length < 2) return 0;
+    const touch1 = touches[0];
+    const touch2 = touches[1];
+    return Math.sqrt(
+      Math.pow(touch2.clientX - touch1.clientX, 2) +
+      Math.pow(touch2.clientY - touch1.clientY, 2)
+    );
+  };
+
+  // Touch event handlers for pinch-to-zoom
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!interactive) return;
+    
+    setIsTouching(true);
+    
+    if (e.touches.length === 2) {
+      // Two finger pinch - start zoom
+      const distance = getTouchDistance(e.touches);
+      setLastTouchDistance(distance);
+      e.preventDefault(); // Prevent browser zoom
+    } else if (e.touches.length === 1) {
+      // Single finger - start drag
+      setIsDragging(true);
+      const touch = e.touches[0];
+      setLastPointer({ x: touch.clientX, y: touch.clientY });
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!interactive || !isTouching) return;
+    
+    e.preventDefault(); // Prevent browser zoom/scroll
+    
+    if (e.touches.length === 2 && lastTouchDistance > 0) {
+      // Two finger pinch - handle zoom
+      const distance = getTouchDistance(e.touches);
+      const ratio = distance / lastTouchDistance;
+      const newScale = Math.max(0.1, Math.min(10, currentTransform.photoScale * ratio));
+      
+      const newTransform = createPhotoTransform(
+        newScale,
+        currentTransform.photoCenterX,
+        currentTransform.photoCenterY
+      );
+      
+      setCurrentTransform(newTransform);
+      onTransformChange?.(newTransform);
+      setLastTouchDistance(distance);
+    } else if (e.touches.length === 1 && isDragging && lastPointer && containerRef.current) {
+      // Single finger - handle drag
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - lastPointer.x;
+      const deltaY = touch.clientY - lastPointer.y;
+      
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const normalizedDeltaX = deltaX / containerRect.width;
+      const normalizedDeltaY = deltaY / containerRect.height;
+      
+      const newCenterX = Math.max(0, Math.min(1, currentTransform.photoCenterX - normalizedDeltaX));
+      const newCenterY = Math.max(0, Math.min(1, currentTransform.photoCenterY - normalizedDeltaY));
+      
+      const newTransform = createPhotoTransform(
+        currentTransform.photoScale,
+        newCenterX,
+        newCenterY
+      );
+      
+      setCurrentTransform(newTransform);
+      onTransformChange?.(newTransform);
+      setLastPointer({ x: touch.clientX, y: touch.clientY });
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!interactive) return;
+    
+    if (e.touches.length === 0) {
+      // All fingers lifted
+      setIsTouching(false);
+      setIsDragging(false);
+      setLastPointer(null);
+      setLastTouchDistance(0);
+    } else if (e.touches.length === 1) {
+      // One finger remaining - switch to drag mode
+      setLastTouchDistance(0);
+      const touch = e.touches[0];
+      setLastPointer({ x: touch.clientX, y: touch.clientY });
+      setIsDragging(true);
+    }
+  };
+
   // Interactive handlers (only active if interactive=true)
   const handlePointerDown = (e: React.PointerEvent) => {
     if (!interactive) return;
@@ -236,6 +333,8 @@ export default function PhotoRenderer({
       <div>Center Y: {currentTransform.photoCenterY.toFixed(3)}</div>
       <div>Interactive: {interactive ? 'Yes' : 'No'}</div>
       <div>Dragging: {isDragging ? 'Yes' : 'No'}</div>
+      <div>Touching: {isTouching ? 'Yes' : 'No'}</div>
+      <div>Touch Distance: {lastTouchDistance.toFixed(0)}</div>
     </div>
   ) : null;
 
@@ -243,11 +342,17 @@ export default function PhotoRenderer({
     <div
       ref={containerRef}
       className={`relative overflow-hidden ${className}`}
-      style={style}
+      style={{
+        ...style,
+        touchAction: interactive ? 'none' : 'auto' // Prevent browser zoom when interactive
+      }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       <img
         ref={imageRef}

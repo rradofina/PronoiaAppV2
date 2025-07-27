@@ -190,7 +190,14 @@ export default function PhotoGrid({
 }: PhotoGridProps) {
   
   return (
-    <div className="flex-1 overflow-y-auto p-3 sm:p-4" onScroll={onScroll}>
+    <div 
+      className="flex-1 overflow-y-auto p-3 sm:p-4" 
+      style={{
+        touchAction: 'pan-y', // Enable vertical touch scrolling
+        WebkitOverflowScrolling: 'touch' // Enable momentum scrolling on iOS
+      }}
+      onScroll={onScroll}
+    >
       {showScrollHint && !hasScrolled && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
           <p className="text-yellow-800 text-center font-medium text-sm">

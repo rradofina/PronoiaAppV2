@@ -139,7 +139,7 @@ export default function PngTemplateVisual({
               isInlineEditing 
                 ? 'border-4 border-yellow-400 shadow-lg shadow-yellow-400/50 z-50 ring-2 ring-yellow-300' // Enhanced highlighting for inline editing
                 : isSelected 
-                ? 'border-4 border-blue-500 border-opacity-90 z-10 cursor-pointer shadow-md' 
+                ? 'border-4 border-blue-500 border-opacity-90 z-40 cursor-pointer shadow-md' // Above overlay (z-30)
                 : 'hover:border-2 hover:border-blue-300 hover:border-opacity-60 cursor-pointer'
             }`}
             style={{

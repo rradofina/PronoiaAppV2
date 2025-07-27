@@ -679,6 +679,17 @@ export default function PhotoSelectionScreen({
     setInlineEditingPhoto(null);
   };
 
+  const handleOverlayCancel = () => {
+    if (viewMode === 'inline-editing') {
+      // In inline editing mode, cancel the editing
+      handleInlineCancel();
+    } else if (selectedSlot) {
+      // Just slot selected (not editing), deselect it
+      console.log('🔧 Deselecting slot via overlay click');
+      setSelectedSlot(null);
+    }
+  };
+
   // Favorites management
   const handleToggleFavorite = (photoId: string) => {
     setFavoritedPhotos(prev => {
@@ -772,17 +783,14 @@ export default function PhotoSelectionScreen({
 
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ touchAction: 'manipulation' }}>
+    <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ touchAction: 'pan-x pan-y' }}>
       
-      {/* Inline Editing Overlay */}
-      {viewMode === 'inline-editing' && (
+      {/* Spotlight Overlay - Show in inline editing OR when slot selected in print mode */}
+      {(viewMode === 'inline-editing' || (selectedSlot && selectionMode === 'print')) && (
         <>
-          {/* Mobile/Tablet: Only darken the top portion (header + photo grid area) */}
+          {/* Mobile/Tablet: Full screen overlay with cutouts for favorites and selected slot */}
           <div 
-            className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-black bg-opacity-70 pointer-events-none"
-            style={{ 
-              bottom: '60vh' // Only darken top 40% of screen, leave template area and favorites clear
-            }}
+            className="lg:hidden fixed inset-0 z-30 bg-black bg-opacity-70 pointer-events-none"
           />
           
           {/* Desktop: darken only the header area, leave template area and sidebar clear */}
@@ -795,13 +803,10 @@ export default function PhotoSelectionScreen({
           />
           
           {/* Clickable overlay for canceling - only on darkened areas */}
-          {/* Mobile clickable area */}
+          {/* Mobile clickable area - full screen except elevated elements */}
           <div 
-            className="lg:hidden fixed top-0 left-0 right-0 z-25"
-            style={{ 
-              bottom: '60vh' // Match the darkened area on mobile
-            }}
-            onClick={handleInlineCancel}
+            className="lg:hidden fixed inset-0 z-25"
+            onClick={handleOverlayCancel}
           />
           
           {/* Desktop clickable area - only header */}
@@ -811,7 +816,7 @@ export default function PhotoSelectionScreen({
               right: '320px', // Match the darkened area width
               height: '80px' // Match the darkened area height
             }}
-            onClick={handleInlineCancel}
+            onClick={handleOverlayCancel}
           />
         </>
       )}
@@ -876,7 +881,7 @@ export default function PhotoSelectionScreen({
                   </div>
                 )}
               </div>
-              <div className="flex-1 relative" onClick={handleBackgroundClick}>
+              <div className="flex-1 relative z-40" onClick={handleBackgroundClick}>
                 <TemplateGrid
                   templateSlots={templateSlots}
                   photos={photos}
@@ -901,7 +906,7 @@ export default function PhotoSelectionScreen({
         </div>
 
         {/* Two-Mode Bottom Section - Mobile/Tablet */}
-        <div className="lg:hidden bg-white shadow-lg border-t flex-shrink-0" style={{ 
+        <div className="lg:hidden bg-white shadow-lg border-t flex-shrink-0 relative z-40" style={{ 
           height: '140px', // Consistent height for both modes
           touchAction: 'pan-x' 
         }}>

@@ -26,6 +26,10 @@ export default function TemplateGrid({
   // Cover Flow state
   const [currentIndex, setCurrentIndex] = useState(0);
   
+  // Touch swipe state for coverflow navigation
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
+  
   // Group slots by template
   const templateGroups = Object.values(
     templateSlots.reduce((acc, slot) => {
@@ -131,11 +135,53 @@ export default function TemplateGrid({
     };
   };
 
+  // Touch swipe handlers for coverflow navigation
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (layout !== 'coverflow') return;
+    const touch = e.touches[0];
+    setTouchStart({ x: touch.clientX, y: touch.clientY });
+    setTouchEnd(null);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (layout !== 'coverflow') return;
+    const touch = e.touches[0];
+    setTouchEnd({ x: touch.clientX, y: touch.clientY });
+  };
+
+  const handleTouchEnd = () => {
+    if (layout !== 'coverflow' || !touchStart || !touchEnd) return;
+    
+    const deltaX = touchStart.x - touchEnd.x;
+    const deltaY = touchStart.y - touchEnd.y;
+    const isHorizontalSwipe = Math.abs(deltaX) > Math.abs(deltaY);
+    const minSwipeDistance = 50;
+
+    if (isHorizontalSwipe && Math.abs(deltaX) > minSwipeDistance) {
+      if (deltaX > 0) {
+        // Swiped left - go to next template
+        navigateToTemplate(currentIndex + 1);
+      } else {
+        // Swiped right - go to previous template
+        navigateToTemplate(currentIndex - 1);
+      }
+    }
+    
+    setTouchStart(null);
+    setTouchEnd(null);
+  };
+
   return (
-    <div className={containerClasses} style={{ 
-      touchAction: layout === 'horizontal' ? 'pan-x' : 'auto',
-      perspective: layout === 'coverflow' ? '1000px' : 'none'
-    }}>
+    <div 
+      className={containerClasses} 
+      style={{ 
+        touchAction: layout === 'horizontal' ? 'pan-x' : layout === 'coverflow' ? 'pan-x' : 'auto',
+        perspective: layout === 'coverflow' ? '1000px' : 'none'
+      }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       {templateGroups.map(({ templateId, templateName, slots }, index) => (
         <div 
           key={templateId} 
