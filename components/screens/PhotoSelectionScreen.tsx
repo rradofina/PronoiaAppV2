@@ -838,12 +838,11 @@ export default function PhotoSelectionScreen({
             className="lg:hidden fixed inset-0 z-30 bg-black bg-opacity-70 pointer-events-none"
           />
           
-          {/* Desktop: darken only the header area, leave template area and sidebar clear */}
+          {/* Desktop: darken the entire template area, leave sidebar clear */}
           <div 
-            className="hidden lg:block fixed top-0 left-0 z-30 bg-black bg-opacity-70 pointer-events-none"
+            className="hidden lg:block fixed top-0 left-0 bottom-0 z-30 bg-black bg-opacity-70 pointer-events-none"
             style={{ 
-              right: '320px', // Leave space for desktop sidebar (320px wide)
-              height: '80px' // Only darken the header area, leave template area visible
+              right: '320px' // Leave space for desktop sidebar (320px wide)
             }}
           />
           
@@ -854,12 +853,11 @@ export default function PhotoSelectionScreen({
             onClick={handleOverlayCancel}
           />
           
-          {/* Desktop clickable area - only header */}
+          {/* Desktop clickable area - entire template area */}
           <div 
-            className="hidden lg:block fixed top-0 left-0 z-25"
+            className="hidden lg:block fixed top-0 left-0 bottom-0 z-25"
             style={{ 
-              right: '320px', // Match the darkened area width
-              height: '80px' // Match the darkened area height
+              right: '320px' // Match the darkened area width
             }}
             onClick={handleOverlayCancel}
           />
