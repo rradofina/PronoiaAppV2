@@ -71,17 +71,45 @@ export default function PngTemplateVisual({
                  (pngTemplate as any).base64_preview ||
                  (fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : null);
   
-  console.log('🖼️ PngTemplateVisual DEBUG:', {
+  // Calculate aspect ratios and container behavior
+  const expectedAspectRatio = 2/3; // 1200/1800 for 4R
+  const actualAspectRatio = pngTemplate.dimensions.width / pngTemplate.dimensions.height;
+  const aspectRatioMatch = Math.abs(actualAspectRatio - expectedAspectRatio) < 0.01;
+  
+  // Determine object-contain behavior
+  const containerWiderThanPNG = actualAspectRatio < expectedAspectRatio;
+  const objectContainBehavior = containerWiderThanPNG 
+    ? '📐 PNG fits to HEIGHT, padded on SIDES (left/right)'
+    : '📐 PNG fits to WIDTH, padded on TOP/BOTTOM';
+  
+  console.log('🖼️ PngTemplateVisual ASPECT RATIO DEBUG:', {
     templateName: pngTemplate.name,
     templateType: pngTemplate.templateType,
-    finalPngUrl: pngUrl,
-    base64_preview: (pngTemplate as any).base64_preview?.substring(0, 50) + '...',
-    drive_file_id: driveFileId,
-    thumbnail_url: (pngTemplate as any).thumbnail_url,
-    extractedFileId: fileId,
-    allTemplateProperties: Object.keys(pngTemplate),
+    
+    // Dimensions
+    storedDimensions: pngTemplate.dimensions,
+    correctDimensions: { width: 1200, height: 1800 },
+    
+    // Aspect Ratios
+    storedAspectRatio: actualAspectRatio.toFixed(3),
+    correctAspectRatio: expectedAspectRatio.toFixed(3),
+    aspectRatioMatch,
+    
+    // Container Behavior
+    containerWiderThanPNG,
+    objectContainBehavior,
+    
+    // Diagnosis
+    diagnosis: !aspectRatioMatch ? 
+      `🚨 PROBLEM: Container aspect ratio ${actualAspectRatio.toFixed(3)} ≠ PNG aspect ratio. ${objectContainBehavior}` :
+      '✅ Container and PNG aspect ratios match perfectly',
+    
+    // Fix needed
+    fixNeeded: !aspectRatioMatch ? 
+      `Change stored dimensions from ${pngTemplate.dimensions.width}×${pngTemplate.dimensions.height} to 1200×1800` :
+      'No fix needed',
+    
     slotsConnected: thisTemplateSlots.length,
-    firstSlotTemplateType: thisTemplateSlots[0]?.templateType,
     holesCount: pngTemplate.holes?.length
   });
 
@@ -98,7 +126,7 @@ export default function PngTemplateVisual({
       <img 
         src={pngUrl}
         alt={pngTemplate.name}
-        className="absolute inset-0 w-full h-full object-fill"
+        className="absolute inset-0 w-full h-full object-contain"
         onLoad={() => console.log('✅ PNG loaded successfully:', pngTemplate.name)}
         onError={() => console.error('❌ PNG failed to load:', pngUrl)}
       />

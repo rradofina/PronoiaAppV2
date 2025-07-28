@@ -96,11 +96,7 @@ export default function TemplateGrid({
 
   const visualHeight = layout === 'horizontal' 
     ? undefined 
-    : layout === 'main'
-    ? { height: '500px' }
-    : layout === 'coverflow'
-    ? { height: '600px' }  // Increased from 400px to 600px for better space utilization
-    : { height: '400px' };
+    : undefined; // Let aspectRatio CSS property control dimensions instead of fixed heights
 
   // Cover Flow item positioning and styling
   const getCoverFlowStyle = (index: number) => {
@@ -245,7 +241,7 @@ export default function TemplateGrid({
             )}
           </div>
           
-          <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={visualHeight}>
+          <div className="w-full overflow-hidden border border-gray-200" style={visualHeight}>
             <TemplateVisual
               key={`template-visual-${templateId}-${slots[0]?.templateType || templateId.split('_')[0]}`}
               template={{ id: slots[0]?.templateType || templateId.split('_')[0], name: templateName, slots: slots.length }}

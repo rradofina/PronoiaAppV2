@@ -128,14 +128,14 @@ function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isU
           </div>
         )}
         
-        {/* Star button for favorites */}
+        {/* Star button for favorites - larger hitbox for better touch targeting */}
         {onToggleFavorite && (
           <button
             onClick={(e) => {
               e.stopPropagation();
               onToggleFavorite(photo.id);
             }}
-            className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+            className={`absolute top-1 right-1 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
               isFavorited 
                 ? 'bg-yellow-500 text-white shadow-lg' 
                 : 'bg-black bg-opacity-50 text-white hover:bg-opacity-70'

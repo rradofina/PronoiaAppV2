@@ -141,8 +141,36 @@ class TemplateRasterizationService {
 
       const img = await this.loadImage(pngUrl);
       
-      // Draw template background at full canvas size
-      this.ctx.drawImage(img, 0, 0, this.canvas!.width, this.canvas!.height);
+      // Draw template background maintaining aspect ratio (like CSS object-contain)
+      const canvasAspectRatio = this.canvas!.width / this.canvas!.height;
+      const imgAspectRatio = img.width / img.height;
+      
+      let drawWidth, drawHeight, drawX, drawY;
+      
+      if (imgAspectRatio > canvasAspectRatio) {
+        // Image is wider - fit to canvas width
+        drawWidth = this.canvas!.width;
+        drawHeight = this.canvas!.width / imgAspectRatio;
+        drawX = 0;
+        drawY = (this.canvas!.height - drawHeight) / 2;
+      } else {
+        // Image is taller - fit to canvas height
+        drawWidth = this.canvas!.height * imgAspectRatio;
+        drawHeight = this.canvas!.height;
+        drawX = (this.canvas!.width - drawWidth) / 2;
+        drawY = 0;
+      }
+      
+      console.log('🎨 Template background sizing:', {
+        canvasSize: { width: this.canvas!.width, height: this.canvas!.height },
+        imgSize: { width: img.width, height: img.height },
+        canvasAspectRatio: canvasAspectRatio.toFixed(3),
+        imgAspectRatio: imgAspectRatio.toFixed(3),
+        drawSize: { width: drawWidth, height: drawHeight },
+        drawPosition: { x: drawX, y: drawY }
+      });
+      
+      this.ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
       
       console.log('✅ Template background drawn');
     } catch (error) {
@@ -180,6 +208,7 @@ class TemplateRasterizationService {
 
   /**
    * Draw a single photo in its template slot
+   * CRITICAL: Must match UI coordinate system exactly
    */
   private async drawPhotoInSlot(photo: Photo, slot: TemplateSlot, template: ManualTemplate): Promise<void> {
     if (!this.ctx) return;
@@ -203,12 +232,14 @@ class TemplateRasterizationService {
       slotIndex: slot.slotIndex,
       hasTransform: !!slot.transform,
       photoSize: { width: img.width, height: img.height },
-      hole: { x: hole.x, y: hole.y, width: hole.width, height: hole.height }
+      hole: { x: hole.x, y: hole.y, width: hole.width, height: hole.height },
+      templateDimensions: template.dimensions,
+      canvasDimensions: { width: this.canvas?.width, height: this.canvas?.height }
     });
 
     // Apply photo transform if present
     if (slot.transform && isPhotoTransform(slot.transform)) {
-      this.drawPhotoWithTransform(img, slot.transform, hole.x, hole.y, hole.width, hole.height);
+      this.drawPhotoWithTransform(img, slot.transform, hole, template);
     } else {
       // Default: fit photo in hole
       this.drawPhotoFitInHole(img, hole.x, hole.y, hole.width, hole.height);
@@ -217,26 +248,22 @@ class TemplateRasterizationService {
 
   /**
    * Draw photo with PhotoTransform applied
-   * Matches the CSS transform logic from PhotoRenderer exactly
+   * CRITICAL: Must exactly match PhotoRenderer CSS behavior
    */
   private drawPhotoWithTransform(
     img: HTMLImageElement,
     transform: PhotoTransform,
-    holeX: number,
-    holeY: number,
-    holeWidth: number,
-    holeHeight: number
+    hole: { x: number, y: number, width: number, height: number },
+    template: ManualTemplate
   ): void {
     if (!this.ctx) return;
 
-    console.log('🎨 Drawing photo with transform:', {
+    console.log('🎨 Drawing photo with transform (COORDINATE SYSTEM FIX):', {
       photoSize: { width: img.width, height: img.height },
-      hole: { x: holeX, y: holeY, width: holeWidth, height: holeHeight },
-      transform: {
-        photoScale: transform.photoScale,
-        photoCenterX: transform.photoCenterX,
-        photoCenterY: transform.photoCenterY
-      }
+      hole,
+      template: { width: template.dimensions.width, height: template.dimensions.height },
+      canvas: { width: this.canvas?.width, height: this.canvas?.height },
+      transform
     });
 
     // Save context for clipping
@@ -244,40 +271,46 @@ class TemplateRasterizationService {
 
     // Create clipping path for the hole
     this.ctx.beginPath();
-    this.ctx.rect(holeX, holeY, holeWidth, holeHeight);
+    this.ctx.rect(hole.x, hole.y, hole.width, hole.height);
     this.ctx.clip();
 
-    // === MATCH CSS LOGIC EXACTLY ===
-    // CSS: transform: `translate(${translateX}%, ${translateY}%) scale(${photoScale})`
-    // CSS: translateX = (0.5 - photoCenterX) * 100 (percentage of photo width)
-    // CSS: translateY = (0.5 - photoCenterY) * 100 (percentage of photo height)
+    // === MATCH CSS PHOTORENDERER BEHAVIOR EXACTLY ===
+    // 
+    // CSS PhotoRenderer logic:
+    // 1. Photo fills hole container (width: 100%, height: 100%) 
+    // 2. object-fit: cover (photo scales to fill, may crop)
+    // 3. transform: translate(X%, Y%) scale(photoScale)
+    //
+    // The KEY insight: CSS transforms happen at the container level,
+    // not at the native template resolution!
 
-    // Step 1: Calculate "fit" scale to determine base photo size in hole
-    const fitScale = Math.min(holeWidth / img.width, holeHeight / img.height);
-    
-    // Step 2: Apply user's photo scale on top of fit scale
-    const finalScale = fitScale * transform.photoScale;
-    const scaledWidth = img.width * finalScale;
-    const scaledHeight = img.height * finalScale;
+    // Step 1: Photo fills the hole container (like CSS width/height 100%)
+    // At this stage, the photo dimensions match the hole dimensions
+    const containerPhotoWidth = hole.width;   // Photo width at hole scale
+    const containerPhotoHeight = hole.height; // Photo height at hole scale
 
-    // Step 3: Calculate percentage-based translation (same as CSS)
-    const translateXPercent = (0.5 - transform.photoCenterX) * 100; // Percentage of photo width
-    const translateYPercent = (0.5 - transform.photoCenterY) * 100; // Percentage of photo height
+    // Step 2: Apply PhotoTransform scale (like CSS scale())
+    const scaledWidth = containerPhotoWidth * transform.photoScale;
+    const scaledHeight = containerPhotoHeight * transform.photoScale;
 
-    // Step 4: Convert percentage translation to pixels
+    // Step 3: Calculate CSS-style percentage translations
+    // CSS: translate(X%, Y%) where % is relative to the element size (scaled photo)
+    const translateXPercent = (0.5 - transform.photoCenterX) * 100;
+    const translateYPercent = (0.5 - transform.photoCenterY) * 100;
+
+    // Step 4: Convert percentage to pixels (relative to scaled photo dimensions)
     const translateXPixels = (translateXPercent / 100) * scaledWidth;
     const translateYPixels = (translateYPercent / 100) * scaledHeight;
 
-    // Step 5: Position photo center in hole center, then apply translation
-    const holeCenterX = holeX + (holeWidth / 2);
-    const holeCenterY = holeY + (holeHeight / 2);
+    // Step 5: Position photo in hole (like CSS container positioning)
+    const holeCenterX = hole.x + (hole.width / 2);
+    const holeCenterY = hole.y + (hole.height / 2);
     
     const drawX = holeCenterX - (scaledWidth / 2) + translateXPixels;
     const drawY = holeCenterY - (scaledHeight / 2) + translateYPixels;
 
-    console.log('🎨 Transform calculations:', {
-      fitScale,
-      finalScale,
+    console.log('🎨 COORDINATE SYSTEM FIX - Transform calculations:', {
+      containerPhotoSize: { width: containerPhotoWidth, height: containerPhotoHeight },
       scaledSize: { width: scaledWidth, height: scaledHeight },
       translatePercent: { x: translateXPercent, y: translateYPercent },
       translatePixels: { x: translateXPixels, y: translateYPixels },
