@@ -3,6 +3,7 @@ import HeaderNavigation from '../HeaderNavigation';
 import { useState, useEffect } from 'react';
 import { manualPackageService } from '../../services/manualPackageService';
 import { packageGroupService } from '../../services/packageGroupService';
+import { googleDriveService } from '../../services/googleDriveService';
 
 interface FolderSelectionScreenProps {
   googleAuth: GoogleAuth;
@@ -20,6 +21,134 @@ interface FolderSelectionScreenProps {
   onManageTemplates: () => void;
   // New prop for package management
   onManagePackages?: () => void;
+}
+
+// Transform Google Drive URLs to working image URLs
+const transformGoogleDriveImageUrl = (photo: any, size: string = 's100'): string => {
+  // Try to use the Google Drive file ID to create a working URL
+  if (photo.googleDriveId || photo.id) {
+    const fileId = photo.googleDriveId || photo.id;
+    const transformedUrl = `https://lh3.googleusercontent.com/d/${fileId}=${size}`;
+    console.log(`🔄 Transformed URL for ${photo.name}: ${transformedUrl}`);
+    return transformedUrl;
+  }
+  
+  // Fallback to thumbnail URL with size adjustment
+  if (photo.thumbnailUrl) {
+    const fallbackUrl = photo.thumbnailUrl.replace('=s220', `=${size}`);
+    console.log(`📷 Fallback URL for ${photo.name}: ${fallbackUrl}`);
+    return fallbackUrl;
+  }
+  
+  // Last resort: use regular URL
+  console.log(`⚠️ Using regular URL for ${photo.name}: ${photo.url}`);
+  return photo.url || '';
+};
+
+// Simple folder card component with thumbnail
+function FolderCard({ folder, onSelect }: { folder: DriveFolder; onSelect: () => void }) {
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [previewImages, setPreviewImages] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFolderImages = async () => {
+      try {
+        console.log(`📁 Fetching images for folder: ${folder.name}`);
+        const photos = await googleDriveService.getPhotosFromFolder(folder.id);
+        console.log(`📸 Found ${photos.length} photos in ${folder.name}`);
+        
+        if (photos.length > 0) {
+          // Get first photo for main thumbnail
+          const firstPhoto = photos[0];
+          const smallThumbnail = transformGoogleDriveImageUrl(firstPhoto, 's80');
+          setThumbnailUrl(smallThumbnail);
+
+          // Get first 3 photos for preview strip
+          const previewPhotos = photos.slice(0, 3).map(photo => 
+            transformGoogleDriveImageUrl(photo, 's100')
+          );
+          console.log(`🖼️ Preview URLs for ${folder.name}:`, previewPhotos);
+          setPreviewImages(previewPhotos);
+        }
+      } catch (error) {
+        console.error('Failed to fetch folder images:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFolderImages();
+  }, [folder.id]);
+
+  return (
+    <div
+      onClick={onSelect}
+      className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200 w-full"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center">
+          {/* Thumbnail or fallback icon */}
+          <div className="w-10 h-10 mr-4 rounded-full overflow-hidden flex-shrink-0">
+            {isLoading ? (
+              <div className="w-full h-full bg-gray-300 animate-pulse rounded-full" />
+            ) : thumbnailUrl ? (
+              <img
+                src={thumbnailUrl}
+                alt={`Preview of ${folder.name}`}
+                className="w-full h-full object-cover"
+                onError={() => setThumbnailUrl(null)}
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-sm">
+                📁
+              </div>
+            )}
+          </div>
+          
+          <div>
+            <p className="font-semibold text-gray-800 text-lg">{folder.name}</p>
+            <p className="text-sm text-gray-500">
+              {new Date(folder.createdTime).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-4">
+          {/* Photo Preview Strip */}
+          {previewImages.length > 0 && (
+            <div className="flex space-x-2">
+              {previewImages.map((imageUrl, index) => (
+                <div key={index} className="w-12 h-12 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
+                  <img
+                    src={imageUrl}
+                    alt={`Photo ${index + 1} from ${folder.name}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Arrow indicator */}
+          <div className="text-blue-500 opacity-60 hover:opacity-100 transition-opacity flex-shrink-0">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function FolderSelectionScreen({
@@ -185,6 +314,8 @@ export default function FolderSelectionScreen({
         onSignOut={onSignOut}
         onChangeMainFolder={onChangeMainFolder}
         showMainFolder={true}
+        onManageTemplates={onManageTemplates}
+        onManagePackages={onManagePackages}
       />
       
       <div className="p-4">
@@ -204,48 +335,18 @@ export default function FolderSelectionScreen({
                   Main folder: {selectedMainFolder?.name}
                 </div>
                 
-                {/* Admin Management Buttons */}
-                <div className="mt-4 flex flex-col sm:flex-row gap-3 items-center justify-center">
-                  <button
-                    onClick={onManageTemplates}
-                    className="inline-flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium shadow-md"
-                  >
-                    <span>🖼️</span>
-                    <span>Manage Templates</span>
-                    <span className="text-xs bg-purple-500 px-2 py-1 rounded">Admin</span>
-                  </button>
-                  
-                  {onManagePackages && (
-                    <button
-                      onClick={onManagePackages}
-                      className="inline-flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium shadow-md"
-                    >
-                      <span>📦</span>
-                      <span>Manage Packages</span>
-                      <span className="text-xs bg-green-500 px-2 py-1 rounded">Admin</span>
-                    </button>
-                  )}
-                </div>
               </div>
 
               <div className="bg-white rounded-lg p-6 shadow-sm">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-                  {clientFolders.map((folder) => (
-                    <div
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {clientFolders
+                    .sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime())
+                    .map((folder) => (
+                    <FolderCard 
                       key={folder.id}
-                      onClick={() => handleFolderSelect(folder)}
-                      className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200"
-                    >
-                      <div className="flex items-center">
-                        <div className="text-2xl mr-3">👥</div>
-                        <div>
-                          <p className="font-medium text-gray-800">{folder.name}</p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(folder.createdTime).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                      folder={folder}
+                      onSelect={() => handleFolderSelect(folder)}
+                    />
                   ))}
                 </div>
 

@@ -1,6 +1,7 @@
 import { DriveFolder, GoogleAuth } from '../../types';
 import { useState, useEffect } from 'react';
 import { ChevronRight, Folder, ChevronLeft } from 'lucide-react';
+import HeaderNavigation from '../HeaderNavigation';
 
 interface DriveSetupScreenProps {
   isGapiLoaded: boolean;
@@ -110,14 +111,25 @@ export default function DriveSetupScreen({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 flex items-center justify-center">
-      
+    <div className="min-h-screen bg-gray-50">
       {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
       <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
         DriveSetupScreen.tsx
       </div>
       
-      <div className="max-w-4xl w-full mx-auto">
+      {/* Header Navigation - only show when signed in */}
+      {googleAuth.isSignedIn && (
+        <HeaderNavigation
+          googleAuth={googleAuth}
+          mainSessionsFolder={mainSessionsFolder}
+          onSignOut={handleSignOut}
+          onChangeMainFolder={() => setIsSelectingFolder(true)}
+          showMainFolder={false}
+        />
+      )}
+      
+      <div className="p-4">
+        <div className="max-w-4xl w-full mx-auto">
 
         {!googleAuth.isSignedIn ? (
           <div className="space-y-6">
@@ -159,58 +171,59 @@ export default function DriveSetupScreen({
           </div>
         ) : (
           <div className="bg-white rounded-lg p-8 shadow-sm">
-            <div className="text-center mb-6">
+            <div className="text-center mb-8">
               <div className="text-4xl mb-4">✅</div>
-              <h2 className="text-2xl font-semibold text-gray-800 mb-2">
+              <h2 className="text-3xl font-bold text-gray-800 mb-3">
                 Connected to Google Drive
               </h2>
-              <p className="text-gray-600">
-                Signed in as: <span className="font-medium">{googleAuth.userEmail}</span>
+              <p className="text-gray-600 text-lg">
+                Ready to select your main photo folder
               </p>
-              <button
-                onClick={handleSignOut}
-                className="mt-4 bg-red-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-600 transition-all duration-200"
-              >
-                Sign Out
-              </button>
             </div>
             
             {mainSessionsFolder && !isSelectingFolder ? (
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                  Main Photo Folder
+              <div className="mb-8">
+                <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center">
+                  Selected Main Photo Folder
                 </h3>
-                <div className="flex items-center justify-between bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <div className="text-2xl mr-3">📁</div>
-                    <div>
-                      <p className="font-medium text-gray-800">{mainSessionsFolder.name}</p>
+                <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 border border-green-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-12 h-12 mr-4 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-xl flex-shrink-0">
+                        📁
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-800 text-xl">{mainSessionsFolder.name}</p>
+                        <p className="text-sm text-gray-600">Main photo storage folder</p>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => setIsSelectingFolder(true)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-blue-700 transition-all duration-200 shadow-md"
+                    >
+                      Change Folder
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setIsSelectingFolder(true)}
-                    className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-medium text-sm hover:bg-blue-200 transition-all duration-200"
-                  >
-                    Change
-                  </button>
                 </div>
-                <div className="text-center mt-4">
+                <div className="text-center mt-6">
                   <button
                     onClick={() => handleMainFolderSelect({ id: mainSessionsFolder.id, name: mainSessionsFolder.name, createdTime: '' })}
-                    className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-all duration-200"
+                    className="bg-green-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-green-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                   >
                     Continue with "{mainSessionsFolder.name}"
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                  {isSelectingFolder ? 'Change Main Photo Folder' : 'Select Your Main Photo Folder'}
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  This is the top-level folder in your Google Drive where all your client galleries are stored.
-                </p>
+              <div className="mb-8">
+                <div className="text-center mb-8">
+                  <h3 className="text-2xl font-bold text-gray-800 mb-4">
+                    {isSelectingFolder ? 'Change Main Photo Folder' : 'Select Your Main Photo Folder'}
+                  </h3>
+                  <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+                    Choose the top-level folder in your Google Drive where all your client photo galleries are stored.
+                  </p>
+                </div>
                 
                 {/* Breadcrumbs */}
                 <div className="flex items-center mb-6 p-3 bg-gray-50 rounded-lg overflow-x-auto">
@@ -233,17 +246,43 @@ export default function DriveSetupScreen({
                   ))}
                 </div>
                 
-                {/* Folder List */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-80 overflow-y-auto p-2 bg-gray-50 rounded-lg">
-                  {currentFolders.map((folder) => (
-                    <button
+                {/* Modern Folder List */}
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {currentFolders
+                    .sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime())
+                    .map((folder) => (
+                    <div
                       key={folder.id}
                       onClick={() => handleFolderClick(folder)}
-                      className="flex flex-col items-center p-4 bg-white border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-all duration-200 shadow-sm hover:shadow-md"
+                      className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200 w-full"
                     >
-                      <Folder className="w-10 h-10 text-yellow-500 mb-3" />
-                      <span className="text-sm text-center font-medium text-gray-700 line-clamp-2 leading-tight">{folder.name}</span>
-                    </button>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 mr-4 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-lg flex-shrink-0">
+                            📁
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-800 text-lg">{folder.name}</p>
+                            <p className="text-sm text-gray-500">
+                              {new Date(folder.createdTime).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Arrow indicator */}
+                        <div className="text-blue-500 opacity-60 hover:opacity-100 transition-opacity flex-shrink-0">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
                 
@@ -277,9 +316,9 @@ export default function DriveSetupScreen({
               </div>
             )}
 
-
           </div>
         )}
+        </div>
       </div>
     </div>
   );
