@@ -25,9 +25,19 @@ export interface RasterizationOptions {
 class TemplateRasterizationService {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
+  
+  // Stores the transform applied to the template background to align photo holes correctly
+  private templateScale: number = 1;
+  private templateOffsetX: number = 0;
+  private templateOffsetY: number = 0;
 
   private initializeCanvas(width: number, height: number): void {
     if (typeof window === 'undefined') return;
+
+    // Reset transform state for each new rasterization
+    this.templateScale = 1;
+    this.templateOffsetX = 0;
+    this.templateOffsetY = 0;
 
     this.canvas = document.createElement('canvas');
     this.canvas.width = width;
@@ -60,52 +70,41 @@ class TemplateRasterizationService {
     };
 
     try {
-      console.log('🎨 Starting template rasterization:', {
-        templateName: template.name,
-        templateType: template.template_type,
-        dimensions: template.dimensions,
-        slotsCount: templateSlots.length,
-        photosCount: photos.length,
-        settings
-      });
-
-      // Initialize canvas with template dimensions
-      this.initializeCanvas(template.dimensions.width, template.dimensions.height);
+      // CLIPPING FIX: Use PNG natural dimensions for canvas to show full template
+      let canvasWidth = template.dimensions.width;
+      let canvasHeight = template.dimensions.height;
       
+      if (template.drive_file_id) {
+        const pngDimensions = await this.getPngNaturalDimensions(template.drive_file_id);
+        if (pngDimensions) {
+          canvasWidth = pngDimensions.width;
+          canvasHeight = pngDimensions.height;
+          console.log('🎨 Using PNG natural dimensions for canvas:', pngDimensions);
+        }
+      }
+      
+      this.initializeCanvas(canvasWidth, canvasHeight);
       if (!this.canvas || !this.ctx) {
         throw new Error('Failed to initialize canvas');
       }
 
-      // Clear canvas with background
       if (settings.includeBackground) {
         this.ctx.fillStyle = settings.backgroundColor;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       }
 
-      // Load and draw PNG template background
       if (template.drive_file_id) {
         await this.drawTemplateBackground(template);
       }
 
-      // Draw photos in their respective slots
       await this.drawPhotosInSlots(templateSlots, photos, template);
 
-      // Generate blob
       const blob = await this.canvasToBlob(settings.format, settings.quality);
       const fileName = this.generateFileName(template, settings);
 
-      console.log('✅ Template rasterization completed:', {
-        fileName,
-        blobSize: blob.size,
-        dimensions: template.dimensions
-      });
-
-      return {
-        blob,
-        fileName,
-        dimensions: template.dimensions,
-        generatedAt: new Date()
-      };
+      const actualDimensions = { width: this.canvas.width, height: this.canvas.height };
+      console.log('✅ Template rasterization completed:', { fileName, blobSize: blob.size, actualDimensions });
+      return { blob, fileName, dimensions: actualDimensions, generatedAt: new Date() };
 
     } catch (error) {
       console.error('❌ Template rasterization failed:', error);
@@ -114,65 +113,62 @@ class TemplateRasterizationService {
   }
 
   /**
-   * Load and draw PNG template background
+   * Get PNG natural dimensions without drawing it
+   */
+  private async getPngNaturalDimensions(driveFileId: string): Promise<{ width: number; height: number } | null> {
+    try {
+      let pngUrl: string;
+      
+      if (driveFileId.includes('drive.google.com')) {
+        const match = driveFileId.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        pngUrl = match ? `https://lh3.googleusercontent.com/d/${match[1]}` : '';
+        if (!pngUrl) throw new Error('Invalid Google Drive URL format');
+      } else {
+        pngUrl = `https://lh3.googleusercontent.com/d/${driveFileId}`;
+      }
+
+      const img = await this.loadImage(pngUrl);
+      return { width: img.width, height: img.height };
+    } catch (error) {
+      console.warn('⚠️ Failed to get PNG dimensions, using template dimensions:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Load and draw PNG template background at natural 1:1 scale
    */
   private async drawTemplateBackground(template: ManualTemplate): Promise<void> {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.canvas) return;
 
     try {
-      console.log('🖼️ Loading template background...');
-      
-      // Get PNG URL from Google Drive file ID
       const fileId = template.drive_file_id;
       let pngUrl: string;
       
       if (fileId.includes('drive.google.com')) {
-        // Extract file ID from Google Drive URL
         const match = fileId.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        if (match) {
-          pngUrl = `https://lh3.googleusercontent.com/d/${match[1]}`;
-        } else {
-          throw new Error('Invalid Google Drive URL format');
-        }
+        pngUrl = match ? `https://lh3.googleusercontent.com/d/${match[1]}` : '';
+        if (!pngUrl) throw new Error('Invalid Google Drive URL format');
       } else {
-        // Assume it's already a file ID
         pngUrl = `https://lh3.googleusercontent.com/d/${fileId}`;
       }
 
       const img = await this.loadImage(pngUrl);
       
-      // Draw template background maintaining aspect ratio (like CSS object-contain)
-      const canvasAspectRatio = this.canvas!.width / this.canvas!.height;
-      const imgAspectRatio = img.width / img.height;
+      // CLIPPING FIX: Draw PNG at natural 1:1 scale (no scaling)
+      // Canvas is already sized to match PNG dimensions
+      this.templateScale = 1;
+      this.templateOffsetX = 0;
+      this.templateOffsetY = 0;
       
-      let drawWidth, drawHeight, drawX, drawY;
-      
-      if (imgAspectRatio > canvasAspectRatio) {
-        // Image is wider - fit to canvas width
-        drawWidth = this.canvas!.width;
-        drawHeight = this.canvas!.width / imgAspectRatio;
-        drawX = 0;
-        drawY = (this.canvas!.height - drawHeight) / 2;
-      } else {
-        // Image is taller - fit to canvas height
-        drawWidth = this.canvas!.height * imgAspectRatio;
-        drawHeight = this.canvas!.height;
-        drawX = (this.canvas!.width - drawWidth) / 2;
-        drawY = 0;
-      }
-      
-      console.log('🎨 Template background sizing:', {
-        canvasSize: { width: this.canvas!.width, height: this.canvas!.height },
-        imgSize: { width: img.width, height: img.height },
-        canvasAspectRatio: canvasAspectRatio.toFixed(3),
-        imgAspectRatio: imgAspectRatio.toFixed(3),
-        drawSize: { width: drawWidth, height: drawHeight },
-        drawPosition: { x: drawX, y: drawY }
+      console.log('🎨 Drawing PNG at natural 1:1 scale:', {
+        pngSize: { width: img.width, height: img.height },
+        canvasSize: { width: this.canvas.width, height: this.canvas.height },
+        scale: this.templateScale,
+        offset: { x: this.templateOffsetX, y: this.templateOffsetY }
       });
       
-      this.ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-      
-      console.log('✅ Template background drawn');
+      this.ctx.drawImage(img, 0, 0, img.width, img.height);
     } catch (error) {
       console.warn('⚠️ Failed to load template background, continuing without it:', error);
     }
@@ -182,177 +178,200 @@ class TemplateRasterizationService {
    * Draw photos in their respective template slots
    */
   private async drawPhotosInSlots(templateSlots: TemplateSlot[], photos: Photo[], template: ManualTemplate): Promise<void> {
-    if (!this.ctx) return;
-
-    console.log('📸 Drawing photos in slots...');
-
     for (const slot of templateSlots) {
       if (!slot.photoId) continue;
-
       try {
         const photo = photos.find(p => p.id === slot.photoId);
-        if (!photo) {
+        if (photo) {
+          await this.drawPhotoInSlot(photo, slot, template);
+        } else {
           console.warn(`⚠️ Photo not found for slot ${slot.id}`);
-          continue;
         }
-
-        await this.drawPhotoInSlot(photo, slot, template);
       } catch (error) {
         console.error(`❌ Failed to draw photo in slot ${slot.id}:`, error);
-        // Continue with other photos
       }
     }
-
-    console.log('✅ All photos drawn');
   }
 
   /**
-   * Draw a single photo in its template slot
-   * CRITICAL: Must match UI coordinate system exactly
+   * Draw a single photo in its template slot, handling all coordinate transforms
    */
   private async drawPhotoInSlot(photo: Photo, slot: TemplateSlot, template: ManualTemplate): Promise<void> {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.canvas) return;
 
-    // Get high-resolution photo URL
     const highResUrls = getHighResPhotoUrls(photo);
     const photoUrl = highResUrls[0] || photo.url;
-
-    // Load photo image
     const img = await this.loadImage(photoUrl);
 
-    // Get hole data from template
-    const hole = template.holes_data[slot.slotIndex];
-    if (!hole) {
+    const originalHole = template.holes_data[slot.slotIndex];
+    if (!originalHole) {
       console.warn(`⚠️ No hole data found for slot index ${slot.slotIndex}`);
       return;
     }
 
-    console.log('🖼️ Drawing photo in slot:', {
-      photoName: photo.name,
-      slotIndex: slot.slotIndex,
-      hasTransform: !!slot.transform,
-      photoSize: { width: img.width, height: img.height },
-      hole: { x: hole.x, y: hole.y, width: hole.width, height: hole.height },
+    // COORDINATE FIX: Scale hole coordinates from template.dimensions to PNG natural dimensions
+    // Since PNG is drawn at 1:1 scale, we need to scale hole coordinates to match
+    const scaleX = this.canvas.width / template.dimensions.width;
+    const scaleY = this.canvas.height / template.dimensions.height;
+    
+    const transformedHole = {
+      x: originalHole.x * scaleX,
+      y: originalHole.y * scaleY,
+      width: originalHole.width * scaleX,
+      height: originalHole.height * scaleY
+    };
+    
+    console.log('🔄 Hole coordinate scaling:', {
       templateDimensions: template.dimensions,
-      canvasDimensions: { width: this.canvas?.width, height: this.canvas?.height }
+      canvasDimensions: { width: this.canvas.width, height: this.canvas.height },
+      scaleFactors: { x: scaleX.toFixed(3), y: scaleY.toFixed(3) },
+      originalHole: { x: originalHole.x, y: originalHole.y, width: originalHole.width, height: originalHole.height },
+      transformedHole: { x: transformedHole.x.toFixed(1), y: transformedHole.y.toFixed(1), width: transformedHole.width.toFixed(1), height: transformedHole.height.toFixed(1) }
     });
 
-    // Apply photo transform if present
+    // Use transformed hole coordinates directly - no clamping to avoid clipping
     if (slot.transform && isPhotoTransform(slot.transform)) {
-      this.drawPhotoWithTransform(img, slot.transform, hole, template);
+      this.drawPhotoWithTransform(img, slot.transform, transformedHole);
     } else {
-      // Default: fit photo in hole
-      this.drawPhotoFitInHole(img, hole.x, hole.y, hole.width, hole.height);
+      this.drawPhotoFitInHole(img, transformedHole);
     }
   }
 
   /**
-   * Draw photo with PhotoTransform applied
-   * CRITICAL: Must exactly match PhotoRenderer CSS behavior
+   * Draw photo with PhotoTransform - FIXED to match UI CSS behavior exactly
    */
   private drawPhotoWithTransform(
     img: HTMLImageElement,
     transform: PhotoTransform,
-    hole: { x: number, y: number, width: number, height: number },
-    template: ManualTemplate
+    hole: { x: number, y: number, width: number, height: number }
   ): void {
     if (!this.ctx) return;
 
-    console.log('🎨 Drawing photo with transform (COORDINATE SYSTEM FIX):', {
-      photoSize: { width: img.width, height: img.height },
-      hole,
-      template: { width: template.dimensions.width, height: template.dimensions.height },
-      canvas: { width: this.canvas?.width, height: this.canvas?.height },
-      transform
-    });
-
-    // Save context for clipping
     this.ctx.save();
 
-    // Create clipping path for the hole
+    // 1. Set the clipping region for the hole
     this.ctx.beginPath();
     this.ctx.rect(hole.x, hole.y, hole.width, hole.height);
     this.ctx.clip();
 
-    // === MATCH CSS PHOTORENDERER BEHAVIOR EXACTLY ===
-    // 
-    // CSS PhotoRenderer logic:
-    // 1. Photo fills hole container (width: 100%, height: 100%) 
-    // 2. object-fit: cover (photo scales to fill, may crop)
-    // 3. transform: translate(X%, Y%) scale(photoScale)
-    //
-    // The KEY insight: CSS transforms happen at the container level,
-    // not at the native template resolution!
-
-    // Step 1: Photo fills the hole container (like CSS width/height 100%)
-    // At this stage, the photo dimensions match the hole dimensions
-    const containerPhotoWidth = hole.width;   // Photo width at hole scale
-    const containerPhotoHeight = hole.height; // Photo height at hole scale
-
-    // Step 2: Apply PhotoTransform scale (like CSS scale())
-    const scaledWidth = containerPhotoWidth * transform.photoScale;
-    const scaledHeight = containerPhotoHeight * transform.photoScale;
-
-    // Step 3: Calculate CSS-style percentage translations
-    // CSS: translate(X%, Y%) where % is relative to the element size (scaled photo)
-    const translateXPercent = (0.5 - transform.photoCenterX) * 100;
-    const translateYPercent = (0.5 - transform.photoCenterY) * 100;
-
-    // Step 4: Convert percentage to pixels (relative to scaled photo dimensions)
-    const translateXPixels = (translateXPercent / 100) * scaledWidth;
-    const translateYPixels = (translateYPercent / 100) * scaledHeight;
-
-    // Step 5: Position photo in hole (like CSS container positioning)
-    const holeCenterX = hole.x + (hole.width / 2);
-    const holeCenterY = hole.y + (hole.height / 2);
+    // 2. Calculate object-fit: cover scale (same as UI)
+    const coverScale = Math.max(hole.width / img.width, hole.height / img.height);
     
-    const drawX = holeCenterX - (scaledWidth / 2) + translateXPixels;
-    const drawY = holeCenterY - (scaledHeight / 2) + translateYPixels;
-
-    console.log('🎨 COORDINATE SYSTEM FIX - Transform calculations:', {
-      containerPhotoSize: { width: containerPhotoWidth, height: containerPhotoHeight },
-      scaledSize: { width: scaledWidth, height: scaledHeight },
-      translatePercent: { x: translateXPercent, y: translateYPercent },
-      translatePixels: { x: translateXPixels, y: translateYPixels },
-      holeCenter: { x: holeCenterX, y: holeCenterY },
-      finalPosition: { x: drawX, y: drawY }
+    // 3. SQUISHING FIX: Clamp photoScale to prevent coverage issues
+    // photoScale < 1.0 would make finalScale < coverScale, breaking hole coverage
+    const clampedPhotoScale = Math.max(1.0, transform.photoScale);
+    const wasClampedScale = clampedPhotoScale !== transform.photoScale;
+    
+    // 4. Clamp photoCenterX/Y to valid bounds to prevent positioning issues
+    const clampedCenterX = Math.max(0, Math.min(1, transform.photoCenterX));
+    const clampedCenterY = Math.max(0, Math.min(1, transform.photoCenterY));
+    const wasClampedPosition = clampedCenterX !== transform.photoCenterX || clampedCenterY !== transform.photoCenterY;
+    
+    // 5. Calculate the photo's rendered size after object-fit: cover
+    const renderedWidth = img.width * coverScale;
+    const renderedHeight = img.height * coverScale;
+    
+    // 6. Apply clamped zoom scale (ensures coverage is maintained)
+    const finalScale = coverScale * clampedPhotoScale;
+    const finalWidth = img.width * finalScale;
+    const finalHeight = img.height * finalScale;
+    
+    // 7. FRAMING FIX: Match CSS transform order exactly - translate first, then scale
+    // CSS: translate(X%, Y%) scale(S) with transform-origin: center center
+    
+    // Step 1: Calculate translation relative to COVER-SCALED size (not final scaled)
+    // This matches how CSS calculates percentage before applying the scale transform
+    const translateXPercent = (0.5 - clampedCenterX) * 100;
+    const translateYPercent = (0.5 - clampedCenterY) * 100;
+    
+    // CRITICAL: Use renderedWidth/Height (cover-scaled) as reference, not finalWidth/Height
+    const translateXPixels = (translateXPercent / 100) * renderedWidth;
+    const translateYPixels = (translateYPercent / 100) * renderedHeight;
+    
+    // Step 2: Position cover-scaled photo at hole center
+    const holeCenterX = hole.x + hole.width / 2;
+    const holeCenterY = hole.y + hole.height / 2;
+    
+    // Step 3: Apply translation (like CSS translate)
+    const translatedCenterX = holeCenterX + translateXPixels;
+    const translatedCenterY = holeCenterY + translateYPixels;
+    
+    // Step 4: Apply user scale from the translated center (like CSS scale with transform-origin: center)
+    // Final position accounts for the scale expansion from center
+    const finalX = translatedCenterX - (finalWidth / 2);
+    const finalY = translatedCenterY - (finalHeight / 2);
+    
+    console.log('🎨 FRAMING FIX - Matching CSS transform order exactly:', {
+      originalImage: { width: img.width, height: img.height },
+      hole: { x: hole.x, y: hole.y, width: hole.width, height: hole.height },
+      coverScale: coverScale.toFixed(3),
+      userTransform: {
+        photoScale: transform.photoScale.toFixed(3),
+        photoCenterX: transform.photoCenterX.toFixed(3),
+        photoCenterY: transform.photoCenterY.toFixed(3)
+      },
+      clampedTransform: {
+        photoScale: clampedPhotoScale.toFixed(3),
+        photoCenterX: clampedCenterX.toFixed(3),
+        photoCenterY: clampedCenterY.toFixed(3)
+      },
+      clamping: {
+        scaleWasClamped: wasClampedScale,
+        positionWasClamped: wasClampedPosition,
+        reason: wasClampedScale ? 'photoScale < 1.0 would break coverage' : 'none'
+      },
+      cssTransformOrder: {
+        step1_coverScale: coverScale.toFixed(3),
+        step2_translate: {
+          percentX: translateXPercent.toFixed(1) + '%',
+          percentY: translateYPercent.toFixed(1) + '%',
+          pixelsX: translateXPixels.toFixed(1),
+          pixelsY: translateYPixels.toFixed(1),
+          referenceSize: `${renderedWidth.toFixed(1)}x${renderedHeight.toFixed(1)} (cover-scaled)`
+        },
+        step3_userScale: clampedPhotoScale.toFixed(3),
+        step4_finalSize: `${finalWidth.toFixed(1)}x${finalHeight.toFixed(1)}`
+      },
+      positioning: {
+        holeCenter: { x: holeCenterX.toFixed(1), y: holeCenterY.toFixed(1) },
+        afterTranslation: { x: translatedCenterX.toFixed(1), y: translatedCenterY.toFixed(1) },
+        finalPosition: { x: finalX.toFixed(1), y: finalY.toFixed(1) }
+      },
+      coverageGuarantee: finalScale >= coverScale ? '✅ MAINTAINED' : '❌ BROKEN',
+      cssEquivalent: `translate(${translateXPercent.toFixed(1)}%, ${translateYPercent.toFixed(1)}%) scale(${clampedPhotoScale.toFixed(3)})`
     });
 
-    // Draw the photo
-    this.ctx.drawImage(img, drawX, drawY, scaledWidth, scaledHeight);
+    // 7. Draw the photo at the calculated position and scale
+    this.ctx.drawImage(img, finalX, finalY, finalWidth, finalHeight);
 
-    // Restore context
     this.ctx.restore();
   }
 
   /**
-   * Draw photo fit in hole (default behavior)
+   * Draw photo fit in hole (object-fit: contain behavior)
    */
   private drawPhotoFitInHole(
     img: HTMLImageElement,
-    holeX: number,
-    holeY: number,
-    holeWidth: number,
-    holeHeight: number
+    hole: { x: number, y: number, width: number, height: number }
   ): void {
     if (!this.ctx) return;
 
-    // Calculate scale to fit photo in hole
-    const scale = Math.min(holeWidth / img.width, holeHeight / img.height);
+    this.ctx.save();
+
+    this.ctx.beginPath();
+    this.ctx.rect(hole.x, hole.y, hole.width, hole.height);
+    this.ctx.clip();
+
+    const scale = Math.min(hole.width / img.width, hole.height / img.height);
     const scaledWidth = img.width * scale;
     const scaledHeight = img.height * scale;
 
-    // Center the photo in the hole
-    const offsetX = (holeWidth - scaledWidth) / 2;
-    const offsetY = (holeHeight - scaledHeight) / 2;
+    const offsetX = (hole.width - scaledWidth) / 2;
+    const offsetY = (hole.height - scaledHeight) / 2;
 
-    this.ctx.drawImage(
-      img,
-      holeX + offsetX,
-      holeY + offsetY,
-      scaledWidth,
-      scaledHeight
-    );
+    this.ctx.drawImage(img, hole.x + offsetX, hole.y + offsetY, scaledWidth, scaledHeight);
+    
+    this.ctx.restore();
   }
 
   /**
@@ -362,10 +381,8 @@ class TemplateRasterizationService {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
-      
+      img.onerror = (e) => reject(new Error(`Failed to load image: ${url}. Error: ${e}`));
       img.src = url;
     });
   }
@@ -376,17 +393,12 @@ class TemplateRasterizationService {
   private async canvasToBlob(format: 'jpeg' | 'png', quality: number = 0.95): Promise<Blob> {
     return new Promise((resolve, reject) => {
       if (!this.canvas) {
-        reject(new Error('Canvas not initialized'));
-        return;
+        return reject(new Error('Canvas not initialized'));
       }
-
       this.canvas.toBlob(
         (blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Failed to create blob from canvas'));
-          }
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to create blob from canvas'));
         },
         format === 'jpeg' ? 'image/jpeg' : 'image/png',
         quality
@@ -401,8 +413,7 @@ class TemplateRasterizationService {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
     const cleanName = template.name.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
     const extension = options.format === 'jpeg' ? 'jpg' : 'png';
-    
-    return `${cleanName}_${timestamp}.${extension}`;
+    return `${cleanName}_${options.dpi}dpi_${timestamp}.${extension}`;
   }
 
   /**
@@ -410,21 +421,14 @@ class TemplateRasterizationService {
    */
   async downloadTemplate(rasterized: RasterizedTemplate): Promise<void> {
     try {
-      // Create download link
       const url = URL.createObjectURL(rasterized.blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = rasterized.fileName;
-      
-      // Trigger download
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
-      // Clean up
       URL.revokeObjectURL(url);
-      
-      console.log('✅ Template download triggered:', rasterized.fileName);
     } catch (error) {
       console.error('❌ Failed to download template:', error);
       throw new Error('Failed to download template');
