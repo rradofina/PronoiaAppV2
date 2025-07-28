@@ -44,7 +44,21 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
       this.cache = data || [];
       this.lastSync = new Date();
       
-      console.log(`✅ Loaded ${this.cache.length} manual templates`);
+      console.log(`✅ Loaded ${this.cache.length} manual templates:`, {
+        totalTemplates: this.cache.length,
+        templatesByType: this.cache.reduce((acc, t) => {
+          acc[t.template_type] = (acc[t.template_type] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+        activeTemplates: this.cache.filter(t => t.is_active).length,
+        printSizes: [...new Set(this.cache.map(t => t.print_size))],
+        templateDetails: this.cache.map(t => ({
+          name: t.name,
+          template_type: t.template_type,
+          print_size: t.print_size,
+          is_active: t.is_active
+        }))
+      });
       return this.cache;
     } catch (error) {
       console.error('❌ Manual template service error:', error);
@@ -57,7 +71,34 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
    */
   async getActiveTemplates(): Promise<ManualTemplate[]> {
     const templates = await this.getAllTemplates();
-    return templates.filter(t => t.is_active);
+    const activeTemplates = templates.filter(t => t.is_active);
+    
+    console.log('🎯 MANUAL TEMPLATE SERVICE - getActiveTemplates() result:', {
+      totalTemplatesFromDB: templates.length,
+      activeTemplates: activeTemplates.length,
+      templatesByType: activeTemplates.reduce((acc, t) => {
+        acc[t.template_type] = (acc[t.template_type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+      templateDetails: activeTemplates.map(t => ({
+        id: t.id,
+        name: t.name,
+        template_type: t.template_type,
+        print_size: t.print_size,
+        is_active: t.is_active,
+        drive_file_id: t.drive_file_id
+      }))
+    });
+    
+    return activeTemplates;
+  }
+
+  /**
+   * Get available template types from database
+   */
+  async getAvailableTemplateTypes(): Promise<string[]> {
+    // Use existing getUniqueTemplateTypes method without print size filter
+    return this.getUniqueTemplateTypes();
   }
 
   /**
@@ -223,6 +264,95 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
       t.name.toLowerCase().includes(lowerQuery) || 
       (t.description && t.description.toLowerCase().includes(lowerQuery))
     );
+  }
+
+  /**
+   * Get unique template types available in the database
+   * @param printSize - Optional filter by print size
+   * @returns Array of unique template types
+   */
+  async getUniqueTemplateTypes(printSize?: PrintSize): Promise<string[]> {
+    const templates = await this.getActiveTemplates();
+    
+    const filteredTemplates = printSize 
+      ? templates.filter(t => t.print_size === printSize)
+      : templates;
+    
+    const uniqueTypes = [...new Set(filteredTemplates.map(t => t.template_type))];
+    
+    console.log('📋 Available template types:', {
+      printSize: printSize || 'all',
+      templateTypes: uniqueTypes,
+      totalTemplates: filteredTemplates.length
+    });
+    
+    return uniqueTypes;
+  }
+
+  /**
+   * Get templates grouped by type for a specific print size
+   * @param printSize - Print size to filter by
+   * @returns Object with template types as keys and template arrays as values
+   */
+  async getTemplatesGroupedByType(printSize: PrintSize): Promise<Record<TemplateType, ManualTemplate[]>> {
+    const templates = await this.getActiveTemplates();
+    const filteredTemplates = templates.filter(t => t.print_size === printSize);
+    
+    const grouped = filteredTemplates.reduce((acc, template) => {
+      if (!acc[template.template_type]) {
+        acc[template.template_type] = [];
+      }
+      acc[template.template_type].push(template);
+      return acc;
+    }, {} as Record<TemplateType, ManualTemplate[]>);
+
+    console.log('🏷️ Templates grouped by type for', printSize + ':', {
+      availableTypes: Object.keys(grouped),
+      counts: Object.entries(grouped).reduce((acc, [type, templates]) => {
+        acc[type] = templates.length;
+        return acc;
+      }, {} as Record<string, number>)
+    });
+
+    return grouped;
+  }
+
+  /**
+   * Find template by exact template type match
+   * Prioritizes exact template_type match over other fields
+   * @param targetType - Template type to find
+   * @param printSize - Print size to filter by
+   * @returns First matching template or null
+   */
+  async findTemplateByType(targetType: TemplateType, printSize: PrintSize): Promise<ManualTemplate | null> {
+    const templates = await this.getActiveTemplates();
+    
+    // Filter by print size first
+    const sizedTemplates = templates.filter(t => t.print_size === printSize);
+    
+    // Find exact template_type match
+    const exactMatch = sizedTemplates.find(t => t.template_type === targetType);
+    
+    if (exactMatch) {
+      console.log('✅ Found exact template type match:', {
+        targetType,
+        printSize,
+        foundTemplate: {
+          id: exactMatch.id,
+          name: exactMatch.name,
+          template_type: exactMatch.template_type
+        }
+      });
+      return exactMatch;
+    }
+
+    console.log('❌ No exact template type match found:', {
+      targetType,
+      printSize,
+      availableTypes: sizedTemplates.map(t => t.template_type)
+    });
+    
+    return null;
   }
 
   /**

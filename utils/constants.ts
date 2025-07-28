@@ -230,7 +230,8 @@ export const calculatePhotoSlots = (templateType: TemplateType) => {
 // Package validation moved to manual package service
 
 export const validateTemplateType = (templateType: string): templateType is TemplateType => {
-  return ['solo', 'collage', 'photocard', 'photostrip'].indexOf(templateType) !== -1;
+  // Template types are now dynamic - any non-empty string is valid
+  return typeof templateType === 'string' && templateType.trim().length > 0;
 };
 
 export const validateImageFile = (file: File): boolean => {

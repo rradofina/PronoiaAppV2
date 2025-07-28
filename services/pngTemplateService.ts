@@ -14,7 +14,7 @@ export interface PngTemplate {
   driveFileId: string;
   name: string;
   printSize: PrintSize;
-  templateType: 'solo' | 'collage' | 'photocard' | 'photostrip';
+  templateType: string; // Dynamic template types
   holes: Array<{
     id: string;
     x: number;
@@ -234,7 +234,8 @@ export class PngTemplateService {
         mimeType: 'image/png'
       });
 
-      console.log(`🖼️ Found ${pngFiles.length} PNG files in ${printSize} folder`);
+      console.log(`🖼️ Found ${pngFiles.length} PNG files in ${printSize} folder:`, 
+        pngFiles.map(f => f.name));
       
       // Debug: Log each PNG file
       pngFiles.forEach(file => {

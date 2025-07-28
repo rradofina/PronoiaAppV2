@@ -122,7 +122,7 @@ export class SupabaseService {
   async saveTemplate(templateData: {
     session_id: string;
     user_id: string;
-    type: 'solo' | 'collage' | 'photocard' | 'photostrip';
+    type: string; // Dynamic template types
     name: string;
     dimensions: object;
     layout_config: object;

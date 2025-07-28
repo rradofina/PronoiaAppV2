@@ -16,6 +16,14 @@ const TemplateVisual: React.FC<TemplateVisualProps> = ({
   photos,
   selectedSlot
 }) => {
+  console.log('🎨 TemplateVisual render:', {
+    templateId: template.id,
+    templateName: template.name,
+    templateSlots: template.slots,
+    slotsLength: slots.length,
+    // Dynamic template types - remove hardcoded array
+    template: { id: template.id, type: template.id }
+  });
   const getPhotoUrl = (photoId?: string | null) => {
     if (!photoId) {
       console.log('🖼️ TemplateVisual: No photoId provided');
@@ -179,7 +187,24 @@ const TemplateVisual: React.FC<TemplateVisualProps> = ({
     );
   }
 
-  return null;
+  // Fallback for any unmatched template types - render a simple preview
+  console.warn(`⚠️ TemplateVisual: Unknown template type "${template.id}", using fallback rendering`);
+  
+  return (
+    <div className="bg-white p-3 rounded-lg shadow-md w-full h-full" style={{ aspectRatio: printAspectRatio, minHeight: '200px' }}>
+      <div className="w-full h-full flex items-center justify-center border-2 border-dashed border-gray-300 rounded">
+        <div className="text-center text-gray-500">
+          <div className="text-lg mb-2">{template.name}</div>
+          <div className="text-xs">
+            {template.slots} slot{template.slots !== 1 ? 's' : ''}
+          </div>
+          <div className="text-xs text-gray-400 mt-1">
+            Type: {template.id}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 TemplateVisual.displayName = 'TemplateVisual';

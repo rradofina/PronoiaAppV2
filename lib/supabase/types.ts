@@ -79,7 +79,7 @@ export interface Database {
           id: string;
           session_id: string;
           user_id: string;
-          type: 'solo' | 'collage' | 'photocard' | 'photostrip';
+          type: string; // Dynamic template types
           name: string;
           dimensions: Json;
           layout_config: Json;
@@ -90,7 +90,7 @@ export interface Database {
           id?: string;
           session_id: string;
           user_id: string;
-          type: 'solo' | 'collage' | 'photocard' | 'photostrip';
+          type: string; // Dynamic template types
           name: string;
           dimensions: Json;
           layout_config: Json;
@@ -101,7 +101,7 @@ export interface Database {
           id?: string;
           session_id?: string;
           user_id?: string;
-          type?: 'solo' | 'collage' | 'photocard' | 'photostrip';
+          type?: string; // Dynamic template types
           name?: string;
           dimensions?: Json;
           layout_config?: Json;

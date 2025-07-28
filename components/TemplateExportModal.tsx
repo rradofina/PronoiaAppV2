@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import { templateExportService } from '../services/templateExportService';
+import { manualTemplateService } from '../services/manualTemplateService';
 import { TemplateExportOptions, TemplateType, PrintSize } from '../types';
 
 interface TemplateExportModalProps {
@@ -22,6 +23,27 @@ export default function TemplateExportModal({ isOpen, onClose }: TemplateExportM
     type: 'success' | 'error' | null;
     message: string;
   }>({ type: null, message: '' });
+  
+  const [availableTemplateTypes, setAvailableTemplateTypes] = useState<TemplateType[]>([]);
+
+  // Load available template types when modal opens
+  useEffect(() => {
+    const loadTemplateTypes = async () => {
+      if (!isOpen) return;
+      
+      try {
+        const types = await manualTemplateService.getUniqueTemplateTypes();
+        setAvailableTemplateTypes(types);
+        console.log('📋 Export Modal - Loaded dynamic template types:', types);
+      } catch (error) {
+        console.error('❌ Export Modal - Error loading template types:', error);
+        // Fallback to empty array if service fails
+        setAvailableTemplateTypes([]);
+      }
+    };
+
+    loadTemplateTypes();
+  }, [isOpen]);
 
   const handleExportAll = async () => {
     setIsExporting(true);
@@ -284,7 +306,7 @@ export default function TemplateExportModal({ isOpen, onClose }: TemplateExportM
                   <div>
                     <h4 className="font-medium text-gray-900 mb-2">Export by Template Type</h4>
                     <div className="grid grid-cols-2 gap-2">
-                      {(['solo', 'collage', 'photocard', 'photostrip'] as TemplateType[]).map(type => (
+                      {availableTemplateTypes.map(type => (
                         <button
                           key={type}
                           onClick={() => handleExportByType(type)}

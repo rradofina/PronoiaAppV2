@@ -224,7 +224,7 @@ export default function PngTemplateManagementScreen({
     name: '',
     description: '',
     drive_file_id: '',
-    template_type: 'solo' as 'solo' | 'collage' | 'photocard' | 'photostrip',
+    template_type: 'solo', // Default template type - now dynamic
     print_size: '4R' as '4R' | '5R' | 'A4'
   });
 

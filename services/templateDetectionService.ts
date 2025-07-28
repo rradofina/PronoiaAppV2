@@ -16,7 +16,7 @@ export interface TemplateAnalysisResult {
   holes: TemplateHole[];
   dimensions: { width: number; height: number };
   hasInternalBranding: boolean;
-  templateType: 'solo' | 'collage' | 'photocard' | 'photostrip';
+  templateType: string; // Dynamic template types
 }
 
 interface Point {
@@ -551,22 +551,46 @@ export class TemplateDetectionService {
   /**
    * Determine template type based on filename and hole count
    */
-  private determineTemplateType(holes: TemplateHole[], filename?: string): 'solo' | 'collage' | 'photocard' | 'photostrip' {
+  private determineTemplateType(holes: TemplateHole[], filename?: string): string {
+    console.log('🔍 TEMPLATE TYPE DETECTION:', {
+      filename,
+      holeCount: holes.length,
+      holes: holes.map(h => ({ id: h.id, size: `${h.width}×${h.height}` }))
+    });
+    
     // First try to detect from filename
     if (filename) {
       const name = filename.toLowerCase();
       
+      console.log('📝 Checking filename keywords for:', name);
+      
       // Look for keywords in filename
-      if (name.includes('solo') || name.includes('single')) return 'solo';
-      if (name.includes('collage') || name.includes('grid')) return 'collage';
-      if (name.includes('photocard') || name.includes('photo-card') || name.includes('card')) return 'photocard';
-      if (name.includes('strip') || name.includes('photo-strip') || name.includes('photostrip')) return 'photostrip';
+      if (name.includes('solo') || name.includes('single')) {
+        console.log('✅ Detected SOLO from filename keyword');
+        return 'solo';
+      }
+      if (name.includes('collage') || name.includes('grid')) {
+        console.log('✅ Detected COLLAGE from filename keyword');
+        return 'collage';
+      }
+      if (name.includes('photocard') || name.includes('photo-card') || name.includes('card')) {
+        console.log('✅ Detected PHOTOCARD from filename keyword');
+        return 'photocard';
+      }
+      if (name.includes('strip') || name.includes('photo-strip') || name.includes('photostrip')) {
+        console.log('✅ Detected PHOTOSTRIP from filename keyword');
+        return 'photostrip';
+      }
+      
+      console.log('⚠️ No filename keywords matched, falling back to hole count detection');
     }
     
     // Fallback to hole count detection
     const holeCount = holes.length;
+    console.log('🔢 Using hole count detection:', holeCount, 'holes');
 
     if (holeCount === 1) {
+      console.log('✅ Detected SOLO from hole count (1 hole)');
       return 'solo';
     } else if (holeCount === 4) {
       // Check if it's a 2x2 grid (collage) or colored backgrounds (photocard)
@@ -575,13 +599,26 @@ export class TemplateDetectionService {
       
       // If holes are more square-ish, likely photocard; if rectangular, likely collage
       const aspectRatio = avgWidth / avgHeight;
-      return aspectRatio > 0.8 && aspectRatio < 1.2 ? 'photocard' : 'collage';
+      const detectedType = aspectRatio > 0.8 && aspectRatio < 1.2 ? 'photocard' : 'collage';
+      
+      console.log('🔍 4-hole template analysis:', {
+        avgWidth: Math.round(avgWidth),
+        avgHeight: Math.round(avgHeight),
+        aspectRatio: aspectRatio.toFixed(2),
+        detectedType
+      });
+      console.log(`✅ Detected ${detectedType.toUpperCase()} from 4-hole analysis`);
+      
+      return detectedType;
     } else if (holeCount === 6) {
+      console.log('✅ Detected PHOTOSTRIP from hole count (6 holes)');
       return 'photostrip';
     }
 
     // Default fallback
-    return holeCount <= 2 ? 'solo' : holeCount <= 4 ? 'collage' : 'photostrip';
+    const fallbackType = holeCount <= 2 ? 'solo' : holeCount <= 4 ? 'collage' : 'photostrip';
+    console.log(`⚠️ Using default fallback: ${holeCount} holes → ${fallbackType}`);
+    return fallbackType;
   }
 
   /**

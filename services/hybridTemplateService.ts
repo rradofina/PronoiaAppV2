@@ -54,11 +54,19 @@ class HybridTemplateServiceImpl {
       
       // Load manual templates first
       const manualTemplates = await manualTemplateService.getActiveTemplates();
-      console.log(`📋 Found ${manualTemplates.length} manual templates`);
+      console.log(`📋 HYBRID SERVICE - Manual templates loaded:`, {
+        count: manualTemplates.length,
+        types: manualTemplates.map(t => `${t.name} (${t.template_type})`),
+        driveFileIds: manualTemplates.map(t => t.drive_file_id)
+      });
 
       // Load auto-detected templates
       const autoTemplates = await pngTemplateService.loadTemplates();
-      console.log(`🤖 Found ${autoTemplates.length} auto-detected templates`);
+      console.log(`🤖 HYBRID SERVICE - Auto templates loaded:`, {
+        count: autoTemplates.length,
+        types: autoTemplates.map(t => `${t.name} (${t.templateType})`),
+        driveFileIds: autoTemplates.map(t => t.driveFileId || t.id)
+      });
 
       // Convert to hybrid format
       const hybridManual = this.convertManualToHybrid(manualTemplates);
@@ -70,13 +78,49 @@ class HybridTemplateServiceImpl {
         !manualDriveFileIds.has(autoTemplate.drive_file_id)
       );
 
-      console.log(`🔀 Filtered out ${hybridAuto.length - filteredAuto.length} auto-detected templates (manual overrides exist)`);
+      console.log(`🔀 HYBRID SERVICE - Filtering auto templates:`, {
+        manualDriveFileIds: Array.from(manualDriveFileIds),
+        autoTemplatesBeforeFilter: hybridAuto.length,
+        autoTemplatesAfterFilter: filteredAuto.length,
+        filteredOutCount: hybridAuto.length - filteredAuto.length,
+        remainingAutoTemplates: filteredAuto.map(t => `${t.name} (${t.template_type})`)
+      });
 
       // Combine templates (manual first, then auto)
       this.cache = [...hybridManual, ...filteredAuto];
       this.lastSync = new Date();
 
-      console.log(`✅ Hybrid template loading complete: ${this.cache.length} total (${hybridManual.length} manual, ${filteredAuto.length} auto)`);
+      console.log(`✅ HYBRID SERVICE - Final combined result:`, {
+        totalTemplates: this.cache.length,
+        manualCount: hybridManual.length,
+        autoCount: filteredAuto.length,
+        finalTemplatesList: this.cache.map(t => `${t.name} (${t.template_type}, ${t.print_size})`),
+        finalTemplatesByType: this.cache.reduce((acc, t) => {
+          acc[t.template_type] = (acc[t.template_type] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>)
+      });
+      
+      // CRITICAL DEBUG: Check template type distribution  
+      const typeDistribution = this.cache.reduce((acc, t) => {
+        acc[t.template_type] = (acc[t.template_type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      console.log('📊 Hybrid template type distribution:', {
+        typeDistribution,
+        totalTemplates: this.cache.length,
+        templateDetails: this.cache.map(t => ({
+          name: t.name,
+          template_type: t.template_type,
+          print_size: t.print_size,
+          source: t.source,
+          drive_file_id: t.drive_file_id
+        })),
+        // Dynamic template types from database
+        availableTypes: [...new Set(this.cache.map(t => t.template_type))]
+      });
+
       return this.cache;
     } catch (error) {
       console.error('❌ Error loading hybrid templates:', error);

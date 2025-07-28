@@ -140,44 +140,38 @@ export default function FullscreenTemplateEditor({
     setCurrentPhotoId(newPhotoId);
   }, [selectedPhoto?.id, selectedSlot?.photoId, selectedSlot?.transform, currentPhotoId]);
 
-  // Get PNG templates and find the one for this slot (with null checks)
+  // Get PNG templates and find the one for this slot - simplified matching
   const pngTemplates = (window as any).pngTemplates || [];
-  const templateId = selectedSlot?.templateId?.split('_')[0]; // Get base template ID
   const pngTemplate = selectedSlot ? pngTemplates.find((t: any) => {
-    // First priority: exact template type match (this handles swapped templates correctly)
-    const typeMatch = t.template_type === selectedSlot.templateType;
+    // Match by template type and print size (handles template swaps correctly)
+    const templateTypeMatch = t.template_type === selectedSlot.templateType;
+    const printSizeMatch = t.print_size === selectedSlot.printSize;
     
-    // Second priority: exact ID match (for backward compatibility)
-    const idMatch = t.id === templateId;
+    // Both template type and print size must match for template swap compatibility
+    const isCompatible = templateTypeMatch && printSizeMatch;
     
-    // Third priority: template type matches legacy templateType property
-    const legacyTypeMatch = t.templateType === selectedSlot.templateType;
-    
-    console.log('🔍 Template matching debug (prioritizing templateType):', { 
-      templateId, 
+    console.log('🔍 Simplified template matching:', { 
       slotTemplateType: selectedSlot.templateType,
-      pngTemplateId: t.id, 
-      pngTemplateType: t.template_type,
-      pngTemplateLegacyType: t.templateType,
-      pngTemplateName: t.name,
-      typeMatch,
-      idMatch,
-      legacyTypeMatch,
-      finalMatch: typeMatch || legacyTypeMatch || idMatch
+      slotPrintSize: selectedSlot.printSize,
+      templateType: t.template_type,
+      templatePrintSize: t.print_size,
+      templateName: t.name,
+      isCompatible
     });
     
-    // Prioritize template type matches (handles swapped templates correctly)
-    return typeMatch || legacyTypeMatch || idMatch;
+    return isCompatible;
   }) : null;
 
   // Debug: log what template was matched
-  console.log('🎯 Final template match result:', {
-    selectedSlotType: selectedSlot?.templateType,
+  console.log('🎯 Template match result:', {
+    slotType: selectedSlot?.templateType,
+    slotPrintSize: selectedSlot?.printSize,
     matchedTemplate: pngTemplate ? {
       id: pngTemplate.id,
       name: pngTemplate.name,
-      type: pngTemplate.template_type
-    } : 'NO MATCH FOUND'
+      type: pngTemplate.template_type,
+      printSize: pngTemplate.print_size
+    } : 'NO COMPATIBLE TEMPLATE FOUND'
   });
 
   // Get all slots for this template
@@ -420,11 +414,14 @@ export default function FullscreenTemplateEditor({
         {!pngTemplate ? (
           <div className="text-white text-center">
             <div className="text-4xl mb-4">❌</div>
-            <p className="text-red-400 font-medium">No matching PNG template found</p>
+            <p className="text-red-400 font-medium">No compatible template found</p>
             <p className="text-gray-400 text-sm mt-2">
-              Looking for: {selectedSlot?.templateType} template with ID: {selectedSlot?.templateId?.split('_')[0]}
+              Looking for: {selectedSlot?.templateType} ({selectedSlot?.printSize})
             </p>
-            <p className="text-gray-400 text-xs mt-1">Available templates: {pngTemplates.length}</p>
+            <p className="text-gray-400 text-xs mt-1">
+              Available templates: {pngTemplates.length} | 
+              Types: {[...new Set(pngTemplates.map((t: any) => t.template_type))].join(', ')}
+            </p>
           </div>
         ) : !templateBlobUrl ? (
           <div className="text-white text-center">
@@ -494,7 +491,7 @@ export default function FullscreenTemplateEditor({
                     width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
                     height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
                   }}
-                  onClick={() => viewMode === 'multi-slot' && !isEditingSlot ? handleSlotClick(slot) : undefined}
+                  onClick={() => viewMode === 'multi-slot' ? handleSlotClick(slot) : undefined}
                 >
                   {isEditingSlot ? (
                     // Editing slot - interactive PhotoRenderer

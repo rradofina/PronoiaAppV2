@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import { TemplateSlot, Photo, ManualPackage, ManualTemplate } from '../types';
-import { HybridTemplate, hybridTemplateService } from '../services/hybridTemplateService';
 import { manualTemplateService } from '../services/manualTemplateService';
 import { manualPackageService } from '../services/manualPackageService';
 
@@ -13,7 +12,7 @@ interface TemplateSwapModalProps {
   templateSlots: TemplateSlot[];
   photos: Photo[];
   selectedPackage: ManualPackage | null;
-  onConfirmSwap: (newTemplate: HybridTemplate, updatedSlots: TemplateSlot[]) => void;
+  onConfirmSwap: (newTemplate: ManualTemplate, updatedSlots: TemplateSlot[]) => void;
   TemplateVisual: React.ComponentType<any>;
 }
 
@@ -27,8 +26,8 @@ export default function TemplateSwapModal({
   onConfirmSwap,
   TemplateVisual
 }: TemplateSwapModalProps) {
-  const [availableTemplates, setAvailableTemplates] = useState<HybridTemplate[]>([]);
-  const [selectedNewTemplate, setSelectedNewTemplate] = useState<HybridTemplate | null>(null);
+  const [availableTemplates, setAvailableTemplates] = useState<ManualTemplate[]>([]);
+  const [selectedNewTemplate, setSelectedNewTemplate] = useState<ManualTemplate | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Load available templates when modal opens
@@ -46,47 +45,30 @@ export default function TemplateSwapModal({
         
         console.log('📏 Loading all templates for print size:', currentPrintSize);
         
-        // Load ALL templates of the same print size from global catalog
-        const allTemplates = await manualTemplateService.getAllTemplates();
+        // Load ALL templates directly from database - simple and reliable
+        const printSizeTemplates = await manualTemplateService.getTemplatesByPrintSize(currentPrintSize);
         
-        if (!allTemplates || allTemplates.length === 0) {
-          console.warn('❌ No templates found in global catalog');
+        if (!printSizeTemplates || printSizeTemplates.length === 0) {
+          console.warn('❌ No templates found for print size:', currentPrintSize);
           setAvailableTemplates([]);
           return;
         }
         
-        // Filter by print size only (show ALL template types for this print size)
-        const printSizeTemplates = allTemplates.filter(template => 
-          template.print_size === currentPrintSize && template.is_active
-        );
-        
-        console.log('🔄 Found global templates for', currentPrintSize + ':', {
-          totalTemplates: allTemplates.length,
-          filteredByPrintSize: printSizeTemplates.length,
+        console.log('🔄 TEMPLATE SWAP - Database templates for', currentPrintSize + ':', {
+          templatesFound: printSizeTemplates.length,
           currentPrintSize,
           templateTypes: [...new Set(printSizeTemplates.map(t => t.template_type))],
-          templateNames: printSizeTemplates.map(t => t.name)
+          templateNames: printSizeTemplates.map(t => t.name),
+          templateDetails: printSizeTemplates.map(t => ({
+            name: t.name,
+            template_type: t.template_type,
+            print_size: t.print_size,
+            is_active: t.is_active
+          }))
         });
         
-        // Convert to hybrid format for compatibility  
-        const hybridTemplates: HybridTemplate[] = printSizeTemplates.map(template => ({
-          id: template.id,
-          name: template.name,
-          description: template.description,
-          template_type: template.template_type,
-          print_size: template.print_size,
-          drive_file_id: template.drive_file_id,
-          driveFileId: template.drive_file_id,
-          holes: template.holes_data,
-          dimensions: template.dimensions,
-          thumbnail_url: template.thumbnail_url,
-          sample_image_url: template.sample_image_url,
-          base64_preview: template.base64_preview,
-          source: 'manual' as const,
-          is_active: template.is_active
-        }));
-        
-        setAvailableTemplates(hybridTemplates);
+        // Use database templates directly - no conversion needed
+        setAvailableTemplates(printSizeTemplates);
       } catch (error) {
         console.error('❌ Error loading package templates:', error);
         setAvailableTemplates([]);
@@ -137,7 +119,7 @@ export default function TemplateSwapModal({
     }
   }, [isOpen, templateToSwap, availableTemplates]);
 
-  const handleTemplateSelect = (template: HybridTemplate) => {
+  const handleTemplateSelect = (template: ManualTemplate) => {
     setSelectedNewTemplate(template);
   };
 
@@ -155,7 +137,7 @@ export default function TemplateSwapModal({
         id: selectedNewTemplate.id,
         name: selectedNewTemplate.name,
         template_type: selectedNewTemplate.template_type,
-        holesCount: selectedNewTemplate.holes?.length
+        holesCount: selectedNewTemplate.holes_data?.length
       }
     });
 
@@ -195,7 +177,7 @@ export default function TemplateSwapModal({
       : `${selectedNewTemplate.name} (Print #${printNumber})`;
 
     // Create new slots based on the new template with smart photo preservation
-    const newSlotsCount = selectedNewTemplate.holes?.length || 1;
+    const newSlotsCount = selectedNewTemplate.holes_data?.length || 1;
     const oldSlotsCount = templateToSwap.slots.length;
     
     console.log('🔄 SLOT CONVERSION DEBUG:', {
@@ -304,6 +286,7 @@ export default function TemplateSwapModal({
   
   // Show ALL templates of the same print size (including current template)
   const filteredTemplates = availableTemplates;
+  
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -375,7 +358,7 @@ export default function TemplateSwapModal({
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
                         {filteredTemplates.map((template) => {
                           const isSelected = selectedNewTemplate?.id === template.id;
-                          const slotCountDiff = template.holes?.length !== templateToSwap.slots.length;
+                          const slotCountDiff = template.holes_data?.length !== templateToSwap.slots.length;
                             
                             return (
                               <div
@@ -399,10 +382,10 @@ export default function TemplateSwapModal({
                                 {slotCountDiff && (
                                   <div className="mb-3 p-2 bg-orange-50 border border-orange-200 rounded-lg">
                                     <div className="text-xs text-orange-700 font-medium">
-                                      ⚠️ Slot count: {template.holes?.length || 1} (current: {templateToSwap.slots.length})
+                                      ⚠️ Slot count: {template.holes_data?.length || 1} (current: {templateToSwap.slots.length})
                                     </div>
                                     <div className="text-xs text-orange-600 mt-1">
-                                      {template.holes?.length! > templateToSwap.slots.length ? 'Empty slots will be added' : 'Some photos may be lost'}
+                                      {template.holes_data?.length! > templateToSwap.slots.length ? 'Empty slots will be added' : 'Some photos may be lost'}
                                     </div>
                                   </div>
                                 )}
@@ -433,8 +416,8 @@ export default function TemplateSwapModal({
                             {/* Fallback template visual */}
                             <div className={`template-fallback w-full h-full flex items-center justify-center ${template.sample_image_url ? "hidden" : "block"}`}>
                               <TemplateVisual
-                                template={{ id: template.template_type, name: template.name, slots: template.holes?.length || 1 }}
-                                slots={Array.from({ length: template.holes?.length || 1 }, (_, index) => ({
+                                template={{ id: template.template_type, name: template.name, slots: template.holes_data?.length || 1 }}
+                                slots={Array.from({ length: template.holes_data?.length || 1 }, (_, index) => ({
                                   id: `preview_${index}`,
                                   templateId: template.template_type,
                                   templateName: template.name,
@@ -453,7 +436,7 @@ export default function TemplateSwapModal({
                               {template.print_size}
                             </span>
                             <span>
-                              {template.holes?.length || 1} slot{(template.holes?.length || 1) !== 1 ? 's' : ''}
+                              {template.holes_data?.length || 1} slot{(template.holes_data?.length || 1) !== 1 ? 's' : ''}
                             </span>
                             {template.sample_image_url && (
                               <span className="text-green-600 font-medium">✓ Preview</span>
@@ -467,8 +450,8 @@ export default function TemplateSwapModal({
                                 Replace "<span className="font-medium">{templateToSwap.templateName}</span>" with "<span className="font-medium">{template.name}</span>"?
                                 {slotCountDiff && (
                                   <span className="block text-orange-600 font-medium mt-1">
-                                    ⚠️ Slot count will change: {templateToSwap.slots.length} → {template.holes?.length || 1}
-                                    {templateToSwap.slots.length > (template.holes?.length || 1) ? ' (some photos may be lost)' : ' (empty slots will be added)'}
+                                    ⚠️ Slot count will change: {templateToSwap.slots.length} → {template.holes_data?.length || 1}
+                                    {templateToSwap.slots.length > (template.holes_data?.length || 1) ? ' (some photos may be lost)' : ' (empty slots will be added)'}
                                   </span>
                                 )}
                               </p>

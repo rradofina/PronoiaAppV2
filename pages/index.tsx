@@ -16,7 +16,7 @@ import TemplateFolderSelectionScreen from '../components/screens/TemplateFolderS
 import ManualTemplateManagerScreen from '../components/admin/ManualTemplateManagerScreen';
 import ManualPackageManagerScreen from '../components/admin/ManualPackageManagerScreen';
 import googleDriveService from '../services/googleDriveService';
-import { hybridTemplateService } from '../services/hybridTemplateService';
+import { manualTemplateService } from '../services/manualTemplateService';
 import { manualPackageService } from '../services/manualPackageService';
 import { templateCacheService } from '../services/templateCacheService';
 import { TEMPLATE_TYPES, PRINT_SIZES } from '../utils/constants';
@@ -812,7 +812,7 @@ export default function Home() {
     setAdditionalPrints(newAdditionalPrints);
     
     // Check if current template count exceeds new total allowed prints
-    const newTotalAllowed = (selectedPackage?.templateCount || 0) + newAdditionalPrints;
+    const newTotalAllowed = (selectedPackage?.template_count || 0) + newAdditionalPrints;
     const currentTemplateTotal = getTotalTemplateCount();
     
     if (currentTemplateTotal > newTotalAllowed) {
@@ -843,7 +843,7 @@ export default function Home() {
 
   // Helper function to get total allowed prints (base package + additional)
   const getTotalAllowedPrints = () => {
-    const basePrints = selectedPackage?.templateCount || 0;
+    const basePrints = selectedPackage?.template_count || 0;
     return basePrints + additionalPrints;
   };
 
@@ -944,44 +944,106 @@ export default function Home() {
     };
   }, []);
 
-  // Load PNG templates on app startup when authenticated
+  // Load templates from database on app startup - INDEPENDENT of Google API
   useEffect(() => {
-    const loadPngTemplatesOnStartup = async () => {
-      // Check if we have proper Google API authentication
-      if (!window.gapi?.client?.drive) {
-        console.log('⚠️ Google Drive API not ready yet, skipping template loading');
-        return;
-      }
-
-      // Double-check authentication state
-      if (!googleAuth.isSignedIn) {
-        console.log('⚠️ User not signed in, skipping template loading');
-        return;
-      }
-
+    const loadTemplatesFromDatabase = async () => {
       try {
-        console.log('🔄 Loading PNG templates on app startup...');
-        // Use hybrid template service for better reliability and manual template support
-        const allTemplates = await hybridTemplateService.getAllTemplates();
+        console.log('🔄 Loading templates from database on app startup...');
+        // Use database directly - much simpler and more reliable
+        const dbTemplates = await manualTemplateService.getActiveTemplates();
+        
+        // Convert to format expected by window.pngTemplates with detailed debugging
+        console.log('🔄 TEMPLATE CONVERSION - Starting conversion of', dbTemplates.length, 'templates');
+        
+        const allTemplates = dbTemplates.map((template, index) => {
+          console.log(`📝 Converting template ${index + 1}/${dbTemplates.length}:`, {
+            id: template.id,
+            name: template.name,
+            template_type: template.template_type,
+            print_size: template.print_size,
+            has_holes_data: !!template.holes_data,
+            holes_data_length: template.holes_data?.length,
+            has_dimensions: !!template.dimensions,
+            has_drive_file_id: !!template.drive_file_id
+          });
+          
+          try {
+            const convertedTemplate = {
+              id: template.id,
+              name: template.name,
+              description: template.description,
+              template_type: template.template_type,
+              print_size: template.print_size,
+              drive_file_id: template.drive_file_id,
+              driveFileId: template.drive_file_id, // Compatibility alias
+              holes: template.holes_data,
+              dimensions: template.dimensions,
+              thumbnail_url: template.thumbnail_url,
+              sample_image_url: template.sample_image_url,
+              base64_preview: template.base64_preview,
+              source: 'manual' as const,
+              is_active: template.is_active
+            };
+            
+            console.log(`✅ Successfully converted template: ${template.name}`);
+            return convertedTemplate;
+          } catch (error) {
+            console.error(`❌ Error converting template ${template.name}:`, error);
+            return null;
+          }
+        }).filter(Boolean); // Remove any null templates from conversion errors
+        
+        console.log('🎯 TEMPLATE CONVERSION COMPLETE:', {
+          originalCount: dbTemplates.length,
+          convertedCount: allTemplates.length,
+          droppedCount: dbTemplates.length - allTemplates.length,
+          finalTemplates: allTemplates.map(t => `${t?.name || 'Unknown'} (${t?.template_type || 'Unknown'}, ${t?.print_size || 'Unknown'})`)
+        });
         
         // Store all templates globally for fullscreen editor access
         (window as any).pngTemplates = allTemplates;
         
         console.log('✅ PNG templates loaded on startup:', {
           totalTemplates: allTemplates.length,
-          templateTypes: allTemplates.map(t => `${t.name} (${t.template_type})`).slice(0, 5),
-          printSizes: [...new Set(allTemplates.map(t => t.print_size))]
+          templateTypes: allTemplates.map(t => `${t?.name || 'Unknown'} (${t?.template_type || 'Unknown'})`).slice(0, 5),
+          printSizes: [...new Set(allTemplates.map(t => t?.print_size).filter(Boolean))],
+          templatesByType: allTemplates.reduce((acc, t) => {
+            const templateType = t?.template_type || 'Unknown';
+            acc[templateType] = (acc[templateType] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>),
+          fourRTemplates: allTemplates.filter(t => t?.print_size === '4R').map(t => ({
+            name: t?.name || 'Unknown',
+            template_type: t?.template_type || 'Unknown',
+            source: t?.source || 'Unknown',
+            id: t?.id || 'Unknown',
+            drive_file_id: t?.drive_file_id || 'Unknown'
+          })),
+          // Dynamic template types - no hardcoded requirements
+          availableTypes: [...new Set(allTemplates.map(t => t?.template_type).filter(Boolean))]
+        });
+        
+        // TEMPLATE TYPE CHECK: Verify template types are loaded (dynamic from database)
+        const loadedTypes = [...new Set(allTemplates.map(t => t?.template_type).filter(Boolean))];
+        
+        console.log('✅ Template types loaded from database:', {
+          loadedTypes,
+          totalTemplates: allTemplates.length,
+          typeBreakdown: loadedTypes.map(type => ({
+            type,
+            count: allTemplates.filter(t => t.template_type === type).length
+          }))
         });
       } catch (error) {
-        console.warn('⚠️ Failed to load PNG templates on startup:', error);
-        console.log('📝 Templates will be loaded when needed during package selection');
+        console.warn('⚠️ Failed to load templates from database:', error);
+        // Set empty array as fallback
+        (window as any).pngTemplates = [];
       }
     };
 
-    // Skip loading templates on startup to avoid authentication issues
-    // Templates will be loaded when needed during package selection
-    console.log('⏭️ Skipping PNG template loading on startup - will load when needed');
-  }, [googleAuth.isSignedIn, isRestoringAuth, isGapiLoaded]);
+    // Load templates immediately - no dependencies needed
+    loadTemplatesFromDatabase();
+  }, []); // Empty dependency array - only run once on app startup
 
   const renderScreen = () => {
     switch (currentScreen) {

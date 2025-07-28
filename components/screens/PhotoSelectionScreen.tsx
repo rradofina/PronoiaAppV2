@@ -1,4 +1,4 @@
-import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, ManualPackage } from '../../types';
+import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, ManualPackage, ManualTemplate } from '../../types';
 import { useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
@@ -9,7 +9,6 @@ import PhotoRenderer from '../PhotoRenderer';
 import FullscreenTemplateSelector from '../FullscreenTemplateSelector';
 import PhotoSelectionMode from '../PhotoSelectionMode';
 import SlidingTemplateBar from '../SlidingTemplateBar';
-import { HybridTemplate, hybridTemplateService } from '../../services/hybridTemplateService';
 import { manualTemplateService } from '../../services/manualTemplateService';
 import { templateRasterizationService } from '../../services/templateRasterizationService';
 import PngTemplateVisual from '../PngTemplateVisual';
@@ -22,7 +21,36 @@ import OriginalTemplateVisual from '../TemplateVisual';
 
 // Simplified TemplateVisual component
 const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel }: any) => {
-  const pngTemplates = (window as any).pngTemplates || [];
+  // Get templates from both window cache AND database to ensure consistency with swap modal
+  const windowTemplates = (window as any).pngTemplates || [];
+  const [databaseTemplates, setDatabaseTemplates] = useState<any[]>([]);
+  
+  // Load all templates from database for consistent template matching
+  useEffect(() => {
+    const loadAllTemplates = async () => {
+      try {
+        const allDbTemplates = await manualTemplateService.getActiveTemplates();
+        const convertedTemplates = allDbTemplates.map(template => ({
+          ...template,
+          holes: template.holes_data,
+          driveFileId: template.drive_file_id
+        }));
+        setDatabaseTemplates(convertedTemplates);
+        console.log('📋 Loaded all templates from database for consistent matching:', {
+          totalCount: convertedTemplates.length,
+          types: [...new Set(convertedTemplates.map(t => t.template_type))]
+        });
+      } catch (error) {
+        console.error('❌ Failed to load templates from database:', error);
+        setDatabaseTemplates([]);
+      }
+    };
+    
+    loadAllTemplates();
+  }, []);
+  
+  // Use database templates (consistent with swap modal) or fall back to window templates
+  const pngTemplates = databaseTemplates.length > 0 ? databaseTemplates : windowTemplates;
   
   // Find PNG template using slot's templateType for better accuracy after swaps
   const templateType = slots[0]?.templateType || template.id;
@@ -62,35 +90,39 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
       slotIndex: s.slotIndex
     })),
     pngTemplatesAvailable: pngTemplates.length,
-    isSoloTemplate: templateType === 'solo' || template.id === 'solo',
+    templateTypeFromSlots: templateType,
     // Track where templateType comes from
     templateTypeSource: slots[0]?.templateType ? 'slots[0].templateType' : 'template.id',
     slots0TemplateType: slots[0]?.templateType,
     templateIdValue: template.id
   });
   
-  // Safety check to ensure window.pngTemplates is populated
+  // ENHANCED: Safety check with detailed template type analysis
   if (pngTemplates.length === 0) {
-    console.warn('🚨 SOLO TEMPLATE DEBUG - No PNG templates found in window.pngTemplates');
+    console.error('🚨 CRITICAL ERROR - No PNG templates found in window.pngTemplates');
+    console.log('🔧 This will cause template swapping to fail. Check hybridTemplateService loading.');
   } else {
-    console.log('✅ SOLO TEMPLATE DEBUG - PNG templates loaded:', {
+    // Dynamic template types - get available types from loaded templates
+    const availableTypes = [...new Set(pngTemplates.map((t: any) => t.template_type || t.templateType))];
+    
+    console.log('✅ TEMPLATE DEBUG - PNG templates analysis:', {
       totalCount: pngTemplates.length,
-      soloTemplates: pngTemplates.filter((t: any) => t.template_type === 'solo' || t.templateType === 'solo'),
-      allTemplateTypes: [...new Set(pngTemplates.map((t: any) => t.template_type || t.templateType))],
-      firstFewTemplates: pngTemplates.slice(0, 3).map((t: any) => ({
-        id: t.id,
+      availableTemplateTypes: availableTypes,
+      searchingFor: templateType,
+      templatesForCurrentType: pngTemplates.filter((t: any) => 
+        t.template_type === templateType || t.templateType === templateType
+      ).map((t: any) => ({
         name: t.name,
         template_type: t.template_type,
         templateType: t.templateType,
-        holesCount: t.holes?.length || 0
+        id: t.id
       }))
     });
   }
   
-  console.log('🔍 SOLO TEMPLATE DEBUG - TemplateVisual matching:', {
+  console.log('🔍 TEMPLATE DEBUG - TemplateVisual matching:', {
     templateType,
     templateId: template.id,
-    isSolo: templateType === 'solo' || template.id === 'solo',
     availableTemplates: pngTemplates.map((t: any) => ({ 
       id: t.id, 
       name: t.name, 
@@ -106,101 +138,67 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
     }))
   });
   
-  // Enhanced template matching logic with multiple fallback strategies
-  // NAVIGATION PROTECTION: Only proceed with matching if we have consistent data
+  // Strict template matching - NO fallbacks, NO hardcoding
   let pngTemplate = null;
   
   if (pngTemplates.length > 0 && templateType) {
-    // Primary matching strategy with better solo template handling
-    pngTemplate = 
-      // 1. Exact match on template_type field
-      pngTemplates.find((t: any) => t.template_type === templateType) || 
-      // 2. Exact match on templateType field  
-      pngTemplates.find((t: any) => t.templateType === templateType) ||
-      // 3. Match template.id (for legacy compatibility)
-      pngTemplates.find((t: any) => t.template_type === template.id) ||
-      // 4. Match by ID
-      pngTemplates.find((t: any) => t.id === templateType);
+    // Find exact template_type match
+    const candidateTemplate = pngTemplates.find((t: any) => t.template_type === templateType);
+    
+    if (candidateTemplate) {
+      // Strict compatibility check: template holes must match expected slots
+      const templateHoles = candidateTemplate.holes?.length || 0;
+      const expectedSlots = slots.length;
       
-    // 5. Enhanced solo template fallback - try multiple properties and patterns
-    if (!pngTemplate && (templateType === 'solo' || template.id === 'solo')) {
-      console.log('🔍 SOLO TEMPLATE DEBUG - Enhanced solo template search...', {
-        totalTemplates: pngTemplates.length,
-        searchingFor: 'solo templates with various property patterns'
-      });
-      
-      // Try multiple solo template patterns
-      pngTemplate = 
-        // Try template_type === 'solo'
-        pngTemplates.find((t: any) => t.template_type === 'solo') ||
-        // Try templateType === 'solo' 
-        pngTemplates.find((t: any) => t.templateType === 'solo') ||
-        // Try id === 'solo'
-        pngTemplates.find((t: any) => t.id === 'solo') ||
-        // Try name containing 'solo' (case insensitive)
-        pngTemplates.find((t: any) => t.name?.toLowerCase().includes('solo')) ||
-        // Try templates with single hole (solo characteristic)
-        pngTemplates.find((t: any) => t.holes?.length === 1) ||
-        // Last resort - use first available template for solo
-        pngTemplates[0];
-      
-      if (pngTemplate) {
-        console.log('✅ SOLO TEMPLATE DEBUG - Found solo template using enhanced search:', {
-          id: pngTemplate.id,
-          name: pngTemplate.name,
-          template_type: pngTemplate.template_type,
-          templateType: pngTemplate.templateType,
-          holesCount: pngTemplate.holes?.length || 0,
-          matchedBy: 
-            pngTemplate.template_type === 'solo' ? 'template_type=solo' :
-            pngTemplate.templateType === 'solo' ? 'templateType=solo' :
-            pngTemplate.id === 'solo' ? 'id=solo' :
-            pngTemplate.name?.toLowerCase().includes('solo') ? 'name contains solo' :
-            pngTemplate.holes?.length === 1 ? 'single hole template' :
-            'first available template'
+      if (templateHoles === expectedSlots) {
+        pngTemplate = candidateTemplate;
+        console.log('✅ Compatible template found:', {
+          templateName: pngTemplate.name,
+          templateType: pngTemplate.template_type,
+          holes: templateHoles,
+          slots: expectedSlots,
+          compatible: true
+        });
+      } else {
+        console.error('❌ TEMPLATE INCOMPATIBLE - Hole count mismatch:', {
+          templateName: candidateTemplate.name,
+          templateType: candidateTemplate.template_type,
+          templateHoles: templateHoles,
+          expectedSlots: expectedSlots,
+          compatible: false,
+          willShowError: true
         });
       }
-    }
-    
-    // 6. Fallback for other template types
-    if (!pngTemplate && templateType !== 'solo' && template.id !== 'solo') {
-      pngTemplate = pngTemplates[0];
-      console.log('🔄 Using first available template for non-solo type:', templateType);
+    } else {
+      console.error('❌ NO TEMPLATE MATCH - Template type not found in database:', {
+        searchedTemplateType: templateType,
+        availableTypes: [...new Set(pngTemplates.map((t: any) => t.template_type))],
+        totalTemplatesInDB: pngTemplates.length,
+        slotsLookingFor: slots.length,
+        thisWillShowError: true
+      });
     }
   } else {
-    console.warn('🛡️ NAVIGATION PROTECTION - Skipping PNG template matching due to invalid state:', {
+    console.warn('⚠️ Invalid template matching state:', {
       pngTemplatesCount: pngTemplates.length,
       templateType: templateType,
       hasValidTemplateType: !!templateType
     });
   }
 
-  // NAVIGATION DEBUG: Track the final decision
-  const matchResult = pngTemplate ? {
-    id: pngTemplate.id,
-    name: pngTemplate.name,
-    template_type: pngTemplate.template_type,
-    templateType: pngTemplate.templateType,
-    holesCount: pngTemplate.holes?.length || 0,
-    matchedBy: pngTemplates.find((t: any) => t.template_type === templateType) ? 'template_type===templateType' :
-               pngTemplates.find((t: any) => t.templateType === templateType) ? 'templateType===templateType' :
-               pngTemplates.find((t: any) => t.template_type === template.id) ? 'template_type===template.id' :
-               pngTemplates.find((t: any) => t.id === templateType) ? 'id===templateType' :
-               (templateType === 'solo' || template.id === 'solo') && 
-               pngTemplates.find((t: any) => t.template_type === 'solo' || t.templateType === 'solo') ? 'solo-fallback' : 'first-available'
-  } : `NO PNG TEMPLATE FOUND - Will use legacy fallback for ${templateType}`;
-
-  console.log('🎯 NAVIGATION DEBUG - Template matching result:', {
+  // Final matching decision - strict, no fallbacks
+  console.log('🎯 Template matching decision:', {
     searchedFor: templateType,
-    templateId: template.id,
-    isSolo: templateType === 'solo' || template.id === 'solo',
-    result: matchResult,
-    willUsePngTemplateVisual: !!pngTemplate,
-    willUseLegacyFallback: !pngTemplate
+    found: !!pngTemplate,
+    templateName: pngTemplate?.name || 'NOT FOUND',
+    slotsExpected: slots.length,
+    templateHoles: pngTemplate?.holes?.length || 0,
+    willRenderCorrectly: !!pngTemplate
   });
 
+  // Render result: either exact match or error state
   if (pngTemplate) {
-    console.log('✅ NAVIGATION DEBUG - Using PngTemplateVisual for:', templateType, 'with template:', pngTemplate.name);
+    console.log('✅ Rendering exact template match:', pngTemplate.name);
     return (
       <PngTemplateVisual
         pngTemplate={pngTemplate}
@@ -216,40 +214,41 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
     );
   }
 
-  // Emergency fallback for solo templates - should not be needed with enhanced matching above
-  if ((templateType === 'solo' || template.id === 'solo') && pngTemplates.length > 0 && !pngTemplate) {
-    console.warn('🚨 EMERGENCY FALLBACK - Solo template matching failed, using first available PNG template');
-    pngTemplate = pngTemplates[0];
-  }
-
-  // If we now have a PNG template (including from emergency fallback), use it
-  if (pngTemplate) {
-    console.log('✅ NAVIGATION DEBUG - Using PngTemplateVisual with fallback template:', pngTemplate.name);
-    return (
-      <PngTemplateVisual
-        pngTemplate={pngTemplate}
-        templateSlots={slots}
-        onSlotClick={onSlotClick}
-        photos={photos}
-        selectedSlot={selectedSlot}
-        inlineEditingSlot={inlineEditingSlot}
-        inlineEditingPhoto={inlineEditingPhoto}
-        onInlineApply={onInlineApply}
-        onInlineCancel={onInlineCancel}
-      />
-    );
-  }
-
-  // Fallback to legacy TemplateVisual only when no PNG templates are available at all
-  console.log('❌ NAVIGATION DEBUG - Using legacy TemplateVisual fallback for:', templateType, '(No PNG templates available)');
+  // No compatible template found - show detailed error state
+  const candidateTemplate = pngTemplates.find((t: any) => t.template_type === templateType);
+  const availableTypes = [...new Set(pngTemplates.map((t: any) => t.template_type))];
+  
+  console.log('❌ Template error, showing detailed error state for:', templateType);
   return (
-    <OriginalTemplateVisual
-      template={template}
-      slots={slots}
-      onSlotClick={onSlotClick}
-      photos={photos}
-      selectedSlot={selectedSlot}
-    />
+    <div className="w-full h-full flex flex-col items-center justify-center bg-red-50 border-2 border-red-200 rounded-lg p-4">
+      <div className="text-red-600 text-4xl mb-4">⚠️</div>
+      <h3 className="text-red-800 font-bold text-lg mb-2">Template Issue</h3>
+      
+      {candidateTemplate ? (
+        // Template exists but incompatible
+        <div className="text-center">
+          <p className="text-red-700 mb-3">
+            Template <span className="font-mono bg-red-100 px-2 py-1 rounded">{candidateTemplate.name}</span> found but incompatible
+          </p>
+          <div className="text-sm text-red-600 space-y-1">
+            <p>Template holes: <span className="font-bold">{candidateTemplate.holes?.length || 0}</span></p>
+            <p>Expected slots: <span className="font-bold">{slots.length}</span></p>
+            <p className="mt-3 font-medium">Hole count must match slot count exactly.</p>
+          </div>
+        </div>
+      ) : (
+        // Template type not found
+        <div className="text-center">
+          <p className="text-red-700 mb-3">
+            No template found for type: <span className="font-mono bg-red-100 px-2 py-1 rounded">{templateType}</span>
+          </p>
+          <div className="text-sm text-red-600">
+            <p>Available types: {availableTypes.length > 0 ? availableTypes.join(', ') : 'None'}</p>
+            <p className="mt-2">Please add a <strong>{templateType}</strong> template to the database.</p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -299,7 +298,7 @@ export default function PhotoSelectionScreen({
   const [selectedSize, setSelectedSize] = useState<'4R' | '5R' | 'A4'>('4R');
   const [addPrintQuantity, setAddPrintQuantity] = useState(1);
   const [hasScrolled, setHasScrolled] = useState(false);
-  const [availableTemplates, setAvailableTemplates] = useState<HybridTemplate[]>([]);
+  const [availableTemplates, setAvailableTemplates] = useState<ManualTemplate[]>([]);
   
   // Two-mode system for photo selection
   const [selectionMode, setSelectionMode] = useState<'photo' | 'print'>('photo'); // Default to photo selection mode
@@ -325,16 +324,15 @@ export default function PhotoSelectionScreen({
   useEffect(() => {
     const loadTemplates = async () => {
       try {
-        // Use hybrid template service to get BOTH manual AND auto-detected templates
-        const allHybridTemplates = await hybridTemplateService.getAllTemplates();
-        console.log('🔄 PhotoSelectionScreen - Loaded hybrid templates:', {
-          totalCount: allHybridTemplates.length,
-          manualCount: allHybridTemplates.filter(t => t.source === 'manual').length,
-          autoCount: allHybridTemplates.filter(t => t.source === 'auto').length,
-          templateTypes: [...new Set(allHybridTemplates.map(t => t.template_type))],
-          templateNames: allHybridTemplates.map(t => t.name)
+        // Use database directly - simple and reliable
+        const dbTemplates = await manualTemplateService.getActiveTemplates();
+        console.log('🔄 PhotoSelectionScreen - Loaded database templates:', {
+          totalCount: dbTemplates.length,
+          templateTypes: [...new Set(dbTemplates.map(t => t.template_type))],
+          templateNames: dbTemplates.map(t => t.name),
+          printSizes: [...new Set(dbTemplates.map(t => t.print_size))]
         });
-        setAvailableTemplates(allHybridTemplates);
+        setAvailableTemplates(dbTemplates);
       } catch (error) {
         console.error('❌ Error loading templates:', error);
         setAvailableTemplates([]);
@@ -382,8 +380,8 @@ export default function PhotoSelectionScreen({
 
   const handleConfirmAddPrint = () => {
     if (selectedType) {
-      // Find template from hybrid templates
-      const template = availableTemplates.find((t: HybridTemplate) => 
+      // Find template from database templates
+      const template = availableTemplates.find((t: ManualTemplate) => 
         t.template_type === selectedType && t.print_size === selectedSize
       );
       
@@ -396,7 +394,7 @@ export default function PhotoSelectionScreen({
         for (let i = 0; i < addPrintQuantity; i++) {
           const newTemplateId = `${template.id}_${nextTemplateIndex + i}`;
           
-          for (let slotIndex = 0; slotIndex < template.holes.length; slotIndex++) {
+          for (let slotIndex = 0; slotIndex < template.holes_data.length; slotIndex++) {
             newSlotsToAdd.push({
               id: `${newTemplateId}_${slotIndex}`,
               templateId: newTemplateId,
@@ -740,7 +738,7 @@ export default function PhotoSelectionScreen({
 
   // Template management handlers
 
-  const handleConfirmTemplateSwap = (newTemplate: HybridTemplate, updatedSlots: TemplateSlot[]) => {
+  const handleConfirmTemplateSwap = (newTemplate: ManualTemplate, updatedSlots: TemplateSlot[]) => {
     console.log('🔄 PhotoSelectionScreen - Template swap confirmed:', {
       newTemplate: {
         id: newTemplate.id,
@@ -1147,10 +1145,10 @@ export default function PhotoSelectionScreen({
                     >
                       <option value="">Select template</option>
                       {availableTemplates
-                        .filter((t: HybridTemplate) => t.print_size === selectedSize)
-                        .map((t: HybridTemplate) => (
+                        .filter((t: ManualTemplate) => t.print_size === selectedSize)
+                        .map((t: ManualTemplate) => (
                           <option key={t.id} value={t.template_type}>
-                            {t.name} ({t.holes.length} slots) - {t.source}
+                            {t.name} ({t.holes_data.length} slots)
                           </option>
                         ))}
                     </select>

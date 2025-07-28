@@ -5,14 +5,15 @@ import clsx from 'clsx';
 
 // Store and Utils
 import useAppStore from '../stores/useAppStore';
+import useSessionStore from '../stores/sessionStore';
 import { TEMPLATE_LAYOUTS, TEMPLATE_DESCRIPTIONS } from '../utils/constants';
+import { manualTemplateService } from '../services/manualTemplateService';
 
 // Types
 import { TemplateType } from '../types';
 
 export default function TemplateSelection() {
   const { 
-    session,
     templates,
     addTemplate,
     removeTemplate,
@@ -21,12 +22,38 @@ export default function TemplateSelection() {
     nextStep
   } = useAppStore();
 
+  const { selectedPackage, session } = useSessionStore();
+
   const [selectedTypes, setSelectedTypes] = useState<TemplateType[]>([]);
+  const [availableTemplateTypes, setAvailableTemplateTypes] = useState<TemplateType[]>([]);
+  const [isLoadingTypes, setIsLoadingTypes] = useState(true);
 
   useEffect(() => {
     // Initialize with existing templates
     setSelectedTypes(templates.map(t => t.type));
   }, [templates]);
+
+  // Load available template types from database
+  useEffect(() => {
+    const loadTemplateTypes = async () => {
+      try {
+        setIsLoadingTypes(true);
+        // Get unique template types for the selected package's print size
+        const printSize = selectedPackage?.print_size || '4R';
+        const types = await manualTemplateService.getUniqueTemplateTypes(printSize);
+        setAvailableTemplateTypes(types);
+        console.log('📋 Loaded dynamic template types:', types);
+      } catch (error) {
+        console.error('❌ Error loading template types:', error);
+        // Fallback to empty array if service fails
+        setAvailableTemplateTypes([]);
+      } finally {
+        setIsLoadingTypes(false);
+      }
+    };
+
+    loadTemplateTypes();
+  }, [selectedPackage?.print_size]);
 
   const handleTemplateToggle = (templateType: TemplateType) => {
     if (selectedTypes.includes(templateType)) {
@@ -91,15 +118,15 @@ export default function TemplateSelection() {
     );
   };
 
-  if (!session) {
+  if (!selectedPackage) {
     return (
       <div className="container-tablet py-8 text-center">
-        <p className="text-gray-600">No session found. Please go back and select a package.</p>
+        <p className="text-gray-600">No package selected. Please go back and select a package.</p>
       </div>
     );
   }
 
-  const templateTypes: TemplateType[] = ['solo', 'collage', 'photocard', 'photostrip'];
+  // Remove hard-coded template types - now using dynamic availableTemplateTypes
 
   return (
     <div className="container-tablet py-8">
@@ -117,18 +144,26 @@ export default function TemplateSelection() {
           Select Template Types
         </h1>
         <p className="text-lg text-gray-600 mb-4">
-          Choose up to {session.maxTemplates} template types for {session.clientName}
+          Choose up to {session?.maxTemplates || selectedPackage.template_count} template types for {session?.clientName || 'Client'}
         </p>
         <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
-          <span>🎯 {templates.length} / {session.maxTemplates} selected</span>
+          <span>🎯 {templates.length} / {session?.maxTemplates || selectedPackage.template_count} selected</span>
           <span>•</span>
           <span>📋 {getRemainingTemplates()} remaining</span>
         </div>
       </motion.div>
 
       {/* Template Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        {templateTypes.map((templateType, index) => {
+      {isLoadingTypes ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="animate-pulse bg-gray-200 h-32 rounded-lg"></div>
+          <div className="animate-pulse bg-gray-200 h-32 rounded-lg"></div>
+          <div className="animate-pulse bg-gray-200 h-32 rounded-lg"></div>
+          <div className="animate-pulse bg-gray-200 h-32 rounded-lg"></div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {availableTemplateTypes.map((templateType, index) => {
           const isSelected = selectedTypes.includes(templateType);
           const isDisabled = !isSelected && !canAddTemplate();
 
@@ -216,7 +251,8 @@ export default function TemplateSelection() {
             </motion.div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Continue Button */}
       <motion.div

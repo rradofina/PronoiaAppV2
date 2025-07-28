@@ -233,7 +233,7 @@ export interface Photo {
   };
 }
 
-export type TemplateType = 'solo' | 'collage' | 'photocard' | 'photostrip';
+export type TemplateType = string; // Dynamic template types from database
 
 export interface TemplateTypeInfo {
   id: TemplateType;
@@ -611,6 +611,8 @@ export interface CreatePackageGroupRequest {
 // Service layer types
 export interface ManualTemplateService {
   getAllTemplates(): Promise<ManualTemplate[]>;
+  getAvailableTemplateTypes(): Promise<string[]>;
+  getUniqueTemplateTypes(printSize?: PrintSize): Promise<string[]>;
   getTemplatesByPrintSize(printSize: PrintSize): Promise<ManualTemplate[]>;
   getTemplate(id: string): Promise<ManualTemplate | null>;
   createTemplate(template: CreateManualTemplateRequest): Promise<ManualTemplate>;
