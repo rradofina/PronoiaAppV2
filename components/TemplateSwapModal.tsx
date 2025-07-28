@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
-import { TemplateSlot, Photo } from '../types';
-import { HybridTemplate } from '../services/hybridTemplateService';
+import { TemplateSlot, Photo, ManualPackage, ManualTemplate } from '../types';
+import { HybridTemplate, hybridTemplateService } from '../services/hybridTemplateService';
 import { manualTemplateService } from '../services/manualTemplateService';
+import { manualPackageService } from '../services/manualPackageService';
 
 interface TemplateSwapModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface TemplateSwapModalProps {
   templateToSwap: { templateId: string; templateName: string; slots: TemplateSlot[] } | null;
   templateSlots: TemplateSlot[];
   photos: Photo[];
+  selectedPackage: ManualPackage | null;
   onConfirmSwap: (newTemplate: HybridTemplate, updatedSlots: TemplateSlot[]) => void;
   TemplateVisual: React.ComponentType<any>;
 }
@@ -21,6 +23,7 @@ export default function TemplateSwapModal({
   templateToSwap,
   templateSlots,
   photos,
+  selectedPackage,
   onConfirmSwap,
   TemplateVisual
 }: TemplateSwapModalProps) {
@@ -31,31 +34,61 @@ export default function TemplateSwapModal({
   // Load available templates when modal opens
   useEffect(() => {
     const loadTemplates = async () => {
-      if (!isOpen || !templateToSwap) return;
+      if (!isOpen || !templateToSwap || !selectedPackage) return;
       
       setIsLoading(true);
       try {
-        const allManualTemplates = await manualTemplateService.getAllTemplates();
-        const hybridTemplates: HybridTemplate[] = allManualTemplates.map(manual => ({
-          id: manual.id,
-          name: manual.name,
-          description: manual.description,
-          template_type: manual.template_type,
-          print_size: manual.print_size,
-          drive_file_id: manual.drive_file_id,
-          driveFileId: manual.drive_file_id,
-          holes: manual.holes_data,
-          dimensions: manual.dimensions,
-          thumbnail_url: manual.thumbnail_url,
-          sample_image_url: manual.sample_image_url,
-          base64_preview: manual.base64_preview,
+        console.log('🔄 TemplateSwapModal - Loading ALL templates for print size comparison');
+        
+        // Get current template's print size for filtering
+        const currentSlot = templateToSwap.slots[0];
+        const currentPrintSize = currentSlot?.printSize || selectedPackage?.print_size || '4R';
+        
+        console.log('📏 Loading all templates for print size:', currentPrintSize);
+        
+        // Load ALL templates of the same print size from global catalog
+        const allTemplates = await manualTemplateService.getAllTemplates();
+        
+        if (!allTemplates || allTemplates.length === 0) {
+          console.warn('❌ No templates found in global catalog');
+          setAvailableTemplates([]);
+          return;
+        }
+        
+        // Filter by print size only (show ALL template types for this print size)
+        const printSizeTemplates = allTemplates.filter(template => 
+          template.print_size === currentPrintSize && template.is_active
+        );
+        
+        console.log('🔄 Found global templates for', currentPrintSize + ':', {
+          totalTemplates: allTemplates.length,
+          filteredByPrintSize: printSizeTemplates.length,
+          currentPrintSize,
+          templateTypes: [...new Set(printSizeTemplates.map(t => t.template_type))],
+          templateNames: printSizeTemplates.map(t => t.name)
+        });
+        
+        // Convert to hybrid format for compatibility  
+        const hybridTemplates: HybridTemplate[] = printSizeTemplates.map(template => ({
+          id: template.id,
+          name: template.name,
+          description: template.description,
+          template_type: template.template_type,
+          print_size: template.print_size,
+          drive_file_id: template.drive_file_id,
+          driveFileId: template.drive_file_id,
+          holes: template.holes_data,
+          dimensions: template.dimensions,
+          thumbnail_url: template.thumbnail_url,
+          sample_image_url: template.sample_image_url,
+          base64_preview: template.base64_preview,
           source: 'manual' as const,
-          is_active: manual.is_active
+          is_active: template.is_active
         }));
         
         setAvailableTemplates(hybridTemplates);
       } catch (error) {
-        console.error('❌ Error loading templates:', error);
+        console.error('❌ Error loading package templates:', error);
         setAvailableTemplates([]);
       } finally {
         setIsLoading(false);
@@ -63,7 +96,7 @@ export default function TemplateSwapModal({
     };
 
     loadTemplates();
-  }, [isOpen, templateToSwap]);
+  }, [isOpen, templateToSwap, selectedPackage]);
 
   // Auto-select current template when templates are loaded
   useEffect(() => {
@@ -72,21 +105,34 @@ export default function TemplateSwapModal({
       return;
     }
 
-    // Find exact match by template type and print size
+    console.log('🎯 Auto-selecting current template');
+    
+    // Find current template by matching template type and print size
     const currentSlot = templateToSwap.slots[0];
-    if (!currentSlot) return;
+    if (!currentSlot) {
+      console.log('❌ No current slot found for auto-selection');
+      return;
+    }
 
-    const currentTemplateType = currentSlot.templateType || templateToSwap.templateId.split('_')[0];
+    const currentTemplateType = currentSlot.templateType;
     const currentPrintSize = currentSlot.printSize || '4R';
 
-    const exactMatch = availableTemplates.find(t => 
-      t.template_type === currentTemplateType && t.print_size === currentPrintSize
+    console.log('🔍 Looking for template:', { 
+      currentTemplateType, 
+      currentPrintSize,
+      availableCount: availableTemplates.length 
+    });
+
+    // Find exact match by template type (this should be the current template)
+    const currentTemplate = availableTemplates.find(template => 
+      template.template_type === currentTemplateType
     );
 
-    if (exactMatch) {
-      setSelectedNewTemplate(exactMatch);
+    if (currentTemplate) {
+      console.log('✅ Auto-selected current template:', currentTemplate.name);
+      setSelectedNewTemplate(currentTemplate);
     } else {
-      // Fallback to first available template
+      console.log('⚠️ Current template not found, selecting first available');
       setSelectedNewTemplate(availableTemplates[0] || null);
     }
   }, [isOpen, templateToSwap, availableTemplates]);
@@ -148,17 +194,45 @@ export default function TemplateSwapModal({
       ? `${selectedNewTemplate.name} (Additional Print #${printNumber})`
       : `${selectedNewTemplate.name} (Print #${printNumber})`;
 
-    // Create new slots based on the new template
-    const newSlots: TemplateSlot[] = Array.from({ length: selectedNewTemplate.holes?.length || 1 }, (_, index) => ({
-      id: `${selectedNewTemplate.id}_${Date.now()}_${index}`,
-      templateId: templateToSwap.templateId, // Keep same templateId to maintain position
-      templateName: newTemplateName,
-      templateType: selectedNewTemplate.template_type,
-      slotIndex: index,
-      photoId: templateToSwap.slots[index]?.photoId || undefined, // Keep existing photos if possible
-      transform: templateToSwap.slots[index]?.transform || undefined, // Keep transforms if possible
-      printSize: templateToSwap.slots[0]?.printSize || '4R',
-    }));
+    // Create new slots based on the new template with smart photo preservation
+    const newSlotsCount = selectedNewTemplate.holes?.length || 1;
+    const oldSlotsCount = templateToSwap.slots.length;
+    
+    console.log('🔄 SLOT CONVERSION DEBUG:', {
+      oldTemplateType: templateToSwap.slots[0]?.templateType,
+      newTemplateType: selectedNewTemplate.template_type,
+      oldSlotsCount,
+      newSlotsCount,
+      photoMapping: templateToSwap.slots.map(s => ({ index: s.slotIndex, hasPhoto: !!s.photoId }))
+    });
+    
+    const newSlots: TemplateSlot[] = Array.from({ length: newSlotsCount }, (_, index) => {
+      // Smart photo preservation logic
+      let preservedPhoto = templateToSwap.slots[index]?.photoId;
+      let preservedTransform = templateToSwap.slots[index]?.transform;
+      
+      // If new template has fewer slots than old, try to preserve the first photos
+      if (newSlotsCount < oldSlotsCount && !preservedPhoto && index === 0) {
+        // For solo template (1 slot), try to use first available photo from old template
+        const firstPhotoSlot = templateToSwap.slots.find(s => s.photoId);
+        if (firstPhotoSlot) {
+          preservedPhoto = firstPhotoSlot.photoId;
+          preservedTransform = firstPhotoSlot.transform;
+          console.log(`📸 Preserving first photo from slot ${firstPhotoSlot.slotIndex} to new slot 0`);
+        }
+      }
+      
+      return {
+        id: `${selectedNewTemplate.id}_${Date.now()}_${index}`,
+        templateId: templateToSwap.templateId, // Keep same templateId to maintain position
+        templateName: newTemplateName,
+        templateType: selectedNewTemplate.template_type,
+        slotIndex: index,
+        photoId: preservedPhoto,
+        transform: preservedTransform,
+        printSize: templateToSwap.slots[0]?.printSize || '4R',
+      };
+    });
 
     console.log('🔄 TEMPLATE SWAP DEBUG - New slots created:', {
       newSlotsCount: newSlots.length,
@@ -224,12 +298,12 @@ export default function TemplateSwapModal({
 
   if (!templateToSwap) return null;
 
-  // Filter templates by current print size
+  // Get current template info for display
   const currentSlot = templateToSwap.slots[0];
   const currentPrintSize = currentSlot?.printSize || '4R';
-  const filteredTemplates = availableTemplates.filter(template => 
-    template.print_size === currentPrintSize
-  );
+  
+  // Show ALL templates of the same print size (including current template)
+  const filteredTemplates = availableTemplates;
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -273,7 +347,15 @@ export default function TemplateSwapModal({
                 </div>
                 
                 <p className="text-sm text-gray-600 mb-4">
-                  Select a new template of the same print size ({currentPrintSize}) to replace "{templateToSwap.templateName}". Photos will be preserved where possible.
+                  Select a template to replace "{templateToSwap.templateName}". 
+                  <span className="font-medium text-blue-600">
+                    Showing all {currentPrintSize} templates (Solo, Collage, Photo Cards, Photo Strip).
+                  </span>
+                  {templateToSwap.slots.length > 1 && (
+                    <span className="block mt-1 text-orange-600">
+                      Currently has {templateToSwap.slots.length} slots - photos will be preserved where possible.
+                    </span>
+                  )}
                 </p>
                 
                 {isLoading ? (
@@ -281,22 +363,50 @@ export default function TemplateSwapModal({
                     <div className="text-gray-500">Loading templates...</div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 max-h-[75vh] overflow-y-auto p-3">
-                    {filteredTemplates.map((template) => {
-                      const isSelected = selectedNewTemplate?.id === template.id;
-                      
-                      return (
-                        <div
-                          key={template.id}
-                          className={`border rounded-lg p-3 md:p-4 transition-colors ${
-                            isSelected
-                              ? 'border-blue-500 bg-blue-50' 
-                              : 'border-gray-200 hover:border-blue-300 cursor-pointer'
-                          }`}
-                          onClick={() => !isSelected ? handleTemplateSelect(template) : null}
-                        >
-                          <h4 className="font-medium text-sm md:text-base mb-2 md:mb-3 text-center">{template.name}</h4>
-                          <div className="w-full bg-gray-100 rounded overflow-hidden relative flex items-center justify-center h-64 md:h-80 lg:h-64">
+                  <div className="max-h-[75vh] overflow-y-auto">
+                    {filteredTemplates.length === 0 ? (
+                      <div className="text-center py-12 text-gray-500">
+                        <div className="text-lg mb-2">No templates available</div>
+                        <div className="text-sm">
+                          No {currentPrintSize} templates found in the template catalog.
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                        {filteredTemplates.map((template) => {
+                          const isSelected = selectedNewTemplate?.id === template.id;
+                          const slotCountDiff = template.holes?.length !== templateToSwap.slots.length;
+                            
+                            return (
+                              <div
+                                key={template.id}
+                                className={`border rounded-xl p-4 transition-all duration-200 shadow-sm hover:shadow-md ${
+                                  isSelected
+                                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' 
+                                    : 'border-gray-200 hover:border-blue-300 cursor-pointer hover:bg-gray-50'
+                                }`}
+                                onClick={() => !isSelected ? handleTemplateSelect(template) : null}
+                              >
+                                <div className="flex items-center justify-between mb-3">
+                                  <h4 className="font-semibold text-gray-900 text-sm">
+                                    {template.name}
+                                  </h4>
+                                  <div className="text-xs bg-gray-100 px-2 py-1 rounded-full text-gray-600">
+                                    {template.template_type}
+                                  </div>
+                                </div>
+                                
+                                {slotCountDiff && (
+                                  <div className="mb-3 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+                                    <div className="text-xs text-orange-700 font-medium">
+                                      ⚠️ Slot count: {template.holes?.length || 1} (current: {templateToSwap.slots.length})
+                                    </div>
+                                    <div className="text-xs text-orange-600 mt-1">
+                                      {template.holes?.length! > templateToSwap.slots.length ? 'Empty slots will be added' : 'Some photos may be lost'}
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="w-full bg-gray-100 rounded overflow-hidden relative flex items-center justify-center h-64 md:h-80 lg:h-64">
                             {template.sample_image_url ? (
                               <img
                                 src={(() => {
@@ -338,16 +448,29 @@ export default function TemplateSwapModal({
                               />
                             </div>
                           </div>
-                          <p className="text-xs md:text-sm text-gray-500 text-center mt-1 md:mt-2">
-                            {template.print_size} • {template.holes?.length || 1} photos
-                            {template.sample_image_url && <span className="text-green-600"> • Sample</span>}
-                          </p>
+                          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                            <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                              {template.print_size}
+                            </span>
+                            <span>
+                              {template.holes?.length || 1} slot{(template.holes?.length || 1) !== 1 ? 's' : ''}
+                            </span>
+                            {template.sample_image_url && (
+                              <span className="text-green-600 font-medium">✓ Preview</span>
+                            )}
+                          </div>
                           
                           {/* Show confirmation buttons when this template is selected */}
                           {isSelected && (
                             <div className="mt-3 md:mt-4 pt-2 md:pt-3 border-t border-gray-200">
                               <p className="text-xs md:text-sm text-gray-700 text-center mb-2 md:mb-3">
                                 Replace "<span className="font-medium">{templateToSwap.templateName}</span>" with "<span className="font-medium">{template.name}</span>"?
+                                {slotCountDiff && (
+                                  <span className="block text-orange-600 font-medium mt-1">
+                                    ⚠️ Slot count will change: {templateToSwap.slots.length} → {template.holes?.length || 1}
+                                    {templateToSwap.slots.length > (template.holes?.length || 1) ? ' (some photos may be lost)' : ' (empty slots will be added)'}
+                                  </span>
+                                )}
                               </p>
                               <div className="flex justify-center space-x-2 md:space-x-3">
                                 <button
@@ -370,10 +493,12 @@ export default function TemplateSwapModal({
                                 </button>
                               </div>
                             </div>
-                          )}
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                    )}
                   </div>
                 )}
               </Dialog.Panel>

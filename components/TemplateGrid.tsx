@@ -6,6 +6,7 @@ interface TemplateGridProps {
   photos: Photo[];
   selectedSlot: TemplateSlot | null;
   onSlotClick: (slot: TemplateSlot) => void;
+  onSwapTemplate?: (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => void;
   onDeleteTemplate?: (templateId: string) => void;
   TemplateVisual: React.ComponentType<any>;
   layout?: 'horizontal' | 'vertical' | 'main' | 'coverflow';
@@ -17,6 +18,7 @@ export default function TemplateGrid({
   photos,
   selectedSlot,
   onSlotClick,
+  onSwapTemplate,
   onDeleteTemplate,
   TemplateVisual,
   layout = 'horizontal',
@@ -192,26 +194,41 @@ export default function TemplateGrid({
           }}
           onClick={() => layout === 'coverflow' ? navigateToTemplate(index) : undefined}
         >
-          {/* Action buttons - only show delete for additional templates */}
-          {showActions && onDeleteTemplate && templateName.includes('(Additional)') && (
-            <div className="absolute top-0 right-0 z-30">
-              <button
-                onClick={() => onDeleteTemplate(templateId)}
-                title="Delete Print"
-                className="bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className={`${layout === 'horizontal' ? 'h-3 w-3' : 'h-4 w-4'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          )}
-          
-          <h3 className={`font-semibold mb-2 text-center leading-tight truncate px-1 relative z-20 ${
-            layout === 'horizontal' ? 'text-xs' : 'text-sm'
-          }`}>
-            {templateName}
-          </h3>
+          {/* Title and action buttons at same height */}
+          <div className="flex justify-between items-center mb-2 px-1">
+            <h3 className={`font-semibold leading-tight truncate flex-1 ${
+              layout === 'horizontal' ? 'text-xs' : 'text-sm'
+            }`}>
+              {templateName}
+            </h3>
+            
+            {showActions && (
+              <div className="flex items-center space-x-1 ml-2">
+                {/* Change Template button for all templates */}
+                {onSwapTemplate && (
+                  <button
+                    onClick={() => onSwapTemplate({ templateId, templateName, slots })}
+                    className="bg-gray-500 text-white px-2 py-1 rounded-md text-xs font-medium hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 shadow-sm"
+                  >
+                    Change Template
+                  </button>
+                )}
+                
+                {/* Delete button for additional templates only */}
+                {onDeleteTemplate && templateName.includes('(Additional)') && (
+                  <button
+                    onClick={() => onDeleteTemplate(templateId)}
+                    title="Delete Print"
+                    className="bg-red-600 text-white rounded-full p-1 shadow-sm hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className={`${layout === 'horizontal' ? 'h-3 w-3' : 'h-4 w-4'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           
           <div className="w-full rounded-lg overflow-hidden border border-gray-200" style={visualHeight}>
             <TemplateVisual

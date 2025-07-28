@@ -169,7 +169,7 @@ export default function PhotoRenderer({
     : convertPhotoToCSS(currentTransform);
 
   // Touch helper functions for pinch-to-zoom
-  const getTouchDistance = (touches: TouchList): number => {
+  const getTouchDistance = (touches: React.TouchList): number => {
     if (touches.length < 2) return 0;
     const touch1 = touches[0];
     const touch2 = touches[1];

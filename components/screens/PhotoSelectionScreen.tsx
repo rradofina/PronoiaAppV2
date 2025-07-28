@@ -9,7 +9,7 @@ import PhotoRenderer from '../PhotoRenderer';
 import FullscreenTemplateSelector from '../FullscreenTemplateSelector';
 import PhotoSelectionMode from '../PhotoSelectionMode';
 import SlidingTemplateBar from '../SlidingTemplateBar';
-import { HybridTemplate } from '../../services/hybridTemplateService';
+import { HybridTemplate, hybridTemplateService } from '../../services/hybridTemplateService';
 import { manualTemplateService } from '../../services/manualTemplateService';
 import PngTemplateVisual from '../PngTemplateVisual';
 import PhotoGrid from '../PhotoGrid';
@@ -324,23 +324,16 @@ export default function PhotoSelectionScreen({
   useEffect(() => {
     const loadTemplates = async () => {
       try {
-        const allManualTemplates = await manualTemplateService.getAllTemplates();
-        setAvailableTemplates(allManualTemplates.map(manual => ({
-          id: manual.id,
-          name: manual.name,
-          description: manual.description,
-          template_type: manual.template_type,
-          print_size: manual.print_size,
-          drive_file_id: manual.drive_file_id,
-          driveFileId: manual.drive_file_id,
-          holes: manual.holes_data,
-          dimensions: manual.dimensions,
-          thumbnail_url: manual.thumbnail_url,
-          sample_image_url: manual.sample_image_url,
-          base64_preview: manual.base64_preview,
-          source: 'manual' as const,
-          is_active: manual.is_active
-        })));
+        // Use hybrid template service to get BOTH manual AND auto-detected templates
+        const allHybridTemplates = await hybridTemplateService.getAllTemplates();
+        console.log('🔄 PhotoSelectionScreen - Loaded hybrid templates:', {
+          totalCount: allHybridTemplates.length,
+          manualCount: allHybridTemplates.filter(t => t.source === 'manual').length,
+          autoCount: allHybridTemplates.filter(t => t.source === 'auto').length,
+          templateTypes: [...new Set(allHybridTemplates.map(t => t.template_type))],
+          templateNames: allHybridTemplates.map(t => t.name)
+        });
+        setAvailableTemplates(allHybridTemplates);
       } catch (error) {
         console.error('❌ Error loading templates:', error);
         setAvailableTemplates([]);
@@ -780,6 +773,12 @@ export default function PhotoSelectionScreen({
     setTemplateToSwap(null);
   };
 
+  const handleSwapTemplate = (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => {
+    console.log('🔄 Template swap requested:', template);
+    setTemplateToSwap(template);
+    setShowTemplateSwapper(true);
+  };
+
 
 
   return (
@@ -887,6 +886,7 @@ export default function PhotoSelectionScreen({
                   photos={photos}
                   selectedSlot={selectedSlot}
                   onSlotClick={handleSlotSelectFromTemplate}
+                  onSwapTemplate={handleSwapTemplate}
                   onDeleteTemplate={handleDeletePrint}
                   TemplateVisual={(props: any) => (
                     <TemplateVisual
@@ -1233,6 +1233,7 @@ export default function PhotoSelectionScreen({
         templateToSwap={templateToSwap}
         templateSlots={templateSlots}
         photos={photos}
+        selectedPackage={selectedPackage as ManualPackage}
         onConfirmSwap={handleConfirmTemplateSwap}
         TemplateVisual={TemplateVisual}
       />
