@@ -11,6 +11,7 @@ import PhotoSelectionMode from '../PhotoSelectionMode';
 import SlidingTemplateBar from '../SlidingTemplateBar';
 import { HybridTemplate, hybridTemplateService } from '../../services/hybridTemplateService';
 import { manualTemplateService } from '../../services/manualTemplateService';
+import { templateRasterizationService } from '../../services/templateRasterizationService';
 import PngTemplateVisual from '../PngTemplateVisual';
 import PhotoGrid from '../PhotoGrid';
 import TemplateGrid from '../TemplateGrid';
@@ -779,6 +780,51 @@ export default function PhotoSelectionScreen({
     setShowTemplateSwapper(true);
   };
 
+  const handleDownloadTemplate = async (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => {
+    try {
+      console.log('📥 Template download requested:', template);
+
+      // Find the manual template for this template group
+      const firstSlot = template.slots[0];
+      if (!firstSlot) {
+        throw new Error('No slots found in template');
+      }
+
+      // Get all templates to find the matching manual template
+      const allTemplates = await manualTemplateService.getAllTemplates();
+      const manualTemplate = allTemplates.find(t => 
+        t.template_type === firstSlot.templateType && 
+        t.print_size === (firstSlot.printSize || '4R')
+      );
+
+      if (!manualTemplate) {
+        throw new Error(`Manual template not found for type: ${firstSlot.templateType}`);
+      }
+
+      console.log('📝 Found manual template:', manualTemplate.name);
+
+      // Rasterize and download the template
+      const rasterized = await templateRasterizationService.rasterizeTemplate(
+        manualTemplate,
+        template.slots,
+        photos,
+        {
+          format: 'jpeg',
+          quality: 0.95,
+          includeBackground: true
+        }
+      );
+
+      await templateRasterizationService.downloadTemplate(rasterized);
+
+      console.log('✅ Template download completed');
+    } catch (error) {
+      console.error('❌ Template download failed:', error);
+      // TODO: Show user-friendly error message
+      alert(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
 
 
   return (
@@ -888,6 +934,7 @@ export default function PhotoSelectionScreen({
                   onSlotClick={handleSlotSelectFromTemplate}
                   onSwapTemplate={handleSwapTemplate}
                   onDeleteTemplate={handleDeletePrint}
+                  onDownloadTemplate={handleDownloadTemplate}
                   TemplateVisual={(props: any) => (
                     <TemplateVisual
                       {...props}
