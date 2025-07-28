@@ -217,6 +217,7 @@ class TemplateRasterizationService {
 
   /**
    * Draw photo with PhotoTransform applied
+   * Matches the CSS transform logic from PhotoRenderer exactly
    */
   private drawPhotoWithTransform(
     img: HTMLImageElement,
@@ -228,23 +229,15 @@ class TemplateRasterizationService {
   ): void {
     if (!this.ctx) return;
 
-    // Calculate photo dimensions when fit to hole
-    const fitScale = Math.min(holeWidth / img.width, holeHeight / img.height);
-    const fitWidth = img.width * fitScale;
-    const fitHeight = img.height * fitScale;
-
-    // Apply user's photo scale on top of fit scale
-    const finalScale = fitScale * transform.photoScale;
-    const finalWidth = img.width * finalScale;
-    const finalHeight = img.height * finalScale;
-
-    // Calculate photo center position in canvas coordinates
-    const photoCenterX = holeX + (transform.photoCenterX * finalWidth);
-    const photoCenterY = holeY + (transform.photoCenterY * finalHeight);
-
-    // Calculate top-left position for drawing
-    const drawX = photoCenterX - (finalWidth / 2);
-    const drawY = photoCenterY - (finalHeight / 2);
+    console.log('🎨 Drawing photo with transform:', {
+      photoSize: { width: img.width, height: img.height },
+      hole: { x: holeX, y: holeY, width: holeWidth, height: holeHeight },
+      transform: {
+        photoScale: transform.photoScale,
+        photoCenterX: transform.photoCenterX,
+        photoCenterY: transform.photoCenterY
+      }
+    });
 
     // Save context for clipping
     this.ctx.save();
@@ -254,8 +247,46 @@ class TemplateRasterizationService {
     this.ctx.rect(holeX, holeY, holeWidth, holeHeight);
     this.ctx.clip();
 
+    // === MATCH CSS LOGIC EXACTLY ===
+    // CSS: transform: `translate(${translateX}%, ${translateY}%) scale(${photoScale})`
+    // CSS: translateX = (0.5 - photoCenterX) * 100 (percentage of photo width)
+    // CSS: translateY = (0.5 - photoCenterY) * 100 (percentage of photo height)
+
+    // Step 1: Calculate "fit" scale to determine base photo size in hole
+    const fitScale = Math.min(holeWidth / img.width, holeHeight / img.height);
+    
+    // Step 2: Apply user's photo scale on top of fit scale
+    const finalScale = fitScale * transform.photoScale;
+    const scaledWidth = img.width * finalScale;
+    const scaledHeight = img.height * finalScale;
+
+    // Step 3: Calculate percentage-based translation (same as CSS)
+    const translateXPercent = (0.5 - transform.photoCenterX) * 100; // Percentage of photo width
+    const translateYPercent = (0.5 - transform.photoCenterY) * 100; // Percentage of photo height
+
+    // Step 4: Convert percentage translation to pixels
+    const translateXPixels = (translateXPercent / 100) * scaledWidth;
+    const translateYPixels = (translateYPercent / 100) * scaledHeight;
+
+    // Step 5: Position photo center in hole center, then apply translation
+    const holeCenterX = holeX + (holeWidth / 2);
+    const holeCenterY = holeY + (holeHeight / 2);
+    
+    const drawX = holeCenterX - (scaledWidth / 2) + translateXPixels;
+    const drawY = holeCenterY - (scaledHeight / 2) + translateYPixels;
+
+    console.log('🎨 Transform calculations:', {
+      fitScale,
+      finalScale,
+      scaledSize: { width: scaledWidth, height: scaledHeight },
+      translatePercent: { x: translateXPercent, y: translateYPercent },
+      translatePixels: { x: translateXPixels, y: translateYPixels },
+      holeCenter: { x: holeCenterX, y: holeCenterY },
+      finalPosition: { x: drawX, y: drawY }
+    });
+
     // Draw the photo
-    this.ctx.drawImage(img, drawX, drawY, finalWidth, finalHeight);
+    this.ctx.drawImage(img, drawX, drawY, scaledWidth, scaledHeight);
 
     // Restore context
     this.ctx.restore();
