@@ -1,4 +1,4 @@
-import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, ManualPackage, ManualTemplate } from '../../types';
+import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType, PrintSize, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, ManualPackage, ManualTemplate } from '../../types';
 import { useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
@@ -11,6 +11,7 @@ import PhotoSelectionMode from '../PhotoSelectionMode';
 import SlidingTemplateBar from '../SlidingTemplateBar';
 import { manualTemplateService } from '../../services/manualTemplateService';
 import { templateRasterizationService } from '../../services/templateRasterizationService';
+import { printSizeService } from '../../services/printSizeService';
 import PngTemplateVisual from '../PngTemplateVisual';
 import PhotoGrid from '../PhotoGrid';
 import TemplateGrid from '../TemplateGrid';
@@ -295,7 +296,8 @@ export default function PhotoSelectionScreen({
   const [editingTemplate, setEditingTemplate] = useState<TemplateSlot[] | null>(null);
   const [showAddPrintModal, setShowAddPrintModal] = useState(false);
   const [selectedType, setSelectedType] = useState<TemplateType | null>(null);
-  const [selectedSize, setSelectedSize] = useState<'4R' | '5R' | 'A4'>('4R');
+  const [selectedSize, setSelectedSize] = useState<PrintSize>('');
+  const [availablePrintSizes, setAvailablePrintSizes] = useState<{name: PrintSize; label: string}[]>([]);
   const [addPrintQuantity, setAddPrintQuantity] = useState(1);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<ManualTemplate[]>([]);
@@ -340,6 +342,30 @@ export default function PhotoSelectionScreen({
     };
     loadTemplates();
   }, []);
+
+  // Load available print sizes dynamically
+  useEffect(() => {
+    const loadPrintSizes = async () => {
+      try {
+        const printSizeConfigs = await printSizeService.getAvailablePrintSizes();
+        const printSizeOptions = printSizeConfigs.map(config => ({
+          name: config.name,
+          label: config.label
+        }));
+        setAvailablePrintSizes(printSizeOptions);
+        
+        // Set default print size if none selected
+        if (!selectedSize && printSizeOptions.length > 0) {
+          setSelectedSize(printSizeOptions[0].name);
+        }
+      } catch (error) {
+        console.error('Error loading print sizes:', error);
+        setAvailablePrintSizes([]);
+      }
+    };
+    
+    loadPrintSizes();
+  }, [selectedSize]);
 
   // Auto-select first empty slot when entering screen (but respect completed templates)
   useEffect(() => {
@@ -413,7 +439,10 @@ export default function PhotoSelectionScreen({
     }
     setShowAddPrintModal(false);
     setSelectedType(null);
-    setSelectedSize('4R');
+    // Reset to first available print size instead of hardcoded '4R'
+    if (availablePrintSizes.length > 0) {
+      setSelectedSize(availablePrintSizes[0].name);
+    }
   };
 
   const handleDeletePrint = (templateIdToDelete: string) => {
@@ -792,7 +821,7 @@ export default function PhotoSelectionScreen({
       const allTemplates = await manualTemplateService.getAllTemplates();
       const manualTemplate = allTemplates.find(t => 
         t.template_type === firstSlot.templateType && 
-        t.print_size === (firstSlot.printSize || '4R')
+        t.print_size === (firstSlot.printSize || (availablePrintSizes.length > 0 ? availablePrintSizes[0].name : ''))
       );
 
       if (!manualTemplate) {
@@ -1158,20 +1187,15 @@ export default function PhotoSelectionScreen({
                     <select
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       value={selectedSize}
-                      onChange={(e) => setSelectedSize(e.target.value as '4R' | '5R' | 'A4')}
-                      disabled={!selectedType || selectedType !== 'solo'}
+                      onChange={(e) => setSelectedSize(e.target.value as PrintSize)}
+                      disabled={!selectedType}
                     >
-                      <option value="4R">4R</option>
-                      {selectedType === 'solo' && (
-                        <>
-                          <option value="5R">5R</option>
-                          <option value="A4">A4</option>
-                        </>
-                      )}
+                      {availablePrintSizes.map(size => (
+                        <option key={size.name} value={size.name}>
+                          {size.label}
+                        </option>
+                      ))}
                     </select>
-                    {selectedType && selectedType !== 'solo' && (
-                      <p className="mt-1 text-xs text-gray-500">Only Solo supports 5R/A4</p>
-                    )}
                   </div>
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700">Quantity</label>

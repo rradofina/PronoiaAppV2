@@ -39,7 +39,7 @@ declare global {
   }
 }
 
-// Template Visual Component
+// Template Visual Component - Database-driven rendering
 const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: {
   template: { id: string, name: string, slots: number },
   slots: TemplateSlot[],
@@ -47,137 +47,129 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
   photos: Photo[],
   selectedSlot: TemplateSlot | null
 }) => {
+  const [templateData, setTemplateData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Load template configuration from database
+  useEffect(() => {
+    const loadTemplateData = async () => {
+      try {
+        setIsLoading(true);
+        // Get template type from the first slot (all slots should have same template type)
+        const firstSlot = slots[0];
+        if (firstSlot) {
+          // Find the template from database using template type and print size
+          const allTemplates = await manualTemplateService.getAllTemplates();
+          const dbTemplate = allTemplates.find(t => 
+            t.template_type === firstSlot.templateType &&
+            t.print_size === (firstSlot.printSize || '')
+          );
+          setTemplateData(dbTemplate || null);
+        }
+      } catch (error) {
+        console.error('Error loading template data in index.tsx:', error);
+        setTemplateData(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    if (slots.length > 0) {
+      loadTemplateData();
+    } else {
+      setIsLoading(false);
+    }
+  }, [slots, template.id]);
+
   const getPhotoUrl = (photoId?: string | null) => {
     if (!photoId) return null;
     return photos.find(p => p.id === photoId)?.url || null;
   };
 
-  // 4R print format (4x6 inches) - width:height ratio of 2:3 (or 4:6)
-  const printAspectRatio = '2/3'; // CSS aspect-ratio for 4x6 print
-
-  if (template.id === 'solo') {
-    // Solo Template - Single large photo with border for 4R print
+  // Loading state
+  if (isLoading) {
     return (
-      <div className="bg-white p-3 rounded-lg shadow-md w-full" style={{ aspectRatio: printAspectRatio }}>
-        <div 
-          className={`w-full h-full border-2 border-dashed border-gray-300 rounded cursor-pointer transition-all duration-200 ${
-            selectedSlot === slots[0] ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'
-          }`}
-          onClick={() => onSlotClick(slots[0])}
-          style={{ 
-            backgroundImage: getPhotoUrl(slots[0]?.photoId) ? `url(${getPhotoUrl(slots[0]?.photoId)})` : 'none',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center'
-          }}
-        >
-          {!getPhotoUrl(slots[0]?.photoId) && (
-            <div className="w-full h-full flex items-center justify-center text-gray-400">
-              <div className="text-center">
-                <div className="text-2xl mb-1">📷</div>
-                <div className="text-xs">Click to add photo</div>
+      <div className="bg-white p-3 rounded-lg shadow-md w-full h-full flex items-center justify-center" style={{ minHeight: '200px' }}>
+        <div className="text-center text-gray-500">
+          <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+          <div className="text-sm">Loading template...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state - no template data found
+  if (!templateData) {
+    return (
+      <div className="bg-white p-3 rounded-lg shadow-md w-full h-full flex items-center justify-center" style={{ minHeight: '200px' }}>
+        <div className="text-center text-gray-500">
+          <div className="text-lg mb-2">⚠️</div>
+          <div className="text-sm">Template not found</div>
+          <div className="text-xs text-gray-400 mt-1">
+            {slots[0]?.templateType} - {slots[0]?.printSize}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Database-driven rendering using holes_data and dimensions
+  const { dimensions, holes_data } = templateData;
+  const aspectRatio = dimensions.width / dimensions.height;
+
+  return (
+    <div 
+      className="bg-white p-2 rounded-lg shadow-md w-full h-full relative overflow-hidden" 
+      style={{ 
+        aspectRatio: aspectRatio.toString(), 
+        minHeight: '200px' 
+      }}
+    >
+      {/* Render photo slots based on database holes_data */}
+      {holes_data.map((hole: any, index: number) => {
+        const slot = slots[index];
+        if (!slot) return null;
+
+        // Calculate hole position and size as percentages of template dimensions
+        const holeStyle = {
+          position: 'absolute' as const,
+          left: `${(hole.x / dimensions.width) * 100}%`,
+          top: `${(hole.y / dimensions.height) * 100}%`,
+          width: `${(hole.width / dimensions.width) * 100}%`,
+          height: `${(hole.height / dimensions.height) * 100}%`,
+          backgroundImage: getPhotoUrl(slot.photoId) ? `url('${getPhotoUrl(slot.photoId)}')` : 'none',
+          backgroundPosition: 'center',
+          backgroundSize: 'cover',
+          backgroundRepeat: 'no-repeat'
+        };
+
+        return (
+          <div
+            key={slot.id}
+            className={`cursor-pointer transition-all duration-200 border-2 border-gray-200 rounded ${
+              selectedSlot?.id === slot.id ? 'ring-2 ring-blue-500 border-blue-500' : 'hover:border-gray-300'
+            }`}
+            style={holeStyle}
+            onClick={() => onSlotClick(slot)}
+          >
+            {!getPhotoUrl(slot.photoId) && (
+              <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-50 bg-opacity-80">
+                <div className="text-center">
+                  <div className="text-sm mb-1">+</div>
+                  <div className="text-xs font-medium">Add</div>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        );
+      })}
+      
+      {/* Template info overlay */}
+      <div className="absolute bottom-1 left-1 text-xs text-gray-400 bg-white bg-opacity-80 px-1 rounded">
+        {templateData.template_type} • {templateData.print_size}
       </div>
-    );
-  }
-
-  if (template.id === 'collage') {
-    // Collage Template - 2x2 grid with borders and gaps
-    return (
-      <div className="bg-white p-3 rounded-lg shadow-md w-full" style={{ aspectRatio: printAspectRatio }}>
-        <div className="grid grid-cols-2 gap-2 h-full">
-          {slots.slice(0, 4).map((slot, index) => (
-            <div
-              key={index}
-              className={`border-2 border-dashed border-gray-300 rounded cursor-pointer transition-all duration-200 ${
-                selectedSlot === slot ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'
-              }`}
-              onClick={() => onSlotClick(slot)}
-              style={{ 
-                backgroundImage: getPhotoUrl(slot?.photoId) ? `url(${getPhotoUrl(slot?.photoId)})` : 'none',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center'
-              }}
-            >
-              {!getPhotoUrl(slot?.photoId) && (
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  <div className="text-xs">📷</div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (template.id === 'photocard') {
-    // Photocard Template - 2x2 grid like collage but NO borders/gaps (edge-to-edge)
-    return (
-      <div className="bg-white rounded-lg shadow-md overflow-hidden w-full" style={{ aspectRatio: printAspectRatio }}>
-        <div className="grid grid-cols-2 gap-0 h-full">
-          {slots.slice(0, 4).map((slot, index) => (
-            <div
-              key={index}
-              className={`cursor-pointer transition-all duration-200 ${
-                selectedSlot === slot ? 'ring-2 ring-blue-500 ring-inset' : ''
-              }`}
-              onClick={() => onSlotClick(slot)}
-              style={{ 
-                backgroundImage: getPhotoUrl(slot?.photoId) ? `url(${getPhotoUrl(slot?.photoId)})` : 'none',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center'
-              }}
-            >
-              {!getPhotoUrl(slot?.photoId) && (
-                <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">
-                  <div className="text-xs">📷</div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (template.id === 'photostrip') {
-    // Photo Strip Template - 3 rows of 2 photos each (6 total) like collage but 3 rows
-    return (
-      <div className="bg-white p-3 rounded-lg shadow-md w-full" style={{ aspectRatio: printAspectRatio }}>
-        <div className="grid grid-rows-3 gap-1 h-full">
-          {[0, 1, 2].map((row) => (
-            <div key={row} className="grid grid-cols-2 gap-1 h-full">
-              {slots.slice(row * 2, row * 2 + 2).map((slot, index) => (
-                <div
-                  key={index}
-                  className={`border-2 border-dashed border-gray-300 rounded cursor-pointer transition-all duration-200 ${
-                    selectedSlot === slot ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-400'
-                  }`}
-                  onClick={() => onSlotClick(slot)}
-                  style={{ 
-                    backgroundImage: getPhotoUrl(slot?.photoId) ? `url(${getPhotoUrl(slot?.photoId)})` : 'none',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                  }}
-                >
-                  {!getPhotoUrl(slot?.photoId) && (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <div className="text-xs">📷</div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 };
 
 export default function Home() {

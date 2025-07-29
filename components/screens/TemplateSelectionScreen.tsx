@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Package, TemplateType, GoogleAuth, TemplateTypeInfo, PrintSize } from '../../types';
 import { PngTemplate, pngTemplateService } from '../../services/pngTemplateService';
+import { templateConfigService } from '../../services/templateConfigService';
+import { printSizeService } from '../../services/printSizeService';
 
 interface TemplateSelectionScreenProps {
   selectedPackage: Package | null;
@@ -25,15 +27,27 @@ export default function TemplateSelectionScreen({
   handleBack,
   handleTemplateContinue,
   totalAllowedPrints,
-  currentPrintSize = '4R', // Default to 4R for now
+  currentPrintSize, // Dynamic print size - no hardcoded default
 }: TemplateSelectionScreenProps) {
   const [pngTemplates, setPngTemplates] = useState<PngTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [templateTypeInfo, setTemplateTypeInfo] = useState<TemplateTypeInfo[]>([]);
 
   useEffect(() => {
     loadPngTemplates();
+    loadTemplateTypeInfo();
   }, [currentPrintSize]);
+
+  const loadTemplateTypeInfo = async () => {
+    try {
+      const typeInfos = await templateConfigService.getTemplateTypeInfos();
+      setTemplateTypeInfo(typeInfos);
+    } catch (error) {
+      console.error('Error loading template type info:', error);
+      setTemplateTypeInfo([]);
+    }
+  };
 
   const loadPngTemplates = async () => {
     try {
@@ -123,15 +137,10 @@ export default function TemplateSelectionScreen({
               const totalCount = getTotalTemplateCount();
               const canIncrease = totalCount < totalAllowedPrints;
 
-              // Icon mapping for template types
+              // Dynamic icon mapping from database
               const getTemplateIcon = (type: string) => {
-                const icons: Record<string, string> = {
-                  'solo': '🖼️',
-                  'collage': '🏁',
-                  'photocard': '🎴',
-                  'photostrip': '📸'
-                };
-                return icons[type] || '🖼️';
+                const typeInfo = templateTypeInfo.find(info => info.id === type);
+                return typeInfo?.icon || '🖼️'; // Default icon if not found
               };
 
               return (

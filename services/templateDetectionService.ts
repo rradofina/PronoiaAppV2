@@ -4,6 +4,8 @@
  * marked with magenta (#FF00FF) color regions
  */
 
+import { templateConfigService } from './templateConfigService';
+
 export interface TemplateHole {
   id: string;
   x: number;
@@ -50,7 +52,7 @@ export class TemplateDetectionService {
       return new Promise((resolve, reject) => {
         const img = new Image();
         
-        img.onload = () => {
+        img.onload = async () => {
           try {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -66,7 +68,7 @@ export class TemplateDetectionService {
             
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const holes = this.detectPlaceholderRegions(imageData);
-            const templateType = this.determineTemplateType(holes, filename);
+            const templateType = await this.determineTemplateType(holes, filename);
             const hasInternalBranding = this.detectInternalBranding(imageData, holes);
             
             // Clean up blob URL
@@ -549,86 +551,162 @@ export class TemplateDetectionService {
   }
 
   /**
-   * Determine template type based on filename and hole count
+   * Determine template type based on filename and hole count - using dynamic database configuration
    */
-  private determineTemplateType(holes: TemplateHole[], filename?: string): string {
+  private async determineTemplateType(holes: TemplateHole[], filename?: string): Promise<string> {
     console.log('🔍 TEMPLATE TYPE DETECTION:', {
       filename,
       holeCount: holes.length,
       holes: holes.map(h => ({ id: h.id, size: `${h.width}×${h.height}` }))
     });
     
-    // First try to detect from filename
-    if (filename) {
-      const name = filename.toLowerCase();
+    try {
+      // Load available template types from database
+      const availableTypes = await templateConfigService.getTemplateTypes();
+      console.log('📋 Available template types from database:', availableTypes);
       
-      console.log('📝 Checking filename keywords for:', name);
-      
-      // Look for keywords in filename
-      if (name.includes('solo') || name.includes('single')) {
-        console.log('✅ Detected SOLO from filename keyword');
-        return 'solo';
-      }
-      if (name.includes('collage') || name.includes('grid')) {
-        console.log('✅ Detected COLLAGE from filename keyword');
-        return 'collage';
-      }
-      if (name.includes('photocard') || name.includes('photo-card') || name.includes('card')) {
-        console.log('✅ Detected PHOTOCARD from filename keyword');
-        return 'photocard';
-      }
-      if (name.includes('strip') || name.includes('photo-strip') || name.includes('photostrip')) {
-        console.log('✅ Detected PHOTOSTRIP from filename keyword');
-        return 'photostrip';
+      if (availableTypes.length === 0) {
+        console.warn('⚠️ No template types found in database, using generic fallback');
+        return 'custom';
       }
       
-      console.log('⚠️ No filename keywords matched, falling back to hole count detection');
+      // First try to detect from filename using dynamic keywords
+      if (filename) {
+        const name = filename.toLowerCase();
+        console.log('📝 Checking filename keywords for:', name);
+        
+        // Check against each available template type and its common keywords
+        for (const templateType of availableTypes) {
+          const typeKeywords = this.getTemplateTypeKeywords(templateType.name);
+          
+          for (const keyword of typeKeywords) {
+            if (name.includes(keyword.toLowerCase())) {
+              console.log(`✅ Detected ${templateType.name.toUpperCase()} from filename keyword: ${keyword}`);
+              return templateType.name;
+            }
+          }
+        }
+        
+        console.log('⚠️ No filename keywords matched available types, falling back to hole count detection');
+      }
+      
+      // Fallback to hole count detection with dynamic types
+      const holeCount = holes.length;
+      console.log('🔢 Using hole count detection:', holeCount, 'holes');
+      
+      // Create a mapping of hole count to most likely template types
+      const typeMapping = this.createHoleCountMapping(availableTypes.map(t => t.name), holeCount);
+      
+      if (typeMapping.length > 0) {
+        const detectedType = typeMapping[0]; // Use first (most likely) match
+        console.log(`✅ Detected ${detectedType.toUpperCase()} from hole count mapping`);
+        return detectedType;
+      }
+      
+      // Final fallback - use first available type
+      const fallbackType = availableTypes[0].name;
+      console.log(`⚠️ Using database fallback: ${holeCount} holes → ${fallbackType}`);
+      return fallbackType;
+    } catch (error) {
+      console.error('❌ Error loading template types from database:', error);
+      // Ultimate fallback
+      return 'custom';
+    }
+  }
+  
+  /**
+   * Get common keywords for a template type
+   */
+  private getTemplateTypeKeywords(templateType: string): string[] {
+    const baseKeywords = [templateType]; // Always include the type name itself
+    
+    // Add common variations based on type name
+    const variations: Record<string, string[]> = {
+      'solo': ['solo', 'single', 'one'],
+      'collage': ['collage', 'grid', 'multi'],
+      'photocard': ['photocard', 'photo-card', 'card'],
+      'photostrip': ['photostrip', 'photo-strip', 'strip'],
+      'portrait': ['portrait', 'vertical'],
+      'landscape': ['landscape', 'horizontal'],
+      'square': ['square']
+    };
+    
+    // Check if we have predefined variations
+    const typeVariations = variations[templateType.toLowerCase()];
+    if (typeVariations) {
+      return [...baseKeywords, ...typeVariations];
     }
     
-    // Fallback to hole count detection
-    const holeCount = holes.length;
-    console.log('🔢 Using hole count detection:', holeCount, 'holes');
-
-    if (holeCount === 1) {
-      console.log('✅ Detected SOLO from hole count (1 hole)');
-      return 'solo';
-    } else if (holeCount === 4) {
-      // Check if it's a 2x2 grid (collage) or colored backgrounds (photocard)
-      const avgWidth = holes.reduce((sum, hole) => sum + hole.width, 0) / holes.length;
-      const avgHeight = holes.reduce((sum, hole) => sum + hole.height, 0) / holes.length;
-      
-      // If holes are more square-ish, likely photocard; if rectangular, likely collage
-      const aspectRatio = avgWidth / avgHeight;
-      const detectedType = aspectRatio > 0.8 && aspectRatio < 1.2 ? 'photocard' : 'collage';
-      
-      console.log('🔍 4-hole template analysis:', {
-        avgWidth: Math.round(avgWidth),
-        avgHeight: Math.round(avgHeight),
-        aspectRatio: aspectRatio.toFixed(2),
-        detectedType
-      });
-      console.log(`✅ Detected ${detectedType.toUpperCase()} from 4-hole analysis`);
-      
-      return detectedType;
-    } else if (holeCount === 6) {
-      console.log('✅ Detected PHOTOSTRIP from hole count (6 holes)');
-      return 'photostrip';
+    // For unknown types, try to infer keywords from the name
+    const inferredKeywords = [
+      templateType,
+      templateType.replace(/[_-]/g, ''), // Remove separators
+      templateType.split(/[_-]/).join(' '), // Replace separators with spaces
+    ];
+    
+    return [...baseKeywords, ...inferredKeywords];
+  }
+  
+  /**
+   * Create a mapping of hole count to likely template types
+   */
+  private createHoleCountMapping(availableTypes: string[], holeCount: number): string[] {
+    const mapping: string[] = [];
+    
+    // Common hole count patterns (prioritized by likelihood)
+    const patterns: Record<number, string[]> = {
+      1: ['solo', 'single', 'portrait', 'landscape'],
+      2: ['dual', 'double', 'pair'],
+      3: ['triple', 'trio'],
+      4: ['collage', 'quad', 'photocard', 'grid'],
+      6: ['photostrip', 'strip', 'hex'],
+      8: ['octo', 'grid'],
+      9: ['grid', 'nine']
+    };
+    
+    const likelyPatterns = patterns[holeCount] || [];
+    
+    // Find available types that match the patterns
+    for (const pattern of likelyPatterns) {
+      for (const availableType of availableTypes) {
+        if (availableType.toLowerCase().includes(pattern.toLowerCase()) || 
+            pattern.toLowerCase().includes(availableType.toLowerCase())) {
+          if (!mapping.includes(availableType)) {
+            mapping.push(availableType);
+          }
+        }
+      }
     }
-
-    // Default fallback
-    const fallbackType = holeCount <= 2 ? 'solo' : holeCount <= 4 ? 'collage' : 'photostrip';
-    console.log(`⚠️ Using default fallback: ${holeCount} holes → ${fallbackType}`);
-    return fallbackType;
+    
+    // If no patterns match, add all available types as potential matches
+    if (mapping.length === 0) {
+      mapping.push(...availableTypes);
+    }
+    
+    console.log(`🎯 Hole count ${holeCount} mapped to types:`, mapping);
+    return mapping;
   }
 
   /**
    * Detect if template has internal branding (text inside photo areas)
    */
   private detectInternalBranding(imageData: ImageData, holes: TemplateHole[]): boolean {
-    // For now, use template type as a proxy
-    // Photocards typically have internal branding, others external
-    const templateType = this.determineTemplateType(holes);
-    return templateType === 'photocard' || templateType === 'photostrip';
+    // Simple heuristic: templates with many holes or square aspect ratios likely have internal branding
+    const holeCount = holes.length;
+    
+    if (holeCount >= 4) {
+      // Calculate average aspect ratio of holes
+      const avgAspectRatio = holes.reduce((sum, hole) => {
+        return sum + (hole.width / hole.height);
+      }, 0) / holes.length;
+      
+      // Square-ish holes (aspect ratio close to 1) often indicate photocard-style templates
+      const isSquareish = avgAspectRatio > 0.7 && avgAspectRatio < 1.3;
+      return isSquareish;
+    }
+    
+    // For other templates, assume external branding
+    return false;
   }
 
   /**

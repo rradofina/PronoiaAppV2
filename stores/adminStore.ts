@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { supabaseService } from '../services/supabaseService';
+import { printSizeService } from '../services/printSizeService';
 import useAuthStore from './authStore';
 import { CustomTemplate, TemplateCategory, PrintSize } from '../types';
 
@@ -52,6 +53,7 @@ interface AdminActions {
   clearAdminAuth: () => void;
   
   // Template management actions
+  initializeDefaultPrintSize: () => Promise<string>;
   loadCustomTemplates: (printSize?: PrintSize) => Promise<void>;
   loadTemplateCategories: () => Promise<void>;
   createCustomTemplate: (templateData: any) => Promise<void>;
@@ -90,7 +92,7 @@ export const useAdminStore = create<AdminState & AdminActions>()(
     customTemplates: [],
     templateCategories: [],
     selectedTemplate: null,
-    selectedPrintSize: '4R',
+    selectedPrintSize: '', // Will be initialized dynamically from database
     isLoading: false,
     isSaving: false,
     error: null,
@@ -166,12 +168,39 @@ export const useAdminStore = create<AdminState & AdminActions>()(
       });
     },
 
+    // Initialize default print size from database
+    initializeDefaultPrintSize: async () => {
+      try {
+        const availableSizes = await printSizeService.getAvailablePrintSizes();
+        if (availableSizes.length > 0) {
+          const defaultSize = availableSizes[0].name;
+          set({ selectedPrintSize: defaultSize });
+          console.log('📐 Admin store initialized with default print size:', defaultSize);
+          return defaultSize;
+        }
+      } catch (error) {
+        console.error('Failed to initialize default print size:', error);
+      }
+      return '';
+    },
+
     // Template management actions
     loadCustomTemplates: async (printSize?: PrintSize) => {
       set({ isLoading: true, error: null });
       
       try {
-        const templates = await supabaseService.getCustomTemplates(printSize);
+        // If no print size provided, ensure we have a default
+        let targetPrintSize = printSize;
+        if (!targetPrintSize) {
+          const currentPrintSize = get().selectedPrintSize;
+          if (!currentPrintSize) {
+            targetPrintSize = await get().initializeDefaultPrintSize();
+          } else {
+            targetPrintSize = currentPrintSize;
+          }
+        }
+        
+        const templates = await supabaseService.getCustomTemplates(targetPrintSize);
         
         // Convert DB templates to app format
         const appTemplates: CustomTemplate[] = templates.map(template => ({

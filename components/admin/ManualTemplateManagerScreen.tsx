@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, Reorder } from 'framer-motion';
 import { 
   ManualTemplate, 
   CreateManualTemplateRequest, 
@@ -7,6 +8,8 @@ import {
   GoogleAuth 
 } from '../../types';
 import { manualTemplateService } from '../../services/manualTemplateService';
+import { templateConfigService } from '../../services/templateConfigService';
+import { printSizeService } from '../../services/printSizeService';
 import HeaderNavigation from '../HeaderNavigation';
 
 interface ManualTemplateManagerScreenProps {
@@ -29,24 +32,13 @@ interface TemplateFormData {
   sample_image_url: string; // Sample image showing template filled with photos
 }
 
-const TEMPLATE_TYPES: { value: TemplateType; label: string }[] = [
-  { value: 'solo', label: 'Solo (Single Photo)' },
-  { value: 'collage', label: 'Collage (Multiple Photos)' },
-  { value: 'photocard', label: 'Photo Card (Edge-to-edge)' },
-  { value: 'photostrip', label: 'Photo Strip (6 photos)' }
-];
-
-const PRINT_SIZES: { value: PrintSize; label: string }[] = [
-  { value: '4R', label: '4R (4×6 inches)' },
-  { value: '5R', label: '5R (5×7 inches)' },
-  { value: 'A4', label: 'A4 (8.3×11.7 inches)' }
-];
+// REMOVED: Hardcoded template types and print sizes - now loaded dynamically from database
 
 const EMPTY_FORM: TemplateFormData = {
   name: '',
   description: '',
-  template_type: 'solo',
-  print_size: '4R',
+  template_type: '', // Dynamic - set from first available template type
+  print_size: '', // Dynamic - set from first available print size
   drive_file_id: '',
   holes_data: '[]',
   dimensions: '{"width": 1200, "height": 1800}',
@@ -68,6 +60,11 @@ export default function ManualTemplateManagerScreen({
   const [editingTemplate, setEditingTemplate] = useState<ManualTemplate | null>(null);
   const [formData, setFormData] = useState<TemplateFormData>(EMPTY_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Dynamic options loaded from database
+  const [availableTemplateTypes, setAvailableTemplateTypes] = useState<{ value: TemplateType; label: string }[]>([]);
+  const [availablePrintSizes, setAvailablePrintSizes] = useState<{ value: PrintSize; label: string }[]>([]);
+  const [isLoadingOptions, setIsLoadingOptions] = useState(false);
   const [isAutoDetecting, setIsAutoDetecting] = useState(false);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [detectedHoles, setDetectedHoles] = useState<any[]>([]);
@@ -79,48 +76,55 @@ export default function ManualTemplateManagerScreen({
   const [panY, setPanY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [lastTouchDistance, setLastTouchDistance] = useState(0);
-  const [sortBy, setSortBy] = useState<'name' | 'created_at' | 'template_type' | 'print_size'>('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  // Removed viewMode - using single row layout like packages
 
   // Load templates on mount
   useEffect(() => {
     loadTemplates();
   }, []);
 
-  // Sort templates
-  const sortedTemplates = React.useMemo(() => {
-    return [...templates].sort((a, b) => {
-      let aValue: any = a[sortBy];
-      let bValue: any = b[sortBy];
-      
-      // Handle date sorting
-      if (sortBy === 'created_at') {
-        aValue = new Date(aValue).getTime();
-        bValue = new Date(bValue).getTime();
-      }
-      
-      // Handle string sorting
-      if (typeof aValue === 'string') {
-        aValue = aValue.toLowerCase();
-        bValue = bValue.toLowerCase();
-      }
-      
-      if (sortOrder === 'asc') {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-      } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-      }
-    });
-  }, [templates, sortBy, sortOrder]);
+  // Load dynamic template types and print sizes
+  useEffect(() => {
+    const loadDynamicOptions = async () => {
+      setIsLoadingOptions(true);
+      try {
+        // Load template types from existing templates in database
+        const existingTypes = await manualTemplateService.getUniqueTemplateTypes();
+        const templateTypeOptions = existingTypes.map(type => ({
+          value: type,
+          label: type.charAt(0).toUpperCase() + type.slice(1).replace(/[-_]/g, ' ')
+        }));
 
-  const handleSort = (field: typeof sortBy) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('asc');
-    }
-  };
+        // Load print sizes from database
+        const printSizeConfigs = await printSizeService.getAvailablePrintSizes();
+        const printSizeOptions = printSizeConfigs.map(config => ({
+          value: config.name,
+          label: config.label
+        }));
+
+        setAvailableTemplateTypes(templateTypeOptions);
+        setAvailablePrintSizes(printSizeOptions);
+
+        // Set defaults in form if empty
+        if (!formData.template_type && templateTypeOptions.length > 0) {
+          setFormData(prev => ({ ...prev, template_type: templateTypeOptions[0].value }));
+        }
+        if (!formData.print_size && printSizeOptions.length > 0) {
+          setFormData(prev => ({ ...prev, print_size: printSizeOptions[0].value }));
+        }
+      } catch (error) {
+        console.error('Error loading dynamic options:', error);
+        // Set minimal fallback options
+        setAvailableTemplateTypes([]);
+        setAvailablePrintSizes([]);
+      } finally {
+        setIsLoadingOptions(false);
+      }
+    };
+
+    loadDynamicOptions();
+  }, [formData.template_type, formData.print_size]);
+
 
   const loadTemplates = async () => {
     setIsLoading(true);
@@ -136,6 +140,37 @@ export default function ManualTemplateManagerScreen({
       setIsLoading(false);
     }
   };
+
+  // Handle drag-and-drop reordering
+  const handleReorderTemplates = (newOrder: ManualTemplate[]) => {
+    // Update the main templates array while preserving non-filtered items
+    setTemplates(currentTemplates => {
+      // Create a map of the new order with their new positions
+      const reorderedMap = new Map();
+      newOrder.forEach((template, index) => {
+        reorderedMap.set(template.id, { ...template, sort_order: index + 1 });
+      });
+      
+      // Update the full templates array
+      return currentTemplates.map(template => 
+        reorderedMap.has(template.id) ? reorderedMap.get(template.id) : template
+      );
+    });
+    
+    // Update sort_order in database for each template (fire and forget like package manager)
+    newOrder.forEach(async (template, index) => {
+      try {
+        await manualTemplateService.updateTemplate(template.id, { 
+          sort_order: index + 1 
+        });
+      } catch (error) {
+        console.error('❌ Error updating template order:', error);
+      }
+    });
+    
+    console.log('✅ Template order updated locally');
+  };
+
 
   // Zoom and pan handlers
   const resetZoom = () => {
@@ -497,34 +532,70 @@ export default function ManualTemplateManagerScreen({
 
 
   const renderTemplateCard = (template: ManualTemplate) => (
-    <div
+    <Reorder.Item
       key={template.id}
-      className={`bg-white rounded-lg p-4 border-2 transition-all duration-200 ${
+      value={template}
+      className={`bg-gray-50 rounded-lg p-3 border transition-all duration-200 cursor-move hover:shadow-md ${
         template.is_active
-          ? 'border-green-200 shadow-sm'
-          : 'border-gray-200 opacity-60'
+          ? 'border-green-200'
+          : 'border-gray-300 opacity-60'
       }`}
+      whileDrag={{ 
+        scale: 1.02, 
+        boxShadow: "0 5px 15px rgba(0,0,0,0.1)",
+        zIndex: 50 
+      }}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <h3 className="font-medium text-gray-800 mb-1">{template.name}</h3>
-          {template.description && (
-            <p className="text-sm text-gray-600 mb-2">{template.description}</p>
-          )}
-          <div className="flex items-center space-x-3 text-xs text-gray-500">
-            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
-              {template.template_type}
-            </span>
-            <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
-              {template.print_size}
-            </span>
-            <span>{template.holes_data.length} holes</span>
+      <div className="flex items-start justify-between">
+        <div className="flex items-start space-x-3 flex-1">
+          {/* Drag Handle */}
+          <div className="mt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+              <circle cx="4" cy="4" r="1"/>
+              <circle cx="4" cy="8" r="1"/>
+              <circle cx="4" cy="12" r="1"/>
+              <circle cx="8" cy="4" r="1"/>
+              <circle cx="8" cy="8" r="1"/>
+              <circle cx="8" cy="12" r="1"/>
+              <circle cx="12" cy="4" r="1"/>
+              <circle cx="12" cy="8" r="1"/>
+              <circle cx="12" cy="12" r="1"/>
+            </svg>
+          </div>
+          
+          <div className="flex-1">
+            <div className="flex items-center space-x-2 mb-1">
+              <h4 className="font-medium text-gray-800">{template.name}</h4>
+              {!template.is_active && (
+                <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+                  INACTIVE
+                </span>
+              )}
+            </div>
+            {template.description && (
+              <p className="text-sm text-gray-600 mb-1">{template.description}</p>
+            )}
+            <div className="flex items-center space-x-3 text-xs text-gray-500">
+              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                {template.template_type}
+              </span>
+              <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                {template.print_size}
+              </span>
+              <span>{template.holes_data.length} holes</span>
+              <span className="text-gray-400">
+                Created: {new Date(template.created_at).toLocaleDateString()}
+              </span>
+            </div>
           </div>
         </div>
         
         <div className="flex items-center space-x-1 ml-3">
           <button
-            onClick={() => handleToggleActive(template)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleActive(template);
+            }}
             className={`px-2 py-1 text-xs rounded transition-colors ${
               template.is_active
                 ? 'bg-green-100 text-green-800 hover:bg-green-200'
@@ -535,25 +606,26 @@ export default function ManualTemplateManagerScreen({
             {template.is_active ? '✓' : '○'}
           </button>
           <button
-            onClick={() => handleEdit(template)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEdit(template);
+            }}
             className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
           >
             Edit
           </button>
           <button
-            onClick={() => handleDelete(template)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete(template);
+            }}
             className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded hover:bg-red-200 transition-colors"
           >
             Delete
           </button>
         </div>
       </div>
-
-      <div className="text-xs text-gray-400">
-        Created: {new Date(template.created_at).toLocaleDateString()}
-        {template.created_by && ` by ${template.created_by}`}
-      </div>
-    </div>
+    </Reorder.Item>
   );
 
   const renderTemplatePreview = () => {
@@ -755,11 +827,15 @@ export default function ManualTemplateManagerScreen({
                   onChange={(e) => setFormData(prev => ({ ...prev, template_type: e.target.value as TemplateType }))}
                   className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {TEMPLATE_TYPES.map(type => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
+                  {isLoadingOptions ? (
+                    <option value="">Loading template types...</option>
+                  ) : (
+                    availableTemplateTypes.map(type => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
@@ -773,11 +849,15 @@ export default function ManualTemplateManagerScreen({
                   onChange={(e) => setFormData(prev => ({ ...prev, print_size: e.target.value as PrintSize }))}
                   className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {PRINT_SIZES.map(size => (
-                    <option key={size.value} value={size.value}>
-                      {size.label}
-                    </option>
-                  ))}
+                  {isLoadingOptions ? (
+                    <option value="">Loading print sizes...</option>
+                  ) : (
+                    availablePrintSizes.map(size => (
+                      <option key={size.value} value={size.value}>
+                        {size.label}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
             </div>
@@ -1023,36 +1103,15 @@ export default function ManualTemplateManagerScreen({
               </p>
             </div>
             
-            <div className="flex items-center space-x-3">
-              {/* Sort Controls */}
-              <div className="flex items-center space-x-2 text-sm">
-                <span className="text-gray-600">Sort by:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                  className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="created_at">Date Created</option>
-                  <option value="name">Name</option>
-                  <option value="template_type">Type</option>
-                  <option value="print_size">Print Size</option>
-                </select>
-                <button
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  className="p-1 text-gray-500 hover:text-gray-700"
-                  title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
-                >
-                  {sortOrder === 'asc' ? '↑' : '↓'}
-                </button>
-              </div>
-              
-              <button
-                onClick={handleCreateNew}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                + Create New Template
-              </button>
-            </div>
+            <button
+              onClick={handleCreateNew}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Create Template</span>
+            </button>
           </div>
 
           {/* Error Display */}
@@ -1080,20 +1139,41 @@ export default function ManualTemplateManagerScreen({
             </div>
           )}
 
-          {/* Template Count */}
-          {!isLoading && !error && sortedTemplates.length > 0 && (
-            <div className="text-sm text-gray-600 mb-4">
-              Showing {sortedTemplates.length} template{sortedTemplates.length === 1 ? '' : 's'}
-            </div>
-          )}
 
           {/* Templates List */}
           {!isLoading && !error && (
             <>
-              {sortedTemplates.length > 0 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {sortedTemplates.map(renderTemplateCard)}
-                </div>
+              {templates.length > 0 ? (
+                <>
+                  <div className="bg-white rounded-lg border">
+                    <div className="p-4 border-b bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-800">Manual Templates</h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            ↕️ Drag templates to reorder them - this affects package template order
+                          </p>
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {templates.length} template{templates.length === 1 ? '' : 's'}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="p-4">
+                      <Reorder.Group
+                        axis="y"
+                        values={templates.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))}
+                        onReorder={handleReorderTemplates}
+                        className="space-y-3"
+                      >
+                        {templates
+                          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+                          .map(renderTemplateCard)}
+                      </Reorder.Group>
+                    </div>
+                  </div>
+                </>
               ) : (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">📝</div>
@@ -1110,13 +1190,6 @@ export default function ManualTemplateManagerScreen({
                 </div>
               )}
 
-              {/* Statistics */}
-              {templates.length > 0 && (
-                <div className="text-center text-gray-500 text-sm border-t border-gray-200 pt-4">
-                  Total: {templates.length} template{templates.length === 1 ? '' : 's'} 
-                  ({templates.filter(t => t.is_active).length} active)
-                </div>
-              )}
             </>
           )}
         </div>

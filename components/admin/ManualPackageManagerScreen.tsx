@@ -362,19 +362,45 @@ export default function ManualPackageManagerScreen({
     setError(null);
 
     try {
+      // Determine print size from selected templates
+      let determinedPrintSize: PrintSize = '';
+      const selectedTemplateIds = formData.print_positions
+        .filter(p => p.default_template_id)
+        .map(p => p.default_template_id!);
+
+      if (selectedTemplateIds.length > 0) {
+        // Get the first selected template to determine print size
+        const firstTemplate = availableTemplates.find(t => t.id === selectedTemplateIds[0]);
+        if (firstTemplate) {
+          determinedPrintSize = firstTemplate.print_size;
+        }
+      }
+
+      // Fallback: get the first available print size from the database
+      if (!determinedPrintSize) {
+        try {
+          const { printSizeService } = await import('../../services/printSizeService');
+          const printSizes = await printSizeService.getAvailablePrintSizes();
+          if (printSizes.length > 0) {
+            determinedPrintSize = printSizes[0].name;
+          }
+        } catch (error) {
+          console.error('Failed to get fallback print size:', error);
+          throw new Error('Unable to determine print size. Please select at least one template or ensure print sizes are available in the database.');
+        }
+      }
+
       const packageData: CreateManualPackageRequest = {
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
         thumbnail_url: formData.thumbnail_url.trim() || undefined,
-        print_size: '4R', // We'll need to determine this from the templates or make it dynamic
+        print_size: determinedPrintSize, // Dynamic print size based on selected templates
         template_count: formData.number_of_prints,
         price: formData.price ? parseFloat(formData.price) : undefined,
         photo_limit: formData.photo_limit,
         is_unlimited_photos: formData.is_unlimited_photos,
         group_id: formData.group_id,
-        template_ids: formData.print_positions
-          .filter(p => p.default_template_id)
-          .map(p => p.default_template_id!)
+        template_ids: selectedTemplateIds
       };
 
       if (editingPackage) {

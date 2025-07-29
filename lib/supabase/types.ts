@@ -38,7 +38,7 @@ export interface Database {
           id: string;
           user_id: string;
           client_name: string;
-          package_type: 'A' | 'B' | 'C' | 'D';
+          package_type: string;
           google_drive_folder_id: string;
           output_folder_id: string | null;
           max_templates: number;
@@ -51,7 +51,7 @@ export interface Database {
           id?: string;
           user_id: string;
           client_name: string;
-          package_type: 'A' | 'B' | 'C' | 'D';
+          package_type: string;
           google_drive_folder_id: string;
           output_folder_id?: string | null;
           max_templates: number;
@@ -64,7 +64,7 @@ export interface Database {
           id?: string;
           user_id?: string;
           client_name?: string;
-          package_type?: 'A' | 'B' | 'C' | 'D';
+          package_type?: string;
           google_drive_folder_id?: string;
           output_folder_id?: string | null;
           max_templates?: number;
@@ -181,7 +181,7 @@ export interface Database {
           id: string;
           name: string;
           description: string | null;
-          print_size: '4R' | '5R' | 'A4';
+          print_size: string;
           orientation: 'portrait' | 'landscape';
           layout_data: Json;
           photo_slots: Json;
@@ -201,7 +201,7 @@ export interface Database {
           id?: string;
           name: string;
           description?: string | null;
-          print_size?: '4R' | '5R' | 'A4';
+          print_size?: string;
           orientation?: 'portrait' | 'landscape';
           layout_data?: Json;
           photo_slots?: Json;
@@ -221,7 +221,7 @@ export interface Database {
           id?: string;
           name?: string;
           description?: string | null;
-          print_size?: '4R' | '5R' | 'A4';
+          print_size?: string;
           orientation?: 'portrait' | 'landscape';
           layout_data?: Json;
           photo_slots?: Json;
