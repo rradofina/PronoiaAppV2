@@ -185,6 +185,7 @@ export interface Template {
   id: string;
   type: TemplateType;
   name: string;
+  printSize: PrintSize; // Added print size to Template interface
   photoSlots: PhotoSlot[];
   dimensions: {
     width: number;

@@ -145,6 +145,7 @@ const createTemplate = (type: TemplateType): Template => {
     id,
     type,
     name: `${type.charAt(0).toUpperCase() + type.slice(1)} Template`,
+    printSize: '4R' as const, // Legacy default - should migrate to new system
     photoSlots: [], // Will be populated based on template type
     dimensions: {
       width: 1200,

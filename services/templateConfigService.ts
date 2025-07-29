@@ -135,6 +135,33 @@ class TemplateConfigServiceImpl {
   }
 
   /**
+   * Get the default/preferred print size for a template type
+   * Returns the first available print size for the template type
+   */
+  async getDefaultPrintSize(templateType: string): Promise<PrintSize> {
+    const availableSizes = await this.getAvailablePrintSizes(templateType);
+    
+    if (availableSizes.length === 0) {
+      throw new Error(`No print sizes available for template type '${templateType}'`);
+    }
+    
+    // Return the first available print size (could add preference logic here)
+    return availableSizes[0];
+  }
+
+  /**
+   * Check if a specific print size is available for a template type
+   */
+  async isPrintSizeAvailable(templateType: string, printSize: PrintSize): Promise<boolean> {
+    try {
+      const availableSizes = await this.getAvailablePrintSizes(templateType);
+      return availableSizes.includes(printSize);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
    * Get dimensions for a template type and print size - NO FALLBACKS
    */
   async getTemplateDimensions(templateType: string, printSize: PrintSize): Promise<{ width: number; height: number }> {

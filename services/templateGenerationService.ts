@@ -1,5 +1,5 @@
 // Updated: Template generation service - PURE DATABASE-DRIVEN
-import { Template, Photo, TemplateGenerationOptions, GeneratedTemplate } from '../types';
+import { Template, Photo, TemplateGenerationOptions, GeneratedTemplate, PrintSize } from '../types';
 import { EXPORT_SETTINGS, ERROR_MESSAGES } from '../utils/constants';
 import { saveAs } from 'file-saver';
 import googleDriveService from './googleDriveService';
@@ -44,8 +44,8 @@ class TemplateGenerationService {
         throw new Error('Failed to initialize canvas');
       }
 
-      // Get dynamic dimensions for this template
-      const templateDimensions = await templateConfigService.getTemplateDimensions(template.type, '4R');
+      // Get dynamic dimensions for this template using its print size
+      const templateDimensions = await templateConfigService.getTemplateDimensions(template.type, template.printSize);
       
       const settings = {
         ...EXPORT_SETTINGS,
@@ -57,8 +57,8 @@ class TemplateGenerationService {
       this.ctx.fillStyle = settings.backgroundColor || '#ffffff';
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-      // Get photo slots from database - NO FALLBACKS
-      const slots = await templateConfigService.getPhotoSlots(template.type, '4R');
+      // Get photo slots from database using template's print size - NO FALLBACKS
+      const slots = await templateConfigService.getPhotoSlots(template.type, template.printSize);
       
       // Load and draw photos
       const loadedPhotos: Photo[] = [];
@@ -245,8 +245,8 @@ class TemplateGenerationService {
     maxWidth: number = 400
   ): Promise<string> {
     try {
-      // Get dynamic dimensions for this template
-      const templateDimensions = await templateConfigService.getTemplateDimensions(template.type, '4R');
+      // Get dynamic dimensions for this template using its print size
+      const templateDimensions = await templateConfigService.getTemplateDimensions(template.type, template.printSize);
       
       // Create smaller canvas for preview
       const previewCanvas = document.createElement('canvas');
@@ -269,8 +269,8 @@ class TemplateGenerationService {
       previewCtx.fillStyle = '#ffffff';
       previewCtx.fillRect(0, 0, templateDimensions.width, templateDimensions.height);
 
-      // Get photo slots from database
-      const slots = await templateConfigService.getPhotoSlots(template.type, '4R');
+      // Get photo slots from database using template's print size
+      const slots = await templateConfigService.getPhotoSlots(template.type, template.printSize);
       
       // Draw photos or placeholders
       for (let i = 0; i < template.photoSlots.length; i++) {
@@ -326,12 +326,13 @@ class TemplateGenerationService {
 
   async createTemplateFromType(
     templateType: string,
-    photos: Photo[]
+    photos: Photo[],
+    printSize: PrintSize = '4R' // Default to 4R but make it configurable
   ): Promise<Template> {
     // Get pure database configuration - NO FALLBACKS
-    const dimensions = await templateConfigService.getTemplateDimensions(templateType, '4R');
+    const dimensions = await templateConfigService.getTemplateDimensions(templateType, printSize);
     const layout = await templateConfigService.getTemplateLayout(templateType);
-    const slots = await templateConfigService.getPhotoSlots(templateType, '4R');
+    const slots = await templateConfigService.getPhotoSlots(templateType, printSize);
     
     const photoSlots = slots.map((slot, index) => ({
       id: `slot_${index}`,
@@ -345,6 +346,7 @@ class TemplateGenerationService {
       id: `template_${Date.now()}`,
       type: templateType as any,
       name: `${templateType.charAt(0).toUpperCase() + templateType.slice(1)} Template`,
+      printSize, // Include the print size in the template
       photoSlots,
       dimensions,
       layout: {

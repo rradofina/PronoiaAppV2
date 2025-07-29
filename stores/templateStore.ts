@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { Template, TemplateSlot, Photo, TemplateType, TemplateTypeInfo } from '../types';
+import { Template, TemplateSlot, Photo, TemplateType, TemplateTypeInfo, PrintSize } from '../types';
 import { PngTemplate } from '../services/pngTemplateService';
 import { templateConfigService } from '../services/templateConfigService';
 
@@ -19,7 +19,7 @@ interface TemplateStore {
   pngTemplatePhotos: Record<string, Photo>; // holeId -> Photo mapping
   
   setTemplates: (templates: Template[]) => void;
-  addTemplate: (templateType: TemplateType) => void;
+  addTemplate: (templateType: TemplateType, printSize?: PrintSize) => Promise<void>;
   removeTemplate: (templateId: string) => void;
   selectTemplate: (template: Template | null) => void;
   updateTemplate: (templateId: string, updates: Partial<Template>) => void;
@@ -62,20 +62,24 @@ const useTemplateStore = create<TemplateStore>()(
     
     setTemplates: (templates) => set({ templates }),
     
-    addTemplate: async (templateType) => {
+    addTemplate: async (templateType, printSize) => {
       try {
         const state = get();
         const id = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const now = new Date();
         
+        // Resolve print size dynamically - NO HARDCODING
+        const resolvedPrintSize = printSize || await templateConfigService.getDefaultPrintSize(templateType);
+        
         // Get PURE database configuration - NO FALLBACKS
-        const dimensions = await templateConfigService.getTemplateDimensions(templateType, '4R');
+        const dimensions = await templateConfigService.getTemplateDimensions(templateType, resolvedPrintSize);
         const layout = await templateConfigService.getTemplateLayout(templateType);
         
         const template: Template = {
           id,
           type: templateType,
           name: `${templateType.charAt(0).toUpperCase() + templateType.slice(1)} Template`,
+          printSize: resolvedPrintSize, // Include the resolved print size
           photoSlots: [],
           dimensions,
           layout: {
