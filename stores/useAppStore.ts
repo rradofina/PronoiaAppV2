@@ -137,32 +137,12 @@ const initialLoadingState: LoadingState = {
   progress: undefined,
 };
 
-const createTemplate = (type: TemplateType): Template => {
+const createTemplate = async (type: TemplateType): Promise<Template> => {
   const id = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const now = new Date();
   
-  return {
-    id,
-    type,
-    name: `${type.charAt(0).toUpperCase() + type.slice(1)} Template`,
-    printSize: '4R' as const, // Legacy default - should migrate to new system
-    photoSlots: [], // Will be populated based on template type
-    dimensions: {
-      width: 1200,
-      height: 1800,
-    },
-    layout: {
-      type,
-      slots: {
-        count: type === 'solo' ? 1 : type === 'collage' ? 4 : type === 'photostrip' ? 6 : 1,
-        arrangement: type === 'collage' ? 'grid' : type === 'photostrip' ? 'strip' : 'single',
-        spacing: type === 'collage' ? 20 : type === 'photostrip' ? 15 : 0,
-        padding: type === 'photocard' ? 0 : type === 'solo' ? 60 : type === 'collage' ? 40 : 30,
-      },
-    },
-    createdAt: now,
-    updatedAt: now,
-  };
+  // REMOVED: No hardcoded values - everything comes from database
+  throw new Error('createTemplate is deprecated. Use templateStore.addTemplate() which queries database for configuration.');
 };
 
 const useAppStore = create<AppStore>()(
@@ -198,12 +178,7 @@ const useAppStore = create<AppStore>()(
         selectedSlot: null,
         selectedPackage: null,
         clientName: '',
-        templateCounts: {
-          solo: 0,
-          collage: 0,
-          photocard: 0,
-          photostrip: 0,
-        },
+        templateCounts: {}, // Dynamic template counts - populated by templateStore.loadTemplateTypes()
         packages: [
           { 
             id: 'A', 
@@ -234,40 +209,7 @@ const useAppStore = create<AppStore>()(
             description: 'Complete collection for special occasions'
           },
         ],
-        templateTypes: [
-          {
-            id: 'solo',
-            name: 'Solo Print',
-            description: 'Single photo with white border',
-            icon: '🖼️',
-            preview: 'One large photo with elegant white border',
-            slots: 1
-          },
-          {
-            id: 'collage',
-            name: 'Collage Print',
-            description: '4 photos in 2x2 grid layout',
-            icon: '🏁',
-            preview: 'Four photos arranged in a perfect grid',
-            slots: 4
-          },
-          {
-            id: 'photocard',
-            name: 'Photocard Print',
-            description: '4 photos edge-to-edge, no borders',
-            icon: '🎴',
-            preview: 'Four photos seamlessly connected without borders',
-            slots: 4
-          },
-          {
-            id: 'photostrip',
-            name: 'Photo Strip Print',
-            description: '6 photos in 3 rows of 2',
-            icon: '📸',
-            preview: 'Six photos arranged in three horizontal rows',
-            slots: 6
-          }
-        ],
+        templateTypes: [], // Dynamic template types - populated by templateStore.loadTemplateTypes()
 
         // Actions for new state
         setCurrentScreen: (screen) => set({ currentScreen: screen }),
@@ -355,21 +297,13 @@ const useAppStore = create<AppStore>()(
         },
 
         // Template actions
-        addTemplate: (templateType) => {
+        addTemplate: async (templateType) => {
           const state = get();
           if (!state.canAddTemplate()) return;
 
-          const template = createTemplate(templateType);
-          
-          set((state) => ({
-            templates: [...state.templates, template],
-            session: state.session ? {
-              ...state.session,
-              selectedTemplates: [...state.session.selectedTemplates, template],
-              usedTemplates: state.session.usedTemplates + 1,
-              updatedAt: new Date(),
-            } : null,
-          }));
+          // DEPRECATED: This method is deprecated in favor of templateStore.addTemplate()
+          // which properly queries the database for template configuration
+          throw new Error('addTemplate is deprecated. Use templateStore.addTemplate() instead for database-driven templates.');
         },
 
         removeTemplate: (templateId) => set((state) => ({

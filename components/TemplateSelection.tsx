@@ -39,9 +39,8 @@ export default function TemplateSelection() {
     const loadTemplateTypes = async () => {
       try {
         setIsLoadingTypes(true);
-        // Get unique template types for the selected package's print size
-        const printSize = selectedPackage?.print_size || '4R';
-        const types = await manualTemplateService.getUniqueTemplateTypes(printSize);
+        // Get all unique template types (not filtering by print size since Package doesn't have print_size)
+        const types = await manualTemplateService.getUniqueTemplateTypes();
         setAvailableTemplateTypes(types);
         console.log('📋 Loaded dynamic template types:', types);
       } catch (error) {
@@ -54,7 +53,7 @@ export default function TemplateSelection() {
     };
 
     loadTemplateTypes();
-  }, [selectedPackage?.print_size]);
+  }, [selectedPackage]);
 
   const handleTemplateToggle = (templateType: TemplateType) => {
     if (selectedTypes.includes(templateType)) {
@@ -126,10 +125,10 @@ export default function TemplateSelection() {
           Select Template Types
         </h1>
         <p className="text-lg text-gray-600 mb-4">
-          Choose up to {session?.maxTemplates || selectedPackage.template_count} template types for {session?.clientName || 'Client'}
+          Choose up to {session?.maxTemplates || selectedPackage.templateCount} template types for {session?.clientName || 'Client'}
         </p>
         <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
-          <span>🎯 {templates.length} / {session?.maxTemplates || selectedPackage.template_count} selected</span>
+          <span>🎯 {templates.length} / {session?.maxTemplates || selectedPackage.templateCount} selected</span>
           <span>•</span>
           <span>📋 {getRemainingTemplates()} remaining</span>
         </div>

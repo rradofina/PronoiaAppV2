@@ -154,54 +154,9 @@ export const validateImageUrl = (url: string): boolean => {
   return extension ? SUPPORTED_IMAGE_EXTENSIONS.indexOf(`.${extension}`) !== -1 : false;
 };
 
-// Print Size Configurations for Template Builder
-export const PRINT_SIZES: Record<string, any> = {
-  '4R': {
-    name: '4R' as const,
-    label: '4R (4×6")',
-    dimensions: {
-      width: 1200,
-      height: 1800,
-      dpi: 300,
-      inches: {
-        width: 4,
-        height: 6,
-      },
-    },
-    description: 'Standard 4×6 inch photo print with custom layout support',
-    is_custom_layouts: true,
-  },
-  '5R': {
-    name: '5R' as const,
-    label: '5R (5×7")',
-    dimensions: {
-      width: 1500,
-      height: 2100,
-      dpi: 300,
-      inches: {
-        width: 5,
-        height: 7,
-      },
-    },
-    description: 'Standard 5×7 inch photo print, full-size only',
-    is_custom_layouts: false,
-  },
-  'A4': {
-    name: 'A4' as const,
-    label: 'A4 (8.3×11.7")',
-    dimensions: {
-      width: 2480,
-      height: 3508,
-      dpi: 300,
-      inches: {
-        width: 8.27,
-        height: 11.69,
-      },
-    },
-    description: 'Standard A4 paper size, full-size only',
-    is_custom_layouts: false,
-  },
-};
+// REMOVED: Print size configurations are now loaded from database
+// Use templateConfigService.getAvailablePrintSizes() to get dynamic print sizes
+// No hardcoded print size configurations - everything comes from manual_templates table
 
 // REMOVED: No legacy template types - everything must come from database
 // Use templateConfigService.getTemplateTypes() directly
@@ -241,57 +196,9 @@ export const TEMPLATE_BUILDER = {
     AUTO_SCROLL_MARGIN: 50,
   },
   
-  // Layout presets
-  LAYOUT_PRESETS: {
-    '4R': {
-      'Solo Portrait': {
-        type: 'solo',
-        slots: [{
-          x: 60, y: 60, width: 1080, height: 1680, aspect_ratio: 'free'
-        }]
-      },
-      'Classic Collage': {
-        type: 'collage',
-        slots: [
-          { x: 40, y: 40, width: 530, height: 870, aspect_ratio: '2:3' },
-          { x: 630, y: 40, width: 530, height: 870, aspect_ratio: '2:3' },
-          { x: 40, y: 950, width: 530, height: 870, aspect_ratio: '2:3' },
-          { x: 630, y: 950, width: 530, height: 870, aspect_ratio: '2:3' }
-        ]
-      },
-      'Photo Strip': {
-        type: 'photostrip',
-        slots: [
-          { x: 30, y: 30, width: 570, height: 280, aspect_ratio: '2:1' },
-          { x: 630, y: 30, width: 570, height: 280, aspect_ratio: '2:1' },
-          { x: 30, y: 325, width: 570, height: 280, aspect_ratio: '2:1' },
-          { x: 630, y: 325, width: 570, height: 280, aspect_ratio: '2:1' },
-          { x: 30, y: 620, width: 570, height: 280, aspect_ratio: '2:1' },
-          { x: 630, y: 620, width: 570, height: 280, aspect_ratio: '2:1' }
-        ]
-      }
-    },
-    '5R': {
-      'Full Portrait': {
-        type: 'simple',
-        slots: [{ x: 0, y: 0, width: 1500, height: 2100, aspect_ratio: '5:7' }]
-      },
-      'Full Landscape': {
-        type: 'simple',
-        slots: [{ x: 0, y: 0, width: 2100, height: 1500, aspect_ratio: '7:5' }]
-      }
-    },
-    'A4': {
-      'Full Portrait': {
-        type: 'simple',
-        slots: [{ x: 0, y: 0, width: 2480, height: 3508, aspect_ratio: '210:297' }]
-      },
-      'Full Landscape': {
-        type: 'simple',
-        slots: [{ x: 0, y: 0, width: 3508, height: 2480, aspect_ratio: '297:210' }]
-      }
-    }
-  },
+  // REMOVED: Layout presets are now database-driven
+  // Use templateConfigService.getPhotoSlots() to get actual template layouts from database
+  // No hardcoded layout presets - everything comes from manual_templates holes_data
   
   // Common aspect ratios for photo slots
   ASPECT_RATIOS: [

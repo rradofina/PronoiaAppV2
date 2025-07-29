@@ -172,7 +172,7 @@ export interface TemplateSlot {
   templateId: string;
   templateName: string;
   templateType: TemplateType;
-  printSize?: '4R' | '5R' | 'A4';
+  printSize?: PrintSize; // Dynamic print sizes from database
   slotIndex: number;
   photoId?: string;
   transform?: ContainerTransform | PhotoTransform; // Support both formats
@@ -373,7 +373,7 @@ export interface LoadingState {
 }
 
 // Custom Template System Types
-export type PrintSize = '4R' | '5R' | 'A4';
+export type PrintSize = string; // Dynamic print sizes from database
 export type PrintOrientation = 'portrait' | 'landscape';
 
 export interface CustomPhotoSlot {

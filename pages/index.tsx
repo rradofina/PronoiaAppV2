@@ -19,7 +19,7 @@ import googleDriveService from '../services/googleDriveService';
 import { manualTemplateService } from '../services/manualTemplateService';
 import { manualPackageService } from '../services/manualPackageService';
 import { templateCacheService } from '../services/templateCacheService';
-import { PRINT_SIZES } from '../utils/constants';
+import { printSizeService } from '../services/printSizeService';
 
 declare global {
   interface Window {
@@ -812,7 +812,7 @@ export default function Home() {
     setAdditionalPrints(newAdditionalPrints);
     
     // Check if current template count exceeds new total allowed prints
-    const newTotalAllowed = (selectedPackage?.template_count || 0) + newAdditionalPrints;
+    const newTotalAllowed = (selectedPackage?.templateCount || 0) + newAdditionalPrints;
     const currentTemplateTotal = getTotalTemplateCount();
     
     if (currentTemplateTotal > newTotalAllowed) {
@@ -843,7 +843,7 @@ export default function Home() {
 
   // Helper function to get total allowed prints (base package + additional)
   const getTotalAllowedPrints = () => {
-    const basePrints = selectedPackage?.template_count || 0;
+    const basePrints = selectedPackage?.templateCount || 0;
     return basePrints + additionalPrints;
   };
 
@@ -1031,7 +1031,7 @@ export default function Home() {
           totalTemplates: allTemplates.length,
           typeBreakdown: loadedTypes.map(type => ({
             type,
-            count: allTemplates.filter(t => t.template_type === type).length
+            count: allTemplates.filter(t => t && t.template_type === type).length
           }))
         });
       } catch (error) {

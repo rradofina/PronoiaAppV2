@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '../../../components/admin/AdminLayout';
 import { PngTemplate, pngTemplateService } from '../../../services/pngTemplateService';
 import { PrintSize } from '../../../types';
-import { PRINT_SIZES } from '../../../utils/constants';
+import { printSizeService } from '../../../services/printSizeService';
 import googleDriveService from '../../../services/googleDriveService';
 import useAuthStore from '../../../stores/authStore';
 import TemplateExportModal from '../../../components/TemplateExportModal';
@@ -57,7 +57,8 @@ function PngTemplateCard({ template, onRefresh }: PngTemplateCardProps) {
 
 export default function PngTemplateManagement() {
   const [templates, setTemplates] = useState<PngTemplate[]>([]);
-  const [selectedPrintSize, setSelectedPrintSize] = useState<PrintSize>('4R');
+  const [selectedPrintSize, setSelectedPrintSize] = useState<PrintSize>('');
+  const [availablePrintSizes, setAvailablePrintSizes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [folderInfo, setFolderInfo] = useState<{id: string; name: string; url: string} | null>(null);
@@ -66,6 +67,28 @@ export default function PngTemplateManagement() {
   const [showImportModal, setShowImportModal] = useState(false);
   
   const { googleAuth } = useAuthStore();
+
+  // Load available print sizes dynamically
+  useEffect(() => {
+    const loadPrintSizes = async () => {
+      try {
+        const configs = await printSizeService.getAvailablePrintSizes();
+        const sizes = configs.map(config => config.name);
+        setAvailablePrintSizes(sizes);
+        
+        // Set first available print size as default
+        if (sizes.length > 0 && !selectedPrintSize) {
+          setSelectedPrintSize(sizes[0]);
+        }
+      } catch (error) {
+        console.error('Error loading print sizes:', error);
+        // Fallback to empty array if service fails
+        setAvailablePrintSizes([]);
+      }
+    };
+
+    loadPrintSizes();
+  }, [selectedPrintSize]);
 
   // Initialize Google Drive service with stored authentication
   useEffect(() => {
@@ -220,7 +243,7 @@ export default function PngTemplateManagement() {
           <div className="flex items-center space-x-4">
             <label className="text-sm font-medium text-gray-700">Print Size:</label>
             <div className="flex space-x-2">
-              {Object.keys(PRINT_SIZES).map((size) => (
+              {availablePrintSizes.map((size) => (
                 <button
                   key={size}
                   onClick={() => setSelectedPrintSize(size as PrintSize)}

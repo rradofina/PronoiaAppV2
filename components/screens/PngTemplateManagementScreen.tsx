@@ -224,8 +224,8 @@ export default function PngTemplateManagementScreen({
     name: '',
     description: '',
     drive_file_id: '',
-    template_type: 'solo', // Default template type - now dynamic
-    print_size: '4R' as '4R' | '5R' | 'A4'
+    template_type: '', // Dynamic template type - populated from database
+    print_size: '' // Dynamic print size - populated from database
   });
 
   const loadTemplates = async (forceRefresh = false) => {
