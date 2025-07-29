@@ -19,7 +19,7 @@ import googleDriveService from '../services/googleDriveService';
 import { manualTemplateService } from '../services/manualTemplateService';
 import { manualPackageService } from '../services/manualPackageService';
 import { templateCacheService } from '../services/templateCacheService';
-import { TEMPLATE_TYPES, PRINT_SIZES } from '../utils/constants';
+import { PRINT_SIZES } from '../utils/constants';
 
 declare global {
   interface Window {

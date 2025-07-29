@@ -1,19 +1,27 @@
-// Updated: Template generation service.
+// Updated: Template generation service - PURE DATABASE-DRIVEN
 import { Template, Photo, TemplateGenerationOptions, GeneratedTemplate } from '../types';
-import { TEMPLATE_DIMENSIONS, EXPORT_SETTINGS, calculatePhotoSlots, ERROR_MESSAGES } from '../utils/constants';
+import { EXPORT_SETTINGS, ERROR_MESSAGES } from '../utils/constants';
 import { saveAs } from 'file-saver';
 import googleDriveService from './googleDriveService';
+import { templateConfigService } from './templateConfigService';
 
 class TemplateGenerationService {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
 
-  private initializeCanvas(): void {
+  private async initializeCanvas(template?: Template): Promise<void> {
     if (typeof window === 'undefined') return;
 
+    let dimensions = { width: 1200, height: 1800 }; // Default fallback
+    
+    if (template) {
+      // Get dynamic dimensions from template configuration
+      dimensions = await templateConfigService.getTemplateDimensions(template.type, '4R');
+    }
+
     this.canvas = document.createElement('canvas');
-    this.canvas.width = TEMPLATE_DIMENSIONS.width;
-    this.canvas.height = TEMPLATE_DIMENSIONS.height;
+    this.canvas.width = dimensions.width;
+    this.canvas.height = dimensions.height;
     this.ctx = this.canvas.getContext('2d');
 
     if (this.ctx) {
@@ -29,25 +37,28 @@ class TemplateGenerationService {
   ): Promise<GeneratedTemplate> {
     try {
       if (!this.canvas || !this.ctx) {
-        this.initializeCanvas();
+        await this.initializeCanvas(template);
       }
 
       if (!this.canvas || !this.ctx) {
         throw new Error('Failed to initialize canvas');
       }
 
+      // Get dynamic dimensions for this template
+      const templateDimensions = await templateConfigService.getTemplateDimensions(template.type, '4R');
+      
       const settings = {
         ...EXPORT_SETTINGS,
         ...options,
-        dimensions: { ...TEMPLATE_DIMENSIONS },
+        dimensions: templateDimensions,
       };
 
       // Clear canvas
       this.ctx.fillStyle = settings.backgroundColor || '#ffffff';
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-      // Calculate photo slots based on template type
-      const slots = calculatePhotoSlots(template.type);
+      // Get photo slots from database - NO FALLBACKS
+      const slots = await templateConfigService.getPhotoSlots(template.type, '4R');
       
       // Load and draw photos
       const loadedPhotos: Photo[] = [];
@@ -113,15 +124,19 @@ class TemplateGenerationService {
     let offsetX = 0;
     let offsetY = 0;
 
-    if (templateType === 'photocard') {
-      // For photocard, fill the entire area (crop if necessary)
+    // Get template configuration to determine rendering behavior
+    const layout = await templateConfigService.getTemplateLayout(templateType);
+    const fillSlot = layout.padding === 0; // Templates with no padding fill the slot
+
+    if (fillSlot) {
+      // Fill the entire area (crop if necessary)
       scale = Math.max(scaleX, scaleY);
       drawWidth = img.width * scale;
       drawHeight = img.height * scale;
       offsetX = (width - drawWidth) / 2;
       offsetY = (height - drawHeight) / 2;
     } else {
-      // For other templates, fit within the slot (letterbox if necessary)
+      // Fit within the slot (letterbox if necessary)
       scale = Math.min(scaleX, scaleY);
       drawWidth = img.width * scale;
       drawHeight = img.height * scale;
@@ -138,8 +153,8 @@ class TemplateGenerationService {
       drawHeight
     );
 
-    // Add border for solo template
-    if (templateType === 'solo') {
+    // Add border for templates with high padding (typically solo templates)
+    if (layout.padding >= 50) {
       this.ctx.strokeStyle = '#cccccc';
       this.ctx.lineWidth = 2;
       this.ctx.strokeRect(x, y, width, height);
@@ -230,6 +245,9 @@ class TemplateGenerationService {
     maxWidth: number = 400
   ): Promise<string> {
     try {
+      // Get dynamic dimensions for this template
+      const templateDimensions = await templateConfigService.getTemplateDimensions(template.type, '4R');
+      
       // Create smaller canvas for preview
       const previewCanvas = document.createElement('canvas');
       const previewCtx = previewCanvas.getContext('2d');
@@ -238,9 +256,9 @@ class TemplateGenerationService {
         throw new Error('Failed to create preview canvas');
       }
 
-      const scale = maxWidth / TEMPLATE_DIMENSIONS.width;
-      previewCanvas.width = TEMPLATE_DIMENSIONS.width * scale;
-      previewCanvas.height = TEMPLATE_DIMENSIONS.height * scale;
+      const scale = maxWidth / templateDimensions.width;
+      previewCanvas.width = templateDimensions.width * scale;
+      previewCanvas.height = templateDimensions.height * scale;
 
       // Enable high-quality rendering
       previewCtx.imageSmoothingEnabled = true;
@@ -249,10 +267,10 @@ class TemplateGenerationService {
 
       // Clear canvas
       previewCtx.fillStyle = '#ffffff';
-      previewCtx.fillRect(0, 0, TEMPLATE_DIMENSIONS.width, TEMPLATE_DIMENSIONS.height);
+      previewCtx.fillRect(0, 0, templateDimensions.width, templateDimensions.height);
 
-      // Calculate photo slots
-      const slots = calculatePhotoSlots(template.type);
+      // Get photo slots from database
+      const slots = await templateConfigService.getPhotoSlots(template.type, '4R');
       
       // Draw photos or placeholders
       for (let i = 0; i < template.photoSlots.length; i++) {
@@ -310,7 +328,11 @@ class TemplateGenerationService {
     templateType: string,
     photos: Photo[]
   ): Promise<Template> {
-    const slots = calculatePhotoSlots(templateType as any);
+    // Get pure database configuration - NO FALLBACKS
+    const dimensions = await templateConfigService.getTemplateDimensions(templateType, '4R');
+    const layout = await templateConfigService.getTemplateLayout(templateType);
+    const slots = await templateConfigService.getPhotoSlots(templateType, '4R');
+    
     const photoSlots = slots.map((slot, index) => ({
       id: `slot_${index}`,
       position: slot,
@@ -324,14 +346,14 @@ class TemplateGenerationService {
       type: templateType as any,
       name: `${templateType.charAt(0).toUpperCase() + templateType.slice(1)} Template`,
       photoSlots,
-      dimensions: TEMPLATE_DIMENSIONS,
+      dimensions,
       layout: {
         type: templateType as any,
         slots: {
-          count: slots.length,
-          arrangement: templateType === 'collage' ? 'grid' : templateType === 'photostrip' ? 'strip' : 'single',
-          spacing: templateType === 'collage' ? 20 : templateType === 'photostrip' ? 15 : 0,
-          padding: templateType === 'photocard' ? 0 : templateType === 'solo' ? 60 : templateType === 'collage' ? 40 : 30,
+          count: layout.slots,
+          arrangement: layout.arrangement,
+          spacing: layout.spacing,
+          padding: layout.padding,
         },
       },
       createdAt: new Date(),

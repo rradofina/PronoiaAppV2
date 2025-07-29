@@ -2,61 +2,14 @@ import { TemplateType, TemplateLayout } from '../types';
 
 // Legacy packages removed - now using manual package management system
 
-// Template dimensions (4R size: 4x6 inches at 300 DPI)
-export const TEMPLATE_DIMENSIONS = {
-  width: 1200,
-  height: 1800,
-  dpi: 300,
-  aspectRatio: 2 / 3,
-};
+// REMOVED: Template dimensions are now loaded from database
+// No hardcoded dimensions - everything comes from manual_templates table
 
-// Template layouts configuration
-export const TEMPLATE_LAYOUTS: Record<TemplateType, TemplateLayout> = {
-  solo: {
-    type: 'solo',
-    slots: {
-      count: 1,
-      arrangement: 'single',
-      spacing: 0,
-      padding: 60,
-    },
-  },
-  collage: {
-    type: 'collage',
-    slots: {
-      count: 4,
-      arrangement: 'grid',
-      spacing: 20,
-      padding: 40,
-    },
-  },
-  photocard: {
-    type: 'photocard',
-    slots: {
-      count: 1,
-      arrangement: 'single',
-      spacing: 0,
-      padding: 0,
-    },
-  },
-  photostrip: {
-    type: 'photostrip',
-    slots: {
-      count: 6,
-      arrangement: 'strip',
-      spacing: 15,
-      padding: 30,
-    },
-  },
-};
+// REMOVED: Template layouts are now calculated from database holes_data
+// No hardcoded layouts - everything comes from manual_templates table
 
-// Template type descriptions
-export const TEMPLATE_DESCRIPTIONS: Record<TemplateType, string> = {
-  solo: 'Single photo with white border/matting',
-  collage: '4 photos in a grid layout with spacing',
-  photocard: 'Full bleed photo with no margins',
-  photostrip: '6 photos arranged in a vertical strip',
-};
+// REMOVED: Template descriptions are now loaded from database
+// No hardcoded descriptions - everything comes from manual_templates table
 
 // Google Drive configuration
 export const GOOGLE_DRIVE_CONFIG = {
@@ -174,56 +127,11 @@ export const DEFAULTS = {
   CACHE_DURATION: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
 };
 
-// Template slot calculations
-export const calculatePhotoSlots = (templateType: TemplateType) => {
-  const layout = TEMPLATE_LAYOUTS[templateType];
-  const { width, height } = TEMPLATE_DIMENSIONS;
-  const { padding, spacing } = layout.slots;
-  
-  switch (templateType) {
-    case 'solo':
-      return [
-        {
-          x: padding,
-          y: padding,
-          width: width - 2 * padding,
-          height: height - 2 * padding,
-        },
-      ];
-    
-    case 'collage':
-      const collageCellWidth = (width - 2 * padding - spacing) / 2;
-      const collageCellHeight = (height - 2 * padding - spacing) / 2;
-      return [
-        { x: padding, y: padding, width: collageCellWidth, height: collageCellHeight },
-        { x: padding + collageCellWidth + spacing, y: padding, width: collageCellWidth, height: collageCellHeight },
-        { x: padding, y: padding + collageCellHeight + spacing, width: collageCellWidth, height: collageCellHeight },
-        { x: padding + collageCellWidth + spacing, y: padding + collageCellHeight + spacing, width: collageCellWidth, height: collageCellHeight },
-      ];
-    
-    case 'photocard':
-      return [
-        {
-          x: 0,
-          y: 0,
-          width: width,
-          height: height,
-        },
-      ];
-    
-    case 'photostrip':
-      const stripCellHeight = (height - 2 * padding - 5 * spacing) / 6;
-      const stripCellWidth = width - 2 * padding;
-      return Array.from({ length: 6 }, (_, i) => ({
-        x: padding,
-        y: padding + i * (stripCellHeight + spacing),
-        width: stripCellWidth,
-        height: stripCellHeight,
-      }));
-    
-    default:
-      return [];
-  }
+// REMOVED: Photo slot calculations are now pure database-driven
+// Use templateConfigService.getPhotoSlots() instead
+// This function is deprecated and should not be used
+export const calculatePhotoSlots = () => {
+  throw new Error('calculatePhotoSlots is deprecated. Use templateConfigService.getPhotoSlots() instead.');
 };
 
 // Validation functions
@@ -233,6 +141,9 @@ export const validateTemplateType = (templateType: string): templateType is Temp
   // Template types are now dynamic - any non-empty string is valid
   return typeof templateType === 'string' && templateType.trim().length > 0;
 };
+
+// REMOVED: Template type validation is now handled by templateConfigService
+// Use templateConfigService.getTemplateTypeConfig() to check if a template type exists
 
 export const validateImageFile = (file: File): boolean => {
   return SUPPORTED_IMAGE_TYPES.indexOf(file.type) !== -1;
@@ -292,12 +203,8 @@ export const PRINT_SIZES: Record<string, any> = {
   },
 };
 
-export const TEMPLATE_TYPES = [
-  { id: 'solo', name: 'Solo Print', slots: 1, allowedSizes: ['4R', '5R', 'A4'] },
-  { id: 'collage', name: 'Collage Print', slots: 4, allowedSizes: ['4R'] },
-  { id: 'photocard', name: 'Photocard Print', slots: 4, allowedSizes: ['4R'] },
-  { id: 'photostrip', name: 'Photo Strip Print', slots: 6, allowedSizes: ['4R'] },
-];
+// REMOVED: No legacy template types - everything must come from database
+// Use templateConfigService.getTemplateTypes() directly
 
 // Legacy template cycling removed - now using configured package templates
 

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { Template, TemplateSlot, Photo, TemplateType, TemplateTypeInfo } from '../types';
 import { PngTemplate } from '../services/pngTemplateService';
+import { templateConfigService } from '../services/templateConfigService';
 
 interface TemplateStore {
   templates: Template[];
@@ -10,6 +11,7 @@ interface TemplateStore {
   selectedSlot: TemplateSlot | null;
   templateCounts: Record<string, number>;
   templateTypes: TemplateTypeInfo[];
+  loadingTemplateTypes: boolean;
   
   // PNG Template Support
   pngTemplates: PngTemplate[];
@@ -26,6 +28,8 @@ interface TemplateStore {
   setTemplateCounts: (counts: Record<string, number>) => void;
   handleTemplateCountChange: (templateId: string, change: number, customLimit?: number) => void;
   getTotalTemplateCount: () => number;
+  loadTemplateTypes: () => Promise<void>;
+  refreshTemplateTypes: () => Promise<void>;
   selectPhotoForSlot: (templateId: string, slotId: string, photo: Photo) => void;
   removePhotoFromSlot: (templateId: string, slotId: string) => void;
   isTemplateComplete: (templateId: string) => boolean;
@@ -47,84 +51,53 @@ const useTemplateStore = create<TemplateStore>()(
     selectedTemplate: null,
     templateSlots: [],
     selectedSlot: null,
-    templateCounts: {
-      solo: 0,
-      collage: 0,
-      photocard: 0,
-      photostrip: 0,
-    },
+    templateCounts: {},
+    loadingTemplateTypes: false,
     
     // PNG Template Initial State
     pngTemplates: [],
     selectedPngTemplate: null,
     pngTemplatePhotos: {},
-    templateTypes: [
-      {
-        id: 'solo',
-        name: 'Solo Print',
-        description: 'Single photo with white border',
-        icon: '🖼️',
-        preview: 'One large photo with elegant white border',
-        slots: 1
-      },
-      {
-        id: 'collage',
-        name: 'Collage Print',
-        description: '4 photos in 2x2 grid layout',
-        icon: '🏁',
-        preview: 'Four photos arranged in a perfect grid',
-        slots: 4
-      },
-      {
-        id: 'photocard',
-        name: 'Photocard Print',
-        description: '4 photos edge-to-edge, no borders',
-        icon: '🎴',
-        preview: 'Four photos seamlessly connected without borders',
-        slots: 4
-      },
-      {
-        id: 'photostrip',
-        name: 'Photo Strip Print',
-        description: '6 photos in 3 rows of 2',
-        icon: '📸',
-        preview: 'Six photos arranged in three horizontal rows',
-        slots: 6
-      }
-    ],
+    templateTypes: [],
     
     setTemplates: (templates) => set({ templates }),
     
-    addTemplate: (templateType) => {
-      const state = get();
-      const id = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const now = new Date();
-      
-      const template: Template = {
-        id,
-        type: templateType,
-        name: `${templateType.charAt(0).toUpperCase() + templateType.slice(1)} Template`,
-        photoSlots: [],
-        dimensions: {
-          width: 1200,
-          height: 1800,
-        },
-        layout: {
+    addTemplate: async (templateType) => {
+      try {
+        const state = get();
+        const id = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const now = new Date();
+        
+        // Get PURE database configuration - NO FALLBACKS
+        const dimensions = await templateConfigService.getTemplateDimensions(templateType, '4R');
+        const layout = await templateConfigService.getTemplateLayout(templateType);
+        
+        const template: Template = {
+          id,
           type: templateType,
-          slots: {
-            count: templateType === 'solo' ? 1 : templateType === 'collage' ? 4 : templateType === 'photostrip' ? 6 : 1,
-            arrangement: templateType === 'collage' ? 'grid' : templateType === 'photostrip' ? 'strip' : 'single',
-            spacing: templateType === 'collage' ? 20 : templateType === 'photostrip' ? 15 : 0,
-            padding: templateType === 'photocard' ? 0 : templateType === 'solo' ? 60 : templateType === 'collage' ? 40 : 30,
+          name: `${templateType.charAt(0).toUpperCase() + templateType.slice(1)} Template`,
+          photoSlots: [],
+          dimensions,
+          layout: {
+            type: templateType,
+            slots: {
+              count: layout.slots,
+              arrangement: layout.arrangement,
+              spacing: layout.spacing,
+              padding: layout.padding,
+            },
           },
-        },
-        createdAt: now,
-        updatedAt: now,
-      };
-      
-      set((state) => ({
-        templates: [...state.templates, template],
-      }));
+          createdAt: now,
+          updatedAt: now,
+        };
+        
+        set((state) => ({
+          templates: [...state.templates, template],
+        }));
+      } catch (error) {
+        console.error(`❌ Failed to add template '${templateType}' - not found in database:`, error);
+        throw error;
+      }
     },
     
     removeTemplate: (templateId) => set((state) => ({
@@ -201,13 +174,35 @@ const useTemplateStore = create<TemplateStore>()(
       selectedTemplate: null,
       templateSlots: [],
       selectedSlot: null,
-      templateCounts: {
-        solo: 0,
-        collage: 0,
-        photocard: 0,
-        photostrip: 0,
-      },
+      templateCounts: {},
     }),
+    
+    loadTemplateTypes: async () => {
+      set({ loadingTemplateTypes: true });
+      try {
+        const templateTypeInfos = await templateConfigService.getTemplateTypeInfos();
+        
+        // Initialize template counts for all available types
+        const initialCounts: Record<string, number> = {};
+        templateTypeInfos.forEach(type => {
+          initialCounts[type.id] = 0;
+        });
+        
+        set({
+          templateTypes: templateTypeInfos,
+          templateCounts: initialCounts,
+          loadingTemplateTypes: false
+        });
+      } catch (error) {
+        console.error('Failed to load template types:', error);
+        set({ loadingTemplateTypes: false });
+      }
+    },
+    
+    refreshTemplateTypes: async () => {
+      templateConfigService.clearCache();
+      await get().loadTemplateTypes();
+    },
     
     // PNG Template Actions
     setPngTemplates: (templates) => set({ pngTemplates: templates }),

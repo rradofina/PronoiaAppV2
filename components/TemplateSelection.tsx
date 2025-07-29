@@ -6,7 +6,8 @@ import clsx from 'clsx';
 // Store and Utils
 import useAppStore from '../stores/useAppStore';
 import useSessionStore from '../stores/sessionStore';
-import { TEMPLATE_LAYOUTS, TEMPLATE_DESCRIPTIONS } from '../utils/constants';
+// REMOVED: Template layouts and descriptions now come from database
+// import { TEMPLATE_LAYOUTS, TEMPLATE_DESCRIPTIONS } from '../utils/constants';
 import { manualTemplateService } from '../services/manualTemplateService';
 
 // Types
@@ -86,33 +87,14 @@ export default function TemplateSelection() {
   };
 
   const getTemplatePreview = (templateType: TemplateType) => {
-    const layout = TEMPLATE_LAYOUTS[templateType];
-    const { count, arrangement } = layout.slots;
-
+    // Simplified preview - we'll show a generic template icon
     return (
       <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
-        <div className={clsx(
-          'grid',
-          'gap-1',
-          {
-            'grid-cols-1': templateType === 'solo' || templateType === 'photocard' || templateType === 'photostrip',
-            'grid-cols-2': templateType === 'collage',
-          }
-        )}>
-          {Array.from({ length: Math.min(count, 6) }, (_, i) => (
-            <div
-              key={i}
-              className={clsx(
-                'bg-gray-300',
-                'rounded',
-                {
-                  'w-8 h-4': templateType === 'photostrip',
-                  'w-6 h-6': templateType === 'collage',
-                  'w-12 h-16': templateType !== 'photostrip' && templateType !== 'collage',
-                }
-              )}
-            />
-          ))}
+        <div className="text-center">
+          <div className="text-2xl mb-2">📋</div>
+          <div className="text-xs text-gray-600 capitalize">
+            {templateType} Template
+          </div>
         </div>
       </div>
     );
@@ -214,12 +196,12 @@ export default function TemplateSelection() {
                     {templateType} Template
                   </h3>
                   <p className="text-gray-600 text-sm mb-3">
-                    {TEMPLATE_DESCRIPTIONS[templateType]}
+                    Template layout for {templateType} prints
                   </p>
 
                   {/* Template Details */}
                   <div className="flex items-center justify-center space-x-4 text-xs text-gray-500">
-                    <span>📐 {TEMPLATE_LAYOUTS[templateType].slots.count} photos</span>
+                    <span>📐 Template layout</span>
                     <span>•</span>
                     <span>📏 4R size</span>
                   </div>
