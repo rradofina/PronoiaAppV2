@@ -306,6 +306,10 @@ export default function PhotoSelectionScreen({
   const [selectionMode, setSelectionMode] = useState<'photo' | 'print'>('photo'); // Default to photo selection mode
   const [favoritedPhotos, setFavoritedPhotos] = useState<Set<string>>(new Set()); // Photo IDs that are favorited
   
+  // Bookmarks bar expansion state
+  const [isBookmarksExpanded, setIsBookmarksExpanded] = useState(false);
+
+  
   // Simplified workflow states
   const [viewMode, setViewMode] = useState<'normal' | 'photo-viewer' | 'sliding-templates' | 'template-first' | 'photo-selection' | 'inline-editing'>('normal');
   const [selectedPhotoForViewer, setSelectedPhotoForViewer] = useState<Photo | null>(null);
@@ -385,6 +389,11 @@ export default function PhotoSelectionScreen({
     setSelectedSlot(slot);
     const templateToEdit = templateSlots.filter(s => s.templateId === slot.templateId);
     setEditingTemplate(templateToEdit);
+    
+    // Trigger bookmarks expansion for manual slot selection in print mode
+    if (selectionMode === 'print') {
+      setIsBookmarksExpanded(true);
+    }
   };
 
   const handleInlineEditorClose = () => {
@@ -461,32 +470,46 @@ export default function PhotoSelectionScreen({
   
   // Photo-first workflow
   const handlePhotoClick = (photo: Photo) => {
-    console.log('🔧 handlePhotoClick called:', {
+    console.log('🔧 PHOTO CLICK DEBUG:', {
       photoId: photo.id,
       photoName: photo.name,
       currentViewMode: viewMode,
       currentSelectionMode: selectionMode,
       hasSelectedSlot: !!selectedSlot,
       selectedSlotId: selectedSlot?.id,
-      isInlineEditing: viewMode === 'inline-editing'
+      isInlineEditing: viewMode === 'inline-editing',
+      currentInlineEditingSlot: inlineEditingSlot?.id,
+      currentInlineEditingPhoto: inlineEditingPhoto?.name
     });
+
+    // Collapse bookmarks bar when photo is selected
+    if (isBookmarksExpanded) {
+      setIsBookmarksExpanded(false);
+    }
 
     // Check if we're in inline editing mode first
     if (viewMode === 'inline-editing') {
-      console.log('🔧 Photo clicked in inline editing mode - delegating to handleInlinePhotoSelect');
+      console.log('🔧 Already in inline editing mode - delegating to handleInlinePhotoSelect');
       handleInlinePhotoSelect(photo);
       return;
     }
     
     // In print mode with a selected slot, start inline editing
     if (selectionMode === 'print' && selectedSlot) {
-      console.log('🔧 Starting inline editing - print mode with selected slot:', selectedSlot.id);
+      console.log('🔧 STARTING INLINE EDITING:', {
+        slotId: selectedSlot.id,
+        photoName: photo.name,
+        photoId: photo.id
+      });
+      
       setInlineEditingSlot(selectedSlot);
       setInlineEditingPhoto(photo);
       setViewMode('inline-editing');
+      
+      console.log('🔧 Inline editing states set - should trigger UI update');
     } else {
       // In photo mode or print mode without selected slot, show photo viewer
-      console.log('🔧 Opening photo viewer - photo mode or no selected slot');
+      console.log('🔧 Opening photo viewer - no selected slot or wrong mode');
       setSelectedPhotoForViewer(photo);
       setViewMode('photo-viewer');
     }
@@ -517,13 +540,44 @@ export default function PhotoSelectionScreen({
   };
 
   const handleSlotSelectFromTemplate = (slot: TemplateSlot) => {
-    // Check if slot is empty - if so, start inline editing
-    if (!slot.photoId) {
-      console.log('🔧 Starting inline editing for empty slot:', slot.id);
-      setInlineEditingSlot(slot);
-      setViewMode('inline-editing');
-    } else {
-      setSelectedSlot(slot); // Just highlight the slot for filled slots
+    console.log('🔧 SLOT CLICK DEBUG:', {
+      slotId: slot.id,
+      hasPhoto: !!slot.photoId,
+      photoId: slot.photoId,
+      selectionMode
+    });
+
+    // INTUITIVE UX: Filled slots should be immediately editable
+    if (slot.photoId) {
+      console.log('🔧 Filled slot clicked - starting immediate inline editing');
+      
+      // Find the existing photo in the photos array
+      const existingPhoto = photos.find(photo => photo.id === slot.photoId);
+      
+      if (existingPhoto) {
+        console.log('🔧 Found existing photo, setting inline editing states:', {
+          photo: existingPhoto.name,
+          slotId: slot.id
+        });
+        
+        // Start inline editing immediately with the existing photo
+        setSelectedSlot(slot);
+        setInlineEditingSlot(slot);
+        setInlineEditingPhoto(existingPhoto);
+        setViewMode('inline-editing');
+        return; // Exit early - filled slots go straight to editing
+      } else {
+        console.warn('🔧 Photo not found in photos array:', slot.photoId);
+      }
+    }
+
+    // Empty slot behavior: select and expand bookmarks
+    console.log('🔧 Empty slot clicked - selecting and expanding bookmarks');
+    setSelectedSlot(slot);
+    
+    // Always trigger bookmarks expansion for manual slot selection in print mode
+    if (selectionMode === 'print') {
+      setIsBookmarksExpanded(true);
     }
   };
 
@@ -538,6 +592,11 @@ export default function PhotoSelectionScreen({
     // Only deselect if clicking directly on the background (not on child elements)
     if (event.target !== event.currentTarget) {
       return;
+    }
+
+    // Collapse bookmarks bar when clicking outside in print mode
+    if (isBookmarksExpanded) {
+      setIsBookmarksExpanded(false);
     }
 
     // Check if all templates are complete (all slots have photos)
@@ -650,6 +709,7 @@ export default function PhotoSelectionScreen({
     
     // Reset states and return to normal view
     console.log('🔧 Resetting view states and closing fullscreen editor');
+    setIsBookmarksExpanded(false); // Collapse bookmarks when applying photo
     resetViewStates();
   };
 
@@ -691,6 +751,7 @@ export default function PhotoSelectionScreen({
     setViewMode('normal');
     setInlineEditingSlot(null);
     setInlineEditingPhoto(null);
+    setIsBookmarksExpanded(false); // Collapse bookmarks when applying photo
   };
 
   const handleInlineCancel = () => {
@@ -698,6 +759,7 @@ export default function PhotoSelectionScreen({
     setViewMode('normal');
     setInlineEditingSlot(null);
     setInlineEditingPhoto(null);
+    setIsBookmarksExpanded(false); // Collapse bookmarks when canceling inline editing
   };
 
   const handleOverlayCancel = () => {
@@ -727,6 +789,8 @@ export default function PhotoSelectionScreen({
   // Mode toggling
   const handleModeToggle = () => {
     setSelectionMode(prev => prev === 'photo' ? 'print' : 'photo');
+    // Collapse bookmarks when switching modes
+    setIsBookmarksExpanded(false);
   };
 
   // Get photos used in templates
@@ -857,8 +921,8 @@ export default function PhotoSelectionScreen({
   return (
     <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ touchAction: 'pan-y' }}>
       
-      {/* Spotlight Overlay - Show in inline editing OR when slot selected in print mode */}
-      {(viewMode === 'inline-editing' || (selectedSlot && selectionMode === 'print')) && (
+      {/* Spotlight Overlay - Show only during inline editing for focused editing experience */}
+      {viewMode === 'inline-editing' && (
         <>
           {/* Mobile/Tablet: Full screen overlay with cutouts for favorites and selected slot */}
           <div 
@@ -965,8 +1029,9 @@ export default function PhotoSelectionScreen({
         </div>
 
         {/* Two-Mode Bottom Section - Mobile/Tablet */}
-        <div className="lg:hidden bg-white shadow-lg border-t flex-shrink-0 relative z-40" style={{ 
-          height: '140px', // Consistent height for both modes
+        <div className={`lg:hidden bg-white shadow-lg border-t flex-shrink-0 relative z-40 transition-all duration-300 ease-in-out ${
+          selectionMode === 'print' && isBookmarksExpanded ? 'h-64' : 'h-36'
+        }`} style={{ 
           touchAction: 'pan-x' // Allow horizontal scrolling for photo bar
         }}>
           {selectionMode === 'photo' ? (
@@ -979,6 +1044,7 @@ export default function PhotoSelectionScreen({
               layout="horizontal"
               showRemoveButtons={true}
               usedPhotoIds={getUsedPhotoIds()}
+              isExpanded={false}
             />
           ) : (
             // Print Filling Mode: Show Favorites Bar with controls
@@ -1023,6 +1089,7 @@ export default function PhotoSelectionScreen({
                   layout="horizontal"
                   showRemoveButtons={false}
                   usedPhotoIds={getUsedPhotoIds()}
+                  isExpanded={isBookmarksExpanded}
                 />
               </div>
             </div>
@@ -1049,6 +1116,7 @@ export default function PhotoSelectionScreen({
                   layout="vertical"
                   showRemoveButtons={true}
                   usedPhotoIds={getUsedPhotoIds()}
+                  isExpanded={isBookmarksExpanded}
                 />
               </div>
             </>
@@ -1082,6 +1150,7 @@ export default function PhotoSelectionScreen({
                   layout="vertical"
                   showRemoveButtons={false}
                   usedPhotoIds={getUsedPhotoIds()}
+                  isExpanded={isBookmarksExpanded}
                 />
               </div>
             </>

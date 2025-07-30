@@ -141,6 +141,20 @@ export default function PngTemplateVisual({
         const isInlineEditing = inlineEditingSlot?.id === slot.id;
         const hasInlinePhoto = isInlineEditing && inlineEditingPhoto;
         
+        // DEBUG: Log inline editing state for this slot
+        if (isSelected || isInlineEditing || hasInlinePhoto) {
+          console.log('🔧 TEMPLATE VISUAL DEBUG for slot', slot.id, ':', {
+            isSelected,
+            isInlineEditing,
+            hasInlinePhoto,
+            inlineEditingSlotId: inlineEditingSlot?.id,
+            inlineEditingPhotoName: inlineEditingPhoto?.name,
+            hasOnInlineApply: !!onInlineApply,
+            hasOnInlineCancel: !!onInlineCancel,
+            willShowInlineEditor: hasInlinePhoto && onInlineApply && onInlineCancel
+          });
+        }
+        
         // Debug transform values
         if (slot.transform) {
           if (isPhotoTransform(slot.transform)) {
@@ -165,7 +179,7 @@ export default function PngTemplateVisual({
             key={hole.id}
             className={`absolute transition-all duration-200 overflow-hidden ${
               isInlineEditing 
-                ? 'border-4 border-yellow-400 shadow-lg shadow-yellow-400/50 z-50 ring-2 ring-yellow-300' // Enhanced highlighting for inline editing
+                ? 'border-4 border-blue-400 shadow-lg shadow-blue-400/50 z-50 ring-2 ring-blue-300' // Enhanced highlighting for inline editing (changed to blue)
                 : isSelected 
                 ? 'border-4 border-blue-500 border-opacity-90 z-40 cursor-pointer shadow-md' // Above overlay (z-30)
                 : 'hover:border-2 hover:border-blue-300 hover:border-opacity-60 cursor-pointer'
@@ -177,6 +191,7 @@ export default function PngTemplateVisual({
               height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
             }}
             onClick={() => !isInlineEditing && onSlotClick(slot)}
+            title={slot.photoId ? "Click to edit this photo" : "Click to select slot"}
           >
             {hasInlinePhoto && onInlineApply && onInlineCancel ? (
               // Inline editing mode - show InlinePhotoEditor
