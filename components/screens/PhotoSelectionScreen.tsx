@@ -855,7 +855,7 @@ export default function PhotoSelectionScreen({
 
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ touchAction: 'pan-x pan-y' }}>
+    <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ touchAction: 'pan-y' }}>
       
       {/* Spotlight Overlay - Show in inline editing OR when slot selected in print mode */}
       {(viewMode === 'inline-editing' || (selectedSlot && selectionMode === 'print')) && (
@@ -951,7 +951,7 @@ export default function PhotoSelectionScreen({
                   </div>
                 )}
               </div>
-              <div className="flex-1 relative z-40" onClick={handleBackgroundClick}>
+              <div className="flex-1 relative z-40" onClick={handleBackgroundClick} style={{ touchAction: 'manipulation' }}>
                 <TemplateGrid
                   templateSlots={templateSlots}
                   photos={photos}
@@ -980,7 +980,7 @@ export default function PhotoSelectionScreen({
         {/* Two-Mode Bottom Section - Mobile/Tablet */}
         <div className="lg:hidden bg-white shadow-lg border-t flex-shrink-0 relative z-40" style={{ 
           height: '140px', // Consistent height for both modes
-          touchAction: 'pan-x' 
+          touchAction: 'pan-x' // Allow horizontal scrolling for photo bar
         }}>
           {selectionMode === 'photo' ? (
             // Photo Selection Mode: Show Favorites Bar

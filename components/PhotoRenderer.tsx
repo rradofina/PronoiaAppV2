@@ -183,13 +183,16 @@ export default function PhotoRenderer({
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!interactive) return;
     
+    // Prevent browser zoom/scroll for all interactive touches
+    e.preventDefault();
+    e.stopPropagation();
+    
     setIsTouching(true);
     
     if (e.touches.length === 2) {
       // Two finger pinch - start zoom
       const distance = getTouchDistance(e.touches);
       setLastTouchDistance(distance);
-      e.preventDefault(); // Prevent browser zoom
     } else if (e.touches.length === 1) {
       // Single finger - start drag
       setIsDragging(true);
@@ -201,7 +204,9 @@ export default function PhotoRenderer({
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!interactive || !isTouching) return;
     
-    e.preventDefault(); // Prevent browser zoom/scroll
+    // Stronger prevention for Chrome mobile
+    e.preventDefault();
+    e.stopPropagation();
     
     if (e.touches.length === 2 && lastTouchDistance > 0) {
       // Two finger pinch - handle zoom
@@ -245,6 +250,10 @@ export default function PhotoRenderer({
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!interactive) return;
+    
+    // Prevent any residual browser behavior
+    e.preventDefault();
+    e.stopPropagation();
     
     if (e.touches.length === 0) {
       // All fingers lifted

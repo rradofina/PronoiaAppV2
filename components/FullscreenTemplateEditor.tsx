@@ -542,7 +542,8 @@ export default function FullscreenTemplateEditor({
       <div className="p-4 border-t border-gray-800">
         <div className="text-center text-gray-400 text-sm">
           <p className="font-medium text-yellow-400">📝 {selectedPhoto?.name || 'No photo selected'}</p>
-          <p>Pinch to zoom • Drag to position • Yellow border shows your editing area</p>
+          <p className="hidden md:block">Pinch to zoom • Drag to position • Yellow border shows your editing area</p>
+          <p className="md:hidden">📱 Use two fingers to pinch-zoom the photo • Drag with one finger to position</p>
         </div>
       </div>
     </div>
