@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TemplateSlot, Photo } from '../types';
 
 interface TemplateGridProps {
@@ -34,17 +34,42 @@ export default function TemplateGrid({
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
   const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
   
-  // Responsive sizing state
+  // Container-aware sizing state
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
   
-  // Responsive sizing function
-  const getResponsiveSize = () => {
-    const width = windowSize.width || (typeof window !== 'undefined' ? window.innerWidth : 1024);
+  // Dynamic sizing calculation based on actual available space
+  const calculateOptimalSize = () => {
+    const availableWidth = containerSize.width || windowSize.width || 1024;
+    const availableHeight = containerSize.height || windowSize.height || 768;
     
-    if (width < 640) return { width: 280, spacing: 120 };      // Phone
-    if (width < 768) return { width: 400, spacing: 160 };      // Tablet Portrait  
-    if (width < 1024) return { width: 500, spacing: 200 };     // Tablet Landscape
-    return { width: 600, spacing: 240 };                       // Desktop
+    // Calculate optimal template width based on available space
+    // Leave margins for navigation arrows and padding
+    const horizontalMargin = 120; // Space for side arrows and padding
+    const verticalMargin = 100;   // Space for buttons and padding
+    
+    const maxWidth = availableWidth - horizontalMargin;
+    const maxHeight = availableHeight - verticalMargin;
+    
+    // Template aspect ratio for 4R (typical photo template)
+    const templateAspectRatio = 2/3; // width/height ratio
+    
+    // Calculate width-constrained and height-constrained sizes
+    const widthConstrainedWidth = Math.min(maxWidth, 600); // Cap at reasonable maximum
+    const widthConstrainedHeight = widthConstrainedWidth / templateAspectRatio;
+    
+    const heightConstrainedHeight = Math.min(maxHeight, 800); // Cap at reasonable maximum  
+    const heightConstrainedWidth = heightConstrainedHeight * templateAspectRatio;
+    
+    // Use the smaller of the two to ensure template fits in both dimensions
+    const optimalWidth = Math.min(widthConstrainedWidth, heightConstrainedWidth);
+    const optimalSpacing = Math.max(100, optimalWidth * 0.4); // Spacing proportional to template size
+    
+    return {
+      width: Math.max(250, Math.min(optimalWidth, 600)), // Min 250px, max 600px
+      spacing: optimalSpacing
+    };
   };
 
   // Group slots by template
@@ -85,6 +110,24 @@ export default function TemplateGrid({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Container ResizeObserver for precise container measurements
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        setContainerSize({ width: Math.round(width), height: Math.round(height) });
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
   // Keyboard navigation for Cover Flow
   useEffect(() => {
     if (layout !== 'coverflow') return;
@@ -108,7 +151,7 @@ export default function TemplateGrid({
     : layout === 'main'
     ? "grid grid-cols-1 md:grid-cols-2 gap-6 p-4"
     : layout === 'coverflow'
-    ? "relative w-full h-full flex items-center justify-center overflow-hidden pt-2 sm:pt-4 md:pt-6 lg:pt-10"
+    ? "relative w-full h-full flex items-center justify-center overflow-hidden"
     : "space-y-2";
 
   const itemClasses = layout === 'horizontal' 
@@ -134,8 +177,8 @@ export default function TemplateGrid({
     const offset = index - currentIndex;
     const absOffset = Math.abs(offset);
     
-    // Use responsive sizing instead of fixed mobile/desktop logic
-    const { width: baseWidth, spacing } = getResponsiveSize();
+    // Use dynamic container-aware sizing instead of hardcoded breakpoints
+    const { width: baseWidth, spacing } = calculateOptimalSize();
     
     // Determine if this is a mobile-like screen for rotation/scale adjustments
     const isMobileSize = baseWidth <= 400;
@@ -203,6 +246,7 @@ export default function TemplateGrid({
 
   return (
     <div 
+      ref={containerRef}
       className={containerClasses} 
       style={{ 
         touchAction: layout === 'horizontal' ? 'pan-x' : layout === 'coverflow' ? 'pan-x' : 'auto',
