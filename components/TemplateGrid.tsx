@@ -34,6 +34,19 @@ export default function TemplateGrid({
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
   const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
   
+  // Responsive sizing state
+  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+  
+  // Responsive sizing function
+  const getResponsiveSize = () => {
+    const width = windowSize.width || (typeof window !== 'undefined' ? window.innerWidth : 1024);
+    
+    if (width < 640) return { width: 280, spacing: 120 };      // Phone
+    if (width < 768) return { width: 400, spacing: 160 };      // Tablet Portrait  
+    if (width < 1024) return { width: 500, spacing: 200 };     // Tablet Landscape
+    return { width: 600, spacing: 240 };                       // Desktop
+  };
+
   // Group slots by template
   const templateGroups = Object.values(
     templateSlots.reduce((acc, slot) => {
@@ -55,6 +68,22 @@ export default function TemplateGrid({
       setCurrentIndex(index);
     }
   };
+
+  // Window resize listener for responsive sizing
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    // Set initial size
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Keyboard navigation for Cover Flow
   useEffect(() => {
@@ -79,7 +108,7 @@ export default function TemplateGrid({
     : layout === 'main'
     ? "grid grid-cols-1 md:grid-cols-2 gap-6 p-4"
     : layout === 'coverflow'
-    ? "relative w-full h-full flex items-center justify-center overflow-hidden"
+    ? "relative w-full h-full flex items-center justify-center overflow-hidden pt-10"
     : "space-y-2";
 
   const itemClasses = layout === 'horizontal' 
@@ -105,10 +134,11 @@ export default function TemplateGrid({
     const offset = index - currentIndex;
     const absOffset = Math.abs(offset);
     
-    // Responsive sizing - improved for better template display
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-    const baseWidth = isMobile ? 300 : 450;  // Increased from 400 to 450 for desktop
-    const spacing = isMobile ? 140 : 200;    // Increased spacing from 180 to 200
+    // Use responsive sizing instead of fixed mobile/desktop logic
+    const { width: baseWidth, spacing } = getResponsiveSize();
+    
+    // Determine if this is a mobile-like screen for rotation/scale adjustments
+    const isMobileSize = baseWidth <= 400;
     
     // Center item
     if (offset === 0) {
@@ -122,8 +152,8 @@ export default function TemplateGrid({
     
     // Side items
     const translateX = offset * spacing; // Spacing between items
-    const scale = Math.max(isMobile ? 0.7 : 0.6, 1 - absOffset * 0.2);
-    const rotateY = offset > 0 ? (isMobile ? 15 : 25) : (isMobile ? -15 : -25);
+    const scale = Math.max(isMobileSize ? 0.7 : 0.6, 1 - absOffset * 0.2);
+    const rotateY = offset > 0 ? (isMobileSize ? 15 : 25) : (isMobileSize ? -15 : -25);
     const opacity = Math.max(0.3, 1 - absOffset * 0.3);
     const zIndex = 10 - absOffset;
     
@@ -193,7 +223,7 @@ export default function TemplateGrid({
           onClick={() => layout === 'coverflow' ? navigateToTemplate(index) : undefined}
         >
           {/* Title and action buttons at same height */}
-          <div className="flex justify-between items-center mb-2 px-1">
+          <div className="flex justify-between items-center mb-2 px-3 sm:px-4 md:px-6">
             <h3 className={`font-semibold leading-tight truncate flex-1 ${
               layout === 'horizontal' ? 'text-xs' : 'text-sm'
             }`}>
@@ -201,13 +231,13 @@ export default function TemplateGrid({
             </h3>
             
             {showActions && (
-              <div className="flex items-center space-x-1 ml-2">
+              <div className="flex items-center space-x-1 sm:space-x-2 ml-2">
                 {/* Download button for all templates */}
                 {onDownloadTemplate && (
                   <button
                     onClick={() => onDownloadTemplate({ templateId, templateName, slots })}
                     title="Download Template"
-                    className="bg-gray-500 text-white rounded-full p-1 shadow-sm hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1"
+                    className="bg-gray-500 text-white rounded-full p-1 sm:p-1.5 shadow-sm hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className={`${layout === 'horizontal' ? 'h-3 w-3' : 'h-4 w-4'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -219,7 +249,7 @@ export default function TemplateGrid({
                 {onSwapTemplate && (
                   <button
                     onClick={() => onSwapTemplate({ templateId, templateName, slots })}
-                    className="bg-gray-500 text-white px-2 py-1 rounded-md text-xs font-medium hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 shadow-sm"
+                    className="bg-gray-500 text-white px-2 sm:px-3 py-1 rounded-md text-xs font-medium hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 shadow-sm"
                   >
                     Change Template
                   </button>
@@ -230,7 +260,7 @@ export default function TemplateGrid({
                   <button
                     onClick={() => onDeleteTemplate(templateId)}
                     title="Delete Print"
-                    className="bg-red-600 text-white rounded-full p-1 shadow-sm hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    className="bg-red-600 text-white rounded-full p-1 sm:p-1.5 shadow-sm hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className={`${layout === 'horizontal' ? 'h-3 w-3' : 'h-4 w-4'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
