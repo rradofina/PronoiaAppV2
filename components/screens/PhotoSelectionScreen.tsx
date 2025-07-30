@@ -939,8 +939,7 @@ export default function PhotoSelectionScreen({
             />
           ) : (
             // Print mode: Show templates in Cover Flow
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex-1 relative z-40" onClick={handleBackgroundClick} style={{ touchAction: 'manipulation' }}>
+            <div className="flex-1 relative z-40" onClick={handleBackgroundClick} style={{ touchAction: 'manipulation' }}>
                 <TemplateGrid
                   templateSlots={templateSlots}
                   photos={photos}
@@ -961,7 +960,6 @@ export default function PhotoSelectionScreen({
                   layout="coverflow"
                   showActions={true}
                 />
-              </div>
             </div>
           )}
         </div>

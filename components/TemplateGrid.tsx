@@ -108,7 +108,7 @@ export default function TemplateGrid({
     : layout === 'main'
     ? "grid grid-cols-1 md:grid-cols-2 gap-6 p-4"
     : layout === 'coverflow'
-    ? "relative w-full h-full flex items-center justify-center overflow-hidden pt-10"
+    ? "relative w-full h-full flex items-center justify-center overflow-hidden pt-2 sm:pt-4 md:pt-6 lg:pt-10"
     : "space-y-2";
 
   const itemClasses = layout === 'horizontal' 
@@ -284,46 +284,35 @@ export default function TemplateGrid({
         </div>
       ))}
       
-      {/* Cover Flow Navigation Controls */}
+      {/* Side Navigation Arrows */}
       {layout === 'coverflow' && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-4 z-20">
-          <button
-            onClick={() => navigateToTemplate(currentIndex - 1)}
-            disabled={currentIndex === 0}
-            className="bg-white bg-opacity-80 hover:bg-opacity-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-full p-2 shadow-lg transition-all duration-200"
-            title="Previous template"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
+        <>
+          {/* Left Arrow - Previous Template */}
+          {currentIndex > 0 && (
+            <button
+              onClick={() => navigateToTemplate(currentIndex - 1)}
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-20 hover:bg-opacity-40 text-white rounded-full p-3 transition-all duration-200 z-30"
+              title="Previous template"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
           
-          <div className="flex items-center space-x-1">
-            {templateGroups.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => navigateToTemplate(index)}
-                className={`w-2 h-2 rounded-full transition-all duration-200 ${
-                  index === currentIndex 
-                    ? 'bg-blue-600 w-6' 
-                    : 'bg-white bg-opacity-60 hover:bg-opacity-80'
-                }`}
-                title={`Go to template ${index + 1}`}
-              />
-            ))}
-          </div>
-          
-          <button
-            onClick={() => navigateToTemplate(currentIndex + 1)}
-            disabled={currentIndex === templateGroups.length - 1}
-            className="bg-white bg-opacity-80 hover:bg-opacity-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-full p-2 shadow-lg transition-all duration-200"
-            title="Next template"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
+          {/* Right Arrow - Next Template */}
+          {currentIndex < templateGroups.length - 1 && (
+            <button
+              onClick={() => navigateToTemplate(currentIndex + 1)}
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-20 hover:bg-opacity-40 text-white rounded-full p-3 transition-all duration-200 z-30"
+              title="Next template"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+        </>
       )}
     </div>
   );
