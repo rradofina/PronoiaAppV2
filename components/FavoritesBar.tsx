@@ -36,7 +36,13 @@ export default function FavoritesBar({
   
   // CLIPPING PREVENTION: Calculate safe viewport dimensions
   const getSafeViewportInfo = () => {
-    if (typeof window === 'undefined') return { height: 800, isSafeForExpansion: true };
+    if (typeof window === 'undefined') {
+      return { 
+        height: 800, 
+        availableForExpansion: 200, // Default safe expansion for SSR
+        isSafeForExpansion: true 
+      };
+    }
     
     const viewportHeight = window.visualViewport?.height || window.innerHeight;
     const headerSpace = 160; // Conservative estimate for header + controls
