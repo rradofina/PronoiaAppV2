@@ -27,9 +27,17 @@
     flex-shrink: 0;
   }
   
+  /* Mobile/Tablet: Account for bottom favorites bar */
   .layout-main-content {
     height: calc(100vh - 60px - 150px);
     overflow: hidden;
+  }
+  
+  /* Desktop: No bottom favorites bar, only subtract header */
+  @media (min-width: 1024px) {
+    .layout-main-content {
+      height: calc(100vh - 60px);
+    }
   }
   
   .layout-favorites {
@@ -42,6 +50,13 @@
   @supports (height: 100dvh) {
     .layout-main-content {
       height: calc(100dvh - 60px - 150px);
+    }
+    
+    /* Desktop with dynamic viewport height support */
+    @media (min-width: 1024px) {
+      .layout-main-content {
+        height: calc(100dvh - 60px);
+      }
     }
   }
   
