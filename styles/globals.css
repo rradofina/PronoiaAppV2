@@ -30,7 +30,7 @@
   /* Mobile/Tablet: Account for bottom favorites bar */
   .layout-main-content {
     height: calc(100vh - 60px - 150px);
-    overflow: hidden;
+    overflow-y: auto;
   }
   
   /* Desktop: No bottom favorites bar, only subtract header */
