@@ -131,6 +131,7 @@ export default function InlinePhotoEditor({
         className="w-full h-full"
         debug={false}
         fallbackUrls={photo ? getHighResPhotoUrls(photo) : []}
+        showClippingIndicators={true} // Enable clipping indicators
       />
       
       {/* Editing Controls Overlay */}

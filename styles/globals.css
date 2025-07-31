@@ -1,4 +1,64 @@
 /* Updated: Global styles. */
 @tailwind base;
 @tailwind components;
-@tailwind utilities; 
+@tailwind utilities;
+
+/* Clipping indicator zebra stripe animation */
+@keyframes zebra-stripes {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 16px 16px;
+  }
+}
+
+/* CLIPPING PREVENTION: Portrait tablet viewport utilities */
+@layer utilities {
+  /* Safe viewport height - accounts for system UI */
+  .min-h-safe-screen {
+    min-height: 100vh;
+    min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
+  }
+  
+  /* Prevent favorites bar clipping on portrait tablets */
+  .favorites-bar-safe {
+    max-height: min(80vh, 320px);
+    overflow-y: auto;
+  }
+  
+  /* Emergency clipping detection indicator */
+  .clipping-warning {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(45deg, #ff0000 25%, #ffff00 25%, #ffff00 50%, #ff0000 50%, #ff0000 75%, #ffff00 75%);
+    background-size: 16px 16px;
+    animation: zebra-stripes 0.5s linear infinite;
+    color: white;
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: bold;
+    z-index: 9999;
+    border-radius: 4px 4px 0 0;
+  }
+}
+
+/* DEVELOPMENT: Viewport debugging utilities (remove in production) */
+@layer utilities {
+  .viewport-debug::after {
+    content: attr(data-viewport-info);
+    position: fixed;
+    top: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    font-size: 10px;
+    font-family: monospace;
+    border-radius: 4px;
+    z-index: 9998;
+    pointer-events: none;
+  }
+} 

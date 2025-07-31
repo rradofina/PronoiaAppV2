@@ -18,6 +18,7 @@ import TemplateGrid from '../TemplateGrid';
 import TemplateSwapModal from '../TemplateSwapModal';
 import FavoritesBar from '../FavoritesBar';
 import OriginalTemplateVisual from '../TemplateVisual';
+import { useViewportConstraints, getHeightClass } from '../../hooks/useViewportConstraints';
 
 
 // Simplified TemplateVisual component
@@ -302,12 +303,23 @@ export default function PhotoSelectionScreen({
   const [hasScrolled, setHasScrolled] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<ManualTemplate[]>([]);
   
+  // ENHANCED: Viewport-aware constraints for responsive favorites bar with portrait tablet optimization
+  const viewportConstraints = useViewportConstraints({
+    headerHeight: 140, // Increased from 120 - more realistic for portrait tablets with system UI
+    minContentHeight: 420, // Increased from 400 - ensure sufficient template viewing space
+    padding: 60, // Increased from 40 - more safety margin for portrait tablets
+    maxExpansionRatio: 0.35, // Reduced from 0.45 - more conservative for portrait mode
+    absoluteMaxHeight: 280 // Reduced from 300 - prevent clipping on shorter tablets
+  });
+  
   // Two-mode system for photo selection
   const [selectionMode, setSelectionMode] = useState<'photo' | 'print'>('photo'); // Default to photo selection mode
   const [favoritedPhotos, setFavoritedPhotos] = useState<Set<string>>(new Set()); // Photo IDs that are favorited
   
   // Bookmarks bar expansion state
   const [isBookmarksExpanded, setIsBookmarksExpanded] = useState(false);
+  
+  // Note: Debug logging removed - viewport-aware expansion is working correctly in both modes
 
   
   // Simplified workflow states
@@ -1029,8 +1041,10 @@ export default function PhotoSelectionScreen({
         </div>
 
         {/* Two-Mode Bottom Section - Mobile/Tablet */}
-        <div className={`lg:hidden bg-white shadow-lg border-t flex-shrink-0 relative z-40 transition-all duration-300 ease-in-out ${
-          selectionMode === 'print' && isBookmarksExpanded ? 'h-64' : 'h-36'
+        <div className={`lg:hidden bg-white shadow-lg border-t flex-shrink-0 relative z-40 transition-all duration-300 ease-in-out overflow-y-auto ${
+          selectionMode === 'print' && isBookmarksExpanded 
+            ? getHeightClass(viewportConstraints.safeExpansionHeight) 
+            : 'h-36'
         }`} style={{ 
           touchAction: 'pan-x' // Allow horizontal scrolling for photo bar
         }}>
@@ -1047,52 +1061,20 @@ export default function PhotoSelectionScreen({
               isExpanded={false}
             />
           ) : (
-            // Print Filling Mode: Show Favorites Bar with controls
-            <div className="h-full flex flex-col">
-              <div className="flex-shrink-0 p-2 border-b bg-gray-50 relative">
-                <div className="flex items-center justify-between mb-1">
-                  <button
-                    onClick={handleBack}
-                    className="flex items-center space-x-1 px-2 py-1 rounded-lg font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all duration-200 text-xs"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                    <span>Back</span>
-                  </button>
-                  
-                  <button 
-                    onClick={openAddPrintModal} 
-                    className="bg-green-600 text-white px-2 py-1 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 text-xs"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                    </svg>
-                    <span>Add</span>
-                  </button>
-
-                  <button
-                    onClick={handlePhotoContinue}
-                    className="bg-blue-600 text-white px-3 py-1 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 text-xs"
-                  >
-                    Done
-                  </button>
-                </div>
-                <h2 className="text-xs font-bold text-gray-800 text-center">⭐ Your Favorites • {getDisplayPhotos().length} available</h2>
-              </div>
-              <div className="flex-1 overflow-hidden relative">
-                <FavoritesBar
-                  favoritedPhotos={getDisplayPhotos()}
-                  onPhotoClick={handlePhotoClick}
-                  onRemoveFavorite={handleToggleFavorite}
-                  isActiveInteractionArea={viewMode === 'inline-editing'}
-                  layout="horizontal"
-                  showRemoveButtons={false}
-                  usedPhotoIds={getUsedPhotoIds()}
-                  isExpanded={isBookmarksExpanded}
-                />
-              </div>
-            </div>
+            // Print Filling Mode: Show Favorites Bar (control bar removed to prevent clipping)
+            <FavoritesBar
+              favoritedPhotos={getDisplayPhotos()}
+              onPhotoClick={handlePhotoClick}
+              onRemoveFavorite={handleToggleFavorite}
+              isActiveInteractionArea={viewMode === 'inline-editing'}
+              layout="horizontal"
+              showRemoveButtons={false}
+              usedPhotoIds={getUsedPhotoIds()}
+              isExpanded={isBookmarksExpanded}
+              dynamicHeight={getHeightClass(viewportConstraints.safeExpansionHeight)}
+              adaptivePhotoSize={viewportConstraints.adaptivePhotoSize}
+              maxPhotosToShow={viewportConstraints.maxPhotosToShow}
+            />
           )}
         </div>
 
@@ -1117,6 +1099,8 @@ export default function PhotoSelectionScreen({
                   showRemoveButtons={true}
                   usedPhotoIds={getUsedPhotoIds()}
                   isExpanded={isBookmarksExpanded}
+                  adaptivePhotoSize={viewportConstraints.adaptivePhotoSize}
+                  maxPhotosToShow={viewportConstraints.maxPhotosToShow}
                 />
               </div>
             </>
@@ -1151,6 +1135,8 @@ export default function PhotoSelectionScreen({
                   showRemoveButtons={false}
                   usedPhotoIds={getUsedPhotoIds()}
                   isExpanded={isBookmarksExpanded}
+                  adaptivePhotoSize={viewportConstraints.adaptivePhotoSize}
+                  maxPhotosToShow={viewportConstraints.maxPhotosToShow}
                 />
               </div>
             </>

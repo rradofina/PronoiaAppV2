@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Photo } from '../types';
+import { assessClippingRisk, showClippingWarning, addViewportDebugInfo } from '../utils/clippingDetection';
 
 interface FavoritesBarProps {
   favoritedPhotos: Photo[];
@@ -10,6 +11,10 @@ interface FavoritesBarProps {
   showRemoveButtons?: boolean; // New prop to control remove button visibility
   usedPhotoIds?: Set<string>; // New prop to track which photos are already used
   isExpanded?: boolean; // New prop to control expanded state with animations
+  // Viewport-aware expansion props
+  dynamicHeight?: string; // Dynamic height class (e.g., 'h-48', 'h-[200px]')
+  adaptivePhotoSize?: 'small' | 'medium' | 'large'; // Adaptive photo sizing
+  maxPhotosToShow?: number; // Limit photos shown based on viewport
 }
 
 export default function FavoritesBar({
@@ -20,15 +25,147 @@ export default function FavoritesBar({
   layout = 'horizontal',
   showRemoveButtons = true,
   usedPhotoIds = new Set(),
-  isExpanded = false
+  isExpanded = false,
+  dynamicHeight,
+  adaptivePhotoSize = 'medium',
+  maxPhotosToShow
 }: FavoritesBarProps) {
   
+  // Apply adaptive photo limiting
+  const displayPhotos = maxPhotosToShow ? favoritedPhotos.slice(0, maxPhotosToShow) : favoritedPhotos;
   
-  if (favoritedPhotos.length === 0) {
+  // CLIPPING PREVENTION: Calculate safe viewport dimensions
+  const getSafeViewportInfo = () => {
+    if (typeof window === 'undefined') return { height: 800, isSafeForExpansion: true };
+    
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    const headerSpace = 160; // Conservative estimate for header + controls
+    const minimumContentSpace = 300; // Minimum space for main content
+    const safetyMargin = 60; // Extra safety margin for system UI
+    
+    const availableForExpansion = viewportHeight - headerSpace - minimumContentSpace - safetyMargin;
+    const isSafeForExpansion = availableForExpansion >= 120; // At least h-30 worth of space
+    
+    return { 
+      height: viewportHeight, 
+      availableForExpansion: Math.max(96, availableForExpansion), // Never below h-24
+      isSafeForExpansion 
+    };
+  };
+  
+  const safeViewport = getSafeViewportInfo();
+  
+  // Get adaptive photo height based on size with clipping prevention
+  const getAdaptivePhotoHeight = () => {
+    if (!isExpanded) return 'h-16'; // Always h-16 when collapsed
+    
+    // CLIPPING PREVENTION: Adjust photo size based on available space
+    const basePhotoHeight = (() => {
+      switch (adaptivePhotoSize) {
+        case 'small': return 128; // h-32
+        case 'medium': return 160; // h-40
+        case 'large': return 192; // h-48
+        default: return 160;
+      }
+    })();
+    
+    // Don't allow photos to exceed 60% of available expansion space
+    const maxAllowedPhotoHeight = safeViewport.availableForExpansion * 0.6;
+    const safePhotoHeight = Math.min(basePhotoHeight, maxAllowedPhotoHeight);
+    
+    // Convert back to Tailwind classes with fallback
+    if (safePhotoHeight <= 96) return 'h-24';
+    if (safePhotoHeight <= 128) return 'h-32';
+    if (safePhotoHeight <= 160) return 'h-40';
+    if (safePhotoHeight <= 192) return 'h-48';
+    return `h-[${Math.round(safePhotoHeight)}px]`;
+  };
+  
+  // CLIPPING PREVENTION: Safe container height calculation
+  const getSafeContainerHeight = () => {
+    if (!isExpanded) return 'h-24';
+    
+    // If viewport is too constrained, don't expand
+    if (!safeViewport.isSafeForExpansion) {
+      console.warn('🚨 CLIPPING PREVENTION: Viewport too constrained for favorites bar expansion', {
+        viewportHeight: safeViewport.height,
+        availableSpace: safeViewport.availableForExpansion,
+        recommendedAction: 'Keeping collapsed to prevent clipping'
+      });
+      return 'h-24';
+    }
+    
+    // Use provided dynamic height if it's safe
+    if (dynamicHeight) {
+      const dynamicHeightValue = parseInt(dynamicHeight.replace(/[^\d]/g, '')) || 256;
+      if (dynamicHeightValue <= safeViewport.availableForExpansion) {
+        return dynamicHeight;
+      } else {
+        console.warn('🚨 CLIPPING PREVENTION: Dynamic height would cause clipping', {
+          requestedHeight: dynamicHeightValue,
+          availableSpace: safeViewport.availableForExpansion,
+          fallbackHeight: safeViewport.availableForExpansion
+        });
+      }
+    }
+    
+    // Calculate safe height from available space
+    const safeHeight = Math.min(safeViewport.availableForExpansion, 280); // Cap at 280px
+    
+    // Convert to Tailwind classes
+    if (safeHeight <= 96) return 'h-24';
+    if (safeHeight <= 128) return 'h-32';
+    if (safeHeight <= 160) return 'h-40';
+    if (safeHeight <= 192) return 'h-48';
+    if (safeHeight <= 224) return 'h-56';
+    if (safeHeight <= 256) return 'h-64';
+    if (safeHeight <= 288) return 'h-72';
+    return `h-[${Math.round(safeHeight)}px]`;
+  };
+  
+  const containerHeight = getSafeContainerHeight();
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // DEVELOPMENT: Clipping monitoring and warnings
+  useEffect(() => {
+    if (!isExpanded || !containerRef.current) return;
+    
+    const containerElement = containerRef.current;
+    const containerHeightPx = containerElement.getBoundingClientRect().height;
+    
+    // Assess clipping risk
+    const clippingRisk = assessClippingRisk(containerHeightPx, {
+      headerHeight: 140,
+      contentHeight: 420,
+      padding: 60
+    });
+    
+    // Show warning for high-risk scenarios
+    showClippingWarning(clippingRisk);
+    
+    // Add debug info in development
+    if (process.env.NODE_ENV === 'development') {
+      addViewportDebugInfo(containerElement);
+    }
+    
+    // Log clipping assessment
+    if (clippingRisk.level !== 'none') {
+      console.warn('📏 FavoritesBar clipping assessment:', {
+        containerHeight: containerHeightPx,
+        risk: clippingRisk,
+        isExpanded,
+        layout
+      });
+    }
+  }, [isExpanded, containerHeight, layout]);
+  
+  // Note: Enhanced viewport-aware expansion with clipping prevention
+  
+  if (displayPhotos.length === 0) {
     return (
       <div className={`flex items-center justify-center transition-all duration-300 ease-in-out ${
         layout === 'horizontal' 
-          ? isExpanded ? 'h-64 border-t' : 'h-24 border-t'
+          ? `${containerHeight} border-t`
           : 'h-full'
       } ${
         isActiveInteractionArea 
@@ -53,31 +190,46 @@ export default function FavoritesBar({
   }
 
   if (layout === 'horizontal') {
-    // Horizontal layout (original mobile/tablet design) with expansion animation
+    // Horizontal layout (original mobile/tablet design) with viewport-aware expansion
     return (
-      <div className={`border-t overflow-hidden transition-all duration-300 ease-in-out ${
-        isExpanded ? 'h-64' : 'h-24'
-      } ${
-        isActiveInteractionArea 
-          ? 'bg-yellow-50 border-yellow-300 border-t-2 shadow-lg' 
-          : isExpanded
-          ? 'bg-blue-50 border-blue-300 border-t-2 shadow-lg'
-          : 'bg-white'
-      }`}>
-        <div className="h-full flex items-center">
-          <div className={`flex-shrink-0 px-3 text-sm font-medium ${
-            isActiveInteractionArea ? 'text-yellow-700 font-bold' : isExpanded ? 'text-blue-700 font-bold' : 'text-gray-700'
+      <div 
+        ref={containerRef}
+        className={`border-t overflow-hidden transition-all duration-300 ease-in-out favorites-bar-safe ${
+          containerHeight
+        } ${
+          isActiveInteractionArea 
+            ? 'bg-yellow-50 border-yellow-300 border-t-2 shadow-lg' 
+            : isExpanded
+            ? 'bg-blue-50 border-blue-300 border-t-2 shadow-lg'
+            : 'bg-white'
+        }`}
+        style={{
+          // CSS SAFETY: Add viewport-based max height to prevent clipping
+          maxHeight: '100vh',
+          // CSS SAFETY: Add fallback overflow handling
+          overflowY: 'auto'
+        }}
+      >
+        <div className="h-full flex flex-col">
+          {/* Header section with title */}
+          <div className={`flex-shrink-0 px-3 py-2 text-sm font-medium border-b border-opacity-20 ${
+            isActiveInteractionArea ? 
+              'text-yellow-700 font-bold border-yellow-400' : 
+              isExpanded ? 
+                'text-blue-700 font-bold border-blue-400' : 
+                'text-gray-700 border-gray-300'
           }`}>
             {isActiveInteractionArea ? '⚡ ' : isExpanded ? '📌 ' : ''}Favorites ({favoritedPhotos.length})
             {isActiveInteractionArea && <div className="text-xs text-yellow-600">Tap to fill slot</div>}
             {isExpanded && !isActiveInteractionArea && <div className="text-xs text-blue-600">Slot selected - choose photo</div>}
           </div>
           
-          <div className="flex-1 overflow-x-auto">
-            <div className={`flex px-2 py-2 transition-all duration-300 ease-in-out ${
+          {/* Photos section - takes remaining space */}
+          <div className="flex-1 overflow-x-auto flex items-center">
+            <div className={`flex px-3 py-3 transition-all duration-300 ease-in-out ${
               isExpanded ? 'space-x-4' : 'space-x-2'
             }`} style={{ touchAction: 'pan-x' }}>
-              {favoritedPhotos.map((photo) => {
+              {displayPhotos.map((photo) => {
                 const isUsed = usedPhotoIds.has(photo.id);
                 return (
                   <div
@@ -86,7 +238,7 @@ export default function FavoritesBar({
                     onClick={() => onPhotoClick(photo)}
                   >
                     <div className={`rounded-lg overflow-hidden border-2 transition-all duration-300 ease-in-out ${
-                      isExpanded ? 'h-32' : 'h-16'
+                      getAdaptivePhotoHeight()
                     } ${
                       isUsed
                         ? 'border-green-400 shadow-md' // Used photos get green border
@@ -133,7 +285,7 @@ export default function FavoritesBar({
                   
                   {/* Star indicator */}
                   <div className={`absolute bottom-0 right-0 bg-yellow-500 text-white rounded-full flex items-center justify-center transition-all duration-300 ease-in-out ${
-                    isExpanded ? 'w-5 h-5 text-sm' : 'w-4 h-4 text-xs'
+                    isExpanded ? 'w-6 h-6 text-base' : 'w-4 h-4 text-xs'
                   }`}>
                     ⭐
                   </div>
@@ -148,17 +300,25 @@ export default function FavoritesBar({
   } else {
     // Vertical layout (desktop grid design) with expansion support
     return (
-      <div className={`h-full transition-all duration-300 ease-in-out ${
-        isActiveInteractionArea 
-          ? 'bg-yellow-50 border-yellow-300 shadow-lg' 
-          : isExpanded
-          ? 'bg-blue-50 border-blue-300 shadow-lg'
-          : 'bg-white'
-      }`}>
+      <div 
+        className={`h-full transition-all duration-300 ease-in-out ${
+          isActiveInteractionArea 
+            ? 'bg-yellow-50 border-yellow-300 shadow-lg' 
+            : isExpanded
+            ? 'bg-blue-50 border-blue-300 shadow-lg'
+            : 'bg-white'
+        }`}
+        style={{
+          // CSS SAFETY: Add viewport-based max height to prevent clipping
+          maxHeight: '100vh',
+          // CSS SAFETY: Add fallback overflow handling
+          overflowY: 'auto'
+        }}
+      >
         <div className={`grid gap-2 p-4 transition-all duration-300 ease-in-out ${
           isExpanded ? 'grid-cols-2 gap-3' : 'grid-cols-3 gap-2'
         }`}>
-          {favoritedPhotos.map((photo) => {
+          {displayPhotos.map((photo) => {
             const isUsed = usedPhotoIds.has(photo.id);
             return (
               <div

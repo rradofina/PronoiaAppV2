@@ -20,6 +20,9 @@ interface PhotoRendererProps {
   
   // Optional fallback URLs for error handling
   fallbackUrls?: string[];
+  
+  // Clipping indicators (zebra stripes) for overexposed/underexposed areas
+  showClippingIndicators?: boolean;
 }
 
 // Helper to convert legacy container transforms to CSS (backward compatibility)
@@ -74,7 +77,8 @@ export default function PhotoRenderer({
   className = '',
   style = {},
   debug = false,
-  fallbackUrls = []
+  fallbackUrls = [],
+  showClippingIndicators = false
 }: PhotoRendererProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [lastPointer, setLastPointer] = useState<{ x: number; y: number } | null>(null);
@@ -93,8 +97,155 @@ export default function PhotoRenderer({
       : createPhotoTransform(1, 0.5, 0.5) // Default: fit scale, centered
   );
   
+  // Auto-snap state for smooth zoom corrections
+  const [isSnapping, setIsSnapping] = useState(false);
+  
+  // Clipping detection state
+  const [clippingData, setClippingData] = useState<{
+    overexposed: ImageData | null;
+    underexposed: ImageData | null;
+  }>({ overexposed: null, underexposed: null });
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Calculate smart minimum zoom based on photo and container dimensions
+  const calculateMinimumZoom = (): number => {
+    if (!imageRef.current || !containerRef.current) {
+      return 0.8; // Default minimum if we can't calculate
+    }
+    
+    const photoWidth = imageRef.current.naturalWidth;
+    const photoHeight = imageRef.current.naturalHeight;
+    const containerRect = containerRef.current.getBoundingClientRect();
+    
+    if (photoWidth === 0 || photoHeight === 0 || containerRect.width === 0 || containerRect.height === 0) {
+      return 0.8; // Fallback for edge cases
+    }
+    
+    const photoAspectRatio = photoWidth / photoHeight;
+    const containerAspectRatio = containerRect.width / containerRect.height;
+    
+    // Calculate the scale needed to fit the photo in the container (cover mode)
+    // We want to ensure the photo always covers the full container
+    let fitScale: number;
+    
+    if (photoAspectRatio > containerAspectRatio) {
+      // Photo is wider - fit to height, photo will extend beyond sides
+      fitScale = 1.0; // Container height = photo height when scaled
+    } else {
+      // Photo is taller - fit to width, photo will extend beyond top/bottom  
+      fitScale = 1.0; // Container width = photo width when scaled
+    }
+    
+    // Set minimum to 80% of fit scale, ensuring photo never gets too small
+    const minimumZoom = Math.max(0.8, fitScale * 0.8);
+    
+    return minimumZoom;
+  };
+
+  // Auto-snap to minimum zoom with smooth animation
+  const snapToMinimum = (targetScale?: number) => {
+    const minZoom = targetScale || calculateMinimumZoom();
+    
+    if (currentTransform.photoScale >= minZoom) {
+      return; // Already above minimum, no need to snap
+    }
+    
+    setIsSnapping(true);
+    
+    // Create new transform with minimum scale
+    const snappedTransform = createPhotoTransform(
+      minZoom,
+      currentTransform.photoCenterX,
+      currentTransform.photoCenterY
+    );
+    
+    // Apply the snapped transform
+    setCurrentTransform(snappedTransform);
+    onTransformChange?.(snappedTransform);
+    
+    // Reset snapping state after animation
+    setTimeout(() => setIsSnapping(false), 200);
+  };
+
+  // Analyze image for clipping (overexposed/underexposed areas)
+  const analyzeClipping = () => {
+    if (!showClippingIndicators || !imageRef.current || !canvasRef.current) {
+      return;
+    }
+
+    const img = imageRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx || !img.complete || img.naturalWidth === 0) {
+      return;
+    }
+
+    // Set canvas size to match image natural dimensions (but scaled down for performance)
+    const maxSize = 512; // Limit canvas size for performance
+    const aspectRatio = img.naturalWidth / img.naturalHeight;
+    let canvasWidth, canvasHeight;
+    
+    if (aspectRatio > 1) {
+      canvasWidth = Math.min(maxSize, img.naturalWidth);
+      canvasHeight = canvasWidth / aspectRatio;
+    } else {
+      canvasHeight = Math.min(maxSize, img.naturalHeight);
+      canvasWidth = canvasHeight * aspectRatio;
+    }
+    
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    // Draw image to canvas for pixel analysis
+    ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+    
+    try {
+      const imageData = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
+      const data = imageData.data;
+      
+      // Create masks for overexposed and underexposed areas
+      const overexposedMask = new ImageData(canvasWidth, canvasHeight);
+      const underexposedMask = new ImageData(canvasWidth, canvasHeight);
+      
+      // Thresholds for clipping detection
+      const overexposeThreshold = 250; // RGB values above this are considered clipped
+      const underexposeThreshold = 5;   // RGB values below this are considered clipped
+      
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        
+        // Check for overexposed areas (highlights clipped to white)
+        if (r >= overexposeThreshold && g >= overexposeThreshold && b >= overexposeThreshold) {
+          overexposedMask.data[i] = 255;     // Red channel
+          overexposedMask.data[i + 1] = 0;   // Green channel  
+          overexposedMask.data[i + 2] = 0;   // Blue channel
+          overexposedMask.data[i + 3] = 180; // Alpha (semi-transparent)
+        }
+        
+        // Check for underexposed areas (shadows clipped to black)
+        if (r <= underexposeThreshold && g <= underexposeThreshold && b <= underexposeThreshold) {
+          underexposedMask.data[i] = 0;      // Red channel
+          underexposedMask.data[i + 1] = 0;  // Green channel
+          underexposedMask.data[i + 2] = 255; // Blue channel  
+          underexposedMask.data[i + 3] = 180; // Alpha (semi-transparent)
+        }
+      }
+      
+      setClippingData({
+        overexposed: overexposedMask,
+        underexposed: underexposedMask
+      });
+      
+    } catch (error) {
+      console.warn('Failed to analyze image clipping:', error);
+    }
+  };
 
   // Update internal transform when prop changes
   useEffect(() => {
@@ -108,7 +259,68 @@ export default function PhotoRenderer({
     setCurrentUrlIndex(0);
     setImageError(false);
     setImageLoaded(false);
+    setClippingData({ overexposed: null, underexposed: null }); // Reset clipping data
   }, [photoUrl]);
+  
+  // Analyze clipping when image loads and clipping indicators are enabled
+  useEffect(() => {
+    if (imageLoaded && showClippingIndicators) {
+      // Small delay to ensure image is fully rendered
+      setTimeout(analyzeClipping, 100);
+    }
+  }, [imageLoaded, showClippingIndicators]);
+  
+  // ClippingOverlay component - displays zebra stripes for clipped areas
+  const ClippingOverlay = () => {
+    if (!showClippingIndicators || (!clippingData.overexposed && !clippingData.underexposed)) {
+      return null;
+    }
+    
+    return (
+      <div className="absolute inset-0 pointer-events-none" style={{ ...photoStyle }}>
+        {/* Hidden canvas for clipping analysis */}
+        <canvas
+          ref={canvasRef}
+          style={{ display: 'none' }}
+        />
+        
+        {/* Animated zebra stripes for overexposed areas (red) */}
+        {clippingData.overexposed && (
+          <div 
+            className="absolute inset-0 opacity-70"
+            style={{
+              background: `repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 4px,
+                rgba(255, 0, 0, 0.8) 4px,
+                rgba(255, 0, 0, 0.8) 8px
+              )`,
+              animation: 'zebra-stripes 1s linear infinite',
+              maskImage: 'url(data:image/svg+xml;base64,data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=)'
+            }}
+          />
+        )}
+        
+        {/* Animated zebra stripes for underexposed areas (blue) */}
+        {clippingData.underexposed && (
+          <div 
+            className="absolute inset-0 opacity-70"
+            style={{
+              background: `repeating-linear-gradient(
+                -45deg,
+                transparent,
+                transparent 4px,
+                rgba(0, 100, 255, 0.8) 4px,
+                rgba(0, 100, 255, 0.8) 8px
+              )`,
+              animation: 'zebra-stripes 1.2s linear infinite reverse',
+            }}
+          />
+        )}
+      </div>
+    );
+  };
   
   // Get all available URLs (main + fallbacks)
   const getAllUrls = (): string[] => {
@@ -166,7 +378,11 @@ export default function PhotoRenderer({
     ? convertPhotoToCSS(transform)
     : transform && isContainerTransform(transform)
     ? convertLegacyToCSS(transform)
-    : convertPhotoToCSS(currentTransform);
+    : {
+        ...convertPhotoToCSS(currentTransform),
+        // Add smooth transition when snapping back to minimum zoom
+        transition: isSnapping ? 'transform 0.2s ease-out' : 'none'
+      };
 
   // Touch helper functions for pinch-to-zoom
   const getTouchDistance = (touches: React.TouchList): number => {
@@ -212,7 +428,8 @@ export default function PhotoRenderer({
       // Two finger pinch - handle zoom
       const distance = getTouchDistance(e.touches);
       const ratio = distance / lastTouchDistance;
-      const newScale = Math.max(0.1, Math.min(10, currentTransform.photoScale * ratio));
+      const minZoom = calculateMinimumZoom();
+      const newScale = Math.max(minZoom * 0.7, Math.min(10, currentTransform.photoScale * ratio)); // Allow slight under-zoom during pinch
       
       const newTransform = createPhotoTransform(
         newScale,
@@ -256,11 +473,17 @@ export default function PhotoRenderer({
     e.stopPropagation();
     
     if (e.touches.length === 0) {
-      // All fingers lifted
+      // All fingers lifted - check if we need to snap back to minimum
       setIsTouching(false);
       setIsDragging(false);
       setLastPointer(null);
       setLastTouchDistance(0);
+      
+      // Auto-snap to minimum zoom if too small
+      const minZoom = calculateMinimumZoom();
+      if (currentTransform.photoScale < minZoom) {
+        snapToMinimum(minZoom);
+      }
     } else if (e.touches.length === 1) {
       // One finger remaining - switch to drag mode
       setLastTouchDistance(0);
@@ -322,7 +545,13 @@ export default function PhotoRenderer({
     
     // Scale factor for zoom
     const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.max(0.1, Math.min(10, currentTransform.photoScale * scaleFactor));
+    const minZoom = calculateMinimumZoom();
+    let newScale = Math.max(minZoom, Math.min(10, currentTransform.photoScale * scaleFactor));
+    
+    // If zooming out would go below minimum, snap to minimum
+    if (e.deltaY > 0 && newScale <= minZoom) {
+      newScale = minZoom;
+    }
     
     const newTransform = createPhotoTransform(
       newScale,
@@ -338,11 +567,13 @@ export default function PhotoRenderer({
   const debugInfo = debug ? (
     <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs p-2 rounded z-50 pointer-events-none">
       <div>Scale: {currentTransform.photoScale.toFixed(2)}</div>
+      <div>Min Zoom: {calculateMinimumZoom().toFixed(2)}</div>
       <div>Center X: {currentTransform.photoCenterX.toFixed(3)}</div>
       <div>Center Y: {currentTransform.photoCenterY.toFixed(3)}</div>
       <div>Interactive: {interactive ? 'Yes' : 'No'}</div>
       <div>Dragging: {isDragging ? 'Yes' : 'No'}</div>
       <div>Touching: {isTouching ? 'Yes' : 'No'}</div>
+      <div>Snapping: {isSnapping ? 'Yes' : 'No'}</div>
       <div>Touch Distance: {lastTouchDistance.toFixed(0)}</div>
     </div>
   ) : null;
@@ -410,6 +641,10 @@ export default function PhotoRenderer({
           </div>
         </div>
       )}
+      
+      {/* Clipping indicators overlay */}
+      <ClippingOverlay />
+      
       {debugInfo}
     </div>
   );

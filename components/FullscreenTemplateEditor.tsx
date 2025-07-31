@@ -506,6 +506,7 @@ export default function FullscreenTemplateEditor({
                         className="w-full h-full"
                         debug={false} // Disable visual overlay but keep console logging
                         fallbackUrls={selectedPhoto ? getHighResPhotoUrls(selectedPhoto) : []}
+                        showClippingIndicators={true} // Enable clipping indicators
                       />
                     ) : (
                       <div className="w-full h-full bg-gray-200 border border-gray-300 border-dashed flex items-center justify-center">
