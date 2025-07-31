@@ -13,7 +13,7 @@
   }
 }
 
-/* CLIPPING PREVENTION: Portrait tablet viewport utilities */
+/* FIXED-HEIGHT LAYOUT: Portrait tablet viewport utilities */
 @layer utilities {
   /* Safe viewport height - accounts for system UI */
   .min-h-safe-screen {
@@ -21,10 +21,28 @@
     min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
   }
   
-  /* Prevent favorites bar clipping on portrait tablets */
-  .favorites-bar-safe {
-    max-height: min(80vh, 320px);
+  /* Fixed-height layout system */
+  .layout-header {
+    height: 60px;
+    flex-shrink: 0;
+  }
+  
+  .layout-main-content {
+    height: calc(100vh - 60px - 150px);
+    overflow: hidden;
+  }
+  
+  .layout-favorites {
+    height: 150px;
+    flex-shrink: 0;
     overflow-y: auto;
+  }
+  
+  /* Support for browsers without dvh */
+  @supports (height: 100dvh) {
+    .layout-main-content {
+      height: calc(100dvh - 60px - 150px);
+    }
   }
   
   /* Emergency clipping detection indicator */

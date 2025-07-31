@@ -61,75 +61,14 @@ export default function FavoritesBar({
   
   const safeViewport = getSafeViewportInfo();
   
-  // Get adaptive photo height based on size with clipping prevention
+  // SIMPLIFIED: Fixed photo height for 150px container
   const getAdaptivePhotoHeight = () => {
-    if (!isExpanded) return 'h-16'; // Always h-16 when collapsed
-    
-    // CLIPPING PREVENTION: Adjust photo size based on available space
-    const basePhotoHeight = (() => {
-      switch (adaptivePhotoSize) {
-        case 'small': return 128; // h-32
-        case 'medium': return 160; // h-40
-        case 'large': return 192; // h-48
-        default: return 160;
-      }
-    })();
-    
-    // Don't allow photos to exceed 60% of available expansion space
-    const maxAllowedPhotoHeight = safeViewport.availableForExpansion * 0.6;
-    const safePhotoHeight = Math.min(basePhotoHeight, maxAllowedPhotoHeight);
-    
-    // Convert back to Tailwind classes with fallback
-    if (safePhotoHeight <= 96) return 'h-24';
-    if (safePhotoHeight <= 128) return 'h-32';
-    if (safePhotoHeight <= 160) return 'h-40';
-    if (safePhotoHeight <= 192) return 'h-48';
-    return `h-[${Math.round(safePhotoHeight)}px]`;
+    // For 150px container height, optimal photo height is ~100px (h-24 + padding)
+    return 'h-24'; // 96px - perfect for 150px container with padding
   };
   
-  // CLIPPING PREVENTION: Safe container height calculation
-  const getSafeContainerHeight = () => {
-    if (!isExpanded) return 'h-24';
-    
-    // If viewport is too constrained, don't expand
-    if (!safeViewport.isSafeForExpansion) {
-      console.warn('🚨 CLIPPING PREVENTION: Viewport too constrained for favorites bar expansion', {
-        viewportHeight: safeViewport.height,
-        availableSpace: safeViewport.availableForExpansion,
-        recommendedAction: 'Keeping collapsed to prevent clipping'
-      });
-      return 'h-24';
-    }
-    
-    // Use provided dynamic height if it's safe
-    if (dynamicHeight) {
-      const dynamicHeightValue = parseInt(dynamicHeight.replace(/[^\d]/g, '')) || 256;
-      if (dynamicHeightValue <= safeViewport.availableForExpansion) {
-        return dynamicHeight;
-      } else {
-        console.warn('🚨 CLIPPING PREVENTION: Dynamic height would cause clipping', {
-          requestedHeight: dynamicHeightValue,
-          availableSpace: safeViewport.availableForExpansion,
-          fallbackHeight: safeViewport.availableForExpansion
-        });
-      }
-    }
-    
-    // Calculate safe height from available space
-    const safeHeight = Math.min(safeViewport.availableForExpansion, 280); // Cap at 280px
-    
-    // Convert to Tailwind classes
-    if (safeHeight <= 96) return 'h-24';
-    if (safeHeight <= 128) return 'h-32';
-    if (safeHeight <= 160) return 'h-40';
-    if (safeHeight <= 192) return 'h-48';
-    if (safeHeight <= 224) return 'h-56';
-    if (safeHeight <= 256) return 'h-64';
-    if (safeHeight <= 288) return 'h-72';
-    return `h-[${Math.round(safeHeight)}px]`;
-  };
-  
-  const containerHeight = getSafeContainerHeight();
+  // SIMPLIFIED: Fixed height calculation - no complex viewport calculations needed
+  const containerHeight = 'h-full'; // Use full available height from parent container
   const containerRef = useRef<HTMLDivElement>(null);
   
   // DEVELOPMENT: Clipping monitoring and warnings

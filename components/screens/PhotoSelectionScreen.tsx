@@ -18,7 +18,7 @@ import TemplateGrid from '../TemplateGrid';
 import TemplateSwapModal from '../TemplateSwapModal';
 import FavoritesBar from '../FavoritesBar';
 import OriginalTemplateVisual from '../TemplateVisual';
-import { useViewportConstraints, getHeightClass } from '../../hooks/useViewportConstraints';
+// NOTE: Removed viewport constraints imports - using fixed height layout now
 
 
 // Simplified TemplateVisual component
@@ -303,21 +303,13 @@ export default function PhotoSelectionScreen({
   const [hasScrolled, setHasScrolled] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<ManualTemplate[]>([]);
   
-  // ENHANCED: Viewport-aware constraints for responsive favorites bar with portrait tablet optimization
-  const viewportConstraints = useViewportConstraints({
-    headerHeight: 140, // Increased from 120 - more realistic for portrait tablets with system UI
-    minContentHeight: 420, // Increased from 400 - ensure sufficient template viewing space
-    padding: 60, // Increased from 40 - more safety margin for portrait tablets
-    maxExpansionRatio: 0.35, // Reduced from 0.45 - more conservative for portrait mode
-    absoluteMaxHeight: 280 // Reduced from 300 - prevent clipping on shorter tablets
-  });
+  // NOTE: Removed viewport constraints - using fixed height layout now
   
   // Two-mode system for photo selection
   const [selectionMode, setSelectionMode] = useState<'photo' | 'print'>('photo'); // Default to photo selection mode
   const [favoritedPhotos, setFavoritedPhotos] = useState<Set<string>>(new Set()); // Photo IDs that are favorited
   
-  // Bookmarks bar expansion state
-  const [isBookmarksExpanded, setIsBookmarksExpanded] = useState(false);
+  // NOTE: Removed expansion state - using fixed height layout now
   
   // Note: Debug logging removed - viewport-aware expansion is working correctly in both modes
 
@@ -402,10 +394,7 @@ export default function PhotoSelectionScreen({
     const templateToEdit = templateSlots.filter(s => s.templateId === slot.templateId);
     setEditingTemplate(templateToEdit);
     
-    // Trigger bookmarks expansion for manual slot selection in print mode
-    if (selectionMode === 'print') {
-      setIsBookmarksExpanded(true);
-    }
+    // NOTE: Removed expansion logic - using fixed height layout now
   };
 
   const handleInlineEditorClose = () => {
@@ -494,10 +483,7 @@ export default function PhotoSelectionScreen({
       currentInlineEditingPhoto: inlineEditingPhoto?.name
     });
 
-    // Collapse bookmarks bar when photo is selected
-    if (isBookmarksExpanded) {
-      setIsBookmarksExpanded(false);
-    }
+    // NOTE: Removed collapse logic - using fixed height layout now
 
     // Check if we're in inline editing mode first
     if (viewMode === 'inline-editing') {
@@ -587,10 +573,7 @@ export default function PhotoSelectionScreen({
     console.log('🔧 Empty slot clicked - selecting and expanding bookmarks');
     setSelectedSlot(slot);
     
-    // Always trigger bookmarks expansion for manual slot selection in print mode
-    if (selectionMode === 'print') {
-      setIsBookmarksExpanded(true);
-    }
+    // NOTE: Removed expansion logic - using fixed height layout now
   };
 
   const handlePhotoSelectForSlot = (photo: Photo) => {
@@ -606,10 +589,7 @@ export default function PhotoSelectionScreen({
       return;
     }
 
-    // Collapse bookmarks bar when clicking outside in print mode
-    if (isBookmarksExpanded) {
-      setIsBookmarksExpanded(false);
-    }
+    // NOTE: Removed collapse logic - using fixed height layout now
 
     // Check if all templates are complete (all slots have photos)
     const allSlotsHavePhotos = templateSlots.every(slot => slot.photoId);
@@ -721,7 +701,7 @@ export default function PhotoSelectionScreen({
     
     // Reset states and return to normal view
     console.log('🔧 Resetting view states and closing fullscreen editor');
-    setIsBookmarksExpanded(false); // Collapse bookmarks when applying photo
+    // NOTE: Removed collapse logic - using fixed height layout now
     resetViewStates();
   };
 
@@ -763,7 +743,7 @@ export default function PhotoSelectionScreen({
     setViewMode('normal');
     setInlineEditingSlot(null);
     setInlineEditingPhoto(null);
-    setIsBookmarksExpanded(false); // Collapse bookmarks when applying photo
+    // NOTE: Removed collapse logic - using fixed height layout now
   };
 
   const handleInlineCancel = () => {
@@ -771,7 +751,7 @@ export default function PhotoSelectionScreen({
     setViewMode('normal');
     setInlineEditingSlot(null);
     setInlineEditingPhoto(null);
-    setIsBookmarksExpanded(false); // Collapse bookmarks when canceling inline editing
+    // NOTE: Removed collapse logic - using fixed height layout now
   };
 
   const handleOverlayCancel = () => {
@@ -801,8 +781,7 @@ export default function PhotoSelectionScreen({
   // Mode toggling
   const handleModeToggle = () => {
     setSelectionMode(prev => prev === 'photo' ? 'print' : 'photo');
-    // Collapse bookmarks when switching modes
-    setIsBookmarksExpanded(false);
+    // NOTE: Removed collapse logic - using fixed height layout now
   };
 
   // Get photos used in templates
@@ -972,12 +951,12 @@ export default function PhotoSelectionScreen({
         PhotoSelectionScreen.tsx
       </div>
 
-      {/* Main Content Area */}
+      {/* FIXED-HEIGHT LAYOUT: Main Content Area */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Photo Grid Section */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Mode Header with Toggle */}
-          <div className="bg-white border-b p-3 flex items-center justify-between">
+          {/* Mode Header with Toggle - FIXED HEIGHT */}
+          <div className="bg-white border-b p-3 flex items-center justify-between layout-header">
             <div className="flex items-center space-x-3">
               <h2 className="font-medium text-gray-800">
                 {selectionMode === 'photo' ? 'Select Your Favorite Photos' : 'Fill Your Print Templates'}
@@ -1002,54 +981,61 @@ export default function PhotoSelectionScreen({
             </button>
           </div>
 
-          {selectionMode === 'photo' ? (
-            <PhotoGrid
-              photos={getDisplayPhotos()}
-              onPhotoClick={handlePhotoClick}
-              showScrollHint={false}
-              hasScrolled={hasScrolled}
-              onScroll={() => setHasScrolled(true)}
-              favoritedPhotos={favoritedPhotos}
-              onToggleFavorite={handleToggleFavorite}
-              usedPhotoIds={getUsedPhotoIds()}
-            />
-          ) : (
-            // Print mode: Show templates in Cover Flow
-            <div className="flex-1 relative z-40" onClick={handleBackgroundClick} style={{ touchAction: 'manipulation' }}>
-                <TemplateGrid
-                  templateSlots={templateSlots}
-                  photos={photos}
-                  selectedSlot={selectedSlot}
-                  onSlotClick={handleSlotSelectFromTemplate}
-                  onSwapTemplate={handleSwapTemplate}
-                  onDeleteTemplate={handleDeletePrint}
-                  onDownloadTemplate={handleDownloadTemplate}
-                  TemplateVisual={(props: any) => (
-                    <TemplateVisual
-                      {...props}
-                      inlineEditingSlot={inlineEditingSlot}
-                      inlineEditingPhoto={inlineEditingPhoto}
-                      onInlineApply={handleInlineApply}
-                      onInlineCancel={handleInlineCancel}
-                    />
-                  )}
-                  layout="coverflow"
-                  showActions={true}
-                />
-            </div>
-          )}
+          {/* MAIN CONTENT AREA - CALCULATED FIXED HEIGHT */}
+          <div 
+            className="layout-main-content relative z-40"
+            style={{ 
+              touchAction: 'manipulation'
+            }}
+          >
+            {selectionMode === 'photo' ? (
+              <PhotoGrid
+                photos={getDisplayPhotos()}
+                onPhotoClick={handlePhotoClick}
+                showScrollHint={false}
+                hasScrolled={hasScrolled}
+                onScroll={() => setHasScrolled(true)}
+                favoritedPhotos={favoritedPhotos}
+                onToggleFavorite={handleToggleFavorite}
+                usedPhotoIds={getUsedPhotoIds()}
+              />
+            ) : (
+              // Print mode: Show templates in Cover Flow
+              <div className="h-full" onClick={handleBackgroundClick}>
+                  <TemplateGrid
+                    templateSlots={templateSlots}
+                    photos={photos}
+                    selectedSlot={selectedSlot}
+                    onSlotClick={handleSlotSelectFromTemplate}
+                    onSwapTemplate={handleSwapTemplate}
+                    onDeleteTemplate={handleDeletePrint}
+                    onDownloadTemplate={handleDownloadTemplate}
+                    TemplateVisual={(props: any) => (
+                      <TemplateVisual
+                        {...props}
+                        inlineEditingSlot={inlineEditingSlot}
+                        inlineEditingPhoto={inlineEditingPhoto}
+                        onInlineApply={handleInlineApply}
+                        onInlineCancel={handleInlineCancel}
+                      />
+                    )}
+                    layout="coverflow"
+                    showActions={true}
+                  />
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Two-Mode Bottom Section - Mobile/Tablet */}
-        <div className={`lg:hidden bg-white shadow-lg border-t flex-shrink-0 relative z-40 transition-all duration-300 ease-in-out overflow-y-auto ${
-          selectionMode === 'print' && isBookmarksExpanded 
-            ? getHeightClass(viewportConstraints.safeExpansionHeight) 
-            : 'h-36'
-        }`} style={{ 
-          touchAction: 'pan-x' // Allow horizontal scrolling for photo bar
-        }}>
+        {/* FIXED-HEIGHT FAVORITES BAR - Mobile/Tablet */}
+        <div 
+          className="lg:hidden bg-white shadow-lg border-t layout-favorites relative z-40"
+          style={{ 
+            touchAction: 'pan-x' // Allow horizontal scrolling for photo bar
+          }}
+        >
           {selectionMode === 'photo' ? (
-            // Photo Selection Mode: Show Favorites Bar
+            // Photo Selection Mode: Show Favorites Bar - FIXED HEIGHT
             <FavoritesBar
               favoritedPhotos={getUnusedFavorites()}
               onPhotoClick={handlePhotoClick}
@@ -1058,10 +1044,10 @@ export default function PhotoSelectionScreen({
               layout="horizontal"
               showRemoveButtons={true}
               usedPhotoIds={getUsedPhotoIds()}
-              isExpanded={false}
+              isExpanded={false} // No expansion needed - fixed height
             />
           ) : (
-            // Print Filling Mode: Show Favorites Bar (control bar removed to prevent clipping)
+            // Print Filling Mode: Show Favorites Bar - FIXED HEIGHT
             <FavoritesBar
               favoritedPhotos={getDisplayPhotos()}
               onPhotoClick={handlePhotoClick}
@@ -1070,10 +1056,9 @@ export default function PhotoSelectionScreen({
               layout="horizontal"
               showRemoveButtons={false}
               usedPhotoIds={getUsedPhotoIds()}
-              isExpanded={isBookmarksExpanded}
-              dynamicHeight={getHeightClass(viewportConstraints.safeExpansionHeight)}
-              adaptivePhotoSize={viewportConstraints.adaptivePhotoSize}
-              maxPhotosToShow={viewportConstraints.maxPhotosToShow}
+              isExpanded={false} // No expansion needed - fixed height
+              adaptivePhotoSize="medium" // Fixed medium size for 150px height
+              maxPhotosToShow={8} // Optimal for 150px height
             />
           )}
         </div>
@@ -1098,9 +1083,9 @@ export default function PhotoSelectionScreen({
                   layout="vertical"
                   showRemoveButtons={true}
                   usedPhotoIds={getUsedPhotoIds()}
-                  isExpanded={isBookmarksExpanded}
-                  adaptivePhotoSize={viewportConstraints.adaptivePhotoSize}
-                  maxPhotosToShow={viewportConstraints.maxPhotosToShow}
+                  isExpanded={false}
+                  adaptivePhotoSize="medium"
+                  maxPhotosToShow={8}
                 />
               </div>
             </>
@@ -1134,9 +1119,9 @@ export default function PhotoSelectionScreen({
                   layout="vertical"
                   showRemoveButtons={false}
                   usedPhotoIds={getUsedPhotoIds()}
-                  isExpanded={isBookmarksExpanded}
-                  adaptivePhotoSize={viewportConstraints.adaptivePhotoSize}
-                  maxPhotosToShow={viewportConstraints.maxPhotosToShow}
+                  isExpanded={false}
+                  adaptivePhotoSize="medium"
+                  maxPhotosToShow={8}
                 />
               </div>
             </>
