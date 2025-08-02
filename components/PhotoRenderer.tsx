@@ -100,6 +100,8 @@ export default function PhotoRenderer({
   // Auto-snap state for smooth zoom corrections
   const [isSnapping, setIsSnapping] = useState(false);
   
+  // Removed timeout reference - no more auto-corrections
+  
   // Clipping detection state
   const [clippingData, setClippingData] = useState<{
     overexposed: ImageData | null;
@@ -110,10 +112,10 @@ export default function PhotoRenderer({
   const imageRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Calculate smart minimum zoom based on photo and container dimensions
-  const calculateMinimumZoom = (): number => {
+  // Calculate the absolute minimum zoom needed to cover the container
+  const calculateMinimumCoverZoom = (): number => {
     if (!imageRef.current || !containerRef.current) {
-      return 0.8; // Default minimum if we can't calculate
+      return 0.5; // More permissive default
     }
     
     const photoWidth = imageRef.current.naturalWidth;
@@ -121,54 +123,31 @@ export default function PhotoRenderer({
     const containerRect = containerRef.current.getBoundingClientRect();
     
     if (photoWidth === 0 || photoHeight === 0 || containerRect.width === 0 || containerRect.height === 0) {
-      return 0.8; // Fallback for edge cases
+      return 0.5; // More permissive fallback
     }
     
     const photoAspectRatio = photoWidth / photoHeight;
     const containerAspectRatio = containerRect.width / containerRect.height;
     
-    // Calculate the scale needed to fit the photo in the container (cover mode)
-    // We want to ensure the photo always covers the full container
-    let fitScale: number;
+    // Calculate the absolute minimum scale needed to cover the container
+    // This is the scale where photo edges align with container edges
+    let coverScale: number;
     
     if (photoAspectRatio > containerAspectRatio) {
-      // Photo is wider - fit to height, photo will extend beyond sides
-      fitScale = 1.0; // Container height = photo height when scaled
+      // Photo is wider - need to scale to cover height
+      coverScale = 1.0;
     } else {
-      // Photo is taller - fit to width, photo will extend beyond top/bottom  
-      fitScale = 1.0; // Container width = photo width when scaled
+      // Photo is taller - need to scale to cover width
+      coverScale = 1.0;
     }
     
-    // Set minimum to 80% of fit scale, ensuring photo never gets too small
-    const minimumZoom = Math.max(0.8, fitScale * 0.8);
-    
-    return minimumZoom;
+    // Only enforce this minimum if photo would show empty space
+    return coverScale;
   };
 
-  // Auto-snap to minimum zoom with smooth animation
-  const snapToMinimum = (targetScale?: number) => {
-    const minZoom = targetScale || calculateMinimumZoom();
-    
-    if (currentTransform.photoScale >= minZoom) {
-      return; // Already above minimum, no need to snap
-    }
-    
-    setIsSnapping(true);
-    
-    // Create new transform with minimum scale
-    const snappedTransform = createPhotoTransform(
-      minZoom,
-      currentTransform.photoCenterX,
-      currentTransform.photoCenterY
-    );
-    
-    // Apply the snapped transform
-    setCurrentTransform(snappedTransform);
-    onTransformChange?.(snappedTransform);
-    
-    // Reset snapping state after animation
-    setTimeout(() => setIsSnapping(false), 200);
-  };
+  // Removed all empty space detection - user has complete control
+
+  // Removed all boundary correction logic - user has complete control
 
   // Analyze image for clipping (overexposed/underexposed areas)
   const analyzeClipping = () => {
@@ -269,6 +248,8 @@ export default function PhotoRenderer({
       setTimeout(analyzeClipping, 100);
     }
   }, [imageLoaded, showClippingIndicators]);
+
+  // No timeout cleanup needed - removed auto-corrections
   
   // ClippingOverlay component - displays zebra stripes for clipped areas
   const ClippingOverlay = () => {
@@ -380,8 +361,8 @@ export default function PhotoRenderer({
     ? convertLegacyToCSS(transform)
     : {
         ...convertPhotoToCSS(currentTransform),
-        // Add smooth transition when snapping back to minimum zoom
-        transition: isSnapping ? 'transform 0.2s ease-out' : 'none'
+        // Add smooth spring animation when auto-fitting
+        transition: isSnapping ? 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none'
       };
 
   // Touch helper functions for pinch-to-zoom
@@ -428,8 +409,9 @@ export default function PhotoRenderer({
       // Two finger pinch - handle zoom
       const distance = getTouchDistance(e.touches);
       const ratio = distance / lastTouchDistance;
-      const minZoom = calculateMinimumZoom();
-      const newScale = Math.max(minZoom * 0.7, Math.min(10, currentTransform.photoScale * ratio)); // Allow slight under-zoom during pinch
+      const minCoverZoom = calculateMinimumCoverZoom();
+      const absoluteMinZoom = Math.max(0.1, minCoverZoom * 0.3); // More permissive minimum for pinch
+      const newScale = Math.max(absoluteMinZoom, Math.min(10, currentTransform.photoScale * ratio));
       
       const newTransform = createPhotoTransform(
         newScale,
@@ -473,17 +455,13 @@ export default function PhotoRenderer({
     e.stopPropagation();
     
     if (e.touches.length === 0) {
-      // All fingers lifted - check if we need to snap back to minimum
+      // All fingers lifted - just clean up state, no auto-corrections
       setIsTouching(false);
       setIsDragging(false);
       setLastPointer(null);
       setLastTouchDistance(0);
       
-      // Auto-snap to minimum zoom if too small
-      const minZoom = calculateMinimumZoom();
-      if (currentTransform.photoScale < minZoom) {
-        snapToMinimum(minZoom);
-      }
+      // No auto-corrections - user has complete control over positioning
     } else if (e.touches.length === 1) {
       // One finger remaining - switch to drag mode
       setLastTouchDistance(0);
@@ -536,6 +514,8 @@ export default function PhotoRenderer({
     setIsDragging(false);
     setLastPointer(null);
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    
+    // No auto-corrections - user has complete control over positioning
   };
 
   const handleWheel = (e: React.WheelEvent) => {
@@ -545,13 +525,11 @@ export default function PhotoRenderer({
     
     // Scale factor for zoom
     const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    const minZoom = calculateMinimumZoom();
-    let newScale = Math.max(minZoom, Math.min(10, currentTransform.photoScale * scaleFactor));
+    const minCoverZoom = calculateMinimumCoverZoom();
     
-    // If zooming out would go below minimum, snap to minimum
-    if (e.deltaY > 0 && newScale <= minZoom) {
-      newScale = minZoom;
-    }
+    // Allow zooming below cover minimum temporarily, but limit extreme zoom out
+    const absoluteMinZoom = Math.max(0.1, minCoverZoom * 0.5);
+    let newScale = Math.max(absoluteMinZoom, Math.min(10, currentTransform.photoScale * scaleFactor));
     
     const newTransform = createPhotoTransform(
       newScale,
@@ -561,20 +539,21 @@ export default function PhotoRenderer({
     
     setCurrentTransform(newTransform);
     onTransformChange?.(newTransform);
+    
+    // No immediate auto-fit - let user zoom freely without interference
   };
 
-  // Debug info
+  // Debug info (simplified - no boundary detection)
   const debugInfo = debug ? (
-    <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs p-2 rounded z-50 pointer-events-none">
+    <div className="absolute top-2 left-2 bg-black bg-opacity-90 text-white text-xs p-3 rounded z-50 pointer-events-none max-w-xs">
+      <div className="font-bold mb-2">Photo Renderer Debug</div>
       <div>Scale: {currentTransform.photoScale.toFixed(2)}</div>
-      <div>Min Zoom: {calculateMinimumZoom().toFixed(2)}</div>
       <div>Center X: {currentTransform.photoCenterX.toFixed(3)}</div>
       <div>Center Y: {currentTransform.photoCenterY.toFixed(3)}</div>
       <div>Interactive: {interactive ? 'Yes' : 'No'}</div>
       <div>Dragging: {isDragging ? 'Yes' : 'No'}</div>
       <div>Touching: {isTouching ? 'Yes' : 'No'}</div>
-      <div>Snapping: {isSnapping ? 'Yes' : 'No'}</div>
-      <div>Touch Distance: {lastTouchDistance.toFixed(0)}</div>
+      <div>Mode: User Control (No Auto-Snap)</div>
     </div>
   ) : null;
 

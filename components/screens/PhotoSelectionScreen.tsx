@@ -212,6 +212,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
         inlineEditingPhoto={inlineEditingPhoto}
         onInlineApply={onInlineApply}
         onInlineCancel={onInlineCancel}
+        isEditingMode={!!inlineEditingSlot}
       />
     );
   }
@@ -542,8 +543,16 @@ export default function PhotoSelectionScreen({
       slotId: slot.id,
       hasPhoto: !!slot.photoId,
       photoId: slot.photoId,
-      selectionMode
+      selectionMode,
+      currentViewMode: viewMode,
+      currentInlineEditingSlot: inlineEditingSlot?.id
     });
+
+    // Prevent slot selection if already in inline editing mode
+    if (viewMode === 'inline-editing') {
+      console.log('⚠️ Already in inline editing mode, ignoring slot click');
+      return;
+    }
 
     // INTUITIVE UX: Filled slots should be immediately editable
     if (slot.photoId) {
@@ -555,14 +564,34 @@ export default function PhotoSelectionScreen({
       if (existingPhoto) {
         console.log('🔧 Found existing photo, setting inline editing states:', {
           photo: existingPhoto.name,
-          slotId: slot.id
+          slotId: slot.id,
+          willSetStates: true
         });
         
-        // Start inline editing immediately with the existing photo
-        setSelectedSlot(slot);
-        setInlineEditingSlot(slot);
-        setInlineEditingPhoto(existingPhoto);
-        setViewMode('inline-editing');
+        // Clear any previous states first to ensure clean transition
+        setSelectedSlot(null);
+        setInlineEditingSlot(null);
+        setInlineEditingPhoto(null);
+        
+        // Use setTimeout to ensure state cleanup completes before setting new states
+        setTimeout(() => {
+          console.log('🔧 Setting new inline editing states after cleanup');
+          setSelectedSlot(slot);
+          setInlineEditingSlot(slot);
+          setInlineEditingPhoto(existingPhoto);
+          setViewMode('inline-editing');
+          
+          // Force a small delay to ensure React has processed all state changes
+          setTimeout(() => {
+            console.log('✅ Inline editing state transition complete:', {
+              selectedSlot: slot.id,
+              inlineEditingSlot: slot.id,
+              inlineEditingPhoto: existingPhoto.name,
+              viewMode: 'inline-editing'
+            });
+          }, 50);
+        }, 50);
+        
         return; // Exit early - filled slots go straight to editing
       } else {
         console.warn('🔧 Photo not found in photos array:', slot.photoId);
@@ -716,6 +745,34 @@ export default function PhotoSelectionScreen({
     setInlineEditingPhoto(null);
   };
 
+  // Enhanced escape mechanism for stuck states
+  const forceResetEditingState = () => {
+    console.log('🚨 FORCE RESET - Clearing all editing states');
+    setViewMode('normal');
+    setInlineEditingSlot(null);
+    setInlineEditingPhoto(null);
+    setSelectedSlot(null);
+    setSelectedPhotoForViewer(null);
+    setSelectedPhotoForTemplate(null);
+    setSelectedTemplateForViewer(null);
+    setSelectedSlotForEditor(null);
+  };
+
+  // Keyboard escape handler
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && viewMode === 'inline-editing') {
+        console.log('🔧 ESC key pressed - cancelling inline editing');
+        handleInlineCancel();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [viewMode]);
+
   // Inline editing handlers
   const handleInlinePhotoSelect = (photo: Photo) => {
     console.log('🔧 handleInlinePhotoSelect called:', {
@@ -738,19 +795,84 @@ export default function PhotoSelectionScreen({
   };
 
   const handleInlineApply = (slotId: string, photoId: string, transform: PhotoTransform) => {
-    console.log('🔧 Inline apply:', { slotId, photoId, transform });
-    handleApplyPhotoToSlot(slotId, photoId, transform);
-    setViewMode('normal');
-    setInlineEditingSlot(null);
-    setInlineEditingPhoto(null);
+    console.log('🔧 INLINE APPLY DEBUG:', { 
+      slotId, 
+      photoId, 
+      transform,
+      currentViewMode: viewMode,
+      currentInlineEditingSlot: inlineEditingSlot?.id,
+      currentInlineEditingPhoto: inlineEditingPhoto?.id
+    });
+    
+    // Add timeout safety net in case the apply operation hangs
+    const timeoutId = setTimeout(() => {
+      console.warn('⚠️ TIMEOUT - Inline apply taking too long, force resetting states');
+      forceResetEditingState();
+    }, 5000); // 5 second timeout
+    
+    try {
+      if (!slotId || !photoId) {
+        throw new Error(`Missing required parameters: slotId=${slotId}, photoId=${photoId}`);
+      }
+      
+      handleApplyPhotoToSlot(slotId, photoId, transform);
+      console.log('✅ Photo applied successfully, resetting states');
+      
+      // Clear timeout since operation succeeded
+      clearTimeout(timeoutId);
+      
+      // Reset states with extra safety checks
+      setViewMode('normal');
+      setInlineEditingSlot(null);
+      setInlineEditingPhoto(null);
+      setSelectedSlot(null);
+      
+      // Double-check state reset after a short delay
+      setTimeout(() => {
+        if (viewMode === 'inline-editing') {
+          console.warn('⚠️ State not properly reset, force clearing');
+          forceResetEditingState();
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error('❌ Error in handleInlineApply:', error);
+      
+      // Clear timeout
+      clearTimeout(timeoutId);
+      
+      // Force reset states even if there's an error to prevent getting stuck
+      forceResetEditingState();
+    }
     // NOTE: Removed collapse logic - using fixed height layout now
   };
 
   const handleInlineCancel = () => {
-    console.log('🔧 Inline editing cancelled');
-    setViewMode('normal');
-    setInlineEditingSlot(null);
-    setInlineEditingPhoto(null);
+    console.log('🔧 INLINE CANCEL DEBUG:', {
+      currentViewMode: viewMode,
+      currentInlineEditingSlot: inlineEditingSlot?.id,
+      currentInlineEditingPhoto: inlineEditingPhoto?.id
+    });
+    
+    console.log('✅ Cancelling inline editing, resetting states');
+    
+    try {
+      // Force reset all editing states immediately
+      forceResetEditingState();
+      
+      // Double-check state reset after a short delay
+      setTimeout(() => {
+        if (viewMode === 'inline-editing') {
+          console.warn('⚠️ Cancel operation - state not properly reset, force clearing again');
+          forceResetEditingState();
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error('❌ Error in handleInlineCancel:', error);
+      // Force reset even if there's an error
+      forceResetEditingState();
+    }
     // NOTE: Removed collapse logic - using fixed height layout now
   };
 

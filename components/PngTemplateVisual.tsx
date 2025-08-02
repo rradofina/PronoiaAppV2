@@ -16,6 +16,8 @@ interface PngTemplateVisualProps {
   inlineEditingPhoto?: Photo | null;
   onInlineApply?: (slotId: string, photoId: string, transform: PhotoTransform) => void;
   onInlineCancel?: () => void;
+  // Editing mode detection
+  isEditingMode?: boolean;
 }
 
 
@@ -28,7 +30,8 @@ export default function PngTemplateVisual({
   inlineEditingSlot,
   inlineEditingPhoto,
   onInlineApply,
-  onInlineCancel
+  onInlineCancel,
+  isEditingMode = false
 }: PngTemplateVisualProps) {
   
   const getPhotoUrl = (photoId?: string | null) => {
@@ -174,6 +177,10 @@ export default function PngTemplateVisual({
           }
         }
         
+        // Check if this slot should be blocked during editing mode
+        const isOtherSlotDuringEditing = isEditingMode && !isInlineEditing;
+        const shouldBlockSlot = isOtherSlotDuringEditing;
+        
         return (
           <div
             key={hole.id}
@@ -182,6 +189,8 @@ export default function PngTemplateVisual({
                 ? 'border-4 border-blue-400 shadow-lg shadow-blue-400/50 z-50 ring-2 ring-blue-300' // Enhanced highlighting for inline editing (changed to blue)
                 : isSelected 
                 ? 'border-4 border-blue-500 border-opacity-90 z-40 cursor-pointer shadow-md' // Above overlay (z-30)
+                : shouldBlockSlot
+                ? 'opacity-50 pointer-events-none' // Blocked during editing
                 : 'hover:border-2 hover:border-blue-300 hover:border-opacity-60 cursor-pointer'
             }`}
             style={{
@@ -190,19 +199,33 @@ export default function PngTemplateVisual({
               width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
               height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
             }}
-            onClick={() => !isInlineEditing && onSlotClick(slot)}
-            title={slot.photoId ? "Click to edit this photo" : "Click to select slot"}
+            onClick={() => !shouldBlockSlot && onSlotClick(slot)}
+            title={
+              shouldBlockSlot 
+                ? "Editing in progress - complete current edit first" 
+                : slot.photoId 
+                ? "Click to edit this photo" 
+                : "Click to select slot"
+            }
           >
             {hasInlinePhoto && onInlineApply && onInlineCancel ? (
               // Inline editing mode - show InlinePhotoEditor
-              <InlinePhotoEditor
-                slot={slot}
-                photo={inlineEditingPhoto}
-                photos={photos}
-                onApply={onInlineApply}
-                onCancel={onInlineCancel}
-                className="w-full h-full"
-              />
+              <>
+                {console.log('🔧 PngTemplateVisual - Rendering InlinePhotoEditor:', {
+                  slotId: slot.id,
+                  photoName: inlineEditingPhoto.name,
+                  hasOnInlineApply: !!onInlineApply,
+                  hasOnInlineCancel: !!onInlineCancel
+                })}
+                <InlinePhotoEditor
+                  slot={slot}
+                  photo={inlineEditingPhoto}
+                  photos={photos}
+                  onApply={onInlineApply}
+                  onCancel={onInlineCancel}
+                  className="w-full h-full"
+                />
+              </>
             ) : photoUrl ? (
               // Normal mode - show photo with high-resolution fallbacks
               <PhotoRenderer
@@ -220,6 +243,8 @@ export default function PngTemplateVisual({
                   ? 'bg-yellow-50 border-yellow-400 animate-pulse shadow-lg shadow-yellow-400/30' // Enhanced highlighting for inline editing
                   : isSelected 
                   ? 'bg-blue-50 border-blue-400' 
+                  : shouldBlockSlot
+                  ? 'bg-gray-100 border-gray-300' // Dimmed background during editing
                   : 'bg-gray-200 border-gray-400'
               }`}>
                 {/* Visible placeholder with icon */}
@@ -228,11 +253,20 @@ export default function PngTemplateVisual({
                     ? 'text-yellow-600 font-bold' 
                     : isSelected 
                     ? 'text-blue-600 font-semibold' 
+                    : shouldBlockSlot
+                    ? 'text-gray-400' // Grayed out during editing
                     : 'text-gray-500'
                 }`}>
-                  <div className="text-lg mb-1">+</div>
+                  <div className="text-lg mb-1">
+                    {shouldBlockSlot ? '·' : '+'}
+                  </div>
                   <div className="text-xs font-medium">
-                    {isInlineEditing ? 'Select Photo Below' : 'Tap to Add'}
+                    {isInlineEditing 
+                      ? 'Select Photo Below' 
+                      : shouldBlockSlot 
+                      ? 'Editing...' 
+                      : 'Tap to Add'
+                    }
                   </div>
                 </div>
               </div>

@@ -24,6 +24,7 @@ export default function InlinePhotoEditor({
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
   const [currentTransform, setCurrentTransform] = useState<PhotoTransform>(createPhotoTransform(1, 0.5, 0.5));
   const [photoKey, setPhotoKey] = useState<string>('');
+  const [componentKey, setComponentKey] = useState<string>('');
 
   // Initialize transform when slot or photo changes
   useEffect(() => {
@@ -31,11 +32,15 @@ export default function InlinePhotoEditor({
       slotId: slot?.id,
       hasExistingTransform: !!slot?.transform,
       existingTransform: slot?.transform,
-      photoId: photo?.id
+      photoId: photo?.id,
+      hasOnApply: !!onApply,
+      hasOnCancel: !!onCancel
     });
     
-    // Force re-render with new key to clear any cached images
-    setPhotoKey(`inline-${slot?.id}-${photo?.id}-${Date.now()}`);
+    // Force re-render with new keys to clear any cached state and ensure fresh component
+    const timestamp = Date.now();
+    setPhotoKey(`inline-${slot?.id}-${photo?.id}-${timestamp}`);
+    setComponentKey(`component-${slot?.id}-${photo?.id}-${timestamp}`);
     
     // If the slot already has a transform and we're re-editing the same photo, use it
     if (slot?.transform && isPhotoTransform(slot.transform) && slot.photoId === photo?.id) {
@@ -45,7 +50,15 @@ export default function InlinePhotoEditor({
       console.log('🔄 InlinePhotoEditor - Using default transform for new photo');
       setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
     }
-  }, [slot?.id, photo?.id, slot?.transform, slot?.photoId]);
+    
+    // Validate that we have the required props
+    if (!onApply || !onCancel) {
+      console.error('🚨 InlinePhotoEditor - Missing required handlers:', {
+        hasOnApply: !!onApply,
+        hasOnCancel: !!onCancel
+      });
+    }
+  }, [slot?.id, photo?.id, slot?.transform, slot?.photoId, onApply, onCancel]);
 
   // Load photo URL with instant display and cache optimization
   useEffect(() => {
@@ -88,26 +101,50 @@ export default function InlinePhotoEditor({
 
   // Handle apply button click
   const handleApply = () => {
+    console.log('🔧 InlinePhotoEditor - APPLY BUTTON CLICKED');
+    
     try {
       if (!slot?.id || !photo?.id) {
         console.error('🚨 InlinePhotoEditor - Missing required IDs:', { slotId: slot?.id, photoId: photo?.id });
         return;
       }
 
+      if (!onApply) {
+        console.error('🚨 InlinePhotoEditor - onApply handler is missing!');
+        return;
+      }
+
       console.log('🔧 InlinePhotoEditor - Applying transform:', {
         transform: currentTransform,
         photoId: photo.id,
-        slotId: slot.id
+        slotId: slot.id,
+        hasOnApplyHandler: !!onApply
       });
       
       onApply(slot.id, photo.id, currentTransform);
+      console.log('✅ InlinePhotoEditor - onApply called successfully');
     } catch (error) {
       console.error('🚨 InlinePhotoEditor - Error in handleApply:', error);
       // Fallback to basic transform if we have valid IDs
-      if (slot?.id && photo?.id) {
+      if (slot?.id && photo?.id && onApply) {
+        console.log('🔄 InlinePhotoEditor - Trying fallback with basic transform');
         onApply(slot.id, photo.id, createPhotoTransform(1, 0.5, 0.5));
       }
     }
+  };
+
+  // Handle cancel button click
+  const handleCancel = () => {
+    console.log('🔧 InlinePhotoEditor - CANCEL BUTTON CLICKED');
+    
+    if (!onCancel) {
+      console.error('🚨 InlinePhotoEditor - onCancel handler is missing!');
+      return;
+    }
+
+    console.log('🔧 InlinePhotoEditor - Calling onCancel handler');
+    onCancel();
+    console.log('✅ InlinePhotoEditor - onCancel called successfully');
   };
 
   if (!selectedPhotoUrl) {
@@ -119,7 +156,7 @@ export default function InlinePhotoEditor({
   }
 
   return (
-    <div className={`relative w-full h-full z-50 ${className}`}>
+    <div key={componentKey} className={`relative w-full h-full z-50 ${className}`}>
       {/* Interactive PhotoRenderer */}
       <PhotoRenderer
         key={photoKey}
@@ -144,7 +181,7 @@ export default function InlinePhotoEditor({
           ✓
         </button>
         <button
-          onClick={onCancel}
+          onClick={handleCancel}
           className="bg-red-600 text-white px-3 py-1 rounded-md text-sm font-medium hover:bg-red-700 shadow-lg"
           title="Cancel"
         >
