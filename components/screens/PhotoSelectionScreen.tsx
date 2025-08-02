@@ -912,36 +912,15 @@ export default function PhotoSelectionScreen({
   return (
     <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ touchAction: 'pan-y' }}>
       
-      {/* Spotlight Overlay - Show only during inline editing for focused editing experience */}
+      {/* SELECTIVE BLOCKING - Only dim non-interactive areas during editing */}
       {viewMode === 'inline-editing' && (
         <>
-          {/* Mobile/Tablet: Full screen overlay with cutouts for favorites and selected slot */}
+          {/* Subtle backdrop to indicate editing mode - does not block interactions */}
           <div 
-            className="lg:hidden fixed inset-0 z-30 bg-black bg-opacity-70 pointer-events-none"
-          />
-          
-          {/* Desktop: darken the entire template area, leave sidebar clear */}
-          <div 
-            className="hidden lg:block fixed top-0 left-0 bottom-0 z-30 bg-black bg-opacity-70 pointer-events-none"
+            className="fixed inset-0 z-10 bg-black bg-opacity-20 pointer-events-none"
             style={{ 
-              right: '320px' // Leave space for desktop sidebar (320px wide)
+              // This is purely visual - no click blocking
             }}
-          />
-          
-          {/* Clickable overlay for canceling - only on darkened areas */}
-          {/* Mobile clickable area - full screen except elevated elements */}
-          <div 
-            className="lg:hidden fixed inset-0 z-25"
-            onClick={handleOverlayCancel}
-          />
-          
-          {/* Desktop clickable area - entire template area */}
-          <div 
-            className="hidden lg:block fixed top-0 left-0 bottom-0 z-25"
-            style={{ 
-              right: '320px' // Match the darkened area width
-            }}
-            onClick={handleOverlayCancel}
           />
         </>
       )}
@@ -975,7 +954,7 @@ export default function PhotoSelectionScreen({
                 selectionMode === 'photo'
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+              } ${viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''}`}
             >
               {selectionMode === 'photo' ? '📷 Ready to Fill Prints' : '⭐ Back to Photo Selection'}
             </button>
@@ -983,7 +962,11 @@ export default function PhotoSelectionScreen({
 
           {/* MAIN CONTENT AREA - CALCULATED FIXED HEIGHT */}
           <div 
-            className="layout-main-content relative z-40"
+            className={`layout-main-content relative z-40 ${
+              viewMode === 'inline-editing' && selectionMode === 'print' 
+                ? 'editing-mode' // Custom class to help with styling
+                : ''
+            }`}
             style={{ 
               touchAction: 'manipulation'
             }}
@@ -998,6 +981,7 @@ export default function PhotoSelectionScreen({
                 favoritedPhotos={favoritedPhotos}
                 onToggleFavorite={handleToggleFavorite}
                 usedPhotoIds={getUsedPhotoIds()}
+                isEditingMode={viewMode === 'inline-editing'}
               />
             ) : (
               // Print mode: Show templates in Cover Flow
@@ -1021,6 +1005,8 @@ export default function PhotoSelectionScreen({
                     )}
                     layout="coverflow"
                     showActions={true}
+                    isEditingMode={viewMode === 'inline-editing'}
+                    editingSlot={inlineEditingSlot}
                   />
               </div>
             )}
@@ -1095,8 +1081,10 @@ export default function PhotoSelectionScreen({
               <div className="p-4 border-b">
                 <div className="flex items-center justify-between mb-2">
                   <button 
-                    onClick={openAddPrintModal} 
-                    className="bg-green-600 text-white px-2 py-1 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 text-xs"
+                    onClick={openAddPrintModal}
+                    className={`bg-green-600 text-white px-2 py-1 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 text-xs ${
+                      viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
+                    }`}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
@@ -1132,13 +1120,17 @@ export default function PhotoSelectionScreen({
             <div className="space-y-2">
               <button
                 onClick={handleBack}
-                className="w-full px-4 py-2 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm"
+                className={`w-full px-4 py-2 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm ${
+                  viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
+                }`}
               >
                 ← Back to Package
               </button>
               <button
                 onClick={handlePhotoContinue}
-                className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md"
+                className={`w-full bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md ${
+                  viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
+                }`}
               >
                 Finalize Selections
               </button>

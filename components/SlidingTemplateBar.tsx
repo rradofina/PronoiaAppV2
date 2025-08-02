@@ -9,6 +9,7 @@ interface SlidingTemplateBarProps {
   onClose: () => void;
   isVisible: boolean;
   TemplateVisual: React.FC<any>;
+  isEditingMode?: boolean;
 }
 
 export default function SlidingTemplateBar({
@@ -18,11 +19,12 @@ export default function SlidingTemplateBar({
   onSlotSelect,
   onClose,
   isVisible,
-  TemplateVisual
+  TemplateVisual,
+  isEditingMode = false
 }: SlidingTemplateBarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  if (!isVisible) return null;
+  if (!isVisible || isEditingMode) return null;
 
   // Group slots by template
   const templateGroups = templateSlots.reduce((acc, slot) => {
@@ -132,7 +134,13 @@ export default function SlidingTemplateBar({
                       slots={slots}
                       photos={photos}
                       selectedSlot={null}
-                      onSlotClick={(slot: TemplateSlot) => onSlotSelect(slot)}
+                      onSlotClick={(slot: TemplateSlot) => {
+                        if (isEditingMode) {
+                          console.log('🚫 Slot selection blocked - editing in progress');
+                          return;
+                        }
+                        onSlotSelect(slot);
+                      }}
                     />
                   </div>
 

@@ -332,6 +332,11 @@ export default function FullscreenTemplateEditor({
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      {/* Global interaction blocker - prevents all other UI interactions during editing */}
+      <div className="fixed inset-0 z-[100] pointer-events-none" />
+      
+      {/* Main editor content with higher z-index to remain interactive */}
+      <div className="relative z-[101] flex flex-col h-full">
       
       {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
       <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
@@ -546,6 +551,7 @@ export default function FullscreenTemplateEditor({
           <p className="hidden md:block">Pinch to zoom • Drag to position • Yellow border shows your editing area</p>
           <p className="md:hidden">📱 Use two fingers to pinch-zoom the photo • Drag with one finger to position</p>
         </div>
+      </div>
       </div>
     </div>
   );

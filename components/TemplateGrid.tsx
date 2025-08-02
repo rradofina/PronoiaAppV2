@@ -12,6 +12,8 @@ interface TemplateGridProps {
   TemplateVisual: React.ComponentType<any>;
   layout?: 'horizontal' | 'vertical' | 'main' | 'coverflow';
   showActions?: boolean;
+  isEditingMode?: boolean;
+  editingSlot?: TemplateSlot | null;
 }
 
 export default function TemplateGrid({
@@ -24,7 +26,9 @@ export default function TemplateGrid({
   onDownloadTemplate,
   TemplateVisual,
   layout = 'horizontal',
-  showActions = true
+  showActions = true,
+  isEditingMode = false,
+  editingSlot = null
 }: TemplateGridProps) {
   
   // Cover Flow state
@@ -89,6 +93,10 @@ export default function TemplateGrid({
 
   // Cover Flow navigation
   const navigateToTemplate = (index: number) => {
+    if (isEditingMode) {
+      console.log('🚫 Template navigation blocked - editing in progress');
+      return;
+    }
     if (index >= 0 && index < templateGroups.length) {
       setCurrentIndex(index);
     }
@@ -256,16 +264,21 @@ export default function TemplateGrid({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {templateGroups.map(({ templateId, templateName, slots }, index) => (
-        <div 
-          key={templateId} 
-          className={itemClasses} 
-          style={{
-            ...itemStyle,
-            ...getCoverFlowStyle(index)
-          }}
-          onClick={() => layout === 'coverflow' ? navigateToTemplate(index) : undefined}
-        >
+      {templateGroups.map(({ templateId, templateName, slots }, index) => {
+        // Check if this template contains the currently editing slot
+        const isCurrentEditingTemplate = editingSlot && slots.some(slot => slot.id === editingSlot.id);
+        const shouldBlock = isEditingMode && !isCurrentEditingTemplate;
+        
+        return (
+          <div 
+            key={templateId} 
+            className={`${itemClasses} ${shouldBlock ? 'pointer-events-none opacity-60' : ''}`}
+            style={{
+              ...itemStyle,
+              ...getCoverFlowStyle(index)
+            }}
+            onClick={() => layout === 'coverflow' ? navigateToTemplate(index) : undefined}
+          >
           {/* Title and action buttons at same height */}
           <div className="flex justify-between items-center mb-2 px-3 sm:px-4 md:px-6">
             <h3 className={`font-semibold leading-tight truncate flex-1 ${
@@ -279,9 +292,17 @@ export default function TemplateGrid({
                 {/* Download button for all templates */}
                 {onDownloadTemplate && (
                   <button
-                    onClick={() => onDownloadTemplate({ templateId, templateName, slots })}
+                    onClick={() => {
+                      if (isEditingMode) {
+                        console.log('🚫 Download blocked - editing in progress');
+                        return;
+                      }
+                      onDownloadTemplate({ templateId, templateName, slots });
+                    }}
                     title="Download Template"
-                    className="bg-gray-500 text-white rounded-full p-1 sm:p-1.5 shadow-sm hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1"
+                    className={`bg-gray-500 text-white rounded-full p-1 sm:p-1.5 shadow-sm hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 ${
+                      isEditingMode ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className={`${layout === 'horizontal' ? 'h-3 w-3' : 'h-4 w-4'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -292,8 +313,16 @@ export default function TemplateGrid({
                 {/* Change Template button for all templates */}
                 {onSwapTemplate && (
                   <button
-                    onClick={() => onSwapTemplate({ templateId, templateName, slots })}
-                    className="bg-gray-500 text-white px-2 sm:px-3 py-1 rounded-md text-xs font-medium hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 shadow-sm"
+                    onClick={() => {
+                      if (isEditingMode) {
+                        console.log('🚫 Template swap blocked - editing in progress');
+                        return;
+                      }
+                      onSwapTemplate({ templateId, templateName, slots });
+                    }}
+                    className={`bg-gray-500 text-white px-2 sm:px-3 py-1 rounded-md text-xs font-medium hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 shadow-sm ${
+                      isEditingMode ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   >
                     Change Template
                   </button>
@@ -302,9 +331,17 @@ export default function TemplateGrid({
                 {/* Delete button for additional templates only */}
                 {onDeleteTemplate && templateName.includes('(Additional)') && (
                   <button
-                    onClick={() => onDeleteTemplate(templateId)}
+                    onClick={() => {
+                      if (isEditingMode) {
+                        console.log('🚫 Template delete blocked - editing in progress');
+                        return;
+                      }
+                      onDeleteTemplate(templateId);
+                    }}
                     title="Delete Print"
-                    className="bg-red-600 text-white rounded-full p-1 sm:p-1.5 shadow-sm hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    className={`bg-red-600 text-white rounded-full p-1 sm:p-1.5 shadow-sm hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ${
+                      isEditingMode ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className={`${layout === 'horizontal' ? 'h-3 w-3' : 'h-4 w-4'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -326,7 +363,8 @@ export default function TemplateGrid({
             />
           </div>
         </div>
-      ))}
+        );
+      })}
       
       {/* Side Navigation Arrows */}
       {layout === 'coverflow' && (
@@ -334,8 +372,16 @@ export default function TemplateGrid({
           {/* Left Arrow - Previous Template */}
           {currentIndex > 0 && (
             <button
-              onClick={() => navigateToTemplate(currentIndex - 1)}
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-20 hover:bg-opacity-40 text-white rounded-full p-3 transition-all duration-200 z-30"
+              onClick={() => {
+                if (isEditingMode) {
+                  console.log('🚫 Previous template blocked - editing in progress');
+                  return;
+                }
+                navigateToTemplate(currentIndex - 1);
+              }}
+              className={`absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-20 hover:bg-opacity-40 text-white rounded-full p-3 transition-all duration-200 z-30 ${
+                isEditingMode ? 'opacity-30 cursor-not-allowed' : ''
+              }`}
               title="Previous template"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -347,8 +393,16 @@ export default function TemplateGrid({
           {/* Right Arrow - Next Template */}
           {currentIndex < templateGroups.length - 1 && (
             <button
-              onClick={() => navigateToTemplate(currentIndex + 1)}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-20 hover:bg-opacity-40 text-white rounded-full p-3 transition-all duration-200 z-30"
+              onClick={() => {
+                if (isEditingMode) {
+                  console.log('🚫 Next template blocked - editing in progress');
+                  return;
+                }
+                navigateToTemplate(currentIndex + 1);
+              }}
+              className={`absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-20 hover:bg-opacity-40 text-white rounded-full p-3 transition-all duration-200 z-30 ${
+                isEditingMode ? 'opacity-30 cursor-not-allowed' : ''
+              }`}
               title="Next template"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

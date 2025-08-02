@@ -10,7 +10,7 @@ interface PhotoCardProps {
   isUsedInTemplate?: boolean;
 }
 
-function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isUsedInTemplate = false }: PhotoCardProps) {
+function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isUsedInTemplate = false, isEditingMode = false }: PhotoCardProps & { isEditingMode?: boolean }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -175,6 +175,7 @@ interface PhotoGridProps {
   favoritedPhotos?: Set<string>;
   onToggleFavorite?: (photoId: string) => void;
   usedPhotoIds?: Set<string>;
+  isEditingMode?: boolean;
 }
 
 export default function PhotoGrid({
@@ -186,7 +187,8 @@ export default function PhotoGrid({
   onScroll,
   favoritedPhotos = new Set(),
   onToggleFavorite,
-  usedPhotoIds = new Set()
+  usedPhotoIds = new Set(),
+  isEditingMode = false
 }: PhotoGridProps) {
   
   return (
@@ -218,6 +220,7 @@ export default function PhotoGrid({
             isFavorited={favoritedPhotos.has(photo.id)}
             onToggleFavorite={onToggleFavorite}
             isUsedInTemplate={usedPhotoIds.has(photo.id)}
+            isEditingMode={isEditingMode}
           />
         ))}
       </div>
