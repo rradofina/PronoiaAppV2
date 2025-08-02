@@ -26,7 +26,7 @@ export default function InlinePhotoEditor({
   const [photoKey, setPhotoKey] = useState<string>('');
   const [componentKey, setComponentKey] = useState<string>('');
   
-  // Ref to access PhotoRenderer's finalization method
+  // Ref to access PhotoRenderer's finalization method (unused but kept for PhotoRenderer compatibility)
   const finalizationRef = useRef<(() => Promise<PhotoTransform>) | null>(null);
   
   // Track interaction state for UI hiding
@@ -115,8 +115,8 @@ export default function InlinePhotoEditor({
     console.log('🔧 InlinePhotoEditor - Transform updated:', newTransform);
   };
 
-  // Handle apply button click with finalization
-  const handleApply = async () => {
+  // Handle apply button click
+  const handleApply = () => {
     console.log('🔧 InlinePhotoEditor - APPLY BUTTON CLICKED');
     
     try {
@@ -130,21 +130,8 @@ export default function InlinePhotoEditor({
         return;
       }
 
-      // Call finalization if available to auto-snap and preserve zoom
-      let finalTransform = currentTransform;
-      
-      if (finalizationRef.current) {
-        console.log('⚡ InlinePhotoEditor - Running finalization before apply...');
-        try {
-          finalTransform = await finalizationRef.current();
-          console.log('✅ InlinePhotoEditor - Finalization completed:', finalTransform);
-        } catch (error) {
-          console.warn('⚠️ InlinePhotoEditor - Finalization failed, using current transform:', error);
-          finalTransform = currentTransform;
-        }
-      } else {
-        console.log('📋 InlinePhotoEditor - No finalization available, using current transform');
-      }
+      // Use current transform directly - user has positioned photo exactly where they want it
+      const finalTransform = currentTransform;
 
       console.log('🔧 InlinePhotoEditor - Applying finalized transform:', {
         transform: finalTransform,

@@ -22,7 +22,7 @@ import OriginalTemplateVisual from '../TemplateVisual';
 
 
 // Simplified TemplateVisual component
-const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel }: any) => {
+const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard }: any) => {
   // Get templates from both window cache AND database to ensure consistency with swap modal
   const windowTemplates = (window as any).pngTemplates || [];
   const [databaseTemplates, setDatabaseTemplates] = useState<any[]>([]);
@@ -58,7 +58,8 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
   const templateType = slots[0]?.templateType || template.id;
   
   // STATE GUARD: Prevent rendering with mismatched template data during navigation
-  const isDataConsistent = slots.every((slot: any) => {
+  // Skip validation during user-initiated apply actions to prevent loading flash
+  const isDataConsistent = skipStateGuard || slots.every((slot: any) => {
     const slotTemplateType = slot.templateType || slot.templateId?.split('_')[0];
     return !slotTemplateType || slotTemplateType === templateType || slotTemplateType === template.id;
   });
@@ -303,6 +304,7 @@ export default function PhotoSelectionScreen({
   const [addPrintQuantity, setAddPrintQuantity] = useState(1);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<ManualTemplate[]>([]);
+  const [isApplyingPhoto, setIsApplyingPhoto] = useState(false);
   
   // NOTE: Removed viewport constraints - using fixed height layout now
   
@@ -634,6 +636,9 @@ export default function PhotoSelectionScreen({
     console.log('🔧 FULLSCREEN EDITOR - Apply button clicked:', { slotId, photoId, transform });
     console.log('🔧 Current templateSlots before update:', templateSlots.map(s => ({ id: s.id, photoId: s.photoId, hasTransform: !!s.transform })));
     
+    // Set flag to bypass state guard during apply operation
+    setIsApplyingPhoto(true);
+    
     // Verify photo exists in photos array BEFORE updating
     const photo = photos.find(p => p.id === photoId);
     if (!photo) {
@@ -732,6 +737,9 @@ export default function PhotoSelectionScreen({
     console.log('🔧 Resetting view states and closing fullscreen editor');
     // NOTE: Removed collapse logic - using fixed height layout now
     resetViewStates();
+    
+    // Clear the applying flag to re-enable state guard
+    setTimeout(() => setIsApplyingPhoto(false), 100);
   };
 
   const resetViewStates = () => {
@@ -821,11 +829,13 @@ export default function PhotoSelectionScreen({
       // Clear timeout since operation succeeded
       clearTimeout(timeoutId);
       
-      // Reset states with extra safety checks
-      setViewMode('normal');
-      setInlineEditingSlot(null);
-      setInlineEditingPhoto(null);
-      setSelectedSlot(null);
+      // Delay state reset slightly to prevent loading flash
+      setTimeout(() => {
+        setViewMode('normal');
+        setInlineEditingSlot(null);
+        setInlineEditingPhoto(null);
+        setSelectedSlot(null);
+      }, 75); // Match our fast transition duration
       
       // Double-check state reset after a short delay
       setTimeout(() => {
@@ -1123,6 +1133,7 @@ export default function PhotoSelectionScreen({
                         inlineEditingPhoto={inlineEditingPhoto}
                         onInlineApply={handleInlineApply}
                         onInlineCancel={handleInlineCancel}
+                        skipStateGuard={isApplyingPhoto}
                       />
                     )}
                     layout="coverflow"
