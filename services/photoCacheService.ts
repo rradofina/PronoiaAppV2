@@ -18,7 +18,7 @@ class PhotoCacheService {
   private cache = new Map<string, CachedPhoto>();
   private loadingQueue = new Map<string, LoadingPromise>();
   private preloadQueue: string[] = [];
-  private maxCacheSize = 50; // Maximum number of cached photos
+  private maxCacheSize = 800; // Maximum number of cached photos
   private cacheExpiryTime = 30 * 60 * 1000; // 30 minutes
   private debug = process.env.NODE_ENV === 'development';
   private performanceMetrics = {

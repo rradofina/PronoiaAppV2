@@ -106,7 +106,7 @@ function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isU
       onMouseEnter={handleMouseEnter}
       className="relative overflow-hidden cursor-pointer hover:opacity-90 transition-opacity duration-200"
     >
-      <div className="w-full relative" style={{ aspectRatio: '2/3' }}>
+      <div className="w-full relative aspect-[2/3] xl:aspect-auto">
         {!imageError ? (
           <img 
             src={getCurrentUrl()} 

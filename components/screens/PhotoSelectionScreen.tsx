@@ -1166,7 +1166,6 @@ export default function PhotoSelectionScreen({
               usedPhotoIds={getUsedPhotoIds()}
               isExpanded={false} // No expansion needed - fixed height
               adaptivePhotoSize="medium" // Fixed medium size for 150px height
-              maxPhotosToShow={8} // Optimal for 150px height
             />
           )}
         </div>
@@ -1193,7 +1192,6 @@ export default function PhotoSelectionScreen({
                   usedPhotoIds={getUsedPhotoIds()}
                   isExpanded={false}
                   adaptivePhotoSize="medium"
-                  maxPhotosToShow={8}
                 />
               </div>
             </>
@@ -1231,7 +1229,6 @@ export default function PhotoSelectionScreen({
                   usedPhotoIds={getUsedPhotoIds()}
                   isExpanded={false}
                   adaptivePhotoSize="medium"
-                  maxPhotosToShow={8}
                 />
               </div>
             </>

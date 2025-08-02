@@ -243,89 +243,101 @@ export default function FavoritesBar({
       </div>
     );
   } else {
-    // Vertical layout (desktop grid design) with expansion support
+    // Vertical layout (desktop grid design) with proper scrolling
     return (
       <div 
-        className={`h-full transition-all duration-300 ease-in-out ${
+        className={`h-full flex flex-col transition-all duration-300 ease-in-out ${
           isActiveInteractionArea 
             ? 'bg-yellow-50 border-yellow-300 shadow-lg' 
             : isExpanded
             ? 'bg-blue-50 border-blue-300 shadow-lg'
             : 'bg-white'
         }`}
-        style={{
-          // CSS SAFETY: Add viewport-based max height to prevent clipping
-          maxHeight: '100vh',
-          // CSS SAFETY: Add fallback overflow handling
-          overflowY: 'auto'
-        }}
       >
-        <div className={`grid gap-2 p-4 transition-all duration-300 ease-in-out ${
-          isExpanded ? 'grid-cols-2 gap-3' : 'grid-cols-3 gap-2'
-        }`}>
-          {displayPhotos.map((photo) => {
-            const isUsed = usedPhotoIds.has(photo.id);
-            return (
-              <div
-                key={photo.id}
-                className="relative cursor-pointer group transition-all duration-300 ease-in-out"
-                onClick={() => onPhotoClick(photo)}
-                style={{
-                  aspectRatio: isExpanded ? 'auto' : '1'
-                }}
-              >
-                <div className={`w-full rounded-lg overflow-hidden border-2 transition-all duration-300 ease-in-out ${
-                  isExpanded ? 'h-auto' : 'h-full'
-                } ${
-                  isUsed
-                    ? 'border-green-400 shadow-md' // Used photos get green border
-                    : isActiveInteractionArea 
-                    ? 'border-yellow-400 hover:border-yellow-500 shadow-md hover:shadow-lg hover:scale-105' 
-                    : isExpanded
-                    ? 'border-blue-400 hover:border-blue-500 shadow-md hover:shadow-lg hover:scale-105'
-                    : 'border-gray-200 hover:border-blue-400'
-                }`}>
-                  <img
-                    src={photo.thumbnailUrl || photo.url}
-                    alt={photo.name}
-                    className={`w-full h-full object-cover transition-opacity duration-200 ${
-                      isUsed ? 'opacity-60' : 'opacity-100'
-                    }`}
-                  />
-                  
-                  {/* Used indicator overlay */}
-                  {isUsed && (
-                    <div className="absolute inset-0 bg-green-600 bg-opacity-20 flex items-center justify-center">
-                      <div className="bg-green-600 text-white text-xs px-1 rounded font-medium">
-                        Used
-                      </div>
-                    </div>
-                  )}
-                </div>
-              
-              {/* Remove button on hover - conditional */}
-              {showRemoveButtons && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveFavorite(photo.id);
+        {/* Header section (if needed for context) */}
+        {displayPhotos.length > 9 && (
+          <div className="flex-shrink-0 px-4 py-2 text-xs text-gray-600 border-b border-gray-200">
+            {displayPhotos.length} photos • Scroll to see all
+          </div>
+        )}
+        
+        {/* Scrollable photos grid */}
+        <div 
+          className="flex-1 overflow-y-auto"
+          style={{
+            // Ensure smooth scrolling
+            scrollBehavior: 'smooth',
+            // Prevent momentum scrolling issues on iOS
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
+          <div className={`grid gap-2 p-4 transition-all duration-300 ease-in-out ${
+            isExpanded ? 'grid-cols-2 gap-3' : 'grid-cols-3 gap-2'
+          }`}>
+            {displayPhotos.map((photo) => {
+              const isUsed = usedPhotoIds.has(photo.id);
+              return (
+                <div
+                  key={photo.id}
+                  className="relative cursor-pointer group transition-all duration-300 ease-in-out"
+                  onClick={() => onPhotoClick(photo)}
+                  style={{
+                    aspectRatio: isExpanded ? 'auto' : '1'
                   }}
-                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Remove from favorites"
                 >
-                  ×
-                </button>
-              )}
-              
-              {/* Star indicator */}
-              <div className={`absolute bottom-0 right-0 bg-yellow-500 text-white rounded-full flex items-center justify-center transition-all duration-300 ease-in-out ${
-                isExpanded ? 'w-5 h-5 text-sm' : 'w-4 h-4 text-xs'
-              }`}>
-                ⭐
-              </div>
-              </div>
-            );
-          })}
+                  <div className={`w-full rounded-lg overflow-hidden border-2 transition-all duration-300 ease-in-out ${
+                    isExpanded ? 'h-auto' : 'h-full'
+                  } ${
+                    isUsed
+                      ? 'border-green-400 shadow-md' // Used photos get green border
+                      : isActiveInteractionArea 
+                      ? 'border-yellow-400 hover:border-yellow-500 shadow-md hover:shadow-lg hover:scale-105' 
+                      : isExpanded
+                      ? 'border-blue-400 hover:border-blue-500 shadow-md hover:shadow-lg hover:scale-105'
+                      : 'border-gray-200 hover:border-blue-400'
+                  }`}>
+                    <img
+                      src={photo.thumbnailUrl || photo.url}
+                      alt={photo.name}
+                      className={`w-full h-full object-cover transition-opacity duration-200 ${
+                        isUsed ? 'opacity-60' : 'opacity-100'
+                      }`}
+                    />
+                    
+                    {/* Used indicator overlay */}
+                    {isUsed && (
+                      <div className="absolute inset-0 bg-green-600 bg-opacity-20 flex items-center justify-center">
+                        <div className="bg-green-600 text-white text-xs px-1 rounded font-medium">
+                          Used
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                
+                {/* Remove button on hover - conditional */}
+                {showRemoveButtons && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveFavorite(photo.id);
+                    }}
+                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Remove from favorites"
+                  >
+                    ×
+                  </button>
+                )}
+                
+                {/* Star indicator */}
+                <div className={`absolute bottom-0 right-0 bg-yellow-500 text-white rounded-full flex items-center justify-center transition-all duration-300 ease-in-out ${
+                  isExpanded ? 'w-5 h-5 text-sm' : 'w-4 h-4 text-xs'
+                }`}>
+                  ⭐
+                </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     );

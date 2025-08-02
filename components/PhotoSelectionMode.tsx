@@ -63,8 +63,7 @@ export default function PhotoSelectionMode({
             <div
               key={photo.id}
               onClick={() => onPhotoSelect(photo)}
-              className="relative overflow-hidden cursor-pointer hover:opacity-75 transition-opacity"
-              style={{ aspectRatio: '2/3' }}
+              className="relative overflow-hidden cursor-pointer hover:opacity-75 transition-opacity aspect-[2/3] xl:aspect-auto"
             >
               <TemplateFirstPhotoCard 
                 photo={photo}
