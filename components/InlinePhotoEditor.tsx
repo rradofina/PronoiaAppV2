@@ -28,6 +28,19 @@ export default function InlinePhotoEditor({
   
   // Ref to access PhotoRenderer's finalization method
   const finalizationRef = useRef<(() => Promise<PhotoTransform>) | null>(null);
+  
+  // Track interaction state for UI hiding
+  const [isUserInteracting, setIsUserInteracting] = useState(false);
+  
+  // Safety: Reset interaction state when component mounts
+  useEffect(() => {
+    setIsUserInteracting(false);
+  }, []);
+  
+  // Handle interaction change from PhotoRenderer
+  const handleInteractionChange = (isInteracting: boolean) => {
+    setIsUserInteracting(isInteracting);
+  };
 
   // Initialize transform when slot or photo changes
   useEffect(() => {
@@ -174,8 +187,19 @@ export default function InlinePhotoEditor({
     );
   }
 
+  // Fallback: Reset interaction state when clicking outside photo
+  const handleContainerClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      setIsUserInteracting(false);
+    }
+  };
+
   return (
-    <div key={componentKey} className={`relative w-full h-full z-50 ${className}`}>
+    <div 
+      key={componentKey} 
+      className={`relative w-full h-full z-50 ${className}`}
+      onClick={handleContainerClick}
+    >
       {/* Interactive PhotoRenderer */}
       <PhotoRenderer
         key={photoKey}
@@ -189,10 +213,13 @@ export default function InlinePhotoEditor({
         fallbackUrls={photo ? getHighResPhotoUrls(photo) : []}
         showClippingIndicators={true} // Enable clipping indicators
         finalizationRef={finalizationRef} // Pass ref for finalization method access
+        onInteractionChange={handleInteractionChange} // Track interaction state
       />
       
-      {/* Editing Controls Overlay */}
-      <div className="absolute top-2 right-2 flex space-x-2 z-50">
+      {/* Editing Controls Overlay - Hidden during interaction */}
+      <div className={`absolute top-2 right-2 flex space-x-2 z-50 transition-opacity duration-75 ${
+        isUserInteracting ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      }`}>
         <button
           onClick={handleApply}
           className="bg-green-600 text-white px-3 py-1 rounded-md text-sm font-medium hover:bg-green-700 shadow-lg"
@@ -209,13 +236,10 @@ export default function InlinePhotoEditor({
         </button>
       </div>
       
-      {/* Editing Indicator */}
-      <div className="absolute top-2 left-2 bg-yellow-500 text-black px-2 py-1 rounded-md text-xs font-medium shadow-lg z-50">
-        Editing
-      </div>
-      
-      {/* Instructions */}
-      <div className="absolute bottom-2 left-2 right-2 bg-black bg-opacity-70 text-white px-3 py-2 rounded-md text-xs text-center z-50">
+      {/* Instructions - Hidden during interaction */}
+      <div className={`absolute bottom-2 left-2 right-2 bg-black bg-opacity-70 text-white px-3 py-2 rounded-md text-xs text-center z-50 transition-opacity duration-75 ${
+        isUserInteracting ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      }`}>
         Pinch to zoom • Drag to position
       </div>
     </div>

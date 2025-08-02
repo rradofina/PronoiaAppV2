@@ -190,7 +190,7 @@ export default function PngTemplateVisual({
                 : isSelected 
                 ? 'border-4 border-blue-500 border-opacity-90 z-40 cursor-pointer shadow-md' // Above overlay (z-30)
                 : shouldBlockSlot
-                ? 'opacity-50 pointer-events-none' // Blocked during editing
+                ? 'brightness-75 pointer-events-none' // Darkened during editing
                 : 'hover:border-2 hover:border-blue-300 hover:border-opacity-60 cursor-pointer'
             }`}
             style={{
@@ -263,8 +263,6 @@ export default function PngTemplateVisual({
                   <div className="text-xs font-medium">
                     {isInlineEditing 
                       ? 'Select Photo Below' 
-                      : shouldBlockSlot 
-                      ? 'Editing...' 
                       : 'Tap to Add'
                     }
                   </div>

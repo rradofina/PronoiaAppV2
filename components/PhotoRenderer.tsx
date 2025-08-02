@@ -26,6 +26,9 @@ interface PhotoRendererProps {
   
   // Ref to expose finalization method
   finalizationRef?: React.MutableRefObject<(() => Promise<PhotoTransform>) | null>;
+  
+  // Interaction state callback
+  onInteractionChange?: (isInteracting: boolean) => void;
 }
 
 // Helper to convert legacy container transforms to CSS (backward compatibility)
@@ -82,7 +85,8 @@ export default function PhotoRenderer({
   debug = false,
   fallbackUrls = [],
   showClippingIndicators = false,
-  finalizationRef
+  finalizationRef,
+  onInteractionChange
 }: PhotoRendererProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [lastPointer, setLastPointer] = useState<{ x: number; y: number } | null>(null);
@@ -104,6 +108,10 @@ export default function PhotoRenderer({
   // Auto-snap state for smooth zoom corrections
   const [isSnapping, setIsSnapping] = useState(false);
   
+  // Interaction state tracking for UI hiding
+  const [isInteracting, setIsInteracting] = useState(false);
+  const interactionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // User interaction tracking to prevent auto-snap on recently manipulated photos
   const [lastUserInteraction, setLastUserInteraction] = useState<number>(0);
   const [interactionType, setInteractionType] = useState<string>('none');
@@ -117,6 +125,30 @@ export default function PhotoRenderer({
       console.log(`👆 User interaction tracked: ${type} at ${now}`);
     }
   }, [debug]);
+  
+  // Track interaction state for UI hiding
+  const handleInteractionStart = useCallback(() => {
+    setIsInteracting(true);
+    onInteractionChange?.(true);
+    
+    // Clear existing timeout
+    if (interactionTimeoutRef.current) {
+      clearTimeout(interactionTimeoutRef.current);
+      interactionTimeoutRef.current = null;
+    }
+  }, [onInteractionChange]);
+  
+  const handleInteractionEnd = useCallback(() => {
+    // Clear any existing timeout
+    if (interactionTimeoutRef.current) {
+      clearTimeout(interactionTimeoutRef.current);
+      interactionTimeoutRef.current = null;
+    }
+    
+    // Show UI immediately
+    setIsInteracting(false);
+    onInteractionChange?.(false);
+  }, [onInteractionChange]);
   
   // Check if user has recently interacted with photo (within last 3 seconds)
   const hasRecentUserInteraction = useCallback(() => {
@@ -728,6 +760,15 @@ export default function PhotoRenderer({
       finalizationRef.current = finalizePositioning;
     }
   }, [finalizationRef, finalizePositioning]);
+
+  // Cleanup interaction timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (interactionTimeoutRef.current) {
+        clearTimeout(interactionTimeoutRef.current);
+      }
+    };
+  }, []);
   
   // ClippingOverlay component - displays zebra stripes for clipped areas
   const ClippingOverlay = () => {
@@ -863,6 +904,7 @@ export default function PhotoRenderer({
     e.stopPropagation();
     
     setIsTouching(true);
+    handleInteractionStart();
     
     if (e.touches.length === 2) {
       // Two finger pinch - start zoom
@@ -938,6 +980,7 @@ export default function PhotoRenderer({
       setIsDragging(false);
       setLastPointer(null);
       setLastTouchDistance(0);
+      handleInteractionEnd();
       
       // No auto-corrections - user has complete control over positioning
     } else if (e.touches.length === 1) {
@@ -956,6 +999,7 @@ export default function PhotoRenderer({
     e.preventDefault();
     setIsDragging(true);
     setLastPointer({ x: e.clientX, y: e.clientY });
+    handleInteractionStart();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 
@@ -995,6 +1039,7 @@ export default function PhotoRenderer({
     
     // Track user interaction
     trackUserInteraction('drag-end');
+    handleInteractionEnd();
     
     // No auto-corrections - user has complete control over positioning
   };
@@ -1003,6 +1048,7 @@ export default function PhotoRenderer({
     if (!interactive) return;
     
     e.preventDefault();
+    handleInteractionStart();
     
     // Scale factor for zoom
     const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1;
@@ -1023,6 +1069,10 @@ export default function PhotoRenderer({
     
     // Track user interaction
     trackUserInteraction('zoom');
+    
+    // Show UI immediately after wheel zoom
+    setIsInteracting(false);
+    onInteractionChange?.(false);
     
     // No immediate auto-fit - let user zoom freely without interference
   };

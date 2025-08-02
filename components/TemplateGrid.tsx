@@ -272,7 +272,7 @@ export default function TemplateGrid({
         return (
           <div 
             key={templateId} 
-            className={`${itemClasses} ${shouldBlock ? 'pointer-events-none opacity-60' : ''}`}
+            className={`${itemClasses} ${shouldBlock ? 'pointer-events-none brightness-75' : ''}`}
             style={{
               ...itemStyle,
               ...getCoverFlowStyle(index)
