@@ -185,7 +185,7 @@ export default function InlinePhotoEditor({
         interactive={true}
         onTransformChange={handleTransformChange}
         className="w-full h-full"
-        debug={true}
+        // debug={true}  // Uncomment for auto-snap debugging
         fallbackUrls={photo ? getHighResPhotoUrls(photo) : []}
         showClippingIndicators={true} // Enable clipping indicators
         finalizationRef={finalizationRef} // Pass ref for finalization method access
