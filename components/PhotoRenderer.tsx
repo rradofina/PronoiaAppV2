@@ -245,6 +245,105 @@ export default function PhotoRenderer({
     
   }, [debug]);
 
+  // Post-snap gap validation - simulates gaps after movement to detect if photo is too small
+  const detectPostSnapGaps = useCallback((
+    newCenterX: number, 
+    newCenterY: number, 
+    scale: number = currentTransform.photoScale
+  ): {
+    hasGaps: boolean;
+    gapCount: number;
+    gaps: { left: number; right: number; top: number; bottom: number };
+  } => {
+    if (!imageRef.current || !containerRef.current) {
+      return { 
+        hasGaps: false, 
+        gapCount: 0,
+        gaps: { left: 0, right: 0, top: 0, bottom: 0 }
+      };
+    }
+    
+    // Get container dimensions
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const containerHeight = containerRect.height;
+    
+    // Simulate photo position and size at the new transform
+    const photoNaturalWidth = imageRef.current.naturalWidth;
+    const photoNaturalHeight = imageRef.current.naturalHeight;
+    
+    if (photoNaturalWidth === 0 || photoNaturalHeight === 0) {
+      return { 
+        hasGaps: false, 
+        gapCount: 0,
+        gaps: { left: 0, right: 0, top: 0, bottom: 0 }
+      };
+    }
+    
+    // Calculate how the photo would fit in the container
+    const containerAspect = containerWidth / containerHeight;
+    const photoAspect = photoNaturalWidth / photoNaturalHeight;
+    
+    let fitWidth, fitHeight;
+    if (photoAspect > containerAspect) {
+      // Photo is wider - fit by width
+      fitWidth = containerWidth;
+      fitHeight = containerWidth / photoAspect;
+    } else {
+      // Photo is taller - fit by height
+      fitHeight = containerHeight;
+      fitWidth = containerHeight * photoAspect;
+    }
+    
+    // Apply scale
+    const scaledWidth = fitWidth * scale;
+    const scaledHeight = fitHeight * scale;
+    
+    // Calculate photo position based on center coordinates
+    const photoCenterXPx = newCenterX * scaledWidth;
+    const photoCenterYPx = newCenterY * scaledHeight;
+    
+    // Calculate photo edges relative to container
+    const photoLeft = (containerWidth / 2) - photoCenterXPx;
+    const photoRight = photoLeft + scaledWidth;
+    const photoTop = (containerHeight / 2) - photoCenterYPx;
+    const photoBottom = photoTop + scaledHeight;
+    
+    // Calculate gaps (positive values indicate empty space)
+    const gapLeft = Math.max(0, photoLeft);
+    const gapRight = Math.max(0, containerWidth - photoRight);
+    const gapTop = Math.max(0, photoTop);
+    const gapBottom = Math.max(0, containerHeight - photoBottom);
+    
+    // Post-snap validation uses allowance threshold (user requested >0px)
+    const POST_SNAP_THRESHOLD = 5; // 5px allowance for post-snap validation
+    
+    const hasLeftGap = gapLeft > POST_SNAP_THRESHOLD;
+    const hasRightGap = gapRight > POST_SNAP_THRESHOLD;
+    const hasTopGap = gapTop > POST_SNAP_THRESHOLD;
+    const hasBottomGap = gapBottom > POST_SNAP_THRESHOLD;
+    
+    const gapCount = [hasLeftGap, hasRightGap, hasTopGap, hasBottomGap].filter(Boolean).length;
+    
+    if (debug) {
+      console.log('🔮 Post-Snap Gap Simulation:', {
+        simulatedPosition: { centerX: newCenterX, centerY: newCenterY, scale },
+        photoSize: { width: scaledWidth, height: scaledHeight },
+        photoEdges: { left: photoLeft, right: photoRight, top: photoTop, bottom: photoBottom },
+        gaps: { left: gapLeft, right: gapRight, top: gapTop, bottom: gapBottom },
+        thresholdGaps: { left: hasLeftGap, right: hasRightGap, top: hasTopGap, bottom: hasBottomGap },
+        gapCount,
+        threshold: POST_SNAP_THRESHOLD
+      });
+    }
+    
+    return {
+      hasGaps: gapCount > 0,
+      gapCount,
+      gaps: { left: gapLeft, right: gapRight, top: gapTop, bottom: gapBottom }
+    };
+  }, [currentTransform.photoScale, debug]);
+
   // Precise gap-based movement calculation (user specification)
   const calculateGapBasedMovement = useCallback((gapData: {
     gapCount: number;
@@ -320,6 +419,31 @@ export default function PhotoRenderer({
     const newCenterX = Math.max(0.05, Math.min(0.95, currentTransform.photoCenterX + horizontalMovement));
     const newCenterY = Math.max(0.05, Math.min(0.95, currentTransform.photoCenterY + verticalMovement));
     
+    // Post-snap validation: Check if the new position would result in 3+ gaps
+    console.log('🔮 POST-SNAP VALIDATION: Checking if movement would create more gaps...');
+    const postSnapGaps = detectPostSnapGaps(newCenterX, newCenterY);
+    console.log('📊 POST-SNAP RESULT:', {
+      wouldHaveGaps: postSnapGaps.hasGaps,
+      wouldHaveGapCount: postSnapGaps.gapCount,
+      wouldHaveGapSides: postSnapGaps.gaps
+    });
+    
+    // If post-snap would result in 3+ gaps, override to reset-to-default
+    if (postSnapGaps.gapCount >= 3) {
+      console.log('🚨 POST-SNAP OVERRIDE: Movement would create 3+ gaps, resetting to default instead');
+      return {
+        action: 'reset-to-default',
+        newCenterX: 0.5,
+        newCenterY: 0.5,
+        movements: { 
+          horizontal: 'reset to center (post-snap override)', 
+          vertical: 'reset to center (post-snap override)' 
+        }
+      };
+    }
+    
+    console.log('✅ POST-SNAP VALIDATION PASSED: Movement is safe, proceeding');
+    
     if (debug) {
       console.log('📐 Gap-Based Movement Calculation:', {
         gapCount,
@@ -342,7 +466,7 @@ export default function PhotoRenderer({
       newCenterY,
       movements: { horizontal: horizontalDescription, vertical: verticalDescription }
     };
-  }, [currentTransform, debug]);
+  }, [currentTransform, debug, detectPostSnapGaps]);
 
   // Gap-based finalization following user's exact specification
   const finalizePositioning = useCallback((): Promise<PhotoTransform> => {
@@ -886,7 +1010,7 @@ export default function PhotoRenderer({
     
     // Allow zooming below cover minimum temporarily, but limit extreme zoom out
     const absoluteMinZoom = Math.max(0.1, minCoverZoom * 0.5);
-    let newScale = Math.max(absoluteMinZoom, Math.min(10, currentTransform.photoScale * scaleFactor));
+    const newScale = Math.max(absoluteMinZoom, Math.min(10, currentTransform.photoScale * scaleFactor));
     
     const newTransform = createPhotoTransform(
       newScale,
@@ -940,6 +1064,9 @@ export default function PhotoRenderer({
             <>
               <div className="text-xs text-yellow-300">H: {movement.movements.horizontal}</div>
               <div className="text-xs text-yellow-300">V: {movement.movements.vertical}</div>
+              {movement.movements.horizontal.includes('post-snap override') && (
+                <div className="text-xs text-red-300">⚠️ Post-snap validation triggered</div>
+              )}
             </>
           )}
         </div>
