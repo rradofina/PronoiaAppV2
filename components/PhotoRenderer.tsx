@@ -205,11 +205,11 @@ export default function PhotoRenderer({
       };
     }
     
-    // Calculate precise gaps in pixels
-    const gapLeft = Math.round(imageRect.left - containerRect.left);
-    const gapRight = Math.round(containerRect.right - imageRect.right);
-    const gapTop = Math.round(imageRect.top - containerRect.top);
-    const gapBottom = Math.round(containerRect.bottom - imageRect.bottom);
+    // Calculate precise gaps in pixels (round up to ensure complete gap closure)
+    const gapLeft = Math.ceil(imageRect.left - containerRect.left);
+    const gapRight = Math.ceil(containerRect.right - imageRect.right);
+    const gapTop = Math.ceil(imageRect.top - containerRect.top);
+    const gapBottom = Math.ceil(containerRect.bottom - imageRect.bottom);
     
     // User specification: Move by ANY gap amount (no threshold needed)
     const GAP_THRESHOLD = 0; // No threshold - detect ANY gap amount
