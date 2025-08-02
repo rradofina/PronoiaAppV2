@@ -52,6 +52,67 @@ npm run build            # Test production build works
 **Problem**: Photos were automatically cropped to match slot aspect ratios.
 **Fix**: `components/FullscreenTemplateEditor.tsx` - Use natural photo dimensions (`width: 'auto', height: 'auto'`) with `initialScale={0.5}` to show complete photos first.
 
+### 5. Auto-Snap Movement Direction Bug (CRITICAL - Commits: cc16e75, 3b8eb45)
+**Problem**: Auto-snap was moving photos in opposite directions, making gaps larger instead of closing them.
+**Root Cause**: Movement logic was backwards - gap on left moved photo left (away from edge) instead of right (toward edge).
+
+**Complete Fix Implementation**:
+
+**Files Modified**: `components/PhotoRenderer.tsx`, `components/InlinePhotoEditor.tsx`
+
+**Key Changes Made**:
+1. **Fixed Movement Directions** (cc16e75):
+   ```javascript
+   // WRONG (old code):
+   if (significantGaps.left) {
+     horizontalMovement = -gaps.left / containerRect.width; // moved further left
+   }
+   
+   // CORRECT (fixed code):
+   if (significantGaps.left) {
+     horizontalMovement = gaps.left / containerRect.width; // moves right to close gap
+   }
+   ```
+
+2. **Removed Recent Interaction Blocking**:
+   - **Problem**: 3-second interaction timeout prevented auto-snap from working when users clicked checkmark after positioning
+   - **Fix**: Removed `hasRecentUserInteraction()` blocking in finalization - auto-snap now works regardless of recent interaction
+
+3. **Removed Gap Detection Threshold**:
+   - **Problem**: 5px threshold ignored small gaps that should trigger movement
+   - **Fix**: Set `GAP_THRESHOLD = 0` to detect ANY gap amount (user specification: "move by exact gap amounts")
+
+4. **Added Post-Snap Gap Validation** (3b8eb45):
+   - **Problem**: Photos appearing to have 2 gaps but actually too small for container, creating worse positioning after movement
+   - **Solution**: Added `detectPostSnapGaps()` function with 5px allowance threshold
+   - **Logic**: If movement would create 3+ gaps after snapping → override to reset-to-default instead
+
+**User Specification Implementation**:
+- **4+ sides with gaps** → Reset to default view (center, scale 1.0)
+- **3 sides with gaps** → Reset to default view  
+- **2 sides with gaps** → Move by exact pixel amounts (e.g., left 20px + top 10px = move right 20px + down 10px)
+- **1 side with gaps** → Move by exact pixel amount (e.g., top 20px = move down 20px)
+- **Post-snap validation** → If movement creates 3+ gaps, reset to default instead
+
+**Critical Functions Added/Modified**:
+- `detectGaps()` - DOM-based gap measurement with 0px threshold
+- `calculateGapBasedMovement()` - Pixel-to-percentage movement calculation with post-snap validation
+- `detectPostSnapGaps()` - Simulates gaps after movement with 5px allowance
+- `finalizePositioning()` - Comprehensive finalization with logging
+- Enhanced debug UI with gap visualization and post-snap override warnings
+
+**Testing Commands**:
+```bash
+# Test auto-snap functionality
+npm run dev
+# 1. Position photo with gaps
+# 2. Click checkmark (✓) button  
+# 3. Verify correct movement direction
+# 4. Check console logs for validation process
+```
+
+**NEVER REVERT**: This fix resolves fundamental movement direction bug and prevents edge case poor positioning. Both commits (cc16e75, 3b8eb45) must remain intact.
+
 ## Development Guidelines
 
 ### Tablet Optimization Priority
