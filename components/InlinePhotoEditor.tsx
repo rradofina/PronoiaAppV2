@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TemplateSlot, Photo, PhotoTransform, createPhotoTransform, isPhotoTransform } from '../types';
 import PhotoRenderer from './PhotoRenderer';
 import { photoCacheService } from '../services/photoCacheService';
@@ -25,6 +25,9 @@ export default function InlinePhotoEditor({
   const [currentTransform, setCurrentTransform] = useState<PhotoTransform>(createPhotoTransform(1, 0.5, 0.5));
   const [photoKey, setPhotoKey] = useState<string>('');
   const [componentKey, setComponentKey] = useState<string>('');
+  
+  // Ref to access PhotoRenderer's finalization method
+  const finalizationRef = useRef<(() => Promise<PhotoTransform>) | null>(null);
 
   // Initialize transform when slot or photo changes
   useEffect(() => {
@@ -99,8 +102,8 @@ export default function InlinePhotoEditor({
     console.log('🔧 InlinePhotoEditor - Transform updated:', newTransform);
   };
 
-  // Handle apply button click
-  const handleApply = () => {
+  // Handle apply button click with finalization
+  const handleApply = async () => {
     console.log('🔧 InlinePhotoEditor - APPLY BUTTON CLICKED');
     
     try {
@@ -114,14 +117,30 @@ export default function InlinePhotoEditor({
         return;
       }
 
-      console.log('🔧 InlinePhotoEditor - Applying transform:', {
-        transform: currentTransform,
+      // Call finalization if available to auto-snap and preserve zoom
+      let finalTransform = currentTransform;
+      
+      if (finalizationRef.current) {
+        console.log('⚡ InlinePhotoEditor - Running finalization before apply...');
+        try {
+          finalTransform = await finalizationRef.current();
+          console.log('✅ InlinePhotoEditor - Finalization completed:', finalTransform);
+        } catch (error) {
+          console.warn('⚠️ InlinePhotoEditor - Finalization failed, using current transform:', error);
+          finalTransform = currentTransform;
+        }
+      } else {
+        console.log('📋 InlinePhotoEditor - No finalization available, using current transform');
+      }
+
+      console.log('🔧 InlinePhotoEditor - Applying finalized transform:', {
+        transform: finalTransform,
         photoId: photo.id,
         slotId: slot.id,
         hasOnApplyHandler: !!onApply
       });
       
-      onApply(slot.id, photo.id, currentTransform);
+      onApply(slot.id, photo.id, finalTransform);
       console.log('✅ InlinePhotoEditor - onApply called successfully');
     } catch (error) {
       console.error('🚨 InlinePhotoEditor - Error in handleApply:', error);
@@ -166,9 +185,10 @@ export default function InlinePhotoEditor({
         interactive={true}
         onTransformChange={handleTransformChange}
         className="w-full h-full"
-        debug={false}
+        debug={true}
         fallbackUrls={photo ? getHighResPhotoUrls(photo) : []}
         showClippingIndicators={true} // Enable clipping indicators
+        finalizationRef={finalizationRef} // Pass ref for finalization method access
       />
       
       {/* Editing Controls Overlay */}

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, createPhotoTransform, getPhotoTransformBounds } from '../types';
 import { getHighResPhotoUrls } from '../utils/photoUrlUtils';
 
@@ -23,6 +23,9 @@ interface PhotoRendererProps {
   
   // Clipping indicators (zebra stripes) for overexposed/underexposed areas
   showClippingIndicators?: boolean;
+  
+  // Ref to expose finalization method
+  finalizationRef?: React.MutableRefObject<(() => Promise<PhotoTransform>) | null>;
 }
 
 // Helper to convert legacy container transforms to CSS (backward compatibility)
@@ -78,7 +81,8 @@ export default function PhotoRenderer({
   style = {},
   debug = false,
   fallbackUrls = [],
-  showClippingIndicators = false
+  showClippingIndicators = false,
+  finalizationRef
 }: PhotoRendererProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [lastPointer, setLastPointer] = useState<{ x: number; y: number } | null>(null);
@@ -99,6 +103,33 @@ export default function PhotoRenderer({
   
   // Auto-snap state for smooth zoom corrections
   const [isSnapping, setIsSnapping] = useState(false);
+  
+  // User interaction tracking to prevent auto-snap on recently manipulated photos
+  const [lastUserInteraction, setLastUserInteraction] = useState<number>(0);
+  const [interactionType, setInteractionType] = useState<string>('none');
+  
+  // Track user interactions to prevent auto-snap immediately after user manipulation
+  const trackUserInteraction = useCallback((type: string) => {
+    const now = Date.now();
+    setLastUserInteraction(now);
+    setInteractionType(type);
+    if (debug) {
+      console.log(`👆 User interaction tracked: ${type} at ${now}`);
+    }
+  }, [debug]);
+  
+  // Check if user has recently interacted with photo (within last 3 seconds)
+  const hasRecentUserInteraction = useCallback(() => {
+    const timeSinceInteraction = Date.now() - lastUserInteraction;
+    const RECENT_INTERACTION_THRESHOLD = 3000; // 3 seconds
+    const isRecent = timeSinceInteraction < RECENT_INTERACTION_THRESHOLD;
+    
+    if (debug && isRecent) {
+      console.log(`⏱️ Recent user interaction detected: ${interactionType} ${timeSinceInteraction}ms ago`);
+    }
+    
+    return isRecent;
+  }, [lastUserInteraction, interactionType, debug]);
   
   // Removed timeout reference - no more auto-corrections
   
@@ -145,9 +176,327 @@ export default function PhotoRenderer({
     return coverScale;
   };
 
-  // Removed all empty space detection - user has complete control
+  // Accurate gap detection for precise gap-based movement
+  const detectGaps = useCallback((): {
+    hasGaps: boolean;
+    gapCount: number;
+    gaps: { left: number; right: number; top: number; bottom: number };
+    significantGaps: { left: boolean; right: boolean; top: boolean; bottom: boolean };
+  } => {
+    if (!imageRef.current || !containerRef.current) {
+      return { 
+        hasGaps: false, 
+        gapCount: 0,
+        gaps: { left: 0, right: 0, top: 0, bottom: 0 }, 
+        significantGaps: { left: false, right: false, top: false, bottom: false }
+      };
+    }
+    
+    // Get accurate DOM measurements
+    const imageRect = imageRef.current.getBoundingClientRect();
+    const containerRect = containerRef.current.getBoundingClientRect();
+    
+    if (imageRect.width === 0 || imageRect.height === 0) {
+      return { 
+        hasGaps: false, 
+        gapCount: 0,
+        gaps: { left: 0, right: 0, top: 0, bottom: 0 }, 
+        significantGaps: { left: false, right: false, top: false, bottom: false }
+      };
+    }
+    
+    // Calculate precise gaps in pixels
+    const gapLeft = Math.round(imageRect.left - containerRect.left);
+    const gapRight = Math.round(containerRect.right - imageRect.right);
+    const gapTop = Math.round(imageRect.top - containerRect.top);
+    const gapBottom = Math.round(containerRect.bottom - imageRect.bottom);
+    
+    // User specification: Move by ANY gap amount (no threshold needed)
+    const GAP_THRESHOLD = 0; // No threshold - detect ANY gap amount
+    
+    // Check which sides have gaps (positive values only - empty space)
+    const hasLeftGap = gapLeft > GAP_THRESHOLD;
+    const hasRightGap = gapRight > GAP_THRESHOLD;
+    const hasTopGap = gapTop > GAP_THRESHOLD;
+    const hasBottomGap = gapBottom > GAP_THRESHOLD;
+    
+    // Count significant gaps
+    const gapCount = [hasLeftGap, hasRightGap, hasTopGap, hasBottomGap].filter(Boolean).length;
+    const hasAnyGaps = gapCount > 0;
+    
+    if (debug) {
+      console.log('🔍 Gap Detection (User Specification):', {
+        gaps: { left: gapLeft, right: gapRight, top: gapTop, bottom: gapBottom },
+        significantGaps: { left: hasLeftGap, right: hasRightGap, top: hasTopGap, bottom: hasBottomGap },
+        gapCount,
+        threshold: GAP_THRESHOLD,
+        action: gapCount >= 3 ? 'Reset to default' : 
+               gapCount === 2 ? 'Move by both gap amounts' :
+               gapCount === 1 ? 'Move by single gap amount' : 'No action needed'
+      });
+    }
+    
+    return {
+      hasGaps: hasAnyGaps,
+      gapCount,
+      gaps: { left: gapLeft, right: gapRight, top: gapTop, bottom: gapBottom },
+      significantGaps: { left: hasLeftGap, right: hasRightGap, top: hasTopGap, bottom: hasBottomGap }
+    };
+    
+  }, [debug]);
 
-  // Removed all boundary correction logic - user has complete control
+  // Precise gap-based movement calculation (user specification)
+  const calculateGapBasedMovement = useCallback((gapData: {
+    gapCount: number;
+    gaps: { left: number; right: number; top: number; bottom: number };
+    significantGaps: { left: boolean; right: boolean; top: boolean; bottom: boolean };
+  }): {
+    action: 'none' | 'reset-to-default' | 'move-by-gaps';
+    newCenterX: number;
+    newCenterY: number;
+    movements: { horizontal: string; vertical: string };
+  } => {
+    if (!imageRef.current || !containerRef.current) {
+      return {
+        action: 'none',
+        newCenterX: currentTransform.photoCenterX,
+        newCenterY: currentTransform.photoCenterY,
+        movements: { horizontal: 'no change', vertical: 'no change' }
+      };
+    }
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const { gapCount, gaps, significantGaps } = gapData;
+    
+    // User specification: 3+ sides with gaps → Reset to default
+    if (gapCount >= 3) {
+      return {
+        action: 'reset-to-default',
+        newCenterX: 0.5,
+        newCenterY: 0.5,
+        movements: { horizontal: 'reset to center', vertical: 'reset to center' }
+      };
+    }
+    
+    // User specification: 1-2 sides with gaps → Move by exact gap amounts
+    if (gapCount === 0) {
+      return {
+        action: 'none',
+        newCenterX: currentTransform.photoCenterX,
+        newCenterY: currentTransform.photoCenterY,
+        movements: { horizontal: 'no change', vertical: 'no change' }
+      };
+    }
+    
+    // Calculate movement based on gaps (convert pixels to percentage of photo transform)
+    let horizontalMovement = 0;
+    let verticalMovement = 0;
+    let horizontalDescription = 'no change';
+    let verticalDescription = 'no change';
+    
+    // Horizontal movement
+    if (significantGaps.left) {
+      // Gap on left → move photo right to close the gap
+      horizontalMovement = gaps.left / containerRect.width;
+      horizontalDescription = `move right ${gaps.left}px`;
+    } else if (significantGaps.right) {
+      // Gap on right → move photo left to close the gap  
+      horizontalMovement = -gaps.right / containerRect.width;
+      horizontalDescription = `move left ${gaps.right}px`;
+    }
+    
+    // Vertical movement  
+    if (significantGaps.top) {
+      // Gap on top → move photo down to close the gap
+      verticalMovement = gaps.top / containerRect.height;
+      verticalDescription = `move down ${gaps.top}px`;
+    } else if (significantGaps.bottom) {
+      // Gap on bottom → move photo up to close the gap
+      verticalMovement = -gaps.bottom / containerRect.height;
+      verticalDescription = `move up ${gaps.bottom}px`;
+    }
+    
+    // Apply movements to current position
+    const newCenterX = Math.max(0.05, Math.min(0.95, currentTransform.photoCenterX + horizontalMovement));
+    const newCenterY = Math.max(0.05, Math.min(0.95, currentTransform.photoCenterY + verticalMovement));
+    
+    if (debug) {
+      console.log('📐 Gap-Based Movement Calculation:', {
+        gapCount,
+        gaps,
+        significantGaps,
+        movements: {
+          horizontalPx: horizontalMovement * containerRect.width,
+          verticalPx: verticalMovement * containerRect.height,
+          horizontalPercent: (horizontalMovement * 100).toFixed(2) + '%',
+          verticalPercent: (verticalMovement * 100).toFixed(2) + '%'
+        },
+        oldCenter: [currentTransform.photoCenterX.toFixed(3), currentTransform.photoCenterY.toFixed(3)],
+        newCenter: [newCenterX.toFixed(3), newCenterY.toFixed(3)]
+      });
+    }
+    
+    return {
+      action: 'move-by-gaps',
+      newCenterX,
+      newCenterY,
+      movements: { horizontal: horizontalDescription, vertical: verticalDescription }
+    };
+  }, [currentTransform, debug]);
+
+  // Gap-based finalization following user's exact specification
+  const finalizePositioning = useCallback((): Promise<PhotoTransform> => {
+    return new Promise((resolve) => {
+      const performFinalization = () => {
+        console.log('🚀 FINALIZATION STARTED - Checkmark clicked');
+        console.log('✅ PROCEEDING: Auto-snap executes regardless of recent interaction');
+        
+        // Detect gaps using accurate measurement
+        console.log('🔍 MEASURING GAPS...');
+        const gapData = detectGaps();
+        console.log('📊 GAP MEASUREMENT RESULT:', {
+          hasGaps: gapData.hasGaps,
+          gapCount: gapData.gapCount,
+          gaps: gapData.gaps,
+          significantGaps: gapData.significantGaps
+        });
+        
+        if (!gapData.hasGaps) {
+          console.log('✅ NO GAPS: No adjustment needed');
+          if (debug) {
+            console.log('✅ No significant gaps detected - no adjustment needed');
+          }
+          resolve(currentTransform);
+          return;
+        }
+        
+        console.log('⚠️ GAPS DETECTED: Proceeding with movement calculation');
+
+        // Calculate movement based on user specification
+        console.log('🧮 CALCULATING MOVEMENT...');
+        const movement = calculateGapBasedMovement(gapData);
+        console.log('📊 MOVEMENT VALIDATION:');
+        const debugAction = gapData.gapCount >= 3 ? 'Reset to default' : 
+                           gapData.gapCount === 2 ? 'Move by both gap amounts' :
+                           gapData.gapCount === 1 ? 'Move by single gap amount' : 'No action needed';
+        console.log('  Debug UI shows:', debugAction);
+        console.log('  Finalization calculates:', movement.action);
+        console.log('🎯 MOVEMENT CALCULATION RESULT:', {
+          action: movement.action,
+          newCenterX: movement.newCenterX,
+          newCenterY: movement.newCenterY,
+          movements: movement.movements
+        });
+        
+        if (movement.action === 'none') {
+          console.log('✅ NO ACTION: Current position is acceptable');
+          if (debug) {
+            console.log('✅ No action needed - current position is acceptable');
+          }
+          resolve(currentTransform);
+          return;
+        }
+        
+        console.log('🛠️ APPLYING MOVEMENT: Action required');
+
+        if (debug) {
+          console.log('⚙️ Applying gap-based correction:', {
+            gapCount: gapData.gapCount,
+            action: movement.action,
+            movements: movement.movements
+          });
+        }
+
+        let finalizedTransform: PhotoTransform;
+        
+        if (movement.action === 'reset-to-default') {
+          // 3+ sides with gaps → Reset to default (scale 1, centered)
+          console.log('🔄 RESET TO DEFAULT: Creating transform (1, 0.5, 0.5)');
+          finalizedTransform = createPhotoTransform(1, 0.5, 0.5);
+          console.log('✅ CREATED RESET TRANSFORM:', finalizedTransform);
+          if (debug) {
+            console.log('🔄 Resetting to default: 3+ sides have gaps');
+          }
+        } else if (movement.action === 'move-by-gaps') {
+          // 1-2 sides with gaps → Move by exact gap amounts (preserve zoom)
+          console.log('📐 MOVE BY GAPS: Creating transform with movement');
+          console.log('  Current transform:', currentTransform);
+          console.log('  New center:', { x: movement.newCenterX, y: movement.newCenterY });
+          finalizedTransform = createPhotoTransform(
+            currentTransform.photoScale, // Preserve zoom
+            movement.newCenterX,
+            movement.newCenterY
+          );
+          console.log('✅ CREATED MOVEMENT TRANSFORM:', finalizedTransform);
+          if (debug) {
+            console.log('📐 Moving by gap amounts:', movement.movements);
+          }
+        } else {
+          // Should not happen, but fallback to current transform
+          console.log('⚠️ FALLBACK: Unknown action, using current transform');
+          finalizedTransform = currentTransform;
+        }
+        
+        if (debug) {
+          console.log('✨ Gap-Based Finalization Result:', {
+            oldTransform: {
+              scale: currentTransform.photoScale.toFixed(3),
+              center: [currentTransform.photoCenterX.toFixed(3), currentTransform.photoCenterY.toFixed(3)]
+            },
+            newTransform: {
+              scale: finalizedTransform.photoScale.toFixed(3),
+              center: [finalizedTransform.photoCenterX.toFixed(3), finalizedTransform.photoCenterY.toFixed(3)]
+            },
+            changed: finalizedTransform !== currentTransform
+          });
+        }
+        
+        // Apply transformation
+        console.log('🔄 APPLYING TRANSFORM...');
+        console.log('  Current transform:', currentTransform);
+        console.log('  New transform:', finalizedTransform);
+        console.log('  Transforms are different:', finalizedTransform !== currentTransform);
+        
+        // Check if transforms are actually different (deep comparison for safety)
+        const transformsAreDifferent = 
+          finalizedTransform.photoScale !== currentTransform.photoScale ||
+          finalizedTransform.photoCenterX !== currentTransform.photoCenterX ||
+          finalizedTransform.photoCenterY !== currentTransform.photoCenterY;
+        
+        console.log('  Deep comparison different:', transformsAreDifferent);
+        
+        if (transformsAreDifferent) {
+          console.log('⚙️ EXECUTING TRANSFORM CHANGE...');
+          setIsSnapping(true);
+          setCurrentTransform(finalizedTransform);
+          console.log('✅ Transform state updated');
+          
+          if (onTransformChange) {
+            console.log('📡 Calling onTransformChange callback...');
+            onTransformChange(finalizedTransform);
+            console.log('✅ Callback executed');
+          } else {
+            console.log('⚠️ No onTransformChange callback provided');
+          }
+          
+          setTimeout(() => {
+            setIsSnapping(false);
+            console.log('✅ FINALIZATION COMPLETE - Animation finished');
+            if (debug) console.log('✅ Gap-based finalization complete');
+            resolve(finalizedTransform);
+          }, 350);
+        } else {
+          console.log('ℹ️ NO CHANGE: Transforms are identical, resolving with current');
+          resolve(currentTransform);
+        }
+      };
+
+      // Use requestAnimationFrame to ensure DOM measurements are accurate
+      requestAnimationFrame(() => {
+        requestAnimationFrame(performFinalization);
+      });
+    });
+  }, [currentTransform, detectGaps, calculateGapBasedMovement, onTransformChange, debug, hasRecentUserInteraction, createPhotoTransform]);
 
   // Analyze image for clipping (overexposed/underexposed areas)
   const analyzeClipping = () => {
@@ -249,7 +598,12 @@ export default function PhotoRenderer({
     }
   }, [imageLoaded, showClippingIndicators]);
 
-  // No timeout cleanup needed - removed auto-corrections
+  // Expose finalization method via ref with stable dependencies
+  useEffect(() => {
+    if (finalizationRef) {
+      finalizationRef.current = finalizePositioning;
+    }
+  }, [finalizationRef, finalizePositioning]);
   
   // ClippingOverlay component - displays zebra stripes for clipped areas
   const ClippingOverlay = () => {
@@ -515,6 +869,9 @@ export default function PhotoRenderer({
     setLastPointer(null);
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     
+    // Track user interaction
+    trackUserInteraction('drag-end');
+    
     // No auto-corrections - user has complete control over positioning
   };
 
@@ -540,22 +897,63 @@ export default function PhotoRenderer({
     setCurrentTransform(newTransform);
     onTransformChange?.(newTransform);
     
+    // Track user interaction
+    trackUserInteraction('zoom');
+    
     // No immediate auto-fit - let user zoom freely without interference
   };
 
-  // Debug info (simplified - no boundary detection)
-  const debugInfo = debug ? (
-    <div className="absolute top-2 left-2 bg-black bg-opacity-90 text-white text-xs p-3 rounded z-50 pointer-events-none max-w-xs">
-      <div className="font-bold mb-2">Photo Renderer Debug</div>
-      <div>Scale: {currentTransform.photoScale.toFixed(2)}</div>
-      <div>Center X: {currentTransform.photoCenterX.toFixed(3)}</div>
-      <div>Center Y: {currentTransform.photoCenterY.toFixed(3)}</div>
-      <div>Interactive: {interactive ? 'Yes' : 'No'}</div>
-      <div>Dragging: {isDragging ? 'Yes' : 'No'}</div>
-      <div>Touching: {isTouching ? 'Yes' : 'No'}</div>
-      <div>Mode: User Control (No Auto-Snap)</div>
-    </div>
-  ) : null;
+  // Gap-based debug info following user specification
+  const debugInfo = debug ? (() => {
+    const gapData = detectGaps();
+    const movement = gapData.hasGaps ? calculateGapBasedMovement(gapData) : null;
+    
+    return (
+      <div className="absolute top-2 left-2 bg-black bg-opacity-90 text-white text-xs p-3 rounded z-50 pointer-events-none max-w-sm">
+        <div className="font-bold mb-2">Gap-Based Auto-Snap Debug</div>
+        <div>Scale: {currentTransform.photoScale.toFixed(2)}</div>
+        <div>Center X: {currentTransform.photoCenterX.toFixed(3)}</div>
+        <div>Center Y: {currentTransform.photoCenterY.toFixed(3)}</div>
+        <div>Interactive: {interactive ? 'Yes' : 'No'}</div>
+        <div>Dragging: {isDragging ? 'Yes' : 'No'}</div>
+        <div>Touching: {isTouching ? 'Yes' : 'No'}</div>
+        <div>Snapping: {isSnapping ? 'Yes' : 'No'}</div>
+        
+        <div className="mt-2 border-t border-gray-600 pt-2">
+          <div className="font-semibold">Gap Detection:</div>
+          <div>Gap Count: {gapData.gapCount}</div>
+          <div>L:{gapData.gaps.left} R:{gapData.gaps.right}</div>
+          <div>T:{gapData.gaps.top} B:{gapData.gaps.bottom}</div>
+          <div className="text-xs text-gray-300">
+            Significant: {Object.entries(gapData.significantGaps).filter(([_, hasGap]) => hasGap).map(([side]) => side).join(', ') || 'none'}
+          </div>
+        </div>
+        
+        <div className="mt-2 border-t border-gray-600 pt-2">
+          <div className="font-semibold">Action Plan:</div>
+          <div className="text-xs">
+            {gapData.gapCount >= 3 ? 'Reset to default (3+ gaps)' :
+             gapData.gapCount === 2 ? 'Move by both gap amounts' :
+             gapData.gapCount === 1 ? 'Move by single gap amount' : 'No action needed'}
+          </div>
+          {movement && movement.action !== 'none' && (
+            <>
+              <div className="text-xs text-yellow-300">H: {movement.movements.horizontal}</div>
+              <div className="text-xs text-yellow-300">V: {movement.movements.vertical}</div>
+            </>
+          )}
+        </div>
+        
+        <div className="mt-2 border-t border-gray-600 pt-2">
+          <div className="font-semibold">Status:</div>
+          <div className="text-xs">Recent Interaction: {hasRecentUserInteraction() ? `${interactionType} (${((Date.now() - lastUserInteraction) / 1000).toFixed(1)}s ago)` : 'No'}</div>
+          <div className="text-xs">Will Apply: {gapData.hasGaps ? 'Yes' : 'No'}</div>
+        </div>
+        
+        <div className="mt-2 text-xs text-green-300">Mode: User-Specified Gap Movement</div>
+      </div>
+    );
+  })() : null;
 
   return (
     <div
@@ -623,6 +1021,20 @@ export default function PhotoRenderer({
       
       {/* Clipping indicators overlay */}
       <ClippingOverlay />
+      
+      {/* Gap indicator overlay (debug mode only) */}
+      {debug && (() => {
+        const gapData = detectGaps();
+        if (!gapData.hasGaps) return null;
+        
+        return (
+          <div className="absolute inset-0 pointer-events-none z-40">
+            <div className="absolute top-2 right-2 bg-yellow-600 text-white text-xs px-2 py-1 rounded">
+              {gapData.gapCount} gap{gapData.gapCount > 1 ? 's' : ''}
+            </div>
+          </div>
+        );
+      })()}
       
       {debugInfo}
     </div>
