@@ -38,7 +38,7 @@ function convertLegacyToCSS(containerTransform: ContainerTransform): React.CSSPr
     transformOrigin: 'center center',
     width: '100%',
     height: '100%',
-    objectFit: 'cover' as const,
+    objectFit: 'contain' as const,
     // Improve image quality
     imageRendering: 'auto' as const,
     // Ensure smooth scaling
@@ -59,12 +59,21 @@ function convertPhotoToCSS(photoTransform: PhotoTransform): React.CSSProperties 
   const translateX = (0.5 - photoTransform.photoCenterX) * 100; // Percentage of photo width
   const translateY = (0.5 - photoTransform.photoCenterY) * 100; // Percentage of photo height
   
+  const cssTransform = `translate(${translateX}%, ${translateY}%) scale(${photoTransform.photoScale})`;
+  
+  console.log('🎨 PHOTO CSS CONVERSION:', {
+    input: photoTransform,
+    translation: { translateX, translateY },
+    cssTransform,
+    note: 'Manual scaling + object-fit: contain baseline for proper transform math'
+  });
+  
   return {
-    transform: `translate(${translateX}%, ${translateY}%) scale(${photoTransform.photoScale})`,
+    transform: cssTransform,
     transformOrigin: 'center center',
     width: '100%',
     height: '100%',
-    objectFit: 'cover' as const,
+    objectFit: 'contain' as const,
     // Improve image quality
     imageRendering: 'auto' as const,
     // Ensure smooth scaling

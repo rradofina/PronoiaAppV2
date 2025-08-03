@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { TemplateSlot, Photo, PhotoTransform, createPhotoTransform, isPhotoTransform } from '../types';
+import { TemplateSlot, Photo, PhotoTransform, createPhotoTransform, createSmartPhotoTransformFromSlot, isPhotoTransform } from '../types';
 import PhotoRenderer from './PhotoRenderer';
 import { photoCacheService } from '../services/photoCacheService';
 import { getHighResPhotoUrls } from '../utils/photoUrlUtils';
@@ -22,7 +22,10 @@ export default function InlinePhotoEditor({
   className = ''
 }: InlinePhotoEditorProps) {
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
-  const [currentTransform, setCurrentTransform] = useState<PhotoTransform>(createPhotoTransform(1, 0.5, 0.5));
+  const [currentTransform, setCurrentTransform] = useState<PhotoTransform>(() => {
+    // Initial transform - will be updated by useEffect with proper async smart scaling
+    return createPhotoTransform(1, 0.5, 0.5);
+  });
   const [photoKey, setPhotoKey] = useState<string>('');
   const [componentKey, setComponentKey] = useState<string>('');
   
@@ -63,8 +66,17 @@ export default function InlinePhotoEditor({
       console.log('✅ InlinePhotoEditor - Using existing transform for same photo');
       setCurrentTransform(slot.transform);
     } else {
-      console.log('🔄 InlinePhotoEditor - Using default transform for new photo');
-      setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+      console.log('🔄 InlinePhotoEditor - Using smart transform for new photo with slot data');
+      if (photo && slot) {
+        createSmartPhotoTransformFromSlot(photo, slot)
+          .then(transform => setCurrentTransform(transform))
+          .catch(error => {
+            console.error('❌ InlinePhotoEditor - Smart scaling failed, using fallback:', error);
+            setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+          });
+      } else {
+        setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+      }
     }
     
     // Validate that we have the required props
@@ -144,10 +156,17 @@ export default function InlinePhotoEditor({
       console.log('✅ InlinePhotoEditor - onApply called successfully');
     } catch (error) {
       console.error('🚨 InlinePhotoEditor - Error in handleApply:', error);
-      // Fallback to basic transform if we have valid IDs
+      // Fallback to smart transform if we have valid IDs
       if (slot?.id && photo?.id && onApply) {
-        console.log('🔄 InlinePhotoEditor - Trying fallback with basic transform');
-        onApply(slot.id, photo.id, createPhotoTransform(1, 0.5, 0.5));
+        console.log('🔄 InlinePhotoEditor - Trying fallback with smart transform and slot data');
+        createSmartPhotoTransformFromSlot(photo, slot)
+          .then(fallbackTransform => {
+            onApply(slot.id, photo.id, fallbackTransform);
+          })
+          .catch(fallbackError => {
+            console.error('❌ InlinePhotoEditor - Fallback smart scaling also failed:', fallbackError);
+            onApply(slot.id, photo.id, createPhotoTransform(1, 0.5, 0.5));
+          });
       }
     }
   };
@@ -196,7 +215,7 @@ export default function InlinePhotoEditor({
         interactive={true}
         onTransformChange={handleTransformChange}
         className="w-full h-full"
-        // debug={true}  // Uncomment for auto-snap debugging
+        debug={true}  // Enable for live scaling visualization
         fallbackUrls={photo ? getHighResPhotoUrls(photo) : []}
         showClippingIndicators={true} // Enable clipping indicators
         finalizationRef={finalizationRef} // Pass ref for finalization method access

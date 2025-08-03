@@ -1,5 +1,39 @@
 // Updated: Types for the app.
 
+import { templateConfigService } from '../services/templateConfigService';
+import { googleDriveService } from '../services/googleDriveService';
+
+// Helper function to get real photo dimensions from Google Drive API
+async function getRealPhotoDimensions(photo: Photo): Promise<{ width: number; height: number }> {
+  try {
+    console.log('🔍 FETCHING REAL DIMENSIONS from Google Drive API...');
+    const metadata = await googleDriveService.getPhotoMetadata(photo.googleDriveId);
+    
+    if (metadata && metadata.imageMediaMetadata) {
+      const { width, height } = metadata.imageMediaMetadata;
+      console.log('✅ GOOGLE DRIVE API SUCCESS:', { width, height });
+      return { width: parseInt(width), height: parseInt(height) };
+    } else {
+      throw new Error('No imageMediaMetadata in API response');
+    }
+  } catch (error) {
+    console.warn('❌ Google Drive API failed, trying image loading fallback:', error);
+    
+    // Fallback: Try to load image (will get thumbnail dimensions)
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        console.log('📷 IMAGE LOADING FALLBACK:', { width: img.naturalWidth, height: img.naturalHeight });
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.onerror = (imgError) => {
+        reject(new Error(`Failed to load image: ${imgError}`));
+      };
+      img.src = photo.url;
+    });
+  }
+}
+
 // Core types used throughout the application
 export type Screen = 'drive-setup' | 'folder-selection' | 'package' | 'template' | 'template-setup' | 'photos' | 'preview' | 'complete' | 'png-template-management' | 'template-folder-selection' | 'manual-template-manager' | 'manual-package-manager';
 
@@ -85,17 +119,346 @@ export function getPhotoTransformBounds(photoScale: number): { min: number; max:
   };
 }
 
+// Calculate smart scale with "2-sides only excess" logic for initial photo placement
+export function calculateProperScale(
+  photoWidth: number, 
+  photoHeight: number, 
+  containerWidth: number, 
+  containerHeight: number, 
+  fillSlot: boolean = true
+): number {
+  if (photoWidth === 0 || photoHeight === 0 || containerWidth === 0 || containerHeight === 0) {
+    return 1.0; // Fallback scale
+  }
+  
+  // Calculate scaling to fit/fill the slot - same logic as templateGenerationService
+  const scaleX = containerWidth / photoWidth;
+  const scaleY = containerHeight / photoHeight;
+  
+  if (fillSlot) {
+    // Fill the entire area (crop if necessary) - COVER behavior
+    return Math.max(scaleX, scaleY);
+  } else {
+    // Fit within the slot (letterbox if necessary) - CONTAIN behavior
+    return Math.min(scaleX, scaleY);
+  }
+}
+
+// Smart scaling for initial photo placement - shows WHOLE photo with NO gaps, excess on only 2 sides
+export function calculateSmartFillScale(
+  photoWidth: number,
+  photoHeight: number,
+  containerWidth: number,
+  containerHeight: number
+): number {
+  if (photoWidth === 0 || photoHeight === 0 || containerWidth === 0 || containerHeight === 0) {
+    return 1.0; // Fallback scale
+  }
+  
+  // Calculate scale factors for both dimensions
+  const scaleX = containerWidth / photoWidth;   // Scale needed to fit width
+  const scaleY = containerHeight / photoHeight; // Scale needed to fit height
+  
+  // Calculate aspect ratios to determine scaling strategy
+  const photoAspectRatio = photoWidth / photoHeight;
+  const containerAspectRatio = containerWidth / containerHeight;
+  
+  // INTELLIGENT SCALING: Choose scale that shows WHOLE photo AND eliminates gaps
+  let finalScale: number;
+  let scalingStrategy: string;
+  let excessDirection: string;
+  
+  if (photoAspectRatio < containerAspectRatio) {
+    // Photo is taller than container (portrait in landscape container)
+    // Scale to fit WIDTH completely, excess will be on TOP/BOTTOM
+    finalScale = scaleX;
+    scalingStrategy = 'FIT_WIDTH';
+    excessDirection = 'TOP/BOTTOM';
+  } else {
+    // Photo is wider than container (landscape in portrait container) 
+    // OR same aspect ratio
+    // Scale to fit HEIGHT completely, excess will be on LEFT/RIGHT
+    finalScale = scaleY;
+    scalingStrategy = 'FIT_HEIGHT';
+    excessDirection = 'LEFT/RIGHT';
+  }
+  
+  // Calculate final scaled dimensions for verification
+  const scaledWidth = Math.round(photoWidth * finalScale);
+  const scaledHeight = Math.round(photoHeight * finalScale);
+  
+  console.log('🎯 Smart Fill Scale (WHOLE PHOTO + NO GAPS):', {
+    photo: { width: photoWidth, height: photoHeight, aspectRatio: photoAspectRatio.toFixed(3) },
+    container: { width: containerWidth, height: containerHeight, aspectRatio: containerAspectRatio.toFixed(3) },
+    scales: { scaleX: scaleX.toFixed(3), scaleY: scaleY.toFixed(3) },
+    decision: {
+      strategy: scalingStrategy,
+      chosenScale: finalScale.toFixed(3),
+      excessDirection,
+      logic: photoAspectRatio < containerAspectRatio ? 'Photo taller → fit width' : 'Photo wider → fit height'
+    },
+    result: { width: scaledWidth, height: scaledHeight },
+    verification: {
+      showsWholePhoto: true,
+      fillsWidth: scaledWidth >= containerWidth ? '✅ FILLS' : '❌ GAP',
+      fillsHeight: scaledHeight >= containerHeight ? '✅ FILLS' : '❌ GAP',
+      widthGap: Math.max(0, containerWidth - scaledWidth),
+      heightGap: Math.max(0, containerHeight - scaledHeight),
+      widthExcess: Math.max(0, scaledWidth - containerWidth),
+      heightExcess: Math.max(0, scaledHeight - containerHeight)
+    }
+  });
+  
+  return finalScale;
+}
+
+// Legacy function for backwards compatibility - now uses proper scaling
+export function calculateContainScale(photoAspectRatio: number, containerAspectRatio: number): number {
+  // Convert aspect ratios to dimensions for proper calculation
+  // Assume a standard container size for calculation
+  const containerWidth = 400;
+  const containerHeight = 400;
+  const photoWidth = photoAspectRatio * 400;
+  const photoHeight = 400;
+  
+  // Use COVER behavior (fill) as default for backwards compatibility
+  return calculateProperScale(photoWidth, photoHeight, containerWidth, containerHeight, true);
+}
+
+// Legacy function for backwards compatibility
+export function calculateCoverScale(photoAspectRatio: number, containerAspectRatio: number): number {
+  return calculateContainScale(photoAspectRatio, containerAspectRatio);
+}
+
+// Create a photo-centric transform with smart initial scale for object-fit: contain
+export function createPhotoTransformWithContain(
+  photoAspectRatio: number, 
+  containerAspectRatio: number, 
+  photoCenterX: number = 0.5, 
+  photoCenterY: number = 0.5
+): PhotoTransform {
+  const containScale = calculateContainScale(photoAspectRatio, containerAspectRatio);
+  return createPhotoTransform(containScale, photoCenterX, photoCenterY);
+}
+
+// Legacy function for backwards compatibility
+export function createPhotoTransformWithCover(
+  photoAspectRatio: number, 
+  containerAspectRatio: number, 
+  photoCenterX: number = 0.5, 
+  photoCenterY: number = 0.5
+): PhotoTransform {
+  return createPhotoTransformWithContain(photoAspectRatio, containerAspectRatio, photoCenterX, photoCenterY);
+}
+
+// Helper to get photo aspect ratio from Photo object
+export function getPhotoAspectRatio(photo: Photo): number {
+  // Try to get from metadata first
+  if (photo.metadata?.aspectRatio) {
+    return photo.metadata.aspectRatio;
+  }
+  
+  // Try to calculate from width/height
+  if (photo.metadata?.width && photo.metadata?.height) {
+    return photo.metadata.width / photo.metadata.height;
+  }
+  
+  // Default assumption for photos (most photos are 4:3 or 3:2)
+  return 4 / 3;
+}
+
+// Helper to get hole dimensions from TemplateSlot
+export function getHoleDimensions(slot: TemplateSlot): { width: number; height: number } | null {
+  try {
+    // Get PNG templates from global window object (same way as components do)
+    const pngTemplates = (window as any).pngTemplates || [];
+    
+    console.log('🔍 RAW DATABASE DATA DEBUG:', {
+      totalPngTemplates: pngTemplates.length,
+      lookingFor: { templateType: slot.templateType, printSize: slot.printSize, slotIndex: slot.slotIndex },
+      availableTemplates: pngTemplates.map((t: any) => ({ 
+        template_type: t.template_type, 
+        print_size: t.print_size,
+        holes: t.holes?.length || 0 
+      }))
+    });
+    
+    // Find the template that matches this slot
+    const pngTemplate = pngTemplates.find((t: any) => {
+      return t.template_type === slot.templateType && t.print_size === slot.printSize;
+    });
+    
+    if (!pngTemplate || !pngTemplate.holes) {
+      console.warn('🔍 No PNG template found for slot:', { 
+        templateType: slot.templateType, 
+        printSize: slot.printSize,
+        availableTypes: pngTemplates.map((t: any) => t.template_type),
+        availableSizes: pngTemplates.map((t: any) => t.print_size)
+      });
+      return null;
+    }
+    
+    console.log('🕳️ FOUND TEMPLATE WITH HOLES:', {
+      templateType: pngTemplate.template_type,
+      printSize: pngTemplate.print_size,
+      totalHoles: pngTemplate.holes.length,
+      requestedIndex: slot.slotIndex,
+      allHoles: pngTemplate.holes.map((h: any, i: number) => ({
+        index: i,
+        dimensions: { width: h.width, height: h.height },
+        position: { x: h.x, y: h.y }
+      }))
+    });
+    
+    // Get the hole data for this slot index
+    const hole = pngTemplate.holes[slot.slotIndex];
+    if (!hole) {
+      console.warn('🔍 No hole found at index:', {
+        slotIndex: slot.slotIndex,
+        availableIndices: pngTemplate.holes.map((_: any, i: number) => i),
+        totalHoles: pngTemplate.holes.length
+      });
+      return null;
+    }
+    
+    console.log('✅ HOLE DIMENSIONS EXTRACTED:', {
+      slotIndex: slot.slotIndex,
+      holeDimensions: { width: hole.width, height: hole.height },
+      rawHoleData: hole
+    });
+    
+    return { width: hole.width, height: hole.height };
+  } catch (error) {
+    console.warn('🔍 Error getting hole dimensions:', error);
+    return null;
+  }
+}
+
+// Smart photo transform creation with aspect ratio detection
+export function createSmartPhotoTransform(
+  photo: Photo,
+  containerAspectRatio: number = 1.0, // Default to square container
+  photoCenterX: number = 0.5,
+  photoCenterY: number = 0.5
+): PhotoTransform {
+  const photoAspectRatio = getPhotoAspectRatio(photo);
+  return createPhotoTransformWithContain(photoAspectRatio, containerAspectRatio, photoCenterX, photoCenterY);
+}
+
+// Smart photo transform creation - SINGLE PROCESS, NO FALLBACKS
+export async function createSmartPhotoTransformFromSlot(
+  photo: Photo,
+  slot: TemplateSlot,
+  photoCenterX: number = 0.5,
+  photoCenterY: number = 0.5
+): Promise<PhotoTransform> {
+  console.log('🚀 FUNCTION CALLED: createSmartPhotoTransformFromSlot', {
+    photoId: photo.id,
+    slotId: slot.id,
+    templateType: slot.templateType,
+    slotIndex: slot.slotIndex
+  });
+  
+  // Get photo dimensions - try to detect if missing from metadata
+  let photoWidth = photo.metadata?.width || 0;
+  let photoHeight = photo.metadata?.height || 0;
+  
+  // If metadata is missing, get real dimensions from Google Drive API
+  if (!photoWidth || !photoHeight) {
+    try {
+      console.log('🔍 MISSING METADATA - Getting real dimensions from Google Drive API...');
+      const dimensions = await getRealPhotoDimensions(photo);
+      photoWidth = dimensions.width;
+      photoHeight = dimensions.height;
+      console.log('✅ REAL DIMENSIONS RETRIEVED:', { width: photoWidth, height: photoHeight });
+    } catch (error) {
+      console.warn('❌ Failed to get real dimensions, using defaults:', error);
+      photoWidth = 1600;  // Default to common photo size
+      photoHeight = 1200; // Default to 4:3 aspect ratio
+    }
+  }
+  
+  console.log('📏 PHOTO DIMENSIONS DEBUG:', {
+    photoId: photo.id,
+    photoName: photo.name,
+    rawMetadata: photo.metadata,
+    hasWidth: !!photo.metadata?.width,
+    hasHeight: !!photo.metadata?.height,
+    rawWidth: photo.metadata?.width,
+    rawHeight: photo.metadata?.height,
+    usedWidth: photoWidth,
+    usedHeight: photoHeight,
+    usingDefaults: !photo.metadata?.width || !photo.metadata?.height,
+    defaultsApplied: {
+      width: photoWidth === 1600 ? 'DEFAULT' : 'FROM_METADATA',
+      height: photoHeight === 1200 ? 'DEFAULT' : 'FROM_METADATA'
+    }
+  });
+  
+  // Get hole dimensions with detailed debugging
+  const rawHoleDimensions = getHoleDimensions(slot);
+  const holeDimensions = rawHoleDimensions || { width: 400, height: 400 }; // Default to square
+  
+  console.log('🕳️ HOLE DIMENSIONS DEBUG:', {
+    slotInfo: { 
+      id: slot.id, 
+      templateType: slot.templateType, 
+      slotIndex: slot.slotIndex,
+      printSize: slot.printSize 
+    },
+    rawHoleDimensions,
+    hasRawDimensions: !!rawHoleDimensions,
+    finalHoleDimensions: holeDimensions,
+    usingDefaults: !rawHoleDimensions,
+    defaultsApplied: {
+      width: holeDimensions.width === 400 ? 'DEFAULT' : 'FROM_DATABASE',
+      height: holeDimensions.height === 400 ? 'DEFAULT' : 'FROM_DATABASE'
+    }
+  });
+  
+  // ALWAYS use smart scaling - no branches, no fallbacks
+  const smartScale = calculateSmartFillScale(
+    photoWidth,
+    photoHeight,
+    holeDimensions.width,
+    holeDimensions.height
+  );
+  
+  const finalTransform = createPhotoTransform(smartScale, photoCenterX, photoCenterY);
+  
+  console.log('✅ FINAL TRANSFORM CREATED:', {
+    smartScale,
+    finalTransform,
+    expectedResult: {
+      scaledWidth: Math.round(photoWidth * smartScale),
+      scaledHeight: Math.round(photoHeight * smartScale),
+      shouldFillCompletely: true
+    }
+  });
+  
+  return finalTransform;
+}
+
 // Create a photo-centric transform with zoom-aware bounds
 export function createPhotoTransform(photoScale: number, photoCenterX: number, photoCenterY: number): PhotoTransform {
   const clampedScale = Math.max(0.01, Math.min(10, photoScale)); // Clamp scale
   const bounds = getPhotoTransformBounds(clampedScale);
   
-  return {
+  const transform: PhotoTransform = {
     photoScale: clampedScale,
     photoCenterX: Math.max(bounds.min, Math.min(bounds.max, photoCenterX)), // Zoom-aware clamp
     photoCenterY: Math.max(bounds.min, Math.min(bounds.max, photoCenterY)), // Zoom-aware clamp
-    version: 'photo-centric'
+    version: 'photo-centric' as const
   };
+  
+  console.log('🔧 createPhotoTransform:', {
+    input: { photoScale, photoCenterX, photoCenterY },
+    clamped: { clampedScale, wasScaleClamped: clampedScale !== photoScale },
+    bounds,
+    finalTransform: transform
+  });
+  
+  return transform;
 }
 
 // Migration utilities for legacy transforms

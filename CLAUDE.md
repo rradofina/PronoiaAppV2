@@ -113,6 +113,40 @@ npm run dev
 
 **NEVER REVERT**: This fix resolves fundamental movement direction bug and prevents edge case poor positioning. Both commits (cc16e75, 3b8eb45) must remain intact.
 
+### 6. Photo Rasterization Positioning Shift (PARKED - IN INVESTIGATION)
+**Problem**: Downloaded/rasterized photos have slight upward shift compared to editor preview display.
+**Root Cause**: Mathematical differences between CSS percentage-based transforms (`PhotoRenderer.convertPhotoToCSS()`) and canvas pixel-based positioning calculations (`templateRasterizationService.drawPhotoWithTransform()`).
+
+**Investigation Findings**:
+- **Amplification Effect**: Shift is more noticeable on zoomed photos (3x zoom = 3x more visible shift)
+- **Not Precision**: Issue isn't decimal places but fundamentally different calculation algorithms
+- **CSS vs Canvas**: CSS uses hardware-accelerated matrix transforms; canvas uses manual pixel math
+- **Transform Order**: CSS applies transforms as single matrix operation; canvas applies step-by-step
+
+**Planned Solution**:
+1. **Reverse Engineer CSS**: Use `getBoundingClientRect()` to capture actual CSS-rendered photo positions
+2. **Compare Systems**: Log both CSS and canvas positioning calculations side-by-side
+3. **Find Delta**: Calculate empirical correction factor to eliminate discrepancy
+4. **Apply Fix**: Adjust canvas positioning in `templateRasterizationService.ts` to match CSS exactly
+
+**Files to Modify**:
+- `services/templateRasterizationService.ts` - Canvas positioning calculations (lines 287-302)
+- `components/PhotoRenderer.tsx` - Add temporary diagnostic logging for comparison
+
+**Key Code Areas**:
+```javascript
+// CSS System (PhotoRenderer.tsx:58-63)
+const translateX = (0.5 - photoTransform.photoCenterX) * 100;
+transform: `translate(${translateX}%, ${translateY}%) scale(${photoScale})`
+
+// Canvas System (templateRasterizationService.ts:287-302)  
+const translateXPixels = (translateXPercent / 100) * renderedWidth;
+const finalX = translatedCenterX - (finalWidth / 2);
+ctx.drawImage(img, finalX, finalY, finalWidth, finalHeight);
+```
+
+**Status**: PARKED - Resume after completing other priority tasks that may affect this positioning system.
+
 ## Development Guidelines
 
 ### Tablet Optimization Priority

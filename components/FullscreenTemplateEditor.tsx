@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { TemplateSlot, Photo, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, createPhotoTransform } from '../types';
+import { TemplateSlot, Photo, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, createPhotoTransform, createSmartPhotoTransformFromSlot } from '../types';
 import PhotoRenderer from './PhotoRenderer';
 import { getBestPhotoUrl, addCacheBuster, getHighResPhotoUrls } from '../utils/photoUrlUtils';
 import { photoCacheService } from '../services/photoCacheService';
@@ -34,7 +34,10 @@ export default function FullscreenTemplateEditor({
 }: FullscreenTemplateEditorProps) {
   const [templateBlobUrl, setTemplateBlobUrl] = useState<string | null>(null);
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
-  const [currentTransform, setCurrentTransform] = useState<PhotoTransform>(createPhotoTransform(1, 0.5, 0.5));
+  const [currentTransform, setCurrentTransform] = useState<PhotoTransform>(() => {
+    // Initial transform - will be updated by useEffect with proper async smart scaling
+    return createPhotoTransform(1, 0.5, 0.5);
+  });
   const [currentPhotoId, setCurrentPhotoId] = useState<string | null>(null);
   const [photoKey, setPhotoKey] = useState<string>(''); // Force re-render key
   
@@ -98,18 +101,37 @@ export default function FullscreenTemplateEditor({
     // Force re-render with new key to clear any cached images
     setPhotoKey(`slot-${selectedSlot?.id}-${Date.now()}`);
     
-    // If the slot already has a transform, use it; otherwise use default
+    // If the slot already has a transform, use it; otherwise use smart scaling
     if (selectedSlot?.transform && isPhotoTransform(selectedSlot.transform)) {
       console.log('✅ TRANSFORM DEBUG - Using existing photo-centric transform');
       setCurrentTransform(selectedSlot.transform);
     } else if (selectedSlot?.transform && isContainerTransform(selectedSlot.transform)) {
-      console.log('🔧 TRANSFORM DEBUG - Found legacy transform, using defaults for now');
+      console.log('🔧 TRANSFORM DEBUG - Found legacy transform, using smart scaling with slot data');
       // Legacy transforms can't be easily converted without photo dimensions
-      // Let PhotoRenderer handle it with backward compatibility
-      setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+      // Use smart scaling with slot data instead - async
+      if (selectedPhoto && selectedSlot) {
+        createSmartPhotoTransformFromSlot(selectedPhoto, selectedSlot)
+          .then(transform => setCurrentTransform(transform))
+          .catch(error => {
+            console.error('❌ Smart scaling failed, using fallback:', error);
+            setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+          });
+      } else {
+        setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+      }
     } else {
-      console.log('🔄 TRANSFORM DEBUG - No existing transform, using defaults');
-      setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+      console.log('🔄 TRANSFORM DEBUG - No existing transform, using smart scaling with slot data');
+      // Use smart scaling with slot data - async
+      if (selectedPhoto && selectedSlot) {
+        createSmartPhotoTransformFromSlot(selectedPhoto, selectedSlot)
+          .then(transform => setCurrentTransform(transform))
+          .catch(error => {
+            console.error('❌ Smart scaling failed, using fallback:', error);
+            setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+          });
+      } else {
+        setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+      }
     }
   }, [selectedSlot?.id, selectedPhotoUrl]);
 
@@ -131,10 +153,19 @@ export default function FullscreenTemplateEditor({
       console.log('✅ TRANSFORM DEBUG - Re-editing same photo, preserving transform');
       setCurrentTransform(selectedSlot.transform);
     }
-    // If it's a different photo, reset to default
+    // If it's a different photo, reset with smart scaling using slot data
     else if (newPhotoId !== currentPhotoId && newPhotoId !== null) {
-      console.log('🔄 TRANSFORM DEBUG - Different photo selected, resetting transform');
-      setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+      console.log('🔄 TRANSFORM DEBUG - Different photo selected, using smart scaling with slot data');
+      if (selectedPhoto && selectedSlot) {
+        createSmartPhotoTransformFromSlot(selectedPhoto, selectedSlot)
+          .then(transform => setCurrentTransform(transform))
+          .catch(error => {
+            console.error('❌ Smart scaling failed, using fallback:', error);
+            setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+          });
+      } else {
+        setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+      }
     }
     
     setCurrentPhotoId(newPhotoId);
@@ -314,9 +345,16 @@ export default function FullscreenTemplateEditor({
       onApply(selectedSlot.id, selectedPhoto.id, currentTransform);
     } catch (error) {
       console.error('🚨 TRANSFORM FALLBACK - Error in handleApply:', error);
-      // Fallback to basic photo-centric transform - only if we have valid IDs
+      // Fallback to smart photo-centric transform with slot data - only if we have valid IDs
       if (selectedSlot?.id && selectedPhoto?.id) {
-        onApply(selectedSlot.id, selectedPhoto.id, createPhotoTransform(1, 0.5, 0.5));
+        createSmartPhotoTransformFromSlot(selectedPhoto, selectedSlot)
+          .then(fallbackTransform => {
+            onApply(selectedSlot.id, selectedPhoto.id, fallbackTransform);
+          })
+          .catch(fallbackError => {
+            console.error('❌ Fallback smart scaling also failed:', fallbackError);
+            onApply(selectedSlot.id, selectedPhoto.id, createPhotoTransform(1, 0.5, 0.5));
+          });
       }
     }
   };
