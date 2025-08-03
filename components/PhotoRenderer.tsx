@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, createPhotoTransform, getPhotoTransformBounds } from '../types';
 import { getHighResPhotoUrls } from '../utils/photoUrlUtils';
+import DebugPortal from './DebugPortal';
+import { usePhotoDebug } from '../hooks/usePhotoDebug';
 
 interface PhotoRendererProps {
   photoUrl: string;
@@ -29,6 +31,9 @@ interface PhotoRendererProps {
   
   // Interaction state callback
   onInteractionChange?: (isInteracting: boolean) => void;
+  
+  // Smart reset callback for intelligent photo repositioning
+  onSmartReset?: () => Promise<PhotoTransform>;
 }
 
 // Helper to convert legacy container transforms to CSS (backward compatibility)
@@ -95,7 +100,8 @@ export default function PhotoRenderer({
   fallbackUrls = [],
   showClippingIndicators = false,
   finalizationRef,
-  onInteractionChange
+  onInteractionChange,
+  onSmartReset
 }: PhotoRendererProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [lastPointer, setLastPointer] = useState<{ x: number; y: number } | null>(null);
@@ -766,8 +772,8 @@ export default function PhotoRenderer({
 
   // Gap-based finalization following user's exact specification
   const finalizePositioning = useCallback((): Promise<PhotoTransform> => {
-    return new Promise((resolve) => {
-      const performFinalization = () => {
+    return new Promise(async (resolve) => {
+      const performFinalization = async () => {
         console.log('🚀 FINALIZATION STARTED - Checkmark clicked');
         console.log('✅ PROCEEDING: Auto-snap executes regardless of recent interaction');
         
@@ -830,12 +836,30 @@ export default function PhotoRenderer({
         let finalizedTransform: PhotoTransform;
         
         if (movement.action === 'reset-to-default') {
-          // 3+ sides with gaps → Reset to default (scale 1, centered)
-          console.log('🔄 RESET TO DEFAULT: Creating transform (1, 0.5, 0.5)');
-          finalizedTransform = createPhotoTransform(1, 0.5, 0.5);
-          console.log('✅ CREATED RESET TRANSFORM:', finalizedTransform);
-          if (debug) {
-            console.log('🔄 Resetting to default: 3+ sides have gaps');
+          // 3+ sides with gaps → Smart reset to optimal placement
+          if (onSmartReset) {
+            console.log('🎯 SMART RESET: Using intelligent photo placement');
+            try {
+              finalizedTransform = await onSmartReset();
+              console.log('✅ SMART RESET SUCCESSFUL:', finalizedTransform);
+              if (debug) {
+                console.log('🎯 Smart reset applied: optimal placement restored');
+              }
+            } catch (error) {
+              console.error('❌ Smart reset failed, falling back to default:', error);
+              finalizedTransform = createPhotoTransform(1, 0.5, 0.5);
+              if (debug) {
+                console.log('⚠️ Fallback to default: smart reset unavailable');
+              }
+            }
+          } else {
+            // Fallback to default behavior when smart reset not available
+            console.log('🔄 DEFAULT RESET: Creating transform (1, 0.5, 0.5)');
+            finalizedTransform = createPhotoTransform(1, 0.5, 0.5);
+            console.log('✅ CREATED DEFAULT RESET TRANSFORM:', finalizedTransform);
+            if (debug) {
+              console.log('🔄 Default reset applied: 3+ sides have gaps');
+            }
           }
         } else if (movement.action === 'move-by-gaps') {
           // 1-2 sides with gaps → Move by exact gap amounts (preserve zoom)
@@ -1341,60 +1365,20 @@ export default function PhotoRenderer({
     // No immediate auto-fit - let user zoom freely without interference
   };
 
-  // Gap-based debug info following user specification
-  const debugInfo = debug ? (() => {
-    const gapData = detectGaps();
-    const movement = gapData.hasGaps ? calculateGapBasedMovement(gapData) : null;
-    
-    return (
-      <div className="fixed top-4 right-4 bg-black bg-opacity-95 text-white text-xs p-3 rounded z-[9999] pointer-events-none max-w-sm shadow-lg border border-gray-600">
-        <div className="font-bold mb-2">Gap-Based Auto-Snap Debug</div>
-        <div>Scale: {currentTransform.photoScale.toFixed(2)}</div>
-        <div>Center X: {currentTransform.photoCenterX.toFixed(3)}</div>
-        <div>Center Y: {currentTransform.photoCenterY.toFixed(3)}</div>
-        <div>Interactive: {interactive ? 'Yes' : 'No'}</div>
-        <div>Dragging: {isDragging ? 'Yes' : 'No'}</div>
-        <div>Touching: {isTouching ? 'Yes' : 'No'}</div>
-        <div>Snapping: {isSnapping ? 'Yes' : 'No'}</div>
-        
-        <div className="mt-2 border-t border-gray-600 pt-2">
-          <div className="font-semibold">Gap Detection:</div>
-          <div>Gap Count: {gapData.gapCount}</div>
-          <div>L:{gapData.gaps.left} R:{gapData.gaps.right}</div>
-          <div>T:{gapData.gaps.top} B:{gapData.gaps.bottom}</div>
-          <div className="text-xs text-gray-300">
-            Significant: {Object.entries(gapData.significantGaps).filter(([_, hasGap]) => hasGap).map(([side]) => side).join(', ') || 'none'}
-          </div>
-        </div>
-        
-        <div className="mt-2 border-t border-gray-600 pt-2">
-          <div className="font-semibold">Action Plan:</div>
-          <div className="text-xs">
-            {gapData.gapCount >= 3 ? 'Reset to default (3+ gaps)' :
-             gapData.gapCount === 2 ? 'Move by both gap amounts' :
-             gapData.gapCount === 1 ? 'Move by single gap amount' : 'No action needed'}
-          </div>
-          {movement && movement.action !== 'none' && (
-            <>
-              <div className="text-xs text-yellow-300">H: {movement.movements.horizontal}</div>
-              <div className="text-xs text-yellow-300">V: {movement.movements.vertical}</div>
-              {movement.movements.horizontal.includes('post-snap override') && (
-                <div className="text-xs text-red-300">⚠️ Post-snap validation triggered</div>
-              )}
-            </>
-          )}
-        </div>
-        
-        <div className="mt-2 border-t border-gray-600 pt-2">
-          <div className="font-semibold">Status:</div>
-          <div className="text-xs">Recent Interaction: {hasRecentUserInteraction() ? `${interactionType} (${((Date.now() - lastUserInteraction) / 1000).toFixed(1)}s ago)` : 'No'}</div>
-          <div className="text-xs">Will Apply: {gapData.hasGaps ? 'Yes' : 'No'}</div>
-        </div>
-        
-        <div className="mt-2 text-xs text-green-300">Mode: User-Specified Gap Movement</div>
-      </div>
-    );
-  })() : null;
+  // Use debug hook to generate debug UI
+  const { debugInfo, gapIndicator } = usePhotoDebug({
+    debug,
+    currentTransform,
+    interactive,
+    isDragging,
+    isTouching,
+    isSnapping,
+    detectGaps,
+    calculateGapBasedMovement,
+    hasRecentUserInteraction,
+    lastUserInteraction,
+    interactionType
+  });
 
   return (
     <div
@@ -1464,20 +1448,14 @@ export default function PhotoRenderer({
       <ClippingOverlay />
       
       {/* Gap indicator overlay (debug mode only) */}
-      {debug && (() => {
-        const gapData = detectGaps();
-        if (!gapData.hasGaps) return null;
-        
-        return (
-          <div className="absolute inset-0 pointer-events-none z-40">
-            <div className="absolute top-2 right-2 bg-yellow-600 text-white text-xs px-2 py-1 rounded">
-              {gapData.gapCount} gap{gapData.gapCount > 1 ? 's' : ''}
-            </div>
-          </div>
-        );
-      })()}
+      {gapIndicator}
       
-      {debugInfo}
+      {/* Debug UI rendered outside all containers via portal */}
+      {debugInfo && (
+        <DebugPortal>
+          {debugInfo}
+        </DebugPortal>
+      )}
     </div>
   );
 }

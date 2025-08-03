@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { TemplateSlot, Photo, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, createPhotoTransform, createSmartPhotoTransformFromSlot } from '../types';
 import PhotoRenderer from './PhotoRenderer';
 import { getBestPhotoUrl, addCacheBuster, getHighResPhotoUrls } from '../utils/photoUrlUtils';
@@ -86,6 +86,24 @@ export default function FullscreenTemplateEditor({
     
     console.log('🔧 FullscreenTemplateEditor - Transform updated:', newTransform);
   };
+
+  // Smart reset callback for intelligent photo repositioning
+  const handleSmartReset = useCallback(async (): Promise<PhotoTransform> => {
+    console.log('🎯 FullscreenTemplateEditor - Smart reset requested');
+    if (!selectedPhoto || !selectedSlot) {
+      console.warn('⚠️ Smart reset failed: missing photo or slot data');
+      return createPhotoTransform(1, 0.5, 0.5);
+    }
+    
+    try {
+      const smartTransform = await createSmartPhotoTransformFromSlot(selectedPhoto, selectedSlot);
+      console.log('✅ FullscreenTemplateEditor - Smart reset successful:', smartTransform);
+      return smartTransform;
+    } catch (error) {
+      console.error('❌ FullscreenTemplateEditor - Smart reset failed:', error);
+      return createPhotoTransform(1, 0.5, 0.5);
+    }
+  }, [selectedPhoto, selectedSlot]);
 
   // Initialize transform when selectedSlot changes
   useEffect(() => {
@@ -550,6 +568,7 @@ export default function FullscreenTemplateEditor({
                         debug={false} // Disable visual overlay but keep console logging
                         fallbackUrls={selectedPhoto ? getHighResPhotoUrls(selectedPhoto) : []}
                         showClippingIndicators={true} // Enable clipping indicators
+                        onSmartReset={handleSmartReset} // Smart reset for intelligent photo repositioning
                       />
                     ) : (
                       <div className="w-full h-full bg-gray-200 border border-gray-300 border-dashed flex items-center justify-center">

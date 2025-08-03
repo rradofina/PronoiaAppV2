@@ -18,6 +18,8 @@ interface PngTemplateVisualProps {
   onInlineCancel?: () => void;
   // Editing mode detection
   isEditingMode?: boolean;
+  // Active template restriction
+  isActiveTemplate?: boolean;
 }
 
 
@@ -31,7 +33,8 @@ export default function PngTemplateVisual({
   inlineEditingPhoto,
   onInlineApply,
   onInlineCancel,
-  isEditingMode = false
+  isEditingMode = false,
+  isActiveTemplate = true
 }: PngTemplateVisualProps) {
   
   const getPhotoUrl = (photoId?: string | null) => {
@@ -177,9 +180,10 @@ export default function PngTemplateVisual({
           }
         }
         
-        // Check if this slot should be blocked during editing mode
+        // Check if this slot should be blocked during editing mode or inactive template
         const isOtherSlotDuringEditing = isEditingMode && !isInlineEditing;
-        const shouldBlockSlot = isOtherSlotDuringEditing;
+        const isInactiveTemplate = !isActiveTemplate;
+        const shouldBlockSlot = isOtherSlotDuringEditing || isInactiveTemplate;
         
         return (
           <div
@@ -189,6 +193,8 @@ export default function PngTemplateVisual({
                 ? 'border-4 border-blue-400 shadow-lg shadow-blue-400/50 z-50 ring-2 ring-blue-300' // Enhanced highlighting for inline editing (changed to blue)
                 : isSelected 
                 ? 'border-4 border-blue-500 border-opacity-90 z-40 cursor-pointer shadow-md' // Above overlay (z-30)
+                : isInactiveTemplate
+                ? 'brightness-50 opacity-60 pointer-events-none cursor-not-allowed' // Inactive template
                 : shouldBlockSlot
                 ? 'brightness-75 pointer-events-none' // Darkened during editing
                 : 'hover:border-2 hover:border-blue-300 hover:border-opacity-60 cursor-pointer'
@@ -201,7 +207,9 @@ export default function PngTemplateVisual({
             }}
             onClick={() => !shouldBlockSlot && onSlotClick(slot)}
             title={
-              shouldBlockSlot 
+              isInactiveTemplate
+                ? "Navigate to this template first to edit placeholders"
+                : shouldBlockSlot 
                 ? "Editing in progress - complete current edit first" 
                 : slot.photoId 
                 ? "Click to edit this photo" 

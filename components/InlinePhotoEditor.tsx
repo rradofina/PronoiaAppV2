@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TemplateSlot, Photo, PhotoTransform, createPhotoTransform, createSmartPhotoTransformFromSlot, isPhotoTransform } from '../types';
 import PhotoRenderer from './PhotoRenderer';
 import { photoCacheService } from '../services/photoCacheService';
@@ -127,6 +127,24 @@ export default function InlinePhotoEditor({
     console.log('🔧 InlinePhotoEditor - Transform updated:', newTransform);
   };
 
+  // Smart reset callback for intelligent photo repositioning
+  const handleSmartReset = useCallback(async (): Promise<PhotoTransform> => {
+    console.log('🎯 InlinePhotoEditor - Smart reset requested');
+    if (!photo || !slot) {
+      console.warn('⚠️ Smart reset failed: missing photo or slot data');
+      return createPhotoTransform(1, 0.5, 0.5);
+    }
+    
+    try {
+      const smartTransform = await createSmartPhotoTransformFromSlot(photo, slot);
+      console.log('✅ InlinePhotoEditor - Smart reset successful:', smartTransform);
+      return smartTransform;
+    } catch (error) {
+      console.error('❌ InlinePhotoEditor - Smart reset failed:', error);
+      return createPhotoTransform(1, 0.5, 0.5);
+    }
+  }, [photo, slot]);
+
   // Handle apply button click
   const handleApply = () => {
     console.log('🔧 InlinePhotoEditor - APPLY BUTTON CLICKED');
@@ -236,6 +254,7 @@ export default function InlinePhotoEditor({
         showClippingIndicators={true} // Enable clipping indicators
         finalizationRef={finalizationRef} // Pass ref for finalization method access
         onInteractionChange={handleInteractionChange} // Track interaction state
+        onSmartReset={handleSmartReset} // Smart reset for intelligent photo repositioning
       />
       
       {/* Editing Controls Overlay - Hidden during interaction */}

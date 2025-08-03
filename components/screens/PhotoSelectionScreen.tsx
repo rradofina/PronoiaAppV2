@@ -22,7 +22,7 @@ import OriginalTemplateVisual from '../TemplateVisual';
 
 
 // Simplified TemplateVisual component
-const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard }: any) => {
+const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard, isActiveTemplate = true }: any) => {
   // Get templates from both window cache AND database to ensure consistency with swap modal
   const windowTemplates = (window as any).pngTemplates || [];
   const [databaseTemplates, setDatabaseTemplates] = useState<any[]>([]);
@@ -214,6 +214,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
         onInlineApply={onInlineApply}
         onInlineCancel={onInlineCancel}
         isEditingMode={!!inlineEditingSlot}
+        isActiveTemplate={isActiveTemplate}
       />
     );
   }

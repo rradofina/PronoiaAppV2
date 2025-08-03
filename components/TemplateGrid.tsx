@@ -360,6 +360,7 @@ export default function TemplateGrid({
               onSlotClick={onSlotClick}
               photos={photos}
               selectedSlot={selectedSlot}
+              isActiveTemplate={layout === 'coverflow' ? index === currentIndex : true}
             />
           </div>
         </div>
