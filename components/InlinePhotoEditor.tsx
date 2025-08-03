@@ -142,18 +142,34 @@ export default function InlinePhotoEditor({
         return;
       }
 
-      // Use current transform directly - user has positioned photo exactly where they want it
-      const finalTransform = currentTransform;
-
-      console.log('🔧 InlinePhotoEditor - Applying finalized transform:', {
-        transform: finalTransform,
-        photoId: photo.id,
-        slotId: slot.id,
-        hasOnApplyHandler: !!onApply
-      });
+      // Call finalization method to apply auto-snap gap detection
+      console.log('🔧 InlinePhotoEditor - Calling finalization method for auto-snap...');
       
-      onApply(slot.id, photo.id, finalTransform);
-      console.log('✅ InlinePhotoEditor - onApply called successfully');
+      if (finalizationRef.current) {
+        console.log('✅ InlinePhotoEditor - Finalization ref available, calling...');
+        finalizationRef.current()
+          .then(finalTransform => {
+            console.log('🔧 InlinePhotoEditor - Finalization complete, applying transform:', {
+              transform: finalTransform,
+              photoId: photo.id,
+              slotId: slot.id,
+              hasOnApplyHandler: !!onApply
+            });
+            
+            onApply(slot.id, photo.id, finalTransform);
+            console.log('✅ InlinePhotoEditor - onApply called successfully with finalized transform');
+          })
+          .catch(error => {
+            console.error('❌ InlinePhotoEditor - Finalization failed:', error);
+            // Fallback to current transform
+            onApply(slot.id, photo.id, currentTransform);
+            console.log('⚠️ InlinePhotoEditor - Used fallback transform due to finalization error');
+          });
+      } else {
+        console.error('❌ InlinePhotoEditor - No finalization ref available, using current transform');
+        onApply(slot.id, photo.id, currentTransform);
+        console.log('⚠️ InlinePhotoEditor - Used current transform without finalization');
+      }
     } catch (error) {
       console.error('🚨 InlinePhotoEditor - Error in handleApply:', error);
       // Fallback to smart transform if we have valid IDs
@@ -215,7 +231,7 @@ export default function InlinePhotoEditor({
         interactive={true}
         onTransformChange={handleTransformChange}
         className="w-full h-full"
-        debug={true}  // Enable for live scaling visualization
+        debug={true}  // Enable debug UI to test gap detection fix
         fallbackUrls={photo ? getHighResPhotoUrls(photo) : []}
         showClippingIndicators={true} // Enable clipping indicators
         finalizationRef={finalizationRef} // Pass ref for finalization method access

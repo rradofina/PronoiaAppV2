@@ -217,6 +217,115 @@ export default function PhotoRenderer({
     return coverScale;
   };
 
+  // Mathematical gap calculation that accounts for smart scaling system
+  const calculateMathematicalGaps = useCallback((): {
+    gaps: { left: number; right: number; top: number; bottom: number };
+    photoEdges: { left: number; right: number; top: number; bottom: number };
+    photoSize: { width: number; height: number };
+  } => {
+    if (!imageRef.current || !containerRef.current) {
+      return {
+        gaps: { left: 0, right: 0, top: 0, bottom: 0 },
+        photoEdges: { left: 0, right: 0, top: 0, bottom: 0 },
+        photoSize: { width: 0, height: 0 }
+      };
+    }
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const containerHeight = containerRect.height;
+    
+    const photoNaturalWidth = imageRef.current.naturalWidth;
+    const photoNaturalHeight = imageRef.current.naturalHeight;
+    
+    if (photoNaturalWidth === 0 || photoNaturalHeight === 0 || containerWidth === 0 || containerHeight === 0) {
+      return {
+        gaps: { left: 0, right: 0, top: 0, bottom: 0 },
+        photoEdges: { left: 0, right: 0, top: 0, bottom: 0 },
+        photoSize: { width: 0, height: 0 }
+      };
+    }
+
+    // Step 1: Calculate CSS object-fit: contain baseline scale
+    // This is what CSS automatically does before our transform is applied
+    const containScale = Math.min(
+      containerWidth / photoNaturalWidth,
+      containerHeight / photoNaturalHeight
+    );
+    
+    // Step 2: Apply current photo transform scale (this is our adjustment factor on top of contain)
+    const finalScale = containScale * currentTransform.photoScale;
+    
+    // Step 3: Calculate actual rendered photo dimensions after both contain + transform scaling
+    const renderedWidth = photoNaturalWidth * finalScale;
+    const renderedHeight = photoNaturalHeight * finalScale;
+    
+    // Step 4: Calculate base position (center of container)
+    const baseCenterX = containerWidth / 2;
+    const baseCenterY = containerHeight / 2;
+    
+    // Step 5: Apply photo positioning transforms (photoCenterX/Y affect where photo is positioned)
+    // photoCenterX: 0.5 = center, 0.0 = left edge, 1.0 = right edge
+    const translateX = (0.5 - currentTransform.photoCenterX) * renderedWidth;
+    const translateY = (0.5 - currentTransform.photoCenterY) * renderedHeight;
+    
+    // Step 6: Calculate final photo boundaries
+    const photoLeft = baseCenterX - (renderedWidth / 2) + translateX;
+    const photoRight = photoLeft + renderedWidth;
+    const photoTop = baseCenterY - (renderedHeight / 2) + translateY;
+    const photoBottom = photoTop + renderedHeight;
+    
+    // Step 7: Calculate gaps (only count empty space INSIDE container boundaries)
+    // Gap exists only when photo doesn't reach container edge, creating empty space
+    const actualGapLeft = photoLeft > 0 ? photoLeft : 0; // Empty space on left side (photo doesn't reach left edge)
+    const actualGapRight = photoRight < containerWidth ? (containerWidth - photoRight) : 0; // Empty space on right side (photo doesn't reach right edge)
+    const actualGapTop = photoTop > 0 ? photoTop : 0; // Empty space on top side (photo doesn't reach top edge)
+    const actualGapBottom = photoBottom < containerHeight ? (containerHeight - photoBottom) : 0; // Empty space on bottom side (photo doesn't reach bottom edge)
+
+    if (debug) {
+      console.log('🧮 Mathematical Gap Calculation:', {
+        naturalPhoto: { width: photoNaturalWidth, height: photoNaturalHeight },
+        container: { width: containerWidth, height: containerHeight },
+        scaling: {
+          containScale: containScale.toFixed(3),
+          transformScale: currentTransform.photoScale.toFixed(3),
+          finalScale: finalScale.toFixed(3)
+        },
+        positioning: {
+          photoCenterX: currentTransform.photoCenterX.toFixed(3),
+          photoCenterY: currentTransform.photoCenterY.toFixed(3),
+          translateX: translateX.toFixed(1),
+          translateY: translateY.toFixed(1)
+        },
+        photoSize: { width: renderedWidth.toFixed(1), height: renderedHeight.toFixed(1) },
+        photoEdges: { 
+          left: photoLeft.toFixed(1), 
+          right: photoRight.toFixed(1), 
+          top: photoTop.toFixed(1), 
+          bottom: photoBottom.toFixed(1) 
+        },
+        gaps: { 
+          left: actualGapLeft.toFixed(1), 
+          right: actualGapRight.toFixed(1), 
+          top: actualGapTop.toFixed(1), 
+          bottom: actualGapBottom.toFixed(1) 
+        },
+        note: 'Mathematical calculation - accounts for smart scaling system'
+      });
+    }
+    
+    return {
+      gaps: { 
+        left: actualGapLeft, 
+        right: actualGapRight, 
+        top: actualGapTop, 
+        bottom: actualGapBottom 
+      },
+      photoEdges: { left: photoLeft, right: photoRight, top: photoTop, bottom: photoBottom },
+      photoSize: { width: renderedWidth, height: renderedHeight }
+    };
+  }, [currentTransform, debug]);
+
   // Accurate gap detection for precise gap-based movement
   const detectGaps = useCallback((): {
     hasGaps: boolean;
@@ -233,7 +342,8 @@ export default function PhotoRenderer({
       };
     }
     
-    // Get accurate DOM measurements
+    // Use DOM-based gap detection for visual accuracy (zoom-independent)
+    // This measures actual visual gaps that the user sees, regardless of internal scaling
     const imageRect = imageRef.current.getBoundingClientRect();
     const containerRect = containerRef.current.getBoundingClientRect();
     
@@ -246,11 +356,132 @@ export default function PhotoRenderer({
       };
     }
     
-    // Calculate precise gaps in pixels (round up to ensure complete gap closure)
-    const gapLeft = Math.ceil(imageRect.left - containerRect.left);
-    const gapRight = Math.ceil(containerRect.right - imageRect.right);
-    const gapTop = Math.ceil(imageRect.top - containerRect.top);
-    const gapBottom = Math.ceil(containerRect.bottom - imageRect.bottom);
+    // Add comprehensive coordinate debugging for horizontal gap issues
+    if (debug) {
+      console.log('🔍 COORDINATE DEBUG (HORIZONTAL GAP INVESTIGATION):', {
+        imageRect: {
+          left: imageRect.left,
+          right: imageRect.right,
+          top: imageRect.top,
+          bottom: imageRect.bottom,
+          width: imageRect.width,
+          height: imageRect.height
+        },
+        containerRect: {
+          left: containerRect.left,
+          right: containerRect.right,
+          top: containerRect.top,
+          bottom: containerRect.bottom,
+          width: containerRect.width,
+          height: containerRect.height
+        },
+        calculations: {
+          'imageRect.left > containerRect.left': imageRect.left > containerRect.left,
+          'imageRect.right < containerRect.right': imageRect.right < containerRect.right,
+          'imageRect.left - containerRect.left': imageRect.left - containerRect.left,
+          'containerRect.right - imageRect.right': containerRect.right - imageRect.right,
+          'imageRect.top > containerRect.top': imageRect.top > containerRect.top,
+          'imageRect.bottom < containerRect.bottom': imageRect.bottom < containerRect.bottom
+        },
+        transforms: {
+          photoCenterX: currentTransform.photoCenterX,
+          photoCenterY: currentTransform.photoCenterY,
+          photoScale: currentTransform.photoScale
+        }
+      });
+    }
+
+    // Corrected approach: Use raw DOM pixel gaps with CSS contain offset correction
+    // Movement calculations expect container pixel gaps and handle zoom themselves
+    
+    // Step 1: Get basic DOM gap measurements
+    let rawGapLeft = imageRect.left > containerRect.left ? (imageRect.left - containerRect.left) : 0;
+    let rawGapRight = imageRect.right < containerRect.right ? (containerRect.right - imageRect.right) : 0;
+    let rawGapTop = imageRect.top > containerRect.top ? (imageRect.top - containerRect.top) : 0;
+    let rawGapBottom = imageRect.bottom < containerRect.bottom ? (containerRect.bottom - imageRect.bottom) : 0;
+    
+    // Step 2: Apply CSS contain centering offset correction only where needed
+    const photoNaturalWidth = imageRef.current.naturalWidth || 1;
+    const photoNaturalHeight = imageRef.current.naturalHeight || 1;
+    const photoAspectRatio = photoNaturalWidth / photoNaturalHeight;
+    const containerAspectRatio = containerRect.width / containerRect.height;
+    
+    // CSS object-fit: contain creates centering offset in one dimension
+    const containScale = Math.min(
+      containerRect.width / photoNaturalWidth,
+      containerRect.height / photoNaturalHeight
+    );
+    
+    // Determine which dimension has CSS contain centering offset
+    const fitsHeight = photoAspectRatio >= containerAspectRatio; // Photo wider or equal → fits height, horizontal centering
+    const fitsWidth = !fitsHeight; // Photo taller → fits width, vertical centering
+    
+    // Apply offset correction only to the dimension with empty space
+    if (fitsHeight) {
+      // Photo fits height → horizontal gaps have CSS centering offset
+      const cssScaledWidth = photoNaturalWidth * containScale;
+      const horizontalOffset = (containerRect.width - cssScaledWidth) / 2;
+      rawGapLeft = Math.max(0, rawGapLeft - horizontalOffset);
+      rawGapRight = Math.max(0, rawGapRight - horizontalOffset);
+    } else {
+      // Photo fits width → vertical gaps have CSS centering offset  
+      const cssScaledHeight = photoNaturalHeight * containScale;
+      const verticalOffset = (containerRect.height - cssScaledHeight) / 2;
+      rawGapTop = Math.max(0, rawGapTop - verticalOffset);
+      rawGapBottom = Math.max(0, rawGapBottom - verticalOffset);
+    }
+    
+    // Step 3: Use corrected pixel gaps directly (movement calculation handles zoom)
+    const visualGapLeft = rawGapLeft;
+    const visualGapRight = rawGapRight;
+    const visualGapTop = rawGapTop;
+    const visualGapBottom = rawGapBottom;
+    
+    // Add detailed gap calculation debugging
+    if (debug) {
+      console.log('🧮 GAP CALCULATION DEBUG (RAW PIXELS + CSS CONTAIN CORRECTION):', {
+        photoInfo: {
+          naturalSize: { width: photoNaturalWidth, height: photoNaturalHeight },
+          aspectRatio: photoAspectRatio.toFixed(3)
+        },
+        containerInfo: {
+          size: { width: containerRect.width, height: containerRect.height },
+          aspectRatio: containerAspectRatio.toFixed(3)
+        },
+        cssContainStrategy: {
+          containScale: containScale.toFixed(6),
+          fitsHeight,
+          fitsWidth,
+          correctionApplied: fitsHeight ? 'Horizontal centering offset' : 'Vertical centering offset'
+        },
+        finalPixelGaps: {
+          left: visualGapLeft.toFixed(2),
+          right: visualGapRight.toFixed(2),
+          top: visualGapTop.toFixed(2),
+          bottom: visualGapBottom.toFixed(2)
+        },
+        note: 'Raw pixel gaps with CSS contain centering correction - movement calculation handles zoom'
+      });
+    }
+
+    // Round up to ensure complete gap closure
+    const gapLeft = Math.ceil(visualGapLeft);
+    const gapRight = Math.ceil(visualGapRight);
+    const gapTop = Math.ceil(visualGapTop);
+    const gapBottom = Math.ceil(visualGapBottom);
+
+    // Add final gap values debugging  
+    if (debug) {
+      console.log('🧮 FINAL GAP VALUES:', {
+        finalGaps: {
+          left: gapLeft,
+          right: gapRight,
+          top: gapTop,
+          bottom: gapBottom
+        },
+        note: 'Final gap values after Math.ceil rounding'
+      });
+    }
     
     // User specification: Move by ANY gap amount (no threshold needed)
     const GAP_THRESHOLD = 0; // No threshold - detect ANY gap amount
@@ -266,14 +497,38 @@ export default function PhotoRenderer({
     const hasAnyGaps = gapCount > 0;
     
     if (debug) {
-      console.log('🔍 Gap Detection (User Specification):', {
-        gaps: { left: gapLeft, right: gapRight, top: gapTop, bottom: gapBottom },
-        significantGaps: { left: hasLeftGap, right: hasRightGap, top: hasTopGap, bottom: hasBottomGap },
-        gapCount,
-        threshold: GAP_THRESHOLD,
-        action: gapCount >= 3 ? 'Reset to default' : 
-               gapCount === 2 ? 'Move by both gap amounts' :
-               gapCount === 1 ? 'Move by single gap amount' : 'No action needed'
+      console.log('🔍 Gap Detection (VISUAL DOM-BASED - ZOOM INDEPENDENT):', {
+        imageRect: {
+          left: imageRect.left.toFixed(1),
+          right: imageRect.right.toFixed(1),
+          top: imageRect.top.toFixed(1),
+          bottom: imageRect.bottom.toFixed(1),
+          width: imageRect.width.toFixed(1),
+          height: imageRect.height.toFixed(1)
+        },
+        containerRect: {
+          left: containerRect.left.toFixed(1),
+          right: containerRect.right.toFixed(1),
+          top: containerRect.top.toFixed(1),
+          bottom: containerRect.bottom.toFixed(1),
+          width: containerRect.width.toFixed(1),
+          height: containerRect.height.toFixed(1)
+        },
+        visualGaps: {
+          left: gapLeft,
+          right: gapRight,
+          top: gapTop,
+          bottom: gapBottom,
+          note: 'Based on actual visual positioning, independent of zoom level'
+        },
+        result: {
+          significantGaps: { left: hasLeftGap, right: hasRightGap, top: hasTopGap, bottom: hasBottomGap },
+          gapCount,
+          threshold: GAP_THRESHOLD,
+          action: gapCount >= 3 ? 'Reset to default' : 
+                 gapCount === 2 ? 'Move by both gap amounts' :
+                 gapCount === 1 ? 'Move by single gap amount' : 'No action needed'
+        }
       });
     }
     
@@ -434,26 +689,26 @@ export default function PhotoRenderer({
     let horizontalDescription = 'no change';
     let verticalDescription = 'no change';
     
-    // Horizontal movement
+    // Horizontal movement (FIXED: Correct direction + zoom-aware scaling)
     if (significantGaps.left) {
-      // Gap on left → move photo right to close the gap
-      horizontalMovement = gaps.left / containerRect.width;
-      horizontalDescription = `move right ${gaps.left}px`;
+      // Gap on left → positive movement = move right in CSS coords = move left visually
+      horizontalMovement = gaps.left / containerRect.width / currentTransform.photoScale;
+      horizontalDescription = `move left ${gaps.left}px`;
     } else if (significantGaps.right) {
-      // Gap on right → move photo left to close the gap  
-      horizontalMovement = -gaps.right / containerRect.width;
-      horizontalDescription = `move left ${gaps.right}px`;
+      // Gap on right → negative movement = move left in CSS coords = move right visually
+      horizontalMovement = -gaps.right / containerRect.width / currentTransform.photoScale;
+      horizontalDescription = `move right ${gaps.right}px`;
     }
     
-    // Vertical movement  
+    // Vertical movement (FIXED: Correct direction + zoom-aware scaling)
     if (significantGaps.top) {
-      // Gap on top → move photo down to close the gap
-      verticalMovement = gaps.top / containerRect.height;
-      verticalDescription = `move down ${gaps.top}px`;
+      // Gap on top → positive movement = move up in CSS coords
+      verticalMovement = gaps.top / containerRect.height / currentTransform.photoScale;
+      verticalDescription = `move up ${gaps.top}px`;
     } else if (significantGaps.bottom) {
-      // Gap on bottom → move photo up to close the gap
-      verticalMovement = -gaps.bottom / containerRect.height;
-      verticalDescription = `move up ${gaps.bottom}px`;
+      // Gap on bottom → negative movement = move down in CSS coords
+      verticalMovement = -gaps.bottom / containerRect.height / currentTransform.photoScale;
+      verticalDescription = `move down ${gaps.bottom}px`;
     }
     
     // Apply movements to current position
@@ -1092,7 +1347,7 @@ export default function PhotoRenderer({
     const movement = gapData.hasGaps ? calculateGapBasedMovement(gapData) : null;
     
     return (
-      <div className="absolute top-2 left-2 bg-black bg-opacity-90 text-white text-xs p-3 rounded z-50 pointer-events-none max-w-sm">
+      <div className="fixed top-4 right-4 bg-black bg-opacity-95 text-white text-xs p-3 rounded z-[9999] pointer-events-none max-w-sm shadow-lg border border-gray-600">
         <div className="font-bold mb-2">Gap-Based Auto-Snap Debug</div>
         <div>Scale: {currentTransform.photoScale.toFixed(2)}</div>
         <div>Center X: {currentTransform.photoCenterX.toFixed(3)}</div>
