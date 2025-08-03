@@ -93,8 +93,22 @@ class ManualPackageServiceImpl implements IManualPackageService {
         throw new Error(`Database error: ${error.message}`);
       }
 
-      console.log(`✅ Loaded package with ${data.package_templates?.length || 0} templates`);
-      return data as ManualPackageWithTemplates;
+      console.log('🔍 RAW DATABASE RESPONSE:', JSON.stringify(data, null, 2));
+
+      // Transform the response to match expected structure
+      const packageWithTemplates: ManualPackageWithTemplates = {
+        ...data,
+        templates: data.package_templates?.map((pt: any) => pt.template).filter(Boolean) || []
+      };
+
+      console.log(`✅ Loaded package with ${packageWithTemplates.templates?.length || 0} templates`);
+      console.log('📋 Template details:', packageWithTemplates.templates?.map(t => ({
+        id: t?.id,
+        name: t?.name,
+        type: t?.template_type
+      })));
+      
+      return packageWithTemplates;
     } catch (error) {
       console.error(`❌ Error loading package ${id}:`, error);
       throw error;

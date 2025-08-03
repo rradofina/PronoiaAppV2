@@ -132,23 +132,44 @@ export default function PngTemplateVisual({
       <img 
         src={pngUrl}
         alt={pngTemplate.name}
-        className="absolute inset-0 w-full h-full object-contain"
-        onLoad={() => console.log('✅ PNG loaded successfully:', pngTemplate.name)}
-        onError={() => console.error('❌ PNG failed to load:', pngUrl)}
+        className={`absolute inset-0 w-full h-full ${isActiveTemplate ? 'object-contain' : 'object-cover'}`}
+        onLoad={() => console.log('✅ PNG loaded successfully:', pngTemplate.name, pngUrl)}
+        onError={(e) => {
+          console.error('❌ PNG failed to load:', pngTemplate.name, pngUrl);
+          console.error('❌ Image error details:', e);
+        }}
+        style={{
+          backgroundColor: !isActiveTemplate ? 'transparent' : undefined
+        }}
       />
       
       {/* Photo Holes Overlay */}
       {pngTemplate.holes.map((hole, holeIndex) => {
         const slot = thisTemplateSlots[holeIndex];
-        if (!slot) return null;
         
-        const photoUrl = getPhotoUrl(slot.photoId);
-        const isSelected = selectedSlot?.id === slot.id;
-        const isInlineEditing = inlineEditingSlot?.id === slot.id;
+        // Debug hole information
+        console.log(`🕳️ HOLE DEBUG ${holeIndex + 1}/${pngTemplate.holes.length}:`, {
+          holeId: hole.id,
+          position: { x: hole.x, y: hole.y },
+          size: { width: hole.width, height: hole.height },
+          percentages: {
+            left: `${(hole.x / pngTemplate.dimensions.width) * 100}%`,
+            top: `${(hole.y / pngTemplate.dimensions.height) * 100}%`,
+            width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
+            height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`
+          },
+          hasSlot: !!slot,
+          slotId: slot?.id
+        });
+        
+        // Always show holes, even without slots (for debugging/preview)
+        const photoUrl = slot ? getPhotoUrl(slot.photoId) : null;
+        const isSelected = slot && selectedSlot?.id === slot.id;
+        const isInlineEditing = slot && inlineEditingSlot?.id === slot.id;
         const hasInlinePhoto = isInlineEditing && inlineEditingPhoto;
         
         // DEBUG: Log inline editing state for this slot
-        if (isSelected || isInlineEditing || hasInlinePhoto) {
+        if (slot && (isSelected || isInlineEditing || hasInlinePhoto)) {
           console.log('🔧 TEMPLATE VISUAL DEBUG for slot', slot.id, ':', {
             isSelected,
             isInlineEditing,
@@ -162,7 +183,7 @@ export default function PngTemplateVisual({
         }
         
         // Debug transform values
-        if (slot.transform) {
+        if (slot?.transform) {
           if (isPhotoTransform(slot.transform)) {
             console.log(`🔧 Slot ${holeIndex} photo-centric transform:`, {
               photoScale: slot.transform.photoScale,
@@ -185,6 +206,10 @@ export default function PngTemplateVisual({
         const isInactiveTemplate = !isActiveTemplate;
         const shouldBlockSlot = isOtherSlotDuringEditing || isInactiveTemplate;
         
+        // For preview mode (non-interactive), never apply darkening effects
+        const isPreviewMode = !isActiveTemplate && !isEditingMode;
+        const shouldApplyDarkening = shouldBlockSlot && !isPreviewMode;
+        
         return (
           <div
             key={hole.id}
@@ -193,10 +218,10 @@ export default function PngTemplateVisual({
                 ? 'border-4 border-blue-400 shadow-lg shadow-blue-400/50 z-50 ring-2 ring-blue-300' // Enhanced highlighting for inline editing (changed to blue)
                 : isSelected 
                 ? 'border-4 border-blue-500 border-opacity-90 z-40 cursor-pointer shadow-md' // Above overlay (z-30)
-                : isInactiveTemplate
-                ? 'brightness-50 opacity-60 pointer-events-none cursor-not-allowed' // Inactive template
-                : shouldBlockSlot
-                ? 'brightness-75 pointer-events-none' // Darkened during editing
+                : shouldApplyDarkening
+                ? 'brightness-75 opacity-60 pointer-events-none cursor-not-allowed' // Darkened during editing/inactive (but not preview)
+                : isPreviewMode
+                ? '' // No effects for preview mode - clean display
                 : 'hover:border-2 hover:border-blue-300 hover:border-opacity-60 cursor-pointer'
             }`}
             style={{
@@ -205,9 +230,13 @@ export default function PngTemplateVisual({
               width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
               height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
             }}
-            onClick={() => !shouldBlockSlot && onSlotClick(slot)}
+            onClick={() => slot && !shouldBlockSlot && !isPreviewMode && onSlotClick(slot)}
             title={
-              isInactiveTemplate
+              !slot
+                ? "Template hole - no slot assigned"
+                : isPreviewMode
+                ? "Template preview - no interaction available"
+                : isInactiveTemplate
                 ? "Navigate to this template first to edit placeholders"
                 : shouldBlockSlot 
                 ? "Editing in progress - complete current edit first" 
@@ -236,40 +265,54 @@ export default function PngTemplateVisual({
               </>
             ) : photoUrl ? (
               // Normal mode - show photo with high-resolution fallbacks
-              <PhotoRenderer
-                photoUrl={photoUrl}
-                photoAlt={`Photo ${holeIndex + 1}`}
-                transform={slot.transform}
-                interactive={false}
-                className="w-full h-full"
-                fallbackUrls={photos.find(p => p.id === slot.photoId) ? getHighResPhotoUrls(photos.find(p => p.id === slot.photoId)!) : []}
-              />
+              <>
+                {console.log(`📸 RENDERING PHOTO in hole ${holeIndex + 1}:`, {
+                  photoUrl: photoUrl.substring(0, 60) + '...',
+                  slotId: slot?.id,
+                  holeSize: { width: hole.width, height: hole.height },
+                  holePosition: { x: hole.x, y: hole.y }
+                })}
+                <PhotoRenderer
+                  photoUrl={photoUrl}
+                  photoAlt={`Photo ${holeIndex + 1}`}
+                  transform={slot?.transform}
+                  interactive={false}
+                  className="w-full h-full"
+                  fallbackUrls={slot && photos.find(p => p.id === slot.photoId) ? getHighResPhotoUrls(photos.find(p => p.id === slot.photoId)!) : []}
+                />
+              </>
             ) : (
               // Empty slot - show placeholder with enhanced highlighting when selected
-              <div className={`w-full h-full flex items-center justify-center relative overflow-hidden border-2 border-dashed ${
+              <div className={`w-full h-full flex items-center justify-center relative overflow-hidden border-2 border-solid ${
                 isInlineEditing 
                   ? 'bg-yellow-50 border-yellow-400 animate-pulse shadow-lg shadow-yellow-400/30' // Enhanced highlighting for inline editing
                   : isSelected 
                   ? 'bg-blue-50 border-blue-400' 
-                  : shouldBlockSlot
+                  : isPreviewMode
+                  ? 'bg-blue-50 border-blue-500' // Visible preview placeholder
+                  : shouldApplyDarkening
                   ? 'bg-gray-100 border-gray-300' // Dimmed background during editing
                   : 'bg-gray-200 border-gray-400'
               }`}>
-                {/* Visible placeholder with icon */}
+                {/* Visible placeholder with debug info */}
                 <div className={`text-center ${
                   isInlineEditing 
                     ? 'text-yellow-600 font-bold' 
                     : isSelected 
                     ? 'text-blue-600 font-semibold' 
-                    : shouldBlockSlot
+                    : isPreviewMode
+                    ? 'text-blue-600 font-medium' // Visible preview text
+                    : shouldApplyDarkening
                     ? 'text-gray-400' // Grayed out during editing
                     : 'text-gray-500'
                 }`}>
-                  <div className="text-lg mb-1">
-                    {shouldBlockSlot ? '·' : '+'}
+                  <div className="text-sm mb-1">
+                    {isPreviewMode ? `H${holeIndex + 1}` : (shouldBlockSlot ? '·' : '+')}
                   </div>
                   <div className="text-xs font-medium">
-                    {isInlineEditing 
+                    {isPreviewMode 
+                      ? `${Math.round(hole.width)}×${Math.round(hole.height)}`
+                      : isInlineEditing 
                       ? 'Select Photo Below' 
                       : 'Tap to Add'
                     }

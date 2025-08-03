@@ -1,9 +1,11 @@
-import { GoogleAuth, DriveFolder, Package, PackageGroup, ManualPackage } from '../../types';
+import { GoogleAuth, DriveFolder, Package, PackageGroup, ManualPackage, ManualTemplate, Photo } from '../../types';
 import HeaderNavigation from '../HeaderNavigation';
 import { useState, useEffect } from 'react';
 import { manualPackageService } from '../../services/manualPackageService';
 import { packageGroupService } from '../../services/packageGroupService';
 import { googleDriveService } from '../../services/googleDriveService';
+import AnimatedTemplateReveal from '../animations/AnimatedTemplateReveal';
+import PackageTemplatePreview from '../PackageTemplatePreview';
 
 interface FolderSelectionScreenProps {
   googleAuth: GoogleAuth;
@@ -172,6 +174,16 @@ export default function FolderSelectionScreen({
   const [ungroupedPackages, setUngroupedPackages] = useState<ManualPackage[]>([]);
   const [isLoadingPackages, setIsLoadingPackages] = useState(false);
   const [packageError, setPackageError] = useState<string | null>(null);
+  
+  // Template preview state - per package
+  const [expandedPackageId, setExpandedPackageId] = useState<string | null>(null);
+  const [packageTemplates, setPackageTemplates] = useState<Record<string, ManualTemplate[]>>({});
+  const [loadingPackageId, setLoadingPackageId] = useState<string | null>(null);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+  
+  // Individual template selection state
+  const [selectedTemplates, setSelectedTemplates] = useState<ManualTemplate[]>([]);
+  const [availablePhotos, setAvailablePhotos] = useState<Photo[]>([]);
 
   // Utility function to transform Google Drive URLs to direct image URLs
   const transformGoogleDriveUrl = (url: string): string => {
@@ -276,10 +288,123 @@ export default function FolderSelectionScreen({
     }
   };
 
+  // Load photos from selected folder for template auto-fill
+  const loadAvailablePhotos = async (folder: DriveFolder) => {
+    try {
+      console.log(`📸 Loading photos from folder for template auto-fill: ${folder.name}`);
+      const photos = await googleDriveService.getPhotosFromFolder(folder.id);
+      console.log(`📸 Loaded ${photos.length} photos for template auto-fill`);
+      
+      // Use more photos for better variety in template auto-fill (limit to 50 for performance)
+      const photosForTemplates = photos.slice(0, 50);
+      setAvailablePhotos(photosForTemplates);
+      
+      console.log(`📸 Using ${photosForTemplates.length} photos for template preview auto-fill`);
+    } catch (error) {
+      console.error('❌ Error loading photos for template auto-fill:', error);
+      setAvailablePhotos([]); // Fallback to empty array
+    }
+  };
+
+  // Handle individual template selection
+  const handleTemplateSelect = (template: ManualTemplate) => {
+    console.log('🎯 Individual template selected:', template.name);
+    
+    // Add to selected templates if not already selected
+    setSelectedTemplates(prev => {
+      const isAlreadySelected = prev.some(t => t.id === template.id);
+      if (isAlreadySelected) {
+        return prev.filter(t => t.id !== template.id); // Remove if already selected
+      } else {
+        return [...prev, template]; // Add to selection
+      }
+    });
+  };
+
+  // Load templates for the selected package with debugging
+  const loadPackageTemplates = async (packageId: string, packageName: string) => {
+    console.log('📋 DEBUGGING - Loading templates for package:', {
+      packageId,
+      packageName,
+      packageIdType: typeof packageId
+    });
+    
+    // Check if we already have templates for this package
+    if (packageTemplates[packageId]) {
+      console.log('📋 DEBUGGING - Using cached templates for package:', packageId);
+      setExpandedPackageId(packageId);
+      return;
+    }
+    
+    setLoadingPackageId(packageId);
+    setTemplateError(null);
+    
+    try {
+      console.log('🔄 DEBUGGING - Calling manualPackageService.getPackageWithTemplates...');
+      const packageWithTemplates = await manualPackageService.getPackageWithTemplates(packageId);
+      
+      console.log('📦 DEBUGGING - Raw API response:', {
+        response: packageWithTemplates,
+        hasResponse: !!packageWithTemplates,
+        responseType: typeof packageWithTemplates,
+        templates: packageWithTemplates?.templates,
+        templatesCount: packageWithTemplates?.templates?.length || 0,
+        templatesArray: Array.isArray(packageWithTemplates?.templates),
+        packageTemplatesRaw: packageWithTemplates?.package_templates
+      });
+      
+      if (packageWithTemplates && packageWithTemplates.templates) {
+        console.log('✅ DEBUGGING - Templates found:', packageWithTemplates.templates.length);
+        console.log('📋 DEBUGGING - Template details:', packageWithTemplates.templates.map(t => ({
+          id: t.id,
+          name: t.name,
+          type: t.template_type,
+          printSize: t.print_size,
+          hasHoles: !!t.holes_data,
+          holesCount: t.holes_data?.length || 0
+        })));
+        
+        // Store templates for this package
+        setPackageTemplates(prev => ({
+          ...prev,
+          [packageId]: packageWithTemplates.templates || []
+        }));
+        setExpandedPackageId(packageId);
+      } else {
+        console.log('⚠️ DEBUGGING - No templates found or invalid response structure');
+        // Store empty array for this package so we don't keep trying to load
+        setPackageTemplates(prev => ({
+          ...prev,
+          [packageId]: []
+        }));
+        setExpandedPackageId(packageId);
+      }
+    } catch (error: any) {
+      console.error('❌ DEBUGGING - Error loading templates:', {
+        error,
+        message: error.message,
+        stack: error.stack,
+        packageId,
+        packageName
+      });
+      setTemplateError(error.message || 'Failed to load templates');
+      // Store empty array on error so we don't keep retrying
+      setPackageTemplates(prev => ({
+        ...prev,
+        [packageId]: []
+      }));
+      setExpandedPackageId(packageId);
+    } finally {
+      setLoadingPackageId(null);
+    }
+  };
+
   // Load packages when component mounts or when showing package selection
   useEffect(() => {
     if (showPackageSelection) {
       setSelectedPackage(null); // Reset selected package when entering package selection
+      setExpandedPackageId(null); // Reset expanded package
+      setPackageTemplates({}); // Clear cached templates
       loadPackages();
     }
   }, [showPackageSelection]);
@@ -287,6 +412,7 @@ export default function FolderSelectionScreen({
   const handleFolderSelect = (folder: DriveFolder) => {
     setSelectedFolder(folder);
     handleClientFolderSelect(folder); // Still call the original handler for data loading
+    loadAvailablePhotos(folder); // Load photos for sample generation
     setShowPackageSelection(true); // Show package selection step
   };
 
@@ -294,12 +420,19 @@ export default function FolderSelectionScreen({
     setShowPackageSelection(false);
     setSelectedFolder(null);
     setSelectedPackage(null);
+    setExpandedPackageId(null);
+    setPackageTemplates({});
   };
 
   const handlePackageContinue = () => {
     if (selectedFolder && selectedPackage) {
       handleContinue(); // Continue to next screen
     }
+  };
+
+  const handleChangePackage = () => {
+    setSelectedPackage(null);
+    setExpandedPackageId(null);
   };
 
   return (
@@ -424,67 +557,85 @@ export default function FolderSelectionScreen({
                             {groupedPackages[group.id]?.length > 0 ? (
                               <div className="space-y-3">
                                 {groupedPackages[group.id].map((pkg) => (
-                                  <div
-                                    key={pkg.id}
-                                    onClick={() => {
-                                      const packageData = {
-                                        id: pkg.id,
-                                        name: pkg.name,
-                                        templateCount: pkg.template_count || 1,
-                                        price: pkg.price || 0,
-                                        description: pkg.description || `${pkg.template_count || 1} template${(pkg.template_count || 1) === 1 ? '' : 's'}`
-                                      };
-                                      
-                                      // If already selected, continue to next screen
-                                      if (selectedPackage?.id === pkg.id) {
-                                        handlePackageContinue();
-                                      } else {
-                                        // First click: just select the package
-                                        setSelectedPackage(packageData);
-                                      }
-                                    }}
-                                    className={`flex items-center p-4 rounded-lg cursor-pointer transition-all duration-200 border ${
-                                      selectedPackage?.id === pkg.id
-                                        ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-200'
-                                        : 'hover:bg-gray-50 border-gray-200 bg-white'
-                                    }`}
-                                  >
-                                    {/* Package Icon */}
-                                    <PackageIcon pkg={pkg} />
-                                    
-                                    {/* Package Info */}
-                                    <div className="flex-1">
-                                      <div className="flex items-center justify-between">
-                                        <div>
-                                          <h4 className="text-lg font-bold text-gray-800">{pkg.name}</h4>
-                                          <p className="text-sm text-gray-600 mt-1">
-                                            {pkg.description || `${pkg.template_count} template${pkg.template_count === 1 ? '' : 's'}`}
-                                          </p>
-                                        </div>
+                                  <div key={pkg.id} className="space-y-0">
+                                    <div
+                                      onClick={() => {
+                                        const packageData = {
+                                          id: pkg.id,
+                                          name: pkg.name,
+                                          templateCount: pkg.template_count || 1,
+                                          price: pkg.price || 0,
+                                          description: pkg.description || `${pkg.template_count || 1} template${(pkg.template_count || 1) === 1 ? '' : 's'}`
+                                        };
                                         
-                                        {/* Package Details */}
-                                        <div className="text-right flex-shrink-0 ml-4">
-                                          {pkg.price && (
-                                            <div className="text-xl font-bold text-green-600">
-                                              ₱{pkg.price.toLocaleString()}
-                                            </div>
-                                          )}
-                                          <div className="text-sm text-blue-600 font-medium">
-                                            {pkg.template_count} Print{pkg.template_count > 1 ? 's' : ''}
+                                        // If this package is already expanded, collapse it
+                                        if (expandedPackageId === pkg.id.toString()) {
+                                          setExpandedPackageId(null);
+                                          setSelectedPackage(null);
+                                        } else {
+                                          // Expand this package and load templates
+                                          setSelectedPackage(packageData);
+                                          loadPackageTemplates(pkg.id.toString(), pkg.name);
+                                        }
+                                      }}
+                                      className={`flex items-center p-4 rounded-lg cursor-pointer transition-all duration-200 border ${
+                                        selectedPackage?.id === pkg.id
+                                          ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-200'
+                                          : 'hover:bg-gray-50 border-gray-200 bg-white'
+                                      }`}
+                                    >
+                                      {/* Package Icon */}
+                                      <PackageIcon pkg={pkg} />
+                                      
+                                      {/* Package Info */}
+                                      <div className="flex-1">
+                                        <div className="flex items-center justify-between">
+                                          <div>
+                                            <h4 className="text-lg font-bold text-gray-800">{pkg.name}</h4>
+                                            <p className="text-sm text-gray-600 mt-1">
+                                              {pkg.description || `${pkg.template_count} template${pkg.template_count === 1 ? '' : 's'}`}
+                                            </p>
                                           </div>
-                                          <div className="text-xs text-gray-500">
-                                            {pkg.is_unlimited_photos ? 'Unlimited photos' : `${pkg.photo_limit} photos`}
+                                          
+                                          {/* Package Details */}
+                                          <div className="text-right flex-shrink-0 ml-4">
+                                            {pkg.price && (
+                                              <div className="text-xl font-bold text-green-600">
+                                                ₱{pkg.price.toLocaleString()}
+                                              </div>
+                                            )}
+                                            <div className="text-sm text-blue-600 font-medium">
+                                              {pkg.template_count} Print{pkg.template_count > 1 ? 's' : ''}
+                                            </div>
+                                            <div className="text-xs text-gray-500">
+                                              {pkg.is_unlimited_photos ? 'Unlimited photos' : `${pkg.photo_limit} photos`}
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
+                                      
+                                      {/* Continue Arrow - only show when selected */}
+                                      {selectedPackage?.id === pkg.id && (
+                                        <div className="ml-3 flex items-center text-blue-500 text-xl font-medium">
+                                          ⟩
+                                        </div>
+                                      )}
                                     </div>
-                                    
-                                    {/* Continue Arrow - only show when selected */}
-                                    {selectedPackage?.id === pkg.id && (
-                                      <div className="ml-3 flex items-center text-blue-500 text-xl font-medium">
-                                        ⟩
-                                      </div>
-                                    )}
+
+                                    {/* Template Preview - Show directly below this package when expanded */}
+                                    <AnimatedTemplateReveal show={expandedPackageId === pkg.id.toString()}>
+                                      {expandedPackageId === pkg.id.toString() && (
+                                        <PackageTemplatePreview
+                                          templates={packageTemplates[pkg.id.toString()] || []}
+                                          packageName={pkg.name}
+                                          onContinue={handlePackageContinue}
+                                          onChangePackage={handleChangePackage}
+                                          onTemplateSelect={handleTemplateSelect}
+                                          availablePhotos={availablePhotos}
+                                          loading={loadingPackageId === pkg.id.toString()}
+                                        />
+                                      )}
+                                    </AnimatedTemplateReveal>
                                   </div>
                                 ))}
                               </div>
@@ -512,67 +663,85 @@ export default function FolderSelectionScreen({
                           <div className="p-4">
                             <div className="space-y-3">
                               {ungroupedPackages.map((pkg) => (
-                                <div
-                                  key={pkg.id}
-                                  onClick={() => {
-                                    const packageData = {
-                                      id: pkg.id,
-                                      name: pkg.name,
-                                      templateCount: pkg.template_count || 1,
-                                      price: pkg.price || 0,
-                                      description: pkg.description || `${pkg.template_count || 1} template${(pkg.template_count || 1) === 1 ? '' : 's'}`
-                                    };
+                                <div key={pkg.id} className="space-y-0">
+                                  <div
+                                    onClick={() => {
+                                      const packageData = {
+                                        id: pkg.id,
+                                        name: pkg.name,
+                                        templateCount: pkg.template_count || 1,
+                                        price: pkg.price || 0,
+                                        description: pkg.description || `${pkg.template_count || 1} template${(pkg.template_count || 1) === 1 ? '' : 's'}`
+                                      };
+                                      
+                                      // If this package is already expanded, collapse it
+                                      if (expandedPackageId === pkg.id.toString()) {
+                                        setExpandedPackageId(null);
+                                        setSelectedPackage(null);
+                                      } else {
+                                        // Expand this package and load templates
+                                        setSelectedPackage(packageData);
+                                        loadPackageTemplates(pkg.id.toString(), pkg.name);
+                                      }
+                                    }}
+                                    className={`flex items-center p-4 rounded-lg cursor-pointer transition-all duration-200 border ${
+                                      selectedPackage?.id === pkg.id
+                                        ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-200'
+                                        : 'hover:bg-gray-50 border-gray-200 bg-white'
+                                    }`}
+                                  >
+                                    {/* Package Icon */}
+                                    <PackageIcon pkg={pkg} isUngrouped={true} />
                                     
-                                    // If already selected, continue to next screen
-                                    if (selectedPackage?.id === pkg.id) {
-                                      handlePackageContinue();
-                                    } else {
-                                      // First click: just select the package
-                                      setSelectedPackage(packageData);
-                                    }
-                                  }}
-                                  className={`flex items-center p-4 rounded-lg cursor-pointer transition-all duration-200 border ${
-                                    selectedPackage?.id === pkg.id
-                                      ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-200'
-                                      : 'hover:bg-gray-50 border-gray-200 bg-white'
-                                  }`}
-                                >
-                                  {/* Package Icon */}
-                                  <PackageIcon pkg={pkg} isUngrouped={true} />
-                                  
-                                  {/* Package Info */}
-                                  <div className="flex-1">
-                                    <div className="flex items-center justify-between">
-                                      <div>
-                                        <h4 className="text-lg font-bold text-gray-800">{pkg.name}</h4>
-                                        <p className="text-sm text-gray-600 mt-1">
-                                          {pkg.description || `${pkg.template_count} template${pkg.template_count === 1 ? '' : 's'}`}
-                                        </p>
+                                    {/* Package Info */}
+                                    <div className="flex-1">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <h4 className="text-lg font-bold text-gray-800">{pkg.name}</h4>
+                                          <p className="text-sm text-gray-600 mt-1">
+                                            {pkg.description || `${pkg.template_count} template${pkg.template_count === 1 ? '' : 's'}`}
+                                          </p>
+                                        </div>
+                                        
+                                        {/* Package Details */}
+                                        <div className="text-right flex-shrink-0 ml-4">
+                                          {pkg.price && (
+                                            <div className="text-xl font-bold text-green-600">
+                                              ₱{pkg.price.toLocaleString()}
+                                            </div>
+                                          )}
+                                          <div className="text-sm text-blue-600 font-medium">
+                                            {pkg.template_count} Print{pkg.template_count > 1 ? 's' : ''}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {pkg.is_unlimited_photos ? 'Unlimited photos' : `${pkg.photo_limit} photos`}
+                                          </div>
+                                        </div>
                                       </div>
                                       
-                                      {/* Package Details */}
-                                      <div className="text-right flex-shrink-0 ml-4">
-                                        {pkg.price && (
-                                          <div className="text-xl font-bold text-green-600">
-                                            ₱{pkg.price.toLocaleString()}
-                                          </div>
-                                        )}
-                                        <div className="text-sm text-blue-600 font-medium">
-                                          {pkg.template_count} Print{pkg.template_count > 1 ? 's' : ''}
+                                      {/* Continue Arrow - only show when selected */}
+                                      {selectedPackage?.id === pkg.id && (
+                                        <div className="ml-3 flex items-center text-blue-500 text-xl font-medium">
+                                          ⟩
                                         </div>
-                                        <div className="text-xs text-gray-500">
-                                          {pkg.is_unlimited_photos ? 'Unlimited photos' : `${pkg.photo_limit} photos`}
-                                        </div>
-                                      </div>
+                                      )}
                                     </div>
-                                    
-                                    {/* Continue Arrow - only show when selected */}
-                                    {selectedPackage?.id === pkg.id && (
-                                      <div className="ml-3 flex items-center text-blue-500 text-xl font-medium">
-                                        ⟩
-                                      </div>
-                                    )}
                                   </div>
+
+                                  {/* Template Preview - Show directly below this package when expanded */}
+                                  <AnimatedTemplateReveal show={expandedPackageId === pkg.id.toString()}>
+                                    {expandedPackageId === pkg.id.toString() && (
+                                      <PackageTemplatePreview
+                                        templates={packageTemplates[pkg.id.toString()] || []}
+                                        packageName={pkg.name}
+                                        onContinue={handlePackageContinue}
+                                        onChangePackage={handleChangePackage}
+                                        onTemplateSelect={handleTemplateSelect}
+                                        availablePhotos={availablePhotos}
+                                        loading={loadingPackageId === pkg.id.toString()}
+                                      />
+                                    )}
+                                  </AnimatedTemplateReveal>
                                 </div>
                               ))}
                             </div>

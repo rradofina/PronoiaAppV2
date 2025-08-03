@@ -1162,15 +1162,34 @@ export default function PhotoRenderer({
   };
 
   // Calculate CSS style for the photo
-  const photoStyle: React.CSSProperties = transform && isPhotoTransform(transform)
-    ? convertPhotoToCSS(transform)
-    : transform && isContainerTransform(transform)
-    ? convertLegacyToCSS(transform)
-    : {
+  const photoStyle: React.CSSProperties = (() => {
+    // For non-interactive preview mode, use simple object-fit cover
+    if (!interactive) {
+      console.log(`📸 PhotoRenderer NON-INTERACTIVE mode for ${photoAlt}:`, {
+        photoUrl: photoUrl.substring(0, 60) + '...',
+        style: 'object-fit: cover, center center'
+      });
+      return {
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover' as const,
+        objectPosition: 'center center'
+      };
+    }
+    
+    // For interactive mode, use full transform system
+    if (transform && isPhotoTransform(transform)) {
+      return convertPhotoToCSS(transform);
+    } else if (transform && isContainerTransform(transform)) {
+      return convertLegacyToCSS(transform);
+    } else {
+      return {
         ...convertPhotoToCSS(currentTransform),
         // Add smooth spring animation when auto-fitting
         transition: isSnapping ? 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none'
       };
+    }
+  })();
 
   // Touch helper functions for pinch-to-zoom
   const getTouchDistance = (touches: React.TouchList): number => {
