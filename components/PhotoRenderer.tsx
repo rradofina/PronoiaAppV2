@@ -65,7 +65,7 @@ function convertPhotoToCSS(photoTransform: PhotoTransform): React.CSSProperties 
     input: photoTransform,
     translation: { translateX, translateY },
     cssTransform,
-    note: 'Manual scaling + object-fit: contain baseline for proper transform math'
+    note: 'object-fit: contain baseline + adjustment scale for proper container scaling'
   });
   
   return {

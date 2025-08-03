@@ -145,6 +145,7 @@ export function calculateProperScale(
 }
 
 // Smart scaling for initial photo placement - shows WHOLE photo with NO gaps, excess on only 2 sides
+// Returns adjustment factor on top of object-fit: 'contain' baseline
 export function calculateSmartFillScale(
   photoWidth: number,
   photoHeight: number,
@@ -155,61 +156,62 @@ export function calculateSmartFillScale(
     return 1.0; // Fallback scale
   }
   
-  // Calculate scale factors for both dimensions
-  const scaleX = containerWidth / photoWidth;   // Scale needed to fit width
-  const scaleY = containerHeight / photoHeight; // Scale needed to fit height
-  
   // Calculate aspect ratios to determine scaling strategy
   const photoAspectRatio = photoWidth / photoHeight;
   const containerAspectRatio = containerWidth / containerHeight;
   
-  // INTELLIGENT SCALING: Choose scale that shows WHOLE photo AND eliminates gaps
-  let finalScale: number;
+  // Step 1: Calculate CSS object-fit: 'contain' baseline scale
+  // This is how CSS would scale the photo to fit within container
+  const containScale = Math.min(
+    containerWidth / photoWidth,   // Scale to fit width
+    containerHeight / photoHeight  // Scale to fit height
+  );
+  
+  // Step 2: Calculate gap elimination scale 
+  // This is the scale needed to eliminate all gaps
+  let gapEliminationScale: number;
   let scalingStrategy: string;
   let excessDirection: string;
   
   if (photoAspectRatio < containerAspectRatio) {
     // Photo is taller than container (portrait in landscape container)
-    // Scale to fit WIDTH completely, excess will be on TOP/BOTTOM
-    finalScale = scaleX;
+    // Need to scale to fit WIDTH completely to eliminate gaps
+    gapEliminationScale = containerWidth / photoWidth;
     scalingStrategy = 'FIT_WIDTH';
     excessDirection = 'TOP/BOTTOM';
   } else {
     // Photo is wider than container (landscape in portrait container) 
-    // OR same aspect ratio
-    // Scale to fit HEIGHT completely, excess will be on LEFT/RIGHT
-    finalScale = scaleY;
+    // Need to scale to fit HEIGHT completely to eliminate gaps
+    gapEliminationScale = containerHeight / photoHeight;
     scalingStrategy = 'FIT_HEIGHT';
     excessDirection = 'LEFT/RIGHT';
   }
   
-  // Calculate final scaled dimensions for verification
-  const scaledWidth = Math.round(photoWidth * finalScale);
-  const scaledHeight = Math.round(photoHeight * finalScale);
+  // Step 3: Calculate adjustment factor
+  // This is how much additional scaling we need on top of 'contain' baseline
+  const adjustmentFactor = gapEliminationScale / containScale;
   
-  console.log('🎯 Smart Fill Scale (WHOLE PHOTO + NO GAPS):', {
+  console.log('🎯 Smart Fill Scale (CONTAIN BASELINE + ADJUSTMENT):', {
     photo: { width: photoWidth, height: photoHeight, aspectRatio: photoAspectRatio.toFixed(3) },
     container: { width: containerWidth, height: containerHeight, aspectRatio: containerAspectRatio.toFixed(3) },
-    scales: { scaleX: scaleX.toFixed(3), scaleY: scaleY.toFixed(3) },
-    decision: {
+    baseline: {
+      containScale: containScale.toFixed(3),
+      note: 'CSS object-fit: contain handles this automatically'
+    },
+    gapElimination: {
       strategy: scalingStrategy,
-      chosenScale: finalScale.toFixed(3),
+      gapEliminationScale: gapEliminationScale.toFixed(3),
       excessDirection,
       logic: photoAspectRatio < containerAspectRatio ? 'Photo taller → fit width' : 'Photo wider → fit height'
     },
-    result: { width: scaledWidth, height: scaledHeight },
-    verification: {
-      showsWholePhoto: true,
-      fillsWidth: scaledWidth >= containerWidth ? '✅ FILLS' : '❌ GAP',
-      fillsHeight: scaledHeight >= containerHeight ? '✅ FILLS' : '❌ GAP',
-      widthGap: Math.max(0, containerWidth - scaledWidth),
-      heightGap: Math.max(0, containerHeight - scaledHeight),
-      widthExcess: Math.max(0, scaledWidth - containerWidth),
-      heightExcess: Math.max(0, scaledHeight - containerHeight)
+    result: {
+      adjustmentFactor: adjustmentFactor.toFixed(3),
+      finalVisualScale: (containScale * adjustmentFactor).toFixed(3),
+      note: 'CSS applies: contain baseline × adjustment factor'
     }
   });
   
-  return finalScale;
+  return adjustmentFactor;
 }
 
 // Legacy function for backwards compatibility - now uses proper scaling
