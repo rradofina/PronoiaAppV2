@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ManualTemplate, Photo } from '../types';
 import { AnimatedTemplateItem } from './animations/AnimatedTemplateReveal';
 import PngTemplateVisual from './PngTemplateVisual';
+import TemplateSelectionModal from './TemplateSelectionModal';
 import { getSamplePhotosForTemplate } from '../utils/samplePhotoUtils';
 import { createPhotoTransform, PhotoTransform } from '../types';
 
@@ -51,8 +52,112 @@ export default function PackageTemplatePreview({
   loading = false
 }: PackageTemplatePreviewProps) {
   
+  // Modal state for template selection
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateToChange, setTemplateToChange] = useState<ManualTemplate | null>(null);
+  const [currentTemplates, setCurrentTemplates] = useState<ManualTemplate[]>(templates);
+  const [forceRenderKey, setForceRenderKey] = useState(0);
+  
+  // Update currentTemplates when templates prop changes (but preserve user replacements)
+  React.useEffect(() => {
+    console.log('📥 TEMPLATES PROP CHANGED:', {
+      newTemplatesCount: templates.length,
+      currentTemplatesCount: currentTemplates.length,
+      newTemplateIds: templates.map(t => t.id),
+      currentTemplateIds: currentTemplates.map(t => t.id),
+      templatesChanged: JSON.stringify(templates.map(t => t.id)) !== JSON.stringify(currentTemplates.map(t => t.id))
+    });
+    
+    // ONLY update on initial load - never override user template replacements
+    if (currentTemplates.length === 0) {
+      console.log('🔄 INITIALIZING TEMPLATES - First load only');
+      setCurrentTemplates(templates);
+    } else {
+      console.log('⚠️ PRESERVING USER TEMPLATE REPLACEMENTS - Not overriding local changes');
+    }
+  }, [templates]);
+
+  // Modal handlers
+  const handleChangeTemplate = (template: ManualTemplate) => {
+    setTemplateToChange(template);
+    setShowTemplateModal(true);
+  };
+
+  const handleTemplateReplace = (newTemplate: ManualTemplate) => {
+    if (!templateToChange) return;
+    
+    console.log('🔄 TEMPLATE REPLACEMENT DEBUG:', {
+      beforeCount: currentTemplates.length,
+      templateToChangeId: templateToChange.id,
+      templateToChangeName: templateToChange.name,
+      newTemplateId: newTemplate.id,
+      newTemplateName: newTemplate.name,
+      currentTemplateIds: currentTemplates.map(t => t.id),
+      currentTemplateNames: currentTemplates.map(t => t.name)
+    });
+    
+    // Replace the template in the current templates array
+    const updatedTemplates = currentTemplates.map((t, index) => {
+      const isMatch = t.id === templateToChange.id;
+      console.log(`🔍 CHECKING TEMPLATE ${index + 1}:`, {
+        templateId: t.id,
+        templateToChangeId: templateToChange.id,
+        isMatch,
+        templateName: t.name,
+        willReplace: isMatch ? `YES with ${newTemplate.name}` : 'NO'
+      });
+      return isMatch ? newTemplate : t;
+    });
+    
+    // Validate that replacement actually occurred
+    const replacementWorked = updatedTemplates.some(t => t.id === newTemplate.id);
+    const oldTemplateRemoved = !updatedTemplates.some(t => t.id === templateToChange.id);
+    const countStayedSame = updatedTemplates.length === currentTemplates.length;
+    
+    console.log('🔄 AFTER TEMPLATE REPLACEMENT:', {
+      afterCount: updatedTemplates.length,
+      beforeCount: currentTemplates.length,
+      countStayedSame,
+      updatedTemplateIds: updatedTemplates.map(t => t.id),
+      updatedTemplateNames: updatedTemplates.map(t => t.name),
+      replacementWorked,
+      oldTemplateRemoved,
+      validReplacement: replacementWorked && oldTemplateRemoved && countStayedSame
+    });
+    
+    // Alert if replacement failed
+    if (!replacementWorked || !oldTemplateRemoved || !countStayedSame) {
+      console.error('❌ TEMPLATE REPLACEMENT FAILED:', {
+        replacementWorked,
+        oldTemplateRemoved,
+        countStayedSame,
+        expected: 'All should be true'
+      });
+    }
+    
+    setCurrentTemplates(updatedTemplates);
+    
+    // Force React to re-render by updating render key
+    setForceRenderKey(prev => prev + 1);
+    console.log('🔄 FORCING REACT RE-RENDER with new render key:', forceRenderKey + 1);
+    
+    setShowTemplateModal(false);
+    setTemplateToChange(null);
+    
+    console.log('✅ Template replaced:', {
+      oldTemplate: templateToChange.name,
+      newTemplate: newTemplate.name,
+      printSize: newTemplate.print_size
+    });
+  };
+
+  const handleCloseModal = () => {
+    setShowTemplateModal(false);
+    setTemplateToChange(null);
+  };
+
   // Count total holes across all templates for global photo assignment
-  const totalHoles = templates.reduce((total, template) => {
+  const totalHoles = currentTemplates.reduce((total, template) => {
     return total + (template.holes_data?.length || 0);
   }, 0);
   
@@ -69,7 +174,7 @@ export default function PackageTemplatePreview({
   };
   
   console.log(`📊 GLOBAL PHOTO ASSIGNMENT STRATEGY:`, {
-    totalTemplates: templates.length,
+    totalTemplates: currentTemplates.length,
     totalHoles,
     availablePhotos: photoFilenames.length,
     photoFilenames: photoFilenames.slice(0, 5), // Show first 5 filenames
@@ -89,7 +194,7 @@ export default function PackageTemplatePreview({
     );
   }
 
-  if (templates.length === 0) {
+  if (currentTemplates.length === 0) {
     return (
       <div className="mt-6 p-6 bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="text-center py-8">
@@ -113,15 +218,22 @@ export default function PackageTemplatePreview({
           Templates in "{packageName}"
         </h3>
         <div className="text-sm text-gray-600">
-          {templates.length} template{templates.length > 1 ? 's' : ''} available
+          {currentTemplates.length} template{currentTemplates.length > 1 ? 's' : ''} available
         </div>
       </div>
 
       {/* Templates Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {templates.map((template, index) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        {currentTemplates.map((template, index) => {
+          console.log(`🎨 RENDERING TEMPLATE ${index + 1}:`, {
+            templateId: template.id,
+            templateName: template.name,
+            templateType: template.template_type,
+            renderTimestamp: new Date().toISOString()
+          });
+          
           // Calculate global hole index offset for this template
-          const globalHoleOffset = templates.slice(0, index).reduce((offset, prevTemplate) => {
+          const globalHoleOffset = currentTemplates.slice(0, index).reduce((offset, prevTemplate) => {
             return offset + (prevTemplate.holes_data?.length || 0);
           }, 0);
           console.log(`🔍 TEMPLATE PREVIEW DEBUG - Processing template ${index + 1}:`, {
@@ -203,10 +315,10 @@ export default function PackageTemplatePreview({
           });
 
           return (
-            <AnimatedTemplateItem key={template.id} index={index}>
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow">
+            <AnimatedTemplateItem key={`${template.id}-${forceRenderKey}`} index={index}>
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:shadow-md transition-shadow">
                 {/* Template Header with Name and Change Button */}
-                <div className="flex justify-between items-start mb-3">
+                <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
                     <h4 className="font-medium text-gray-900 text-sm truncate">
                       {template.name}
@@ -215,19 +327,17 @@ export default function PackageTemplatePreview({
                       {template.holes_data?.length || 0} photo slot{(template.holes_data?.length || 0) !== 1 ? 's' : ''}
                     </div>
                   </div>
-                  {onTemplateSelect && (
-                    <button
-                      onClick={() => onTemplateSelect(template)}
-                      className="ml-2 bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 whitespace-nowrap"
-                    >
-                      Change Template
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleChangeTemplate(template)}
+                    className="ml-2 bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 whitespace-nowrap"
+                  >
+                    Change Template
+                  </button>
                 </div>
 
                 {/* Template Visual Preview with Sample Photos */}
                 <div 
-                  className="bg-white rounded border border-gray-200 overflow-hidden mb-3 flex items-center justify-center"
+                  className="bg-white rounded border border-gray-200 overflow-hidden mb-1 flex items-center justify-center"
                   style={{
                     aspectRatio: `${template.holes_data && template.holes_data.length > 0 ? '1200/1800' : '2/3'}`,
                     minHeight: '250px',
@@ -303,6 +413,17 @@ export default function PackageTemplatePreview({
           Choose Different Package
         </button>
       </div>
+
+      {/* Template Selection Modal */}
+      {templateToChange && (
+        <TemplateSelectionModal
+          isOpen={showTemplateModal}
+          onClose={handleCloseModal}
+          currentTemplate={templateToChange}
+          availablePhotos={availablePhotos}
+          onTemplateSelect={handleTemplateReplace}
+        />
+      )}
     </div>
   );
 }
