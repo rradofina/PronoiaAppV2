@@ -3,6 +3,29 @@ import { ManualTemplate, Photo } from '../types';
 import { AnimatedTemplateItem } from './animations/AnimatedTemplateReveal';
 import PngTemplateVisual from './PngTemplateVisual';
 import { getSamplePhotosForTemplate } from '../utils/samplePhotoUtils';
+import { createPhotoTransform, PhotoTransform } from '../types';
+
+// Create smart preview transform that optimizes photo for hole aspect ratio
+function createPreviewTransform(holeAspectRatio: number, photoAspectRatio: number | null = null): PhotoTransform {
+  // For preview mode, we want photos to fill holes nicely using object-cover
+  // Start with a reasonable zoom level that ensures full coverage
+  let previewScale = 1.2; // Slightly zoomed in for better visual appeal
+  
+  // If we know the photo aspect ratio, we can optimize the transform
+  if (photoAspectRatio) {
+    // If photo is much wider than hole, zoom in more to show the interesting center
+    if (photoAspectRatio > holeAspectRatio * 1.5) {
+      previewScale = 1.4; // Zoom in more on wide photos in tall holes
+    }
+    // If photo is much taller than hole, use less zoom to show more of the photo
+    else if (photoAspectRatio < holeAspectRatio * 0.7) {
+      previewScale = 1.1; // Less zoom on tall photos in wide holes
+    }
+  }
+  
+  // Center the photo by default for preview
+  return createPhotoTransform(previewScale, 0.5, 0.5);
+}
 
 interface PackageTemplatePreviewProps {
   templates: ManualTemplate[];
@@ -23,6 +46,33 @@ export default function PackageTemplatePreview({
   availablePhotos = [],
   loading = false
 }: PackageTemplatePreviewProps) {
+  
+  // Count total holes across all templates for global photo assignment
+  const totalHoles = templates.reduce((total, template) => {
+    return total + (template.holes_data?.length || 0);
+  }, 0);
+  
+  // Extract photo filenames for assignment
+  const photoFilenames = availablePhotos.map(photo => photo.name || `Photo ${photo.id}`);
+  
+  // Create global photo assignment strategy
+  const createGlobalPhotoAssignment = (globalHoleIndex: number): string => {
+    if (photoFilenames.length === 0) return `Sample-${globalHoleIndex + 1}`;
+    
+    // Loop filenames if more holes than photos
+    const photoIndex = globalHoleIndex % photoFilenames.length;
+    return photoFilenames[photoIndex];
+  };
+  
+  console.log(`📊 GLOBAL PHOTO ASSIGNMENT STRATEGY:`, {
+    totalTemplates: templates.length,
+    totalHoles,
+    availablePhotos: photoFilenames.length,
+    photoFilenames: photoFilenames.slice(0, 5), // Show first 5 filenames
+    strategy: photoFilenames.length >= totalHoles 
+      ? 'Unique assignment (enough photos)' 
+      : `Looped assignment (${photoFilenames.length} photos for ${totalHoles} holes)`
+  });
   
   if (loading) {
     return (
@@ -66,6 +116,10 @@ export default function PackageTemplatePreview({
       {/* Templates Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {templates.map((template, index) => {
+          // Calculate global hole index offset for this template
+          const globalHoleOffset = templates.slice(0, index).reduce((offset, prevTemplate) => {
+            return offset + (prevTemplate.holes_data?.length || 0);
+          }, 0);
           console.log(`🔍 TEMPLATE PREVIEW DEBUG - Processing template ${index + 1}:`, {
             templateId: template.id,
             templateName: template.name,
@@ -90,21 +144,58 @@ export default function PackageTemplatePreview({
             photoUrls: samplePhotos.map(p => p.url?.substring(0, 80) + '...')
           });
 
-          // Create mock template slots for sample photos
-          const sampleSlots = samplePhotos.map((photo, slotIndex) => ({
-            id: `sample-slot-${template.id}-${slotIndex}`,
-            templateId: template.id.toString(),
-            templateName: template.name,
-            templateType: template.template_type,
-            slotIndex,
-            photoId: photo.id,
-            transform: undefined
-          }));
+          // Create mock template slots for sample photos with smart preview transforms
+          const sampleSlots = samplePhotos.map((photo, slotIndex) => {
+            // Calculate hole aspect ratio for this slot
+            const hole = template.holes_data?.[slotIndex];
+            const holeAspectRatio = hole ? hole.width / hole.height : 1.0;
+            
+            // Estimate photo aspect ratio (assume typical photo ratios if not available)
+            // Most photos are either 4:3, 3:2, or 16:9 - we'll use 3:2 as default
+            const photoAspectRatio = 3/2; // Can be refined with actual photo dimensions later
+            
+            // Create smart preview transform for this hole
+            const previewTransform = createPreviewTransform(holeAspectRatio, photoAspectRatio);
+            
+            console.log(`🎯 SMART PREVIEW TRANSFORM - Slot ${slotIndex + 1}:`, {
+              holeSize: hole ? `${Math.round(hole.width)}×${Math.round(hole.height)}` : 'unknown',
+              holeAspectRatio: holeAspectRatio.toFixed(2),
+              photoAspectRatio: photoAspectRatio.toFixed(2),
+              previewScale: previewTransform.photoScale,
+              strategy: holeAspectRatio > 1.3 ? 'wide hole' : holeAspectRatio < 0.8 ? 'tall hole' : 'square hole'
+            });
+            
+            return {
+              id: `sample-slot-${template.id}-${slotIndex}`,
+              templateId: template.id.toString(),
+              templateName: template.name,
+              templateType: template.template_type,
+              slotIndex,
+              photoId: photo.id,
+              transform: previewTransform
+            };
+          });
+
+          // Create photo filename assignments for this template's holes
+          const holePhotoAssignments = (template.holes_data || []).map((hole, holeIndex) => {
+            const globalHoleIndex = globalHoleOffset + holeIndex;
+            const assignedFilename = createGlobalPhotoAssignment(globalHoleIndex);
+            
+            console.log(`📸 HOLE ASSIGNMENT - Template ${template.id}, Hole ${holeIndex + 1}:`, {
+              globalHoleIndex,
+              localHoleIndex: holeIndex,
+              assignedFilename,
+              holeSize: `${Math.round(hole.width)}×${Math.round(hole.height)}`
+            });
+            
+            return assignedFilename;
+          });
 
           console.log(`🎯 SLOT MAPPING DEBUG - Template ${template.id}:`, {
             slotsCreated: sampleSlots.length,
             slotIds: sampleSlots.map(s => s.id),
-            slotPhotoIds: sampleSlots.map(s => s.photoId)
+            slotPhotoIds: sampleSlots.map(s => s.photoId),
+            holePhotoAssignments
           });
 
           return (
@@ -137,7 +228,7 @@ export default function PackageTemplatePreview({
                         templateType: template.template_type,
                         driveFileId: template.drive_file_id,
                         holes: template.holes_data || [],
-                        dimensions: {
+                        dimensions: template.dimensions || {
                           width: 1200,
                           height: 1800
                         },
@@ -167,6 +258,8 @@ export default function PackageTemplatePreview({
                       selectedSlot={null}
                       isEditingMode={false}
                       isActiveTemplate={false} // Non-interactive preview
+                      debugHoles={true} // Enable debug mode to show hole borders instead of photos
+                      holePhotoAssignments={holePhotoAssignments} // Pass photo filename assignments
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">

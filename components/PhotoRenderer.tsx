@@ -34,6 +34,9 @@ interface PhotoRendererProps {
   
   // Smart reset callback for intelligent photo repositioning
   onSmartReset?: () => Promise<PhotoTransform>;
+  
+  // Preview mode - fills hole with object-cover instead of object-contain
+  previewMode?: boolean;
 }
 
 // Helper to convert legacy container transforms to CSS (backward compatibility)
@@ -54,7 +57,7 @@ function convertLegacyToCSS(containerTransform: ContainerTransform): React.CSSPr
 }
 
 // Convert photo-centric transform to CSS
-function convertPhotoToCSS(photoTransform: PhotoTransform): React.CSSProperties {
+function convertPhotoToCSS(photoTransform: PhotoTransform, previewMode: boolean = false): React.CSSProperties {
   // Simple direct conversion - photoCenterX/Y represent the center point of the visible area
   // photoScale represents zoom level relative to "fit" size
   
@@ -70,7 +73,11 @@ function convertPhotoToCSS(photoTransform: PhotoTransform): React.CSSProperties 
     input: photoTransform,
     translation: { translateX, translateY },
     cssTransform,
-    note: 'object-fit: contain baseline + adjustment scale for proper container scaling'
+    previewMode,
+    objectFit: previewMode ? 'cover' : 'contain',
+    note: previewMode 
+      ? 'Preview mode: object-cover fills hole completely, may crop photo'
+      : 'Edit mode: object-contain shows full photo with potential letterboxing'
   });
   
   return {
@@ -78,7 +85,7 @@ function convertPhotoToCSS(photoTransform: PhotoTransform): React.CSSProperties 
     transformOrigin: 'center center',
     width: '100%',
     height: '100%',
-    objectFit: 'contain' as const,
+    objectFit: previewMode ? 'cover' as const : 'contain' as const,
     // Improve image quality
     imageRendering: 'auto' as const,
     // Ensure smooth scaling
@@ -98,6 +105,7 @@ export default function PhotoRenderer({
   style = {},
   debug = false,
   fallbackUrls = [],
+  previewMode = false,
   showClippingIndicators = false,
   finalizationRef,
   onInteractionChange,
@@ -1179,12 +1187,12 @@ export default function PhotoRenderer({
     
     // For interactive mode, use full transform system
     if (transform && isPhotoTransform(transform)) {
-      return convertPhotoToCSS(transform);
+      return convertPhotoToCSS(transform, previewMode);
     } else if (transform && isContainerTransform(transform)) {
       return convertLegacyToCSS(transform);
     } else {
       return {
-        ...convertPhotoToCSS(currentTransform),
+        ...convertPhotoToCSS(currentTransform, previewMode),
         // Add smooth spring animation when auto-fitting
         transition: isSnapping ? 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none'
       };

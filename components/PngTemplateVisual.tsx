@@ -20,6 +20,10 @@ interface PngTemplateVisualProps {
   isEditingMode?: boolean;
   // Active template restriction
   isActiveTemplate?: boolean;
+  // Debug mode - shows only holes with borders, hides photos
+  debugHoles?: boolean;
+  // Photo filename assignments for each hole (for debug mode)
+  holePhotoAssignments?: string[];
 }
 
 
@@ -34,7 +38,9 @@ export default function PngTemplateVisual({
   onInlineApply,
   onInlineCancel,
   isEditingMode = false,
-  isActiveTemplate = true
+  isActiveTemplate = true,
+  debugHoles = false,
+  holePhotoAssignments = []
 }: PngTemplateVisualProps) {
   
   const getPhotoUrl = (photoId?: string | null) => {
@@ -147,11 +153,12 @@ export default function PngTemplateVisual({
       {pngTemplate.holes.map((hole, holeIndex) => {
         const slot = thisTemplateSlots[holeIndex];
         
-        // Debug hole information
+        // Debug hole information using template dimensions
         console.log(`🕳️ HOLE DEBUG ${holeIndex + 1}/${pngTemplate.holes.length}:`, {
           holeId: hole.id,
           position: { x: hole.x, y: hole.y },
           size: { width: hole.width, height: hole.height },
+          templateDimensions: pngTemplate.dimensions,
           percentages: {
             left: `${(hole.x / pngTemplate.dimensions.width) * 100}%`,
             top: `${(hole.y / pngTemplate.dimensions.height) * 100}%`,
@@ -245,7 +252,25 @@ export default function PngTemplateVisual({
                 : "Click to select slot"
             }
           >
-            {hasInlinePhoto && onInlineApply && onInlineCancel ? (
+            {debugHoles ? (
+              // Debug mode - show photo filename with enhanced borders, no photos
+              <div className="w-full h-full flex items-center justify-center bg-blue-100 border-4 border-blue-500 border-dashed">
+                <div className="text-center text-blue-800 font-mono text-xs">
+                  <div className="font-bold text-sm mb-1">
+                    {holePhotoAssignments[holeIndex] || `HOLE ${holeIndex + 1}`}
+                  </div>
+                  <div className="text-xs text-gray-600 mb-1">
+                    {Math.round(hole.width)}×{Math.round(hole.height)}
+                  </div>
+                  <div className="text-xs mb-1">AR: {(hole.width/hole.height).toFixed(2)}</div>
+                  {slot ? (
+                    <div className="text-green-600 text-xs">✓ HAS SLOT</div>
+                  ) : (
+                    <div className="text-red-600 text-xs">✗ NO SLOT</div>
+                  )}
+                </div>
+              </div>
+            ) : hasInlinePhoto && onInlineApply && onInlineCancel ? (
               // Inline editing mode - show InlinePhotoEditor
               <>
                 {console.log('🔧 PngTemplateVisual - Rendering InlinePhotoEditor:', {
@@ -277,6 +302,7 @@ export default function PngTemplateVisual({
                   photoAlt={`Photo ${holeIndex + 1}`}
                   transform={slot?.transform}
                   interactive={false}
+                  previewMode={isPreviewMode}
                   className="w-full h-full"
                   fallbackUrls={slot && photos.find(p => p.id === slot.photoId) ? getHighResPhotoUrls(photos.find(p => p.id === slot.photoId)!) : []}
                 />
