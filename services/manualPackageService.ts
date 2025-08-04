@@ -77,13 +77,15 @@ class ManualPackageServiceImpl implements IManualPackageService {
         .from('manual_packages')
         .select(`
           *,
-          package_templates (
+          package_templates!inner (
             id,
             order_index,
+            position,
             template:manual_templates (*)
           )
         `)
         .eq('id', id)
+        .order('position', { ascending: true, foreignTable: 'package_templates' })
         .single();
 
       if (error) {
@@ -336,6 +338,49 @@ class ManualPackageServiceImpl implements IManualPackageService {
       console.log('✅ Templates reordered successfully');
     } catch (error) {
       console.error(`❌ Error reordering templates:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Replace template at specific position in package
+   * Maintains the same position, just changes the template_id
+   */
+  async replaceTemplateAtPosition(packageId: string, position: number, newTemplateId: string): Promise<void> {
+    try {
+      console.log(`🔄 Replacing template at position ${position} in package ${packageId} with template ${newTemplateId}`);
+      
+      // Verify the position exists
+      const { data: existingTemplate } = await supabase
+        .from('package_templates')
+        .select('id, template_id')
+        .eq('package_id', packageId)
+        .eq('position', position)
+        .single();
+
+      if (!existingTemplate) {
+        throw new Error(`No template found at position ${position} in package ${packageId}`);
+      }
+
+      console.log(`📋 Replacing template ${existingTemplate.template_id} → ${newTemplateId} at position ${position}`);
+
+      // Update the template_id at the specific position
+      const { error } = await supabase
+        .from('package_templates')
+        .update({ template_id: newTemplateId })
+        .eq('package_id', packageId)
+        .eq('position', position);
+
+      if (error) {
+        throw new Error(`Failed to replace template at position ${position}: ${error.message}`);
+      }
+
+      // Clear cache since package templates changed
+      this.clearCache();
+      
+      console.log(`✅ Template replaced successfully at position ${position}`);
+    } catch (error) {
+      console.error(`❌ Error replacing template at position ${position}:`, error);
       throw error;
     }
   }

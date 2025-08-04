@@ -995,6 +995,7 @@ export interface ManualPackageService {
   updatePackage(id: string, updates: Partial<ManualPackage>): Promise<ManualPackage>;
   deletePackage(id: string): Promise<void>;
   getPackagesByPrintSize(printSize: PrintSize): Promise<ManualPackage[]>;
+  replaceTemplateAtPosition(packageId: string, position: number, newTemplateId: string): Promise<void>;
 }
 
 // Template Export System Types

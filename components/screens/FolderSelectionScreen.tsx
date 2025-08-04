@@ -1,11 +1,118 @@
 import { GoogleAuth, DriveFolder, Package, PackageGroup, ManualPackage, ManualTemplate, Photo } from '../../types';
 import HeaderNavigation from '../HeaderNavigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useReducer } from 'react';
 import { manualPackageService } from '../../services/manualPackageService';
 import { packageGroupService } from '../../services/packageGroupService';
 import { googleDriveService } from '../../services/googleDriveService';
 import AnimatedTemplateReveal from '../animations/AnimatedTemplateReveal';
 import PackageTemplatePreview from '../PackageTemplatePreview';
+
+// Template state management types
+interface TemplateState {
+  packageTemplates: Record<string, ManualTemplate[]>;
+  expandedPackageId: string | null;
+  loadingPackageId: string | null;
+  templateError: string | null;
+}
+
+type TemplateAction = 
+  | { type: 'SET_PACKAGE_TEMPLATES'; packageId: string; templates: ManualTemplate[] }
+  | { type: 'REPLACE_TEMPLATE_BY_POSITION'; packageId: string; templateIndex: number; newTemplate: ManualTemplate }
+  | { type: 'INVALIDATE_PACKAGE_TEMPLATES'; packageId: string }
+  | { type: 'SET_EXPANDED_PACKAGE'; packageId: string | null }
+  | { type: 'SET_LOADING'; packageId: string | null }
+  | { type: 'SET_ERROR'; error: string | null }
+  | { type: 'CLEAR_TEMPLATES' };
+
+// Idempotent template reducer - safe to run operations multiple times
+function templateReducer(state: TemplateState, action: TemplateAction): TemplateState {
+  switch (action.type) {
+    case 'SET_PACKAGE_TEMPLATES':
+      return {
+        ...state,
+        packageTemplates: {
+          ...state.packageTemplates,
+          [action.packageId]: action.templates
+        }
+      };
+    
+    case 'REPLACE_TEMPLATE_BY_POSITION':
+      const currentTemplates = state.packageTemplates[action.packageId] || [];
+      
+      // Validate template index
+      if (action.templateIndex < 0 || action.templateIndex >= currentTemplates.length) {
+        console.error('❌ INVALID TEMPLATE INDEX:', {
+          packageId: action.packageId,
+          templateIndex: action.templateIndex,
+          templatesCount: currentTemplates.length,
+          newTemplateName: action.newTemplate.name
+        });
+        return state;
+      }
+      
+      // Replace template at specific position (index-based, no ID matching)
+      const updatedTemplates = currentTemplates.map((template, index) =>
+        index === action.templateIndex ? action.newTemplate : template
+      );
+      
+      console.log('🔄 POSITION-BASED REPLACE - Template at index:', {
+        packageId: action.packageId,
+        templateIndex: action.templateIndex,
+        oldTemplate: {
+          id: currentTemplates[action.templateIndex]?.id,
+          name: currentTemplates[action.templateIndex]?.name
+        },
+        newTemplate: {
+          id: action.newTemplate.id,
+          name: action.newTemplate.name
+        },
+        beforeCount: currentTemplates.length,
+        afterCount: updatedTemplates.length
+      });
+      
+      return {
+        ...state,
+        packageTemplates: {
+          ...state.packageTemplates,
+          [action.packageId]: updatedTemplates
+        }
+      };
+    
+    case 'SET_EXPANDED_PACKAGE':
+      return { ...state, expandedPackageId: action.packageId };
+    
+    case 'SET_LOADING':
+      return { ...state, loadingPackageId: action.packageId };
+    
+    case 'SET_ERROR':
+      return { ...state, templateError: action.error };
+
+    case 'INVALIDATE_PACKAGE_TEMPLATES':
+      const { [action.packageId]: removed, ...remainingTemplates } = state.packageTemplates;
+      console.log('🗑️ INVALIDATING TEMPLATE CACHE for package:', {
+        packageId: action.packageId,
+        removedTemplatesCount: removed?.length || 0,
+        remainingPackages: Object.keys(remainingTemplates)
+      });
+      return { 
+        ...state, 
+        packageTemplates: remainingTemplates 
+      };
+    
+    case 'CLEAR_TEMPLATES':
+      return { ...state, packageTemplates: {} };
+    
+    default:
+      return state;
+  }
+}
+
+const initialTemplateState: TemplateState = {
+  packageTemplates: {},
+  expandedPackageId: null,
+  loadingPackageId: null,
+  templateError: null
+};
 
 interface FolderSelectionScreenProps {
   googleAuth: GoogleAuth;
@@ -175,15 +282,55 @@ export default function FolderSelectionScreen({
   const [isLoadingPackages, setIsLoadingPackages] = useState(false);
   const [packageError, setPackageError] = useState<string | null>(null);
   
-  // Template preview state - per package
-  const [expandedPackageId, setExpandedPackageId] = useState<string | null>(null);
-  const [packageTemplates, setPackageTemplates] = useState<Record<string, ManualTemplate[]>>({});
-  const [loadingPackageId, setLoadingPackageId] = useState<string | null>(null);
-  const [templateError, setTemplateError] = useState<string | null>(null);
+  // Template state managed by reducer (replaces scattered useState)
+  const [templateState, dispatchTemplate] = useReducer(templateReducer, initialTemplateState);
   
   // Individual template selection state
   const [selectedTemplates, setSelectedTemplates] = useState<ManualTemplate[]>([]);
   const [availablePhotos, setAvailablePhotos] = useState<Photo[]>([]);
+
+  // Database-first template replacement (eliminates race conditions)
+  const handleTemplateReplace = useCallback(async (packageId: string, packageName: string, templateIndex: number, newTemplate: ManualTemplate) => {
+    console.log('🔄 DATABASE-FIRST TEMPLATE REPLACEMENT:', {
+      packageId,
+      packageName,
+      templateIndex,
+      dbPosition: templateIndex + 1, // Convert 0-based to 1-based
+      newTemplateId: newTemplate.id,
+      newTemplateName: newTemplate.name
+    });
+    
+    // Clear any previous errors (no loading state to keep templates visible)
+    dispatchTemplate({ type: 'SET_ERROR', error: null });
+
+    try {
+      const dbPosition = templateIndex + 1; // Convert 0-based to 1-based
+      console.log(`💾 Updating database: position ${dbPosition} → template ${newTemplate.id}`);
+      
+      // Update database first (single source of truth)
+      await manualPackageService.replaceTemplateAtPosition(
+        packageId,
+        dbPosition,
+        newTemplate.id.toString()
+      );
+      
+      console.log('✅ Database updated successfully');
+      
+      // Clear stale cache and reload fresh data (single consistent update)
+      console.log('🔄 Reloading fresh templates from database');
+      dispatchTemplate({ type: 'INVALIDATE_PACKAGE_TEMPLATES', packageId });
+      await loadPackageTemplates(packageId, packageName);
+      
+      console.log('✅ Template replacement completed successfully');
+    } catch (error) {
+      console.error('❌ Template replacement failed:', error);
+      
+      dispatchTemplate({ 
+        type: 'SET_ERROR', 
+        error: `Failed to change template: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      });
+    }
+  }, []);
 
   // Utility function to transform Google Drive URLs to direct image URLs
   const transformGoogleDriveUrl = (url: string): string => {
@@ -330,14 +477,14 @@ export default function FolderSelectionScreen({
     });
     
     // Check if we already have templates for this package
-    if (packageTemplates[packageId]) {
+    if (templateState.packageTemplates[packageId]) {
       console.log('📋 DEBUGGING - Using cached templates for package:', packageId);
-      setExpandedPackageId(packageId);
+      dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId });
       return;
     }
     
-    setLoadingPackageId(packageId);
-    setTemplateError(null);
+    dispatchTemplate({ type: 'SET_LOADING', packageId });
+    dispatchTemplate({ type: 'SET_ERROR', error: null });
     
     try {
       console.log('🔄 DEBUGGING - Calling manualPackageService.getPackageWithTemplates...');
@@ -365,19 +512,21 @@ export default function FolderSelectionScreen({
         })));
         
         // Store templates for this package
-        setPackageTemplates(prev => ({
-          ...prev,
-          [packageId]: packageWithTemplates.templates || []
-        }));
-        setExpandedPackageId(packageId);
+        dispatchTemplate({
+          type: 'SET_PACKAGE_TEMPLATES',
+          packageId,
+          templates: packageWithTemplates.templates || []
+        });
+        dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId });
       } else {
         console.log('⚠️ DEBUGGING - No templates found or invalid response structure');
         // Store empty array for this package so we don't keep trying to load
-        setPackageTemplates(prev => ({
-          ...prev,
-          [packageId]: []
-        }));
-        setExpandedPackageId(packageId);
+        dispatchTemplate({
+          type: 'SET_PACKAGE_TEMPLATES',
+          packageId,
+          templates: []
+        });
+        dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId });
       }
     } catch (error: any) {
       console.error('❌ DEBUGGING - Error loading templates:', {
@@ -387,15 +536,16 @@ export default function FolderSelectionScreen({
         packageId,
         packageName
       });
-      setTemplateError(error.message || 'Failed to load templates');
+      dispatchTemplate({ type: 'SET_ERROR', error: error.message || 'Failed to load templates' });
       // Store empty array on error so we don't keep retrying
-      setPackageTemplates(prev => ({
-        ...prev,
-        [packageId]: []
-      }));
-      setExpandedPackageId(packageId);
+      dispatchTemplate({
+        type: 'SET_PACKAGE_TEMPLATES',
+        packageId,
+        templates: []
+      });
+      dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId });
     } finally {
-      setLoadingPackageId(null);
+      dispatchTemplate({ type: 'SET_LOADING', packageId: null });
     }
   };
 
@@ -403,8 +553,8 @@ export default function FolderSelectionScreen({
   useEffect(() => {
     if (showPackageSelection) {
       setSelectedPackage(null); // Reset selected package when entering package selection
-      setExpandedPackageId(null); // Reset expanded package
-      setPackageTemplates({}); // Clear cached templates
+      dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId: null }); // Reset expanded package
+      dispatchTemplate({ type: 'CLEAR_TEMPLATES' }); // Clear cached templates
       loadPackages();
     }
   }, [showPackageSelection]);
@@ -420,8 +570,8 @@ export default function FolderSelectionScreen({
     setShowPackageSelection(false);
     setSelectedFolder(null);
     setSelectedPackage(null);
-    setExpandedPackageId(null);
-    setPackageTemplates({});
+    dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId: null });
+    dispatchTemplate({ type: 'CLEAR_TEMPLATES' });
   };
 
   const handlePackageContinue = () => {
@@ -432,7 +582,7 @@ export default function FolderSelectionScreen({
 
   const handleChangePackage = () => {
     setSelectedPackage(null);
-    setExpandedPackageId(null);
+    dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId: null });
   };
 
   return (
@@ -569,8 +719,8 @@ export default function FolderSelectionScreen({
                                         };
                                         
                                         // If this package is already expanded, collapse it
-                                        if (expandedPackageId === pkg.id.toString()) {
-                                          setExpandedPackageId(null);
+                                        if (templateState.expandedPackageId === pkg.id.toString()) {
+                                          dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId: null });
                                           setSelectedPackage(null);
                                         } else {
                                           // Expand this package and load templates
@@ -623,16 +773,20 @@ export default function FolderSelectionScreen({
                                     </div>
 
                                     {/* Template Preview - Show directly below this package when expanded */}
-                                    <AnimatedTemplateReveal show={expandedPackageId === pkg.id.toString()}>
-                                      {expandedPackageId === pkg.id.toString() && (
+                                    <AnimatedTemplateReveal show={templateState.expandedPackageId === pkg.id.toString()}>
+                                      {templateState.expandedPackageId === pkg.id.toString() && (
                                         <PackageTemplatePreview
-                                          templates={packageTemplates[pkg.id.toString()] || []}
+                                          templates={templateState.packageTemplates[pkg.id.toString()] || []}
                                           packageName={pkg.name}
+                                          packageId={pkg.id.toString()}
                                           onContinue={handlePackageContinue}
                                           onChangePackage={handleChangePackage}
                                           onTemplateSelect={handleTemplateSelect}
                                           availablePhotos={availablePhotos}
-                                          loading={loadingPackageId === pkg.id.toString()}
+                                          loading={templateState.loadingPackageId === pkg.id.toString()}
+                                          onTemplateReplace={(packageId, templateIndex, newTemplate) => 
+                                            handleTemplateReplace(packageId, pkg.name, templateIndex, newTemplate)
+                                          }
                                         />
                                       )}
                                     </AnimatedTemplateReveal>
@@ -675,8 +829,8 @@ export default function FolderSelectionScreen({
                                       };
                                       
                                       // If this package is already expanded, collapse it
-                                      if (expandedPackageId === pkg.id.toString()) {
-                                        setExpandedPackageId(null);
+                                      if (templateState.expandedPackageId === pkg.id.toString()) {
+                                        dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId: null });
                                         setSelectedPackage(null);
                                       } else {
                                         // Expand this package and load templates
@@ -729,16 +883,20 @@ export default function FolderSelectionScreen({
                                   </div>
 
                                   {/* Template Preview - Show directly below this package when expanded */}
-                                  <AnimatedTemplateReveal show={expandedPackageId === pkg.id.toString()}>
-                                    {expandedPackageId === pkg.id.toString() && (
+                                  <AnimatedTemplateReveal show={templateState.expandedPackageId === pkg.id.toString()}>
+                                    {templateState.expandedPackageId === pkg.id.toString() && (
                                       <PackageTemplatePreview
-                                        templates={packageTemplates[pkg.id.toString()] || []}
+                                        templates={templateState.packageTemplates[pkg.id.toString()] || []}
                                         packageName={pkg.name}
+                                        packageId={pkg.id.toString()}
                                         onContinue={handlePackageContinue}
                                         onChangePackage={handleChangePackage}
                                         onTemplateSelect={handleTemplateSelect}
                                         availablePhotos={availablePhotos}
-                                        loading={loadingPackageId === pkg.id.toString()}
+                                        loading={templateState.loadingPackageId === pkg.id.toString()}
+                                        onTemplateReplace={(packageId, templateIndex, newTemplate) => 
+                                          handleTemplateReplace(packageId, pkg.name, templateIndex, newTemplate)
+                                        }
                                       />
                                     )}
                                   </AnimatedTemplateReveal>

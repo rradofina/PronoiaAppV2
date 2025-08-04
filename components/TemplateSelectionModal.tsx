@@ -37,7 +37,7 @@ function createPreviewTransform(holeAspectRatio: number, photoAspectRatio: numbe
 interface TemplateSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentTemplate: ManualTemplate;
+  currentTemplate: {template: ManualTemplate, index: number};
   availablePhotos: Photo[];
   onTemplateSelect: (template: ManualTemplate) => void;
 }
@@ -60,25 +60,20 @@ export default function TemplateSelectionModal({
       
       setIsLoading(true);
       try {
-        console.log('🔄 TemplateSelectionModal - Loading templates for print size:', currentTemplate.print_size);
+        console.log('🔄 TemplateSelectionModal - Loading templates for print size:', currentTemplate.template.print_size);
         
-        // Get all templates with same print size
-        const printSizeTemplates = await manualTemplateService.getTemplatesByPrintSize(currentTemplate.print_size);
+        // Get all templates with same print size in natural database order
+        const printSizeTemplates = await manualTemplateService.getTemplatesByPrintSize(currentTemplate.template.print_size);
         
-        // Include current template but put it first in the list
-        const currentTemplateInList = printSizeTemplates.find(t => t.id === currentTemplate.id);
-        const otherTemplates = printSizeTemplates.filter(t => t.id !== currentTemplate.id);
+        // Use natural database ordering (sort_order ASC, created_at DESC)
+        // Current template will appear in its proper position and be visually distinguished
+        const allTemplates = printSizeTemplates;
         
-        // Combine with current template first
-        const allTemplates = currentTemplateInList 
-          ? [currentTemplateInList, ...otherTemplates]
-          : otherTemplates;
-        
-        console.log('📋 Available templates for', currentTemplate.print_size + ':', {
+        console.log('📋 Available templates for', currentTemplate.template.print_size + ':', {
           totalFound: printSizeTemplates.length,
-          withCurrent: allTemplates.length,
-          currentTemplateId: currentTemplate.id,
-          templateNames: allTemplates.map(t => t.name)
+          currentTemplateId: currentTemplate.template.id,
+          templateNames: allTemplates.map(t => t.name),
+          naturalOrdering: true
         });
         
         setAvailableTemplates(allTemplates);
@@ -99,10 +94,20 @@ export default function TemplateSelectionModal({
   };
 
   const handleConfirm = () => {
-    if (selectedTemplate) {
-      onTemplateSelect(selectedTemplate);
-      onClose();
+    if (!selectedTemplate) {
+      console.log('⚠️ No template selected for replacement');
+      return;
     }
+
+    console.log('🔄 SIMPLE TEMPLATE CONFIRM:', {
+      selectedTemplateId: selectedTemplate.id,
+      selectedTemplateName: selectedTemplate.name,
+      currentTemplateId: currentTemplate.template.id,
+      currentTemplateIndex: currentTemplate.index
+    });
+
+    onTemplateSelect(selectedTemplate);
+    onClose();
   };
 
   const handleCancel = () => {
@@ -138,7 +143,7 @@ export default function TemplateSelectionModal({
             >
               <Dialog.Panel className="w-fit max-w-[90vw] min-w-[600px] mx-auto transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                 <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900 mb-4">
-                  Change Template - {currentTemplate.print_size} Templates
+                  Change Template - {currentTemplate.template.print_size} Templates
                 </Dialog.Title>
 
                 {isLoading ? (
@@ -149,12 +154,12 @@ export default function TemplateSelectionModal({
                 ) : availableTemplates.length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
                     <div className="text-lg mb-2">No other templates available</div>
-                    <div className="text-sm">No other {currentTemplate.print_size} templates found</div>
+                    <div className="text-sm">No other {currentTemplate.template.print_size} templates found</div>
                   </div>
                 ) : (
                   <>
                     <div className="text-sm text-gray-600 mb-4 text-center">
-                      Select a different {currentTemplate.print_size} template ({availableTemplates.length - 1} alternatives available)
+                      Select a different {currentTemplate.template.print_size} template ({availableTemplates.length} templates available)
                     </div>
 
                     {/* Templates Grid */}
@@ -198,7 +203,7 @@ export default function TemplateSelectionModal({
                         });
 
                         const isSelected = selectedTemplate?.id === template.id;
-                        const isCurrent = template.id === currentTemplate.id;
+                        const isCurrent = template.id === currentTemplate.template.id;
 
                         return (
                           <AnimatedTemplateItem key={template.id} index={index}>
