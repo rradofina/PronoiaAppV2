@@ -110,7 +110,7 @@ export function getSamplePhotosForTemplate(
       ...originalPhoto,
       id: `preview-${templateId}-${i}`,
       name: `Preview ${i + 1}`,
-      url: getOptimizedPhotoUrl(originalPhoto, 's300'), // Smaller size for preview
+      url: getOptimizedPhotoUrl(originalPhoto, 's600'), // Higher resolution for preview
       thumbnailUrl: getOptimizedPhotoUrl(originalPhoto, 's200') // Even smaller thumbnail
     };
     

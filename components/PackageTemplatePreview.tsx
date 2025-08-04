@@ -5,25 +5,29 @@ import PngTemplateVisual from './PngTemplateVisual';
 import { getSamplePhotosForTemplate } from '../utils/samplePhotoUtils';
 import { createPhotoTransform, PhotoTransform } from '../types';
 
-// Create smart preview transform that optimizes photo for hole aspect ratio
+// Create smart preview transform that optimizes photo for hole aspect ratio with gap-free auto-fit
 function createPreviewTransform(holeAspectRatio: number, photoAspectRatio: number | null = null): PhotoTransform {
-  // For preview mode, we want photos to fill holes nicely using object-cover
-  // Start with a reasonable zoom level that ensures full coverage
-  let previewScale = 1.2; // Slightly zoomed in for better visual appeal
+  // For preview mode, we want photos to completely fill holes with no gaps (object-cover behavior)
+  // Calculate the scale needed to ensure no empty space in holes
+  let previewScale = 1.0; // Start with base scale
   
-  // If we know the photo aspect ratio, we can optimize the transform
+  // If we know the photo aspect ratio, calculate exact scale for gap-free fit
   if (photoAspectRatio) {
-    // If photo is much wider than hole, zoom in more to show the interesting center
-    if (photoAspectRatio > holeAspectRatio * 1.5) {
-      previewScale = 1.4; // Zoom in more on wide photos in tall holes
+    if (photoAspectRatio > holeAspectRatio) {
+      // Photo is wider than hole - need to scale by height to fill completely
+      // This ensures height fills hole completely, width may overflow (no gaps)
+      previewScale = 1.0; // PhotoRenderer with object-cover handles this automatically
+    } else {
+      // Photo is taller than hole - need to scale by width to fill completely  
+      // This ensures width fills hole completely, height may overflow (no gaps)
+      previewScale = 1.0; // PhotoRenderer with object-cover handles this automatically
     }
-    // If photo is much taller than hole, use less zoom to show more of the photo
-    else if (photoAspectRatio < holeAspectRatio * 0.7) {
-      previewScale = 1.1; // Less zoom on tall photos in wide holes
-    }
+  } else {
+    // No photo aspect ratio available, use safe auto-fit scale
+    previewScale = 1.0; // Let object-cover behavior handle gap elimination
   }
   
-  // Center the photo by default for preview
+  // Center the photo by default for preview - object-cover will handle proper scaling
   return createPhotoTransform(previewScale, 0.5, 0.5);
 }
 
@@ -201,14 +205,24 @@ export default function PackageTemplatePreview({
           return (
             <AnimatedTemplateItem key={template.id} index={index}>
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow">
-                {/* Template Name and Info */}
-                <div className="mb-3">
-                  <h4 className="font-medium text-gray-900 text-sm truncate">
-                    {template.name}
-                  </h4>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {template.template_type} • {template.print_size}
+                {/* Template Header with Name and Change Button */}
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900 text-sm truncate">
+                      {template.name}
+                    </h4>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {template.holes_data?.length || 0} photo slot{(template.holes_data?.length || 0) !== 1 ? 's' : ''}
+                    </div>
                   </div>
+                  {onTemplateSelect && (
+                    <button
+                      onClick={() => onTemplateSelect(template)}
+                      className="ml-2 bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 whitespace-nowrap"
+                    >
+                      Change Template
+                    </button>
+                  )}
                 </div>
 
                 {/* Template Visual Preview with Sample Photos */}
@@ -216,8 +230,8 @@ export default function PackageTemplatePreview({
                   className="bg-white rounded border border-gray-200 overflow-hidden mb-3 flex items-center justify-center"
                   style={{
                     aspectRatio: `${template.holes_data && template.holes_data.length > 0 ? '1200/1800' : '2/3'}`,
-                    minHeight: '200px',
-                    maxHeight: '400px'
+                    minHeight: '250px',
+                    maxHeight: '500px'
                   }}
                 >
                   {template.drive_file_id ? (
@@ -258,7 +272,7 @@ export default function PackageTemplatePreview({
                       selectedSlot={null}
                       isEditingMode={false}
                       isActiveTemplate={false} // Non-interactive preview
-                      debugHoles={true} // Enable debug mode to show hole borders instead of photos
+                      debugHoles={false} // Show actual photos with auto-fit
                       holePhotoAssignments={holePhotoAssignments} // Pass photo filename assignments
                     />
                   ) : (
@@ -268,20 +282,6 @@ export default function PackageTemplatePreview({
                   )}
                 </div>
 
-                {/* Template Stats */}
-                <div className="mb-3 text-xs text-gray-500 text-center">
-                  {template.holes_data?.length || 0} photo slot{(template.holes_data?.length || 0) !== 1 ? 's' : ''}
-                </div>
-
-                {/* Individual Template Action Button */}
-                {onTemplateSelect && (
-                  <button
-                    onClick={() => onTemplateSelect(template)}
-                    className="w-full bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                  >
-                    Use This Template
-                  </button>
-                )}
               </div>
             </AnimatedTemplateItem>
           );
