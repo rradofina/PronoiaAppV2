@@ -3,6 +3,7 @@ import { ManualTemplate, Photo } from '../types';
 import { AnimatedTemplateItem } from './animations/AnimatedTemplateReveal';
 import PngTemplateVisual from './PngTemplateVisual';
 import TemplateSelectionModal from './TemplateSelectionModal';
+import AddPrintsModal from './AddPrintsModal';
 import { getSamplePhotosForTemplate } from '../utils/samplePhotoUtils';
 import { createPhotoTransform, PhotoTransform } from '../types';
 
@@ -42,6 +43,7 @@ interface PackageTemplatePreviewProps {
   availablePhotos?: Photo[]; // Photos from client folder for samples
   loading?: boolean;
   onTemplateReplace?: (packageId: string, templateIndex: number, newTemplate: ManualTemplate) => void; // Position-based dispatch callback
+  onTemplateAdd?: (template: ManualTemplate) => void; // Callback for adding new templates to package
 }
 
 export default function PackageTemplatePreview({
@@ -53,12 +55,16 @@ export default function PackageTemplatePreview({
   onTemplateSelect,
   availablePhotos = [],
   loading = false,
-  onTemplateReplace
+  onTemplateReplace,
+  onTemplateAdd
 }: PackageTemplatePreviewProps) {
   
   // Modal state for template selection
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateToChange, setTemplateToChange] = useState<{template: ManualTemplate, index: number} | null>(null);
+  
+  // Modal state for adding prints
+  const [showAddPrintsModal, setShowAddPrintsModal] = useState(false);
   
   // Use templates directly from props since parent manages state
   const currentTemplates = templates;
@@ -99,6 +105,17 @@ export default function PackageTemplatePreview({
   const handleCloseModal = () => {
     setShowTemplateModal(false);
     setTemplateToChange(null);
+  };
+
+  const handleAddPrints = () => {
+    setShowAddPrintsModal(true);
+  };
+
+  const handleTemplateAdd = (template: ManualTemplate) => {
+    if (onTemplateAdd) {
+      onTemplateAdd(template);
+    }
+    setShowAddPrintsModal(false);
   };
 
   // Count total holes across all templates for global photo assignment
@@ -159,11 +176,26 @@ export default function PackageTemplatePreview({
     <div className="mt-6 p-6 bg-white rounded-lg shadow-sm border border-gray-200">
       {/* Header */}
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Templates in "{packageName}"
-        </h3>
-        <div className="text-sm text-gray-600">
-          {currentTemplates.length} template{currentTemplates.length > 1 ? 's' : ''} available
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Templates in "{packageName}"
+            </h3>
+            <div className="text-sm text-gray-600">
+              {currentTemplates.length} template{currentTemplates.length > 1 ? 's' : ''} available
+            </div>
+          </div>
+          
+          {/* Add Prints Button */}
+          {onTemplateAdd && (
+            <button
+              onClick={handleAddPrints}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+            >
+              <span className="text-lg">+</span>
+              <span>Add Prints</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -369,6 +401,14 @@ export default function PackageTemplatePreview({
           onTemplateSelect={handleTemplateReplace}
         />
       )}
+
+      {/* Add Prints Modal */}
+      <AddPrintsModal
+        isOpen={showAddPrintsModal}
+        onClose={() => setShowAddPrintsModal(false)}
+        onTemplateAdd={handleTemplateAdd}
+        availablePhotos={availablePhotos}
+      />
     </div>
   );
 }

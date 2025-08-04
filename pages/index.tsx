@@ -675,24 +675,35 @@ export default function Home() {
     }
   };
 
-  const handlePackageContinue = async () => {
+  const handlePackageContinue = async (effectiveTemplates?: ManualTemplate[]) => {
     if (selectedPackage && clientName.trim()) {
       try {
         const startTime = performance.now();
         
-        console.log('📋 Loading configured templates for manual package:', selectedPackage.name);
+        let orderedTemplates: ManualTemplate[];
         
-        // Load package with its configured templates
-        const packageWithTemplates = await manualPackageService.getPackageWithTemplates(selectedPackage.id);
-        
-        if (!packageWithTemplates || !packageWithTemplates.package_templates) {
-          throw new Error(`Package ${selectedPackage.name} has no configured templates. Please configure templates in the Package Manager.`);
+        if (effectiveTemplates && effectiveTemplates.length > 0) {
+          // Use effective templates passed from package selection (includes session changes/additions)
+          console.log('📋 Using effective templates from package selection (includes session changes):', {
+            templatesCount: effectiveTemplates.length,
+            templates: effectiveTemplates.map(t => ({ id: t.id, name: t.name }))
+          });
+          orderedTemplates = effectiveTemplates;
+        } else {
+          // Fallback: Load from database (original behavior)
+          console.log('📋 Fallback: Loading configured templates from database for manual package:', selectedPackage.name);
+          
+          const packageWithTemplates = await manualPackageService.getPackageWithTemplates(selectedPackage.id);
+          
+          if (!packageWithTemplates || !packageWithTemplates.package_templates) {
+            throw new Error(`Package ${selectedPackage.name} has no configured templates. Please configure templates in the Package Manager.`);
+          }
+          
+          // Sort templates by order_index to maintain Print #1, Print #2, etc. order
+          orderedTemplates = packageWithTemplates.package_templates
+            .sort((a, b) => a.order_index - b.order_index)
+            .map(pt => pt.template);
         }
-        
-        // Sort templates by order_index to maintain Print #1, Print #2, etc. order
-        const orderedTemplates = packageWithTemplates.package_templates
-          .sort((a, b) => a.order_index - b.order_index)
-          .map(pt => pt.template);
         
         console.log(`✅ Found ${orderedTemplates.length} configured templates for package:`, orderedTemplates.map(t => t.name));
         

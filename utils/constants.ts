@@ -154,6 +154,9 @@ export const validateImageUrl = (url: string): boolean => {
   return extension ? SUPPORTED_IMAGE_EXTENSIONS.indexOf(`.${extension}`) !== -1 : false;
 };
 
+// Print size display ordering (configurable, not hardcoded in components)
+export const PRINT_SIZE_ORDER = ['4R', '5R', 'A4'] as const;
+
 // REMOVED: Print size configurations are now loaded from database
 // Use templateConfigService.getAvailablePrintSizes() to get dynamic print sizes
 // No hardcoded print size configurations - everything comes from manual_templates table
