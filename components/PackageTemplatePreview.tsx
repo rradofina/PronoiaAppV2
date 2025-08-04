@@ -260,7 +260,7 @@ export default function PackageTemplatePreview({
           });
 
           return (
-            <AnimatedTemplateItem key={`${template.id}-${Date.now()}`} index={index}>
+            <AnimatedTemplateItem key={`${template.id}-${index}`} index={index}>
               <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:shadow-md transition-shadow">
                 {/* Template Header with Name and Change Button */}
                 <div className="flex justify-between items-start mb-2">

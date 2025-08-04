@@ -316,10 +316,14 @@ export default function FolderSelectionScreen({
       
       console.log('✅ Database updated successfully');
       
-      // Clear stale cache and reload fresh data (single consistent update)
-      console.log('🔄 Reloading fresh templates from database');
-      dispatchTemplate({ type: 'INVALIDATE_PACKAGE_TEMPLATES', packageId });
-      await loadPackageTemplates(packageId, packageName);
+      // Update React state directly (no cache invalidation, no animations)
+      console.log('🔄 Updating React state with new template');
+      dispatchTemplate({
+        type: 'REPLACE_TEMPLATE_BY_POSITION',
+        packageId,
+        templateIndex,
+        newTemplate
+      });
       
       console.log('✅ Template replacement completed successfully');
     } catch (error) {
