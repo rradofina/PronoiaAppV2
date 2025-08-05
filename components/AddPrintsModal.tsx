@@ -71,7 +71,7 @@ export default function AddPrintsModal({
         const availableSizes = Object.keys(grouped);
         const sortedSizes = [
           ...PRINT_SIZE_ORDER.filter(size => availableSizes.includes(size)), // First: ordered sizes that exist
-          ...availableSizes.filter(size => !PRINT_SIZE_ORDER.includes(size)).sort() // Then: any additional sizes alphabetically
+          ...availableSizes.filter(size => !(PRINT_SIZE_ORDER as readonly string[]).includes(size)).sort() // Then: any additional sizes alphabetically
         ];
         setPrintSizes(sortedSizes);
       } catch (error) {

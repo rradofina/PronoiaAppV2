@@ -5,7 +5,7 @@ import useDriveStore from '../stores/driveStore';
 import useSessionStore from '../stores/sessionStore';
 import useTemplateStore from '../stores/templateStore';
 import useUiStore from '../stores/uiStore';
-import { DriveFolder, TemplateSlot, Photo, TemplateTypeInfo, Package, TemplateType } from '../types';
+import { DriveFolder, TemplateSlot, Photo, TemplateTypeInfo, Package, TemplateType, ManualTemplate } from '../types';
 import DriveSetupScreen from '../components/screens/DriveSetupScreen';
 import FolderSelectionScreen from '../components/screens/FolderSelectionScreen';
 import PackageSelectionScreen from '../components/screens/PackageSelectionScreen';

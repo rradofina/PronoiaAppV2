@@ -673,10 +673,10 @@ export default function PhotoSelectionScreen({
     
     try {
       // Remove photo from slot
-      const updatedSlot = {
+      const updatedSlot: TemplateSlot = {
         ...slot,
-        photoId: null,
-        transform: null
+        photoId: undefined,
+        transform: undefined
       };
 
       // Update the slot in templateSlots array
