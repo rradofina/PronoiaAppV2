@@ -18,7 +18,8 @@ import TemplateGrid from '../TemplateGrid';
 import TemplateSwapModal from '../TemplateSwapModal';
 import FavoritesBar from '../FavoritesBar';
 import OriginalTemplateVisual from '../TemplateVisual';
-// NOTE: Removed viewport constraints imports - using fixed height layout now
+import { setupViewportHandler, getViewportInfo } from '../../utils/viewportUtils';
+// NOTE: Added viewport utilities for iPad Safari compatibility
 
 
 // Simplified TemplateVisual component
@@ -345,6 +346,20 @@ export default function PhotoSelectionScreen({
   const [showTemplateSwapper, setShowTemplateSwapper] = useState(false);
   const [templateToSwap, setTemplateToSwap] = useState<{ templateId: string; templateName: string; slots: TemplateSlot[] } | null>(null);
   const [templateToView, setTemplateToView] = useState<{ templateId: string; templateName: string; slots: TemplateSlot[] } | null>(null);
+
+  // Setup viewport handling for iPad Safari compatibility
+  useEffect(() => {
+    const cleanup = setupViewportHandler((info) => {
+      console.log('📱 PhotoSelectionScreen viewport update:', {
+        dimensions: `${info.width}×${info.height}`,
+        visualHeight: info.visualHeight,
+        isIpad: info.isIpad,
+        needsAdjustment: info.height !== info.visualHeight
+      });
+    });
+    
+    return cleanup;
+  }, []);
 
   // Load available templates
   useEffect(() => {
