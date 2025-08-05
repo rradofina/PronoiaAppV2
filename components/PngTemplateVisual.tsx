@@ -24,6 +24,14 @@ interface PngTemplateVisualProps {
   debugHoles?: boolean;
   // Photo filename assignments for each hole (for debug mode)
   holePhotoAssignments?: string[];
+  // Edit button state and handler
+  slotShowingEditButton?: TemplateSlot | null;
+  onEditButtonClick?: (slot: TemplateSlot) => void;
+  // Remove confirmation state and handlers
+  slotShowingRemoveConfirmation?: TemplateSlot | null;
+  onRemoveButtonClick?: (slot: TemplateSlot) => void;
+  onConfirmRemove?: (slot: TemplateSlot) => void;
+  onCancelRemove?: () => void;
 }
 
 
@@ -40,7 +48,13 @@ export default function PngTemplateVisual({
   isEditingMode = false,
   isActiveTemplate = true,
   debugHoles = false,
-  holePhotoAssignments = []
+  holePhotoAssignments = [],
+  slotShowingEditButton = null,
+  onEditButtonClick,
+  slotShowingRemoveConfirmation = null,
+  onRemoveButtonClick,
+  onConfirmRemove,
+  onCancelRemove
 }: PngTemplateVisualProps) {
   
   const getPhotoUrl = (photoId?: string | null) => {
@@ -127,7 +141,7 @@ export default function PngTemplateVisual({
 
   return (
     <div 
-      className="relative w-full h-full overflow-hidden"
+      className="relative w-full h-full overflow-visible"
       style={{ 
         aspectRatio: `${pngTemplate.dimensions.width}/${pngTemplate.dimensions.height}`,
         maxWidth: '100%',
@@ -148,6 +162,11 @@ export default function PngTemplateVisual({
           backgroundColor: !isActiveTemplate ? 'transparent' : undefined
         }}
       />
+      
+      {/* Template background darkening overlay during editing */}
+      {isEditingMode && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 pointer-events-none transition-opacity duration-200" />
+      )}
       
       {/* Photo Holes Overlay */}
       {pngTemplate.holes.map((hole, holeIndex) => {
@@ -222,9 +241,9 @@ export default function PngTemplateVisual({
         return (
           <div
             key={hole.id}
-            className={`absolute transition-all duration-200 overflow-hidden ${
+            className={`absolute transition-all duration-200 ${
               isInlineEditing 
-                ? 'border-4 border-blue-400 shadow-lg shadow-blue-400/50 z-50 ring-2 ring-blue-300' // Enhanced highlighting for inline editing (changed to blue)
+                ? 'z-50' // Clean editing experience - no border highlights during editing
                 : isSelected 
                 ? 'border-4 border-blue-500 border-opacity-90 z-40 cursor-pointer shadow-md' // Above overlay (z-30)
                 : shouldApplyDarkening
@@ -281,14 +300,16 @@ export default function PngTemplateVisual({
                   hasOnInlineApply: !!onInlineApply,
                   hasOnInlineCancel: !!onInlineCancel
                 })}
-                <InlinePhotoEditor
-                  slot={slot}
-                  photo={inlineEditingPhoto}
-                  photos={photos}
-                  onApply={onInlineApply}
-                  onCancel={onInlineCancel}
-                  className="w-full h-full"
-                />
+                <div className="w-full h-full overflow-hidden">
+                  <InlinePhotoEditor
+                    slot={slot}
+                    photo={inlineEditingPhoto}
+                    photos={photos}
+                    onApply={onInlineApply}
+                    onCancel={onInlineCancel}
+                    className="w-full h-full"
+                  />
+                </div>
               </>
             ) : photoUrl ? (
               // Normal mode - show photo with high-resolution fallbacks
@@ -299,15 +320,22 @@ export default function PngTemplateVisual({
                   holeSize: { width: hole.width, height: hole.height },
                   holePosition: { x: hole.x, y: hole.y }
                 })}
-                <PhotoRenderer
-                  photoUrl={photoUrl}
-                  photoAlt={`Photo ${holeIndex + 1}`}
-                  transform={slot?.transform}
-                  interactive={false}
-                  previewMode={isPreviewMode}
-                  className="w-full h-full"
-                  fallbackUrls={slot && photos.find(p => p.id === slot.photoId) ? getHighResPhotoUrls(photos.find(p => p.id === slot.photoId)!) : []}
-                />
+                <div className="w-full h-full overflow-hidden">
+                  <PhotoRenderer
+                    photoUrl={photoUrl}
+                    photoAlt={`Photo ${holeIndex + 1}`}
+                    transform={slot?.transform}
+                    interactive={false}
+                    previewMode={isPreviewMode}
+                    className="w-full h-full"
+                    fallbackUrls={slot && photos.find(p => p.id === slot.photoId) ? getHighResPhotoUrls(photos.find(p => p.id === slot.photoId)!) : []}
+                  />
+                </div>
+                
+                {/* Darkening overlay for non-selected slots during editing */}
+                {shouldApplyDarkening && (
+                  <div className="absolute inset-0 bg-black bg-opacity-60 transition-opacity duration-200 pointer-events-none" />
+                )}
               </>
             ) : (
               // Empty slot - show placeholder with enhanced highlighting when selected
@@ -317,11 +345,16 @@ export default function PngTemplateVisual({
                   : isSelected 
                   ? 'bg-blue-50 border-blue-400' 
                   : isPreviewMode
-                  ? 'bg-blue-50 border-blue-500' // Visible preview placeholder
+                  ? 'bg-gray-100 border-gray-300' // Neutral inactive placeholder
                   : shouldApplyDarkening
-                  ? 'bg-gray-100 border-gray-300' // Dimmed background during editing
+                  ? 'bg-gray-500 border-gray-600' // Darker background during editing for consistency
                   : 'bg-gray-200 border-gray-400'
               }`}>
+                
+                {/* Additional darkening overlay for empty slots during editing */}
+                {shouldApplyDarkening && (
+                  <div className="absolute inset-0 bg-black bg-opacity-40 transition-opacity duration-200 pointer-events-none" />
+                )}
                 {/* Visible placeholder with debug info */}
                 <div className={`text-center ${
                   isInlineEditing 
@@ -329,22 +362,76 @@ export default function PngTemplateVisual({
                     : isSelected 
                     ? 'text-blue-600 font-semibold' 
                     : isPreviewMode
-                    ? 'text-blue-600 font-medium' // Visible preview text
+                    ? 'text-gray-500 font-medium' // Neutral inactive text
                     : shouldApplyDarkening
                     ? 'text-gray-400' // Grayed out during editing
                     : 'text-gray-500'
                 }`}>
                   <div className="text-sm mb-1">
-                    {isPreviewMode ? `H${holeIndex + 1}` : (shouldBlockSlot ? '·' : '+')}
+                    {shouldBlockSlot ? '·' : '+'}
                   </div>
                   <div className="text-xs font-medium">
-                    {isPreviewMode 
-                      ? `${Math.round(hole.width)}×${Math.round(hole.height)}`
-                      : isInlineEditing 
+                    {isInlineEditing 
                       ? 'Select Photo Below' 
                       : 'Tap to Add'
                     }
                   </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Edit and Remove buttons positioned INSIDE placeholder (top-right) */}
+            {slot && slot.photoId && slotShowingEditButton?.id === slot.id && onEditButtonClick && onRemoveButtonClick && (
+              <div className="absolute top-2 right-2 flex gap-1 z-70">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditButtonClick(slot);
+                  }}
+                  className="px-2 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 shadow-lg transition-all duration-200"
+                  title="Edit photo"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveButtonClick(slot);
+                  }}
+                  className="px-2 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700 shadow-lg transition-all duration-200"
+                  title="Remove photo"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+
+            {/* Remove confirmation dialog - keep overlay for this since it's temporary */}
+            {slot && slot.photoId && slotShowingRemoveConfirmation?.id === slot.id && onConfirmRemove && onCancelRemove && (
+              <div className="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center gap-4 z-60 p-4">
+                <div className="text-white text-center">
+                  <div className="font-semibold text-lg mb-2">Remove Photo?</div>
+                  <div className="text-sm opacity-90">This will remove the photo from this slot</div>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onConfirmRemove(slot);
+                    }}
+                    className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 shadow-lg transition-all duration-200"
+                  >
+                    Yes, Remove
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCancelRemove();
+                    }}
+                    className="bg-gray-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700 shadow-lg transition-all duration-200"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             )}

@@ -744,9 +744,9 @@ export default function PhotoRenderer({
       verticalDescription = `move down ${gaps.bottom.toFixed(1)}px`;
     }
     
-    // Apply movements to current position
-    const newCenterX = Math.max(0.05, Math.min(0.95, currentTransform.photoCenterX + horizontalMovement));
-    const newCenterY = Math.max(0.05, Math.min(0.95, currentTransform.photoCenterY + verticalMovement));
+    // Apply movements to current position (no artificial bounds - allow true edge positioning)
+    const newCenterX = currentTransform.photoCenterX + horizontalMovement;
+    const newCenterY = currentTransform.photoCenterY + verticalMovement;
     
     // Post-snap validation: Check if the new position would result in 3+ gaps
     console.log('🔮 POST-SNAP VALIDATION: Checking if movement would create more gaps...');
@@ -1473,9 +1473,15 @@ export default function PhotoRenderer({
     // Track user interaction
     trackUserInteraction('zoom');
     
-    // Show UI immediately after wheel zoom
-    setIsInteracting(false);
-    onInteractionChange?.(false);
+    // Set timeout to end interaction after wheel zoom (consistent with touch behavior)
+    if (interactionTimeoutRef.current) {
+      clearTimeout(interactionTimeoutRef.current);
+    }
+    interactionTimeoutRef.current = setTimeout(() => {
+      setIsInteracting(false);
+      onInteractionChange?.(false);
+      interactionTimeoutRef.current = null;
+    }, 150); // Brief delay to allow for multiple quick wheel events
     
     // No immediate auto-fit - let user zoom freely without interference
   };

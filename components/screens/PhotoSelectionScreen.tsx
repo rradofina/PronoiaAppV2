@@ -22,7 +22,7 @@ import OriginalTemplateVisual from '../TemplateVisual';
 
 
 // Simplified TemplateVisual component
-const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard, isActiveTemplate = true }: any) => {
+const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard, isActiveTemplate = true, slotShowingEditButton, onEditButtonClick, slotShowingRemoveConfirmation, onRemoveButtonClick, onConfirmRemove, onCancelRemove }: any) => {
   // Get templates from both window cache AND database to ensure consistency with swap modal
   const windowTemplates = (window as any).pngTemplates || [];
   const [databaseTemplates, setDatabaseTemplates] = useState<any[]>([]);
@@ -215,6 +215,12 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
         onInlineCancel={onInlineCancel}
         isEditingMode={!!inlineEditingSlot}
         isActiveTemplate={isActiveTemplate}
+        slotShowingEditButton={slotShowingEditButton}
+        onEditButtonClick={onEditButtonClick}
+        slotShowingRemoveConfirmation={slotShowingRemoveConfirmation}
+        onRemoveButtonClick={onRemoveButtonClick}
+        onConfirmRemove={onConfirmRemove}
+        onCancelRemove={onCancelRemove}
       />
     );
   }
@@ -328,6 +334,12 @@ export default function PhotoSelectionScreen({
   // Inline editing states
   const [inlineEditingSlot, setInlineEditingSlot] = useState<TemplateSlot | null>(null);
   const [inlineEditingPhoto, setInlineEditingPhoto] = useState<Photo | null>(null);
+  
+  // Edit button state for filled slots (intermediate step before editing)
+  const [slotShowingEditButton, setSlotShowingEditButton] = useState<TemplateSlot | null>(null);
+  
+  // Remove confirmation state
+  const [slotShowingRemoveConfirmation, setSlotShowingRemoveConfirmation] = useState<TemplateSlot | null>(null);
   
   // Template management states (simplified)
   const [showTemplateSwapper, setShowTemplateSwapper] = useState(false);
@@ -560,35 +572,40 @@ export default function PhotoSelectionScreen({
       return;
     }
 
-    // INTUITIVE UX: Filled slots should be immediately editable
+    // NEW UX: Filled slots show edit button first (no immediate editing)
     if (slot.photoId) {
-      console.log('🔧 Filled slot clicked - starting immediate inline editing');
+      console.log('🔧 Filled slot clicked - checking for toggle behavior');
+      
+      // TOGGLE BEHAVIOR: If this slot is already selected with edit button showing, deselect completely
+      if (selectedSlot?.id === slot.id && slotShowingEditButton?.id === slot.id) {
+        console.log('🔧 Same slot clicked - toggling deselection for clean viewing');
+        setSelectedSlot(null);
+        setSlotShowingEditButton(null);
+        console.log('✅ Slot completely deselected - clean viewing mode');
+        return;
+      }
       
       // Find the existing photo in the photos array
       const existingPhoto = photos.find(photo => photo.id === slot.photoId);
       
       if (existingPhoto) {
-        console.log('🔧 Found existing photo, setting inline editing states:', {
+        console.log('🔧 Found existing photo, showing edit button:', {
           photo: existingPhoto.name,
-          slotId: slot.id,
-          willSetStates: true
+          slotId: slot.id
         });
         
-        // Set all states atomically in a single batch to prevent race conditions
-        console.log('🔧 Setting inline editing states atomically');
+        // Show edit button instead of immediately entering edit mode
         setSelectedSlot(slot);
-        setInlineEditingSlot(slot);
-        setInlineEditingPhoto(existingPhoto);
-        setViewMode('inline-editing');
+        setSlotShowingEditButton(slot);
+        // Don't set inline editing states yet - wait for edit button click
         
-        console.log('✅ Inline editing state transition complete:', {
+        console.log('✅ Edit button shown for filled slot:', {
           selectedSlot: slot.id,
-          inlineEditingSlot: slot.id,
-          inlineEditingPhoto: existingPhoto.name,
-          viewMode: 'inline-editing'
+          slotShowingEditButton: slot.id,
+          photo: existingPhoto.name
         });
         
-        return; // Exit early - filled slots go straight to editing
+        return; // Exit early - filled slots show edit button first
       } else {
         console.warn('🔧 Photo not found in photos array:', slot.photoId);
       }
@@ -601,6 +618,86 @@ export default function PhotoSelectionScreen({
     // NOTE: Removed expansion logic - using fixed height layout now
   };
 
+  // Handle edit button click for filled slots
+  const handleEditButtonClick = (slot: TemplateSlot) => {
+    console.log('🔧 Edit button clicked - starting inline editing');
+    
+    // Find the existing photo in the photos array
+    const existingPhoto = photos.find(photo => photo.id === slot.photoId);
+    
+    if (existingPhoto) {
+      console.log('🔧 Starting inline editing from edit button:', {
+        photo: existingPhoto.name,
+        slotId: slot.id
+      });
+      
+      // Clear edit button state and enter inline editing mode
+      setSlotShowingEditButton(null);
+      setInlineEditingSlot(slot);
+      setInlineEditingPhoto(existingPhoto);
+      setViewMode('inline-editing');
+      
+      console.log('✅ Inline editing started from edit button');
+    } else {
+      console.error('❌ Photo not found when clicking edit button:', slot.photoId);
+    }
+  };
+
+  // Handle remove button click for filled slots
+  const handleRemoveButtonClick = (slot: TemplateSlot) => {
+    console.log('🔧 Remove button clicked - showing confirmation');
+    
+    // Hide edit buttons and show remove confirmation
+    setSlotShowingEditButton(null);
+    setSlotShowingRemoveConfirmation(slot);
+  };
+
+  // Handle confirmed photo removal
+  const handleConfirmRemove = async (slot: TemplateSlot) => {
+    console.log('🔧 Confirming photo removal for slot:', slot.id);
+    
+    try {
+      // Remove photo from slot
+      const updatedSlot = {
+        ...slot,
+        photoId: null,
+        transform: null
+      };
+
+      // Update the slot in templateSlots array
+      const updatedTemplateSlots = templateSlots.map(s => 
+        s.id === slot.id ? updatedSlot : s
+      );
+
+      // Update template slots using the provided setter
+      console.log('🔧 Photo removed from slot, updating template slots');
+      setTemplateSlots(updatedTemplateSlots);
+      
+      // Clear all related states
+      setSlotShowingRemoveConfirmation(null);
+      setSelectedSlot(null);
+      
+      console.log('✅ Photo removal completed and template slots updated');
+      
+    } catch (error) {
+      console.error('❌ Error removing photo from slot:', error);
+    }
+  };
+
+  // Handle remove confirmation cancellation
+  const handleCancelRemove = () => {
+    console.log('🔧 Remove confirmation cancelled - returning to edit buttons');
+    
+    // Get the slot that was being considered for removal
+    const slot = slotShowingRemoveConfirmation;
+    
+    // Clear confirmation and show edit buttons again
+    setSlotShowingRemoveConfirmation(null);
+    if (slot) {
+      setSlotShowingEditButton(slot);
+    }
+  };
+
   const handlePhotoSelectForSlot = (photo: Photo) => {
     // This function might not be needed anymore with inline editing
     setSelectedPhotoForTemplate(photo);
@@ -611,6 +708,20 @@ export default function PhotoSelectionScreen({
   const handleBackgroundClick = (event: React.MouseEvent) => {
     // Only deselect if clicking directly on the background (not on child elements)
     if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    // Clear edit button state if shown
+    if (slotShowingEditButton) {
+      console.log('🔧 Background clicked - clearing edit button');
+      setSlotShowingEditButton(null);
+      return;
+    }
+
+    // Clear remove confirmation if shown
+    if (slotShowingRemoveConfirmation) {
+      console.log('🔧 Background clicked - clearing remove confirmation');
+      setSlotShowingRemoveConfirmation(null);
       return;
     }
 
@@ -822,6 +933,8 @@ export default function PhotoSelectionScreen({
     setSelectedSlotForEditor(null);
     setInlineEditingSlot(null);
     setInlineEditingPhoto(null);
+    setSlotShowingEditButton(null);
+    setSlotShowingRemoveConfirmation(null);
   };
 
   // Enhanced escape mechanism for stuck states
@@ -835,6 +948,8 @@ export default function PhotoSelectionScreen({
     setSelectedPhotoForTemplate(null);
     setSelectedTemplateForViewer(null);
     setSelectedSlotForEditor(null);
+    setSlotShowingEditButton(null);
+    setSlotShowingRemoveConfirmation(null);
   };
 
   // Keyboard escape handler
@@ -1198,6 +1313,12 @@ export default function PhotoSelectionScreen({
                         onInlineApply={handleInlineApply}
                         onInlineCancel={handleInlineCancel}
                         skipStateGuard={isApplyingPhoto}
+                        slotShowingEditButton={slotShowingEditButton}
+                        onEditButtonClick={handleEditButtonClick}
+                        slotShowingRemoveConfirmation={slotShowingRemoveConfirmation}
+                        onRemoveButtonClick={handleRemoveButtonClick}
+                        onConfirmRemove={handleConfirmRemove}
+                        onCancelRemove={handleCancelRemove}
                       />
                     )}
                     layout="coverflow"
