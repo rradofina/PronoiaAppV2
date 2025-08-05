@@ -66,10 +66,30 @@ export default function InlinePhotoEditor({
       console.log('✅ InlinePhotoEditor - Using existing transform for same photo');
       setCurrentTransform(slot.transform);
     } else {
-      console.log('🔄 InlinePhotoEditor - Using smart transform for new photo with slot data');
+      // For new photos or replacements, use smart transform for auto-fit
+      console.log('🔄 InlinePhotoEditor - Using smart transform for auto-fit');
       if (photo && slot) {
+        // Store the timestamp when we start calculating
+        const calculationStartTime = Date.now();
+        
         createSmartPhotoTransformFromSlot(photo, slot)
-          .then(transform => setCurrentTransform(transform))
+          .then(transform => {
+            console.log('✨ Smart transform calculated:', transform);
+            // Only apply if user hasn't interacted yet (no manual changes)
+            // Check if the component is still mounted and no user interaction occurred
+            setCurrentTransform(prevTransform => {
+              // If transform hasn't changed from default, apply smart transform
+              if (prevTransform.photoScale === 1 && 
+                  prevTransform.photoCenterX === 0.5 && 
+                  prevTransform.photoCenterY === 0.5) {
+                console.log('✅ Applying smart transform - no user changes detected');
+                return transform;
+              } else {
+                console.log('⏭️ Skipping smart transform - user has already made changes');
+                return prevTransform;
+              }
+            });
+          })
           .catch(error => {
             console.error('❌ InlinePhotoEditor - Smart scaling failed, using fallback:', error);
             setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
@@ -124,7 +144,12 @@ export default function InlinePhotoEditor({
   // Handle transform changes from PhotoRenderer
   const handleTransformChange = (newTransform: PhotoTransform) => {
     setCurrentTransform(newTransform);
-    console.log('🔧 InlinePhotoEditor - Transform updated:', newTransform);
+    console.log('🔧 InlinePhotoEditor - Transform updated by user interaction:', {
+      photoScale: newTransform.photoScale,
+      photoCenterX: newTransform.photoCenterX,
+      photoCenterY: newTransform.photoCenterY,
+      timestamp: Date.now()
+    });
   };
 
   // Smart reset callback for intelligent photo repositioning
@@ -162,6 +187,11 @@ export default function InlinePhotoEditor({
 
       // Call finalization method to apply auto-snap gap detection
       console.log('🔧 InlinePhotoEditor - Calling finalization method for auto-snap...');
+      console.log('📐 Current transform before finalization:', {
+        photoScale: currentTransform.photoScale,
+        photoCenterX: currentTransform.photoCenterX,
+        photoCenterY: currentTransform.photoCenterY
+      });
       
       if (finalizationRef.current) {
         console.log('✅ InlinePhotoEditor - Finalization ref available, calling...');
@@ -171,7 +201,12 @@ export default function InlinePhotoEditor({
               transform: finalTransform,
               photoId: photo.id,
               slotId: slot.id,
-              hasOnApplyHandler: !!onApply
+              hasOnApplyHandler: !!onApply,
+              finalTransformDetails: {
+                photoScale: finalTransform.photoScale,
+                photoCenterX: finalTransform.photoCenterX,
+                photoCenterY: finalTransform.photoCenterY
+              }
             });
             
             onApply(slot.id, photo.id, finalTransform);
@@ -180,11 +215,13 @@ export default function InlinePhotoEditor({
           .catch(error => {
             console.error('❌ InlinePhotoEditor - Finalization failed:', error);
             // Fallback to current transform
+            console.log('📐 Using fallback current transform:', currentTransform);
             onApply(slot.id, photo.id, currentTransform);
             console.log('⚠️ InlinePhotoEditor - Used fallback transform due to finalization error');
           });
       } else {
-        console.error('❌ InlinePhotoEditor - No finalization ref available, using current transform');
+        console.log('❌ InlinePhotoEditor - No finalization ref available, using current transform');
+        console.log('📐 Using current transform without finalization:', currentTransform);
         onApply(slot.id, photo.id, currentTransform);
         console.log('⚠️ InlinePhotoEditor - Used current transform without finalization');
       }

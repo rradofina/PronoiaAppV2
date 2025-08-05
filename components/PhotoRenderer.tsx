@@ -1030,6 +1030,12 @@ export default function PhotoRenderer({
   // Update internal transform when prop changes
   useEffect(() => {
     if (transform && isPhotoTransform(transform)) {
+      console.log('📐 PhotoRenderer - Updating transform from prop:', {
+        photoScale: transform.photoScale,
+        photoCenterX: transform.photoCenterX,
+        photoCenterY: transform.photoCenterY,
+        timestamp: Date.now()
+      });
       setCurrentTransform(transform);
     }
   }, [transform]);
@@ -1171,11 +1177,23 @@ export default function PhotoRenderer({
 
   // Calculate CSS style for the photo
   const photoStyle: React.CSSProperties = (() => {
-    // For non-interactive preview mode, use simple object-fit cover
-    if (!interactive) {
-      console.log(`📸 PhotoRenderer NON-INTERACTIVE mode for ${photoAlt}:`, {
+    // Always check for transform first, regardless of interactive mode
+    if (transform && isPhotoTransform(transform)) {
+      console.log(`📸 PhotoRenderer applying saved transform for ${photoAlt}:`, {
+        transform,
+        interactive,
+        previewMode,
+        style: 'Using convertPhotoToCSS with transform'
+      });
+      return convertPhotoToCSS(transform, previewMode);
+    } else if (transform && isContainerTransform(transform)) {
+      console.log(`📸 PhotoRenderer applying legacy transform for ${photoAlt}`);
+      return convertLegacyToCSS(transform);
+    } else if (!interactive) {
+      // Only use simple cover if no transform exists
+      console.log(`📸 PhotoRenderer NON-INTERACTIVE mode without transform for ${photoAlt}:`, {
         photoUrl: photoUrl.substring(0, 60) + '...',
-        style: 'object-fit: cover, center center'
+        style: 'object-fit: cover, center center (no transform)'
       });
       return {
         width: '100%',
@@ -1183,14 +1201,8 @@ export default function PhotoRenderer({
         objectFit: 'cover' as const,
         objectPosition: 'center center'
       };
-    }
-    
-    // For interactive mode, use full transform system
-    if (transform && isPhotoTransform(transform)) {
-      return convertPhotoToCSS(transform, previewMode);
-    } else if (transform && isContainerTransform(transform)) {
-      return convertLegacyToCSS(transform);
     } else {
+      // Interactive mode with no provided transform - use current state
       return {
         ...convertPhotoToCSS(currentTransform, previewMode),
         // Add smooth spring animation when auto-fitting

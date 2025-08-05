@@ -632,10 +632,60 @@ export default function PhotoSelectionScreen({
     }
   };
 
+  // Handle template navigation changes from TemplateGrid
+  const handleTemplateChange = (templateIndex: number, templateId: string) => {
+    console.log('📱 Template changed via swipe/navigation:', {
+      templateIndex,
+      templateId,
+      currentSelectedSlot: selectedSlot?.id
+    });
+    
+    // Don't change selection if we're in inline editing mode
+    if (viewMode === 'inline-editing') {
+      console.log('⏭️ Skipping slot auto-select - inline editing in progress');
+      return;
+    }
+    
+    // Get slots for the new template
+    const newTemplateSlots = templateSlots.filter(slot => slot.templateId === templateId);
+    
+    if (newTemplateSlots.length > 0) {
+      // Find first empty slot or first slot if all filled
+      const firstEmptySlot = newTemplateSlots.find(slot => !slot.photoId);
+      const slotToSelect = firstEmptySlot || newTemplateSlots[0];
+      
+      console.log('🎯 Auto-selecting slot in new template:', {
+        templateId,
+        slotId: slotToSelect.id,
+        isEmptySlot: !slotToSelect.photoId,
+        totalSlots: newTemplateSlots.length
+      });
+      
+      setSelectedSlot(slotToSelect);
+    } else {
+      // No slots in this template (shouldn't happen but handle gracefully)
+      console.warn('⚠️ No slots found for template:', templateId);
+      setSelectedSlot(null);
+    }
+  };
+
   // Template editor
   const handleApplyPhotoToSlot = (slotId: string, photoId: string, transform?: PhotoTransform | ContainerTransform) => {
     console.log('🔧 FULLSCREEN EDITOR - Apply button clicked:', { slotId, photoId, transform });
     console.log('🔧 Current templateSlots before update:', templateSlots.map(s => ({ id: s.id, photoId: s.photoId, hasTransform: !!s.transform })));
+    
+    // Validate transform
+    if (transform) {
+      console.log('🔍 Transform validation:', {
+        hasTransform: !!transform,
+        isPhotoTransform: isPhotoTransform(transform),
+        isContainerTransform: isContainerTransform(transform),
+        transformType: (transform as any).type || 'unknown',
+        transformData: transform
+      });
+    } else {
+      console.warn('⚠️ No transform provided - will use default or existing');
+    }
     
     // Set flag to bypass state guard during apply operation
     setIsApplyingPhoto(true);
@@ -655,13 +705,33 @@ export default function PhotoSelectionScreen({
     // Create completely new array to ensure React detects the change
     const updatedSlots = templateSlots.map(s => {
       if (s.id === slotId) {
+        // Determine the transform to use
+        let finalTransform = transform;
+        
+        // If no transform provided and slot has no existing transform (new photo)
+        if (!transform && !s.transform) {
+          // Create default transform for new photos
+          finalTransform = createPhotoTransform(1, 0.5, 0.5);
+          console.log('📐 Creating default transform for new photo');
+        } else if (!transform && s.transform) {
+          // Keep existing transform if no new one provided
+          finalTransform = s.transform;
+          console.log('📐 Keeping existing transform');
+        }
+        
         // Create a completely new slot object to ensure React detects the change
         const newSlot = {
           ...s,
           photoId: photoId, // Ensure the photoId is properly set
-          transform: transform || s.transform // Keep existing transform if none provided
+          transform: finalTransform
         };
-        console.log('🔧 Creating new slot object:', newSlot);
+        console.log('🔧 Creating new slot object:', {
+          slotId: newSlot.id,
+          photoId: newSlot.photoId,
+          hasTransform: !!newSlot.transform,
+          transformType: newSlot.transform ? (isPhotoTransform(newSlot.transform) ? 'PhotoTransform' : 'Other') : 'None',
+          transform: newSlot.transform
+        });
         return newSlot;
       }
       return { ...s }; // Create new object references for all slots to force re-render
@@ -823,6 +893,19 @@ export default function PhotoSelectionScreen({
       if (!slotId || !photoId) {
         throw new Error(`Missing required parameters: slotId=${slotId}, photoId=${photoId}`);
       }
+      
+      // Log transform details before passing
+      console.log('🔄 Passing transform to handleApplyPhotoToSlot:', {
+        slotId,
+        photoId,
+        hasTransform: !!transform,
+        isValidPhotoTransform: transform ? isPhotoTransform(transform) : false,
+        transformDetails: transform ? {
+          photoScale: (transform as PhotoTransform).photoScale,
+          photoCenterX: (transform as PhotoTransform).photoCenterX,
+          photoCenterY: (transform as PhotoTransform).photoCenterY
+        } : null
+      });
       
       handleApplyPhotoToSlot(slotId, photoId, transform);
       console.log('✅ Photo applied successfully, resetting states');
@@ -1127,6 +1210,7 @@ export default function PhotoSelectionScreen({
                     onSwapTemplate={handleSwapTemplate}
                     onDeleteTemplate={handleDeletePrint}
                     onDownloadTemplate={handleDownloadTemplate}
+                    onTemplateChange={handleTemplateChange}
                     TemplateVisual={(props: any) => (
                       <TemplateVisual
                         {...props}

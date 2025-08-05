@@ -14,6 +14,7 @@ interface TemplateGridProps {
   showActions?: boolean;
   isEditingMode?: boolean;
   editingSlot?: TemplateSlot | null;
+  onTemplateChange?: (templateIndex: number, templateId: string) => void;
 }
 
 export default function TemplateGrid({
@@ -28,7 +29,8 @@ export default function TemplateGrid({
   layout = 'horizontal',
   showActions = true,
   isEditingMode = false,
-  editingSlot = null
+  editingSlot = null,
+  onTemplateChange
 }: TemplateGridProps) {
   
   // Cover Flow state
@@ -98,7 +100,20 @@ export default function TemplateGrid({
       return;
     }
     if (index >= 0 && index < templateGroups.length) {
+      const oldIndex = currentIndex;
       setCurrentIndex(index);
+      
+      // Notify parent of template change
+      if (onTemplateChange && index !== oldIndex) {
+        const newTemplate = templateGroups[index];
+        console.log('📱 Template navigation - notifying parent:', {
+          fromIndex: oldIndex,
+          toIndex: index,
+          templateId: newTemplate.templateId,
+          templateName: newTemplate.templateName
+        });
+        onTemplateChange(index, newTemplate.templateId);
+      }
     }
   };
 

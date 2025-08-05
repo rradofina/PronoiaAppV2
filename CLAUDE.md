@@ -227,3 +227,53 @@ UPDATE users SET preferences = preferences || '{"role": "admin"}' WHERE email = 
 - `docs/ARCHITECTURE.md` - Detailed system architecture
 - `docs/BUG-FIXES.md` - Critical bug fixes and solutions
 - `docs/MANUAL-TEMPLATES.md` - Template management system
+- `CHANGELOG.md` - Project change history and release notes
+- `PLAN.md` - Product roadmap and upcoming features
+
+## Change Documentation Guidelines
+
+### REQUIRED: Document ALL Changes in CHANGELOG.md
+When making ANY changes to the codebase, you MUST update `CHANGELOG.md` with:
+
+1. **Clear categorization**:
+   - **Added**: New features, components, or functionality
+   - **Changed**: Modifications to existing features
+   - **Fixed**: Bug fixes and issue resolutions
+   - **Removed**: Deleted features or deprecated code
+   - **Security**: Security-related changes
+
+2. **Include specific details**:
+   - File paths and component names affected
+   - Brief description of the change and why
+   - Commit hash for reference
+   - Breaking changes or migration notes
+
+3. **Use clear, descriptive language**:
+   - Explain WHAT changed and WHY
+   - Include impact on users or functionality
+   - Reference related issues or requirements
+
+### Example Changelog Entry Format:
+```markdown
+## [YYYY-MM-DD] - Feature/Fix Name
+
+### Added
+- **Feature Name**: Description of what was added
+  - File: `path/to/file.tsx` - specific changes made
+  - Impact: how this affects users/functionality
+  - Commit: `abc1234`
+
+### Fixed
+- **Bug Name**: Description of issue that was fixed
+  - Root Cause: explanation of the problem
+  - Solution: how it was resolved
+  - Files Modified: `component1.tsx`, `service2.ts`
+  - Commit: `def5678`
+```
+
+### Changelog Maintenance Rules:
+- Update IMMEDIATELY when making changes (don't batch)
+- Always add new entries at the top (reverse chronological)
+- Include version/date headers for major releases
+- Cross-reference with git commits for traceability
+- Maintain consistency with existing format and style
