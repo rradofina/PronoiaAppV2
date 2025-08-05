@@ -30,7 +30,11 @@ interface UsePhotoDebugProps {
   isDragging: boolean;
   isTouching: boolean;
   isSnapping: boolean;
-  detectGaps: () => GapData;
+  calculateMathematicalGaps: () => {
+    gaps: { left: number; right: number; top: number; bottom: number };
+    photoEdges: { left: number; right: number; top: number; bottom: number };
+    photoSize: { width: number; height: number };
+  };
   calculateGapBasedMovement: (gapData: GapData) => Movement | null;
   hasRecentUserInteraction: () => boolean;
   lastUserInteraction: number;
@@ -44,7 +48,7 @@ export function usePhotoDebug({
   isDragging,
   isTouching,
   isSnapping,
-  detectGaps,
+  calculateMathematicalGaps,
   calculateGapBasedMovement,
   hasRecentUserInteraction,
   lastUserInteraction,
@@ -54,12 +58,62 @@ export function usePhotoDebug({
     return { debugInfo: null, gapIndicator: null };
   }
 
-  const gapData = detectGaps();
-  const movement = gapData.hasGaps ? calculateGapBasedMovement(gapData) : null;
+  // Add error handling to prevent silent failures
+  let gapData: GapData;
+  let movement: Movement | null = null;
+  let errorMessage: string | null = null;
+
+  try {
+    console.log('🔧 usePhotoDebug - Using mathematical gap calculation...');
+    
+    // Use mathematical calculation instead of DOM-based detectGaps
+    const mathGaps = calculateMathematicalGaps();
+    
+    // Convert mathematical gaps to GapData format
+    const GAP_THRESHOLD = 0; // Detect any gap amount
+    const hasLeftGap = mathGaps.gaps.left > GAP_THRESHOLD;
+    const hasRightGap = mathGaps.gaps.right > GAP_THRESHOLD;
+    const hasTopGap = mathGaps.gaps.top > GAP_THRESHOLD;
+    const hasBottomGap = mathGaps.gaps.bottom > GAP_THRESHOLD;
+    const gapCount = [hasLeftGap, hasRightGap, hasTopGap, hasBottomGap].filter(Boolean).length;
+    
+    gapData = {
+      hasGaps: gapCount > 0,
+      gapCount: gapCount,
+      gaps: mathGaps.gaps,
+      significantGaps: {
+        left: hasLeftGap,
+        right: hasRightGap,
+        top: hasTopGap,
+        bottom: hasBottomGap
+      }
+    };
+    
+    console.log('🔧 usePhotoDebug - Mathematical gap data:', gapData);
+    movement = gapData.hasGaps ? calculateGapBasedMovement(gapData) : null;
+  } catch (error) {
+    console.error('❌ usePhotoDebug - Error in mathematical gap detection:', error);
+    errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    // Fallback gap data
+    gapData = {
+      hasGaps: false,
+      gapCount: 0,
+      gaps: { left: 0, right: 0, top: 0, bottom: 0 },
+      significantGaps: { left: false, right: false, top: false, bottom: false }
+    };
+  }
 
   const debugInfo = (
     <div className="fixed top-4 left-4 bg-black bg-opacity-95 text-white text-xs p-3 rounded z-[9999] pointer-events-none max-w-sm shadow-lg border border-gray-600">
       <div className="font-bold mb-2">Gap-Based Auto-Snap Debug</div>
+      
+      {errorMessage && (
+        <div className="mb-2 p-2 bg-red-900 border border-red-600 rounded">
+          <div className="text-red-200 font-semibold">Error:</div>
+          <div className="text-red-300">{errorMessage}</div>
+        </div>
+      )}
+      
       <div>Scale: {currentTransform.photoScale.toFixed(2)}</div>
       <div>Center X: {currentTransform.photoCenterX.toFixed(3)}</div>
       <div>Center Y: {currentTransform.photoCenterY.toFixed(3)}</div>
@@ -70,12 +124,18 @@ export function usePhotoDebug({
       
       <div className="mt-2 border-t border-gray-600 pt-2">
         <div className="font-semibold">Gap Detection:</div>
-        <div>Gap Count: {gapData.gapCount}</div>
-        <div>L:{gapData.gaps.left} R:{gapData.gaps.right}</div>
-        <div>T:{gapData.gaps.top} B:{gapData.gaps.bottom}</div>
-        <div className="text-xs text-gray-300">
-          Significant: {Object.entries(gapData.significantGaps).filter(([_, hasGap]) => hasGap).map(([side]) => side).join(', ') || 'none'}
-        </div>
+        {errorMessage ? (
+          <div className="text-red-300">Gap detection failed</div>
+        ) : (
+          <>
+            <div>Gap Count: {gapData.gapCount}</div>
+            <div>L:{gapData.gaps.left.toFixed(1)} R:{gapData.gaps.right.toFixed(1)}</div>
+            <div>T:{gapData.gaps.top.toFixed(1)} B:{gapData.gaps.bottom.toFixed(1)}</div>
+            <div className="text-xs text-gray-300">
+              Significant: {Object.entries(gapData.significantGaps).filter(([_, hasGap]) => hasGap).map(([side]) => side).join(', ') || 'none'}
+            </div>
+          </>
+        )}
       </div>
       
       <div className="mt-2 border-t border-gray-600 pt-2">

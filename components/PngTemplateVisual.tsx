@@ -175,9 +175,10 @@ export default function PngTemplateVisual({
         const isInlineEditing = slot && inlineEditingSlot?.id === slot.id;
         const hasInlinePhoto = isInlineEditing && inlineEditingPhoto;
         
-        // DEBUG: Log inline editing state for this slot
-        if (slot && (isSelected || isInlineEditing || hasInlinePhoto)) {
-          console.log('🔧 TEMPLATE VISUAL DEBUG for slot', slot.id, ':', {
+        // DEBUG: Log ALL slots to identify multiple editor issue
+        if (slot) {
+          console.log(`🔧 SLOT ${holeIndex + 1} (${slot.id}) EDITING CHECK:`, {
+            slotId: slot.id,
             isSelected,
             isInlineEditing,
             hasInlinePhoto,
@@ -185,7 +186,8 @@ export default function PngTemplateVisual({
             inlineEditingPhotoName: inlineEditingPhoto?.name,
             hasOnInlineApply: !!onInlineApply,
             hasOnInlineCancel: !!onInlineCancel,
-            willShowInlineEditor: hasInlinePhoto && onInlineApply && onInlineCancel
+            willShowInlineEditor: hasInlinePhoto && onInlineApply && onInlineCancel,
+            photoUrl: photoUrl ? photoUrl.substring(0, 50) + '...' : 'none'
           });
         }
         
@@ -226,7 +228,7 @@ export default function PngTemplateVisual({
                 : isSelected 
                 ? 'border-4 border-blue-500 border-opacity-90 z-40 cursor-pointer shadow-md' // Above overlay (z-30)
                 : shouldApplyDarkening
-                ? 'brightness-75 opacity-60 pointer-events-none cursor-not-allowed' // Darkened during editing/inactive (but not preview)
+                ? 'pointer-events-none cursor-not-allowed' // Block interaction during editing (but keep photos fully visible)
                 : isPreviewMode
                 ? '' // No effects for preview mode - clean display
                 : 'hover:border-2 hover:border-blue-300 hover:border-opacity-60 cursor-pointer'

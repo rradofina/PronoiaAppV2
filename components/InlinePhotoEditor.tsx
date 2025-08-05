@@ -56,10 +56,10 @@ export default function InlinePhotoEditor({
       hasOnCancel: !!onCancel
     });
     
-    // Force re-render with new keys to clear any cached state and ensure fresh component
-    const timestamp = Date.now();
-    setPhotoKey(`inline-${slot?.id}-${photo?.id}-${timestamp}`);
-    setComponentKey(`component-${slot?.id}-${photo?.id}-${timestamp}`);
+    // Only update keys when photo actually changes to avoid unnecessary remounts
+    // Remove timestamp to prevent remount on every transform change
+    setPhotoKey(`inline-${slot?.id}-${photo?.id}`);
+    setComponentKey(`component-${slot?.id}-${photo?.id}`);
     
     // If the slot already has a transform and we're re-editing the same photo, use it
     if (slot?.transform && isPhotoTransform(slot.transform) && slot.photoId === photo?.id) {
@@ -106,7 +106,7 @@ export default function InlinePhotoEditor({
         hasOnCancel: !!onCancel
       });
     }
-  }, [slot?.id, photo?.id, slot?.transform, slot?.photoId, onApply, onCancel]);
+  }, [slot?.id, photo?.id, slot?.photoId, onApply, onCancel]);
 
   // Load photo URL with instant display and cache optimization
   useEffect(() => {
@@ -258,8 +258,11 @@ export default function InlinePhotoEditor({
 
   if (!selectedPhotoUrl) {
     return (
-      <div className={`w-full h-full bg-gray-200 border border-gray-300 border-dashed flex items-center justify-center ${className}`}>
-        <span className="text-gray-500 text-xs">Loading...</span>
+      <div className={`w-full h-full bg-gray-100 border border-gray-300 flex items-center justify-center ${className}`}>
+        <div className="text-center text-gray-400">
+          <div className="text-2xl mb-1">📸</div>
+          <div className="text-xs">Preparing photo...</div>
+        </div>
       </div>
     );
   }

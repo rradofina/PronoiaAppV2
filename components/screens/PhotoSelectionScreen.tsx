@@ -1,4 +1,4 @@
-import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType, PrintSize, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, ManualPackage, ManualTemplate } from '../../types';
+import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType, PrintSize, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, createPhotoTransform, ManualPackage, ManualTemplate } from '../../types';
 import { useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
@@ -571,29 +571,19 @@ export default function PhotoSelectionScreen({
           willSetStates: true
         });
         
-        // Clear any previous states first to ensure clean transition
-        setSelectedSlot(null);
-        setInlineEditingSlot(null);
-        setInlineEditingPhoto(null);
+        // Set all states atomically in a single batch to prevent race conditions
+        console.log('🔧 Setting inline editing states atomically');
+        setSelectedSlot(slot);
+        setInlineEditingSlot(slot);
+        setInlineEditingPhoto(existingPhoto);
+        setViewMode('inline-editing');
         
-        // Use setTimeout to ensure state cleanup completes before setting new states
-        setTimeout(() => {
-          console.log('🔧 Setting new inline editing states after cleanup');
-          setSelectedSlot(slot);
-          setInlineEditingSlot(slot);
-          setInlineEditingPhoto(existingPhoto);
-          setViewMode('inline-editing');
-          
-          // Force a small delay to ensure React has processed all state changes
-          setTimeout(() => {
-            console.log('✅ Inline editing state transition complete:', {
-              selectedSlot: slot.id,
-              inlineEditingSlot: slot.id,
-              inlineEditingPhoto: existingPhoto.name,
-              viewMode: 'inline-editing'
-            });
-          }, 50);
-        }, 50);
+        console.log('✅ Inline editing state transition complete:', {
+          selectedSlot: slot.id,
+          inlineEditingSlot: slot.id,
+          inlineEditingPhoto: existingPhoto.name,
+          viewMode: 'inline-editing'
+        });
         
         return; // Exit early - filled slots go straight to editing
       } else {
@@ -810,7 +800,7 @@ export default function PhotoSelectionScreen({
     resetViewStates();
     
     // Clear the applying flag to re-enable state guard
-    setTimeout(() => setIsApplyingPhoto(false), 100);
+    setIsApplyingPhoto(false);
   };
 
   const resetViewStates = () => {
@@ -913,21 +903,12 @@ export default function PhotoSelectionScreen({
       // Clear timeout since operation succeeded
       clearTimeout(timeoutId);
       
-      // Delay state reset slightly to prevent loading flash
-      setTimeout(() => {
-        setViewMode('normal');
-        setInlineEditingSlot(null);
-        setInlineEditingPhoto(null);
-        setSelectedSlot(null);
-      }, 75); // Match our fast transition duration
-      
-      // Double-check state reset after a short delay
-      setTimeout(() => {
-        if (viewMode === 'inline-editing') {
-          console.warn('⚠️ State not properly reset, force clearing');
-          forceResetEditingState();
-        }
-      }, 100);
+      // Reset states immediately to prevent loading flashes
+      console.log('🔧 Resetting inline editing states immediately after apply');
+      setViewMode('normal');
+      setInlineEditingSlot(null);
+      setInlineEditingPhoto(null);
+      setSelectedSlot(null);
       
     } catch (error) {
       console.error('❌ Error in handleInlineApply:', error);
@@ -953,14 +934,6 @@ export default function PhotoSelectionScreen({
     try {
       // Force reset all editing states immediately
       forceResetEditingState();
-      
-      // Double-check state reset after a short delay
-      setTimeout(() => {
-        if (viewMode === 'inline-editing') {
-          console.warn('⚠️ Cancel operation - state not properly reset, force clearing again');
-          forceResetEditingState();
-        }
-      }, 100);
       
     } catch (error) {
       console.error('❌ Error in handleInlineCancel:', error);
@@ -1060,11 +1033,7 @@ export default function PhotoSelectionScreen({
     console.log('🔄 PhotoSelectionScreen - Setting template slots with forced new references');
     setTemplateSlots(forceUpdatedSlots);
     setTemplateToSwap(null);
-    
-    // Force a small delay to ensure state update is processed
-    setTimeout(() => {
-      console.log('🔄 PhotoSelectionScreen - Template swap state update completed');
-    }, 100);
+    console.log('🔄 PhotoSelectionScreen - Template swap state update completed');
   };
 
   const handleCloseTemplateSwap = () => {

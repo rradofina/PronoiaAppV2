@@ -15,6 +15,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Files: `PLAN.md`, `CHANGELOG.md`, `CLAUDE.md`
 
 ### Fixed
+- **Loading States After Photo Edit**: Fixed persistent loading spinners appearing after photo edits and during slot navigation
+  - **Root Cause**: Multiple issues causing unnecessary loading states:
+    1. PhotoRenderer treated URL upgrades (immediate URL → blob URL) as new photos, resetting loading state
+    2. Complex state transitions with setTimeout delays caused race conditions during slot navigation
+    3. State cleanup delays between editing modes triggered loading flashes
+  - **Solution**:
+    - Enhanced PhotoRenderer with `isSamePhoto()` function to detect URL upgrades vs actual photo changes
+    - Added Google Drive file ID extraction to identify same photos across different URL formats
+    - Eliminated setTimeout delays in state transitions for atomic state updates
+    - Removed unnecessary delays in inline editing state management (50ms, 75ms, 100ms delays)
+    - Streamlined apply/cancel operations to use immediate state resets
+  - **Files Modified**:
+    - `components/PhotoRenderer.tsx` - Added URL upgrade detection and same-photo comparison
+    - `components/screens/PhotoSelectionScreen.tsx` - Removed race condition setTimeout delays
+  - **Impact**: Loading spinners no longer appear after editing 2nd photo or during slot navigation
+
 - **Photo Zoom/Crop Reset Issue**: Fixed bug where user's zoom and crop adjustments were resetting to default when clicking checkmark
   - **Root Cause**: Smart transform calculation was overwriting user's manual adjustments due to race condition
   - **Solution**: 
@@ -47,6 +63,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Files Modified**:
     - `components/PhotoRenderer.tsx` - Updated photoStyle calculation to respect transforms in all modes
   - **Impact**: Photos now display with correct zoom/crop in template view after editing, matching what users see in edit mode
+
+- **Unnecessary Loading State After Photo Edit**: Improved loading states and fixed multiple photo display issue
+  - **Root Cause**: Multiple loading triggers and potential state management issues causing all photos to show during editing
+  - **Solution**:
+    - Removed timestamp from PhotoRenderer key generation to prevent remounts on transform changes
+    - Optimized PhotoRenderer to only reset loading state when URL actually changes (not on prop updates)
+    - Replaced "Loading..." text with better photo placeholder in InlinePhotoEditor
+    - Added comprehensive debugging to identify multiple photo rendering issues
+  - **Files Modified**:
+    - `components/InlinePhotoEditor.tsx` - Optimized key generation and improved loading placeholder
+    - `components/PhotoRenderer.tsx` - Added URL change detection to prevent unnecessary loading resets
+    - `components/PngTemplateVisual.tsx` - Enhanced debugging for slot editing state
+  - **Impact**: Reduced loading states, better visual feedback, debugging tools to identify remaining issues
 
 ## [2024-08-05] - Session-Based Template Management
 

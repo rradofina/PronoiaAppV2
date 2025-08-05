@@ -347,7 +347,10 @@ export default function PhotoRenderer({
     gaps: { left: number; right: number; top: number; bottom: number };
     significantGaps: { left: boolean; right: boolean; top: boolean; bottom: boolean };
   } => {
+    console.log('🔧 detectGaps - Starting gap detection...');
+    
     if (!imageRef.current || !containerRef.current) {
+      console.log('🔧 detectGaps - No refs available');
       return { 
         hasGaps: false, 
         gapCount: 0,
@@ -355,6 +358,8 @@ export default function PhotoRenderer({
         significantGaps: { left: false, right: false, top: false, bottom: false }
       };
     }
+
+    try {
     
     // Use DOM-based gap detection for visual accuracy (zoom-independent)
     // This measures actual visual gaps that the user sees, regardless of internal scaling
@@ -405,84 +410,78 @@ export default function PhotoRenderer({
       });
     }
 
-    // Corrected approach: Use raw DOM pixel gaps with CSS contain offset correction
-    // Movement calculations expect container pixel gaps and handle zoom themselves
+    // Back to basics: Simple DOM measurement
+    // Use direct getBoundingClientRect measurements with minimal processing
     
-    // Step 1: Get basic DOM gap measurements
-    let rawGapLeft = imageRect.left > containerRect.left ? (imageRect.left - containerRect.left) : 0;
-    let rawGapRight = imageRect.right < containerRect.right ? (containerRect.right - imageRect.right) : 0;
-    let rawGapTop = imageRect.top > containerRect.top ? (imageRect.top - containerRect.top) : 0;
-    let rawGapBottom = imageRect.bottom < containerRect.bottom ? (containerRect.bottom - imageRect.bottom) : 0;
+    const rawGapLeft = Math.max(0, imageRect.left - containerRect.left);
+    const rawGapRight = Math.max(0, containerRect.right - imageRect.right);
+    const rawGapTop = Math.max(0, imageRect.top - containerRect.top);
+    const rawGapBottom = Math.max(0, containerRect.bottom - imageRect.bottom);
     
-    // Step 2: Apply CSS contain centering offset correction only where needed
-    const photoNaturalWidth = imageRef.current.naturalWidth || 1;
-    const photoNaturalHeight = imageRef.current.naturalHeight || 1;
-    const photoAspectRatio = photoNaturalWidth / photoNaturalHeight;
-    const containerAspectRatio = containerRect.width / containerRect.height;
-    
-    // CSS object-fit: contain creates centering offset in one dimension
-    const containScale = Math.min(
-      containerRect.width / photoNaturalWidth,
-      containerRect.height / photoNaturalHeight
-    );
-    
-    // Determine which dimension has CSS contain centering offset
-    const fitsHeight = photoAspectRatio >= containerAspectRatio; // Photo wider or equal → fits height, horizontal centering
-    const fitsWidth = !fitsHeight; // Photo taller → fits width, vertical centering
-    
-    // Apply offset correction only to the dimension with empty space
-    if (fitsHeight) {
-      // Photo fits height → horizontal gaps have CSS centering offset
-      const cssScaledWidth = photoNaturalWidth * containScale;
-      const horizontalOffset = (containerRect.width - cssScaledWidth) / 2;
-      rawGapLeft = Math.max(0, rawGapLeft - horizontalOffset);
-      rawGapRight = Math.max(0, rawGapRight - horizontalOffset);
-    } else {
-      // Photo fits width → vertical gaps have CSS centering offset  
-      const cssScaledHeight = photoNaturalHeight * containScale;
-      const verticalOffset = (containerRect.height - cssScaledHeight) / 2;
-      rawGapTop = Math.max(0, rawGapTop - verticalOffset);
-      rawGapBottom = Math.max(0, rawGapBottom - verticalOffset);
+    // Simple debugging
+    if (debug) {
+      console.log('🔍 SIMPLE DOM GAP DETECTION:', {
+        imageRect: {
+          left: imageRect.left.toFixed(1),
+          right: imageRect.right.toFixed(1),
+          top: imageRect.top.toFixed(1),
+          bottom: imageRect.bottom.toFixed(1),
+          width: imageRect.width.toFixed(1),
+          height: imageRect.height.toFixed(1)
+        },
+        containerRect: {
+          left: containerRect.left.toFixed(1),
+          right: containerRect.right.toFixed(1),
+          top: containerRect.top.toFixed(1),
+          bottom: containerRect.bottom.toFixed(1),
+          width: containerRect.width.toFixed(1),
+          height: containerRect.height.toFixed(1)
+        },
+        rawGaps: {
+          left: rawGapLeft.toFixed(1),
+          right: rawGapRight.toFixed(1),
+          top: rawGapTop.toFixed(1),
+          bottom: rawGapBottom.toFixed(1)
+        },
+        approach: 'Simple DOM measurement - back to basics'
+      });
     }
     
-    // Step 3: Use corrected pixel gaps directly (movement calculation handles zoom)
-    const visualGapLeft = rawGapLeft;
-    const visualGapRight = rawGapRight;
-    const visualGapTop = rawGapTop;
-    const visualGapBottom = rawGapBottom;
+    // Step 2: Use precise rounding for accurate gap measurement
+    // Round to 0.1px precision to avoid floating point errors while preserving accuracy
+    const visualGapLeft = Math.round(rawGapLeft * 10) / 10;
+    const visualGapRight = Math.round(rawGapRight * 10) / 10;
+    const visualGapTop = Math.round(rawGapTop * 10) / 10;
+    const visualGapBottom = Math.round(rawGapBottom * 10) / 10;
     
-    // Add detailed gap calculation debugging
+    // Add simplified gap calculation debugging
     if (debug) {
-      console.log('🧮 GAP CALCULATION DEBUG (RAW PIXELS + CSS CONTAIN CORRECTION):', {
-        photoInfo: {
-          naturalSize: { width: photoNaturalWidth, height: photoNaturalHeight },
-          aspectRatio: photoAspectRatio.toFixed(3)
+      console.log('🧮 SIMPLIFIED GAP CALCULATION (DIRECT DOM MEASUREMENT):', {
+        containerSize: {
+          width: containerRect.width.toFixed(1),
+          height: containerRect.height.toFixed(1)
         },
-        containerInfo: {
-          size: { width: containerRect.width, height: containerRect.height },
-          aspectRatio: containerAspectRatio.toFixed(3)
-        },
-        cssContainStrategy: {
-          containScale: containScale.toFixed(6),
-          fitsHeight,
-          fitsWidth,
-          correctionApplied: fitsHeight ? 'Horizontal centering offset' : 'Vertical centering offset'
+        imageSize: {
+          width: imageRect.width.toFixed(1),
+          height: imageRect.height.toFixed(1)
         },
         finalPixelGaps: {
-          left: visualGapLeft.toFixed(2),
-          right: visualGapRight.toFixed(2),
-          top: visualGapTop.toFixed(2),
-          bottom: visualGapBottom.toFixed(2)
+          left: visualGapLeft.toFixed(1),
+          right: visualGapRight.toFixed(1),
+          top: visualGapTop.toFixed(1),
+          bottom: visualGapBottom.toFixed(1)
         },
-        note: 'Raw pixel gaps with CSS contain centering correction - movement calculation handles zoom'
+        approach: 'Direct DOM measurement without complex offset corrections',
+        precision: 'Rounded to 0.1px for accuracy'
       });
     }
 
-    // Round up to ensure complete gap closure
-    const gapLeft = Math.ceil(visualGapLeft);
-    const gapRight = Math.ceil(visualGapRight);
-    const gapTop = Math.ceil(visualGapTop);
-    const gapBottom = Math.ceil(visualGapBottom);
+    // Use precise values without aggressive rounding
+    // Keep decimal precision for accurate gap detection
+    const gapLeft = visualGapLeft;
+    const gapRight = visualGapRight;
+    const gapTop = visualGapTop;
+    const gapBottom = visualGapBottom;
 
     // Add final gap values debugging  
     if (debug) {
@@ -546,12 +545,29 @@ export default function PhotoRenderer({
       });
     }
     
+    console.log('🔧 detectGaps - Completed successfully:', {
+      hasGaps: hasAnyGaps,
+      gapCount,
+      gaps: { left: gapLeft, right: gapRight, top: gapTop, bottom: gapBottom }
+    });
+
     return {
       hasGaps: hasAnyGaps,
       gapCount,
       gaps: { left: gapLeft, right: gapRight, top: gapTop, bottom: gapBottom },
       significantGaps: { left: hasLeftGap, right: hasRightGap, top: hasTopGap, bottom: hasBottomGap }
     };
+
+    } catch (error) {
+      console.error('❌ detectGaps - Error in gap calculation:', error);
+      // Return safe fallback values
+      return { 
+        hasGaps: false, 
+        gapCount: 0,
+        gaps: { left: 0, right: 0, top: 0, bottom: 0 }, 
+        significantGaps: { left: false, right: false, top: false, bottom: false }
+      };
+    }
     
   }, [debug]);
 
@@ -703,26 +719,29 @@ export default function PhotoRenderer({
     let horizontalDescription = 'no change';
     let verticalDescription = 'no change';
     
-    // Horizontal movement (FIXED: Correct direction + zoom-aware scaling)
+    // Get actual photo dimensions for correct scaling
+    const { photoSize } = calculateMathematicalGaps();
+    
+    // Horizontal movement (FIXED: Use photo dimensions not container dimensions)
     if (significantGaps.left) {
       // Gap on left → positive movement = move right in CSS coords = move left visually
-      horizontalMovement = gaps.left / containerRect.width / currentTransform.photoScale;
-      horizontalDescription = `move left ${gaps.left}px`;
+      horizontalMovement = (gaps.left / photoSize.width) / currentTransform.photoScale;
+      horizontalDescription = `move left ${gaps.left.toFixed(1)}px`;
     } else if (significantGaps.right) {
       // Gap on right → negative movement = move left in CSS coords = move right visually
-      horizontalMovement = -gaps.right / containerRect.width / currentTransform.photoScale;
-      horizontalDescription = `move right ${gaps.right}px`;
+      horizontalMovement = -(gaps.right / photoSize.width) / currentTransform.photoScale;
+      horizontalDescription = `move right ${gaps.right.toFixed(1)}px`;
     }
     
-    // Vertical movement (FIXED: Correct direction + zoom-aware scaling)
+    // Vertical movement (FIXED: Use photo dimensions not container dimensions)
     if (significantGaps.top) {
       // Gap on top → positive movement = move up in CSS coords
-      verticalMovement = gaps.top / containerRect.height / currentTransform.photoScale;
-      verticalDescription = `move up ${gaps.top}px`;
+      verticalMovement = (gaps.top / photoSize.height) / currentTransform.photoScale;
+      verticalDescription = `move up ${gaps.top.toFixed(1)}px`;
     } else if (significantGaps.bottom) {
       // Gap on bottom → negative movement = move down in CSS coords
-      verticalMovement = -gaps.bottom / containerRect.height / currentTransform.photoScale;
-      verticalDescription = `move down ${gaps.bottom}px`;
+      verticalMovement = -(gaps.bottom / photoSize.height) / currentTransform.photoScale;
+      verticalDescription = `move down ${gaps.bottom.toFixed(1)}px`;
     }
     
     // Apply movements to current position
@@ -1040,13 +1059,70 @@ export default function PhotoRenderer({
     }
   }, [transform]);
   
-  // Reset URL state when photoUrl changes
+  // Helper function to determine if two URLs represent the same photo
+  const isSamePhoto = useCallback((url1: string, url2: string): boolean => {
+    if (url1 === url2) return true;
+    
+    // Handle URL upgrades: immediate URL (googleusercontent.com/fife) → blob URL
+    // Extract Google Drive file ID from both URLs
+    const extractFileId = (url: string): string | null => {
+      // Try various Google Drive URL patterns
+      const patterns = [
+        /\/d\/([a-zA-Z0-9-_]+)/,           // /d/FILE_ID
+        /id=([a-zA-Z0-9-_]+)/,            // id=FILE_ID
+        /file\/d\/([a-zA-Z0-9-_]+)/,      // file/d/FILE_ID
+        /uc\?id=([a-zA-Z0-9-_]+)/,        // uc?id=FILE_ID
+        /\/fife\/.*\/([a-zA-Z0-9-_]+)/    // fife/.../FILE_ID
+      ];
+      
+      for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match) return match[1];
+      }
+      return null;
+    };
+    
+    const fileId1 = extractFileId(url1);
+    const fileId2 = extractFileId(url2);
+    
+    // If both URLs have the same Google Drive file ID, they're the same photo
+    if (fileId1 && fileId2 && fileId1 === fileId2) {
+      console.log('📸 PhotoRenderer - URL upgrade detected (same file ID):', {
+        fileId: fileId1,
+        fromType: url1.includes('blob:') ? 'blob' : 'immediate',
+        toType: url2.includes('blob:') ? 'blob' : 'immediate'
+      });
+      return true;
+    }
+    
+    return false;  
+  }, []);
+
+  // Reset URL state only when photoUrl represents a different photo
+  const [lastPhotoUrl, setLastPhotoUrl] = useState<string>('');
   useEffect(() => {
-    setCurrentUrlIndex(0);
-    setImageError(false);
-    setImageLoaded(false);
-    setClippingData({ overexposed: null, underexposed: null }); // Reset clipping data
-  }, [photoUrl]);
+    // Only reset loading state if URL represents a different photo
+    if (!isSamePhoto(photoUrl, lastPhotoUrl)) {
+      console.log('📸 PhotoRenderer - Different photo detected, resetting loading state:', {
+        from: lastPhotoUrl.substring(0, 50) + '...',
+        to: photoUrl.substring(0, 50) + '...',
+        samePhoto: false
+      });
+      setCurrentUrlIndex(0);
+      setImageError(false);
+      setImageLoaded(false);
+      setClippingData({ overexposed: null, underexposed: null });
+      setLastPhotoUrl(photoUrl);
+    } else {
+      console.log('📸 PhotoRenderer - Same photo (URL upgrade), keeping loading state:', {
+        from: lastPhotoUrl.substring(0, 50) + '...',
+        to: photoUrl.substring(0, 50) + '...',
+        samePhoto: true
+      });
+      // Update the URL reference but keep loading state
+      setLastPhotoUrl(photoUrl);
+    }
+  }, [photoUrl, lastPhotoUrl, isSamePhoto]);
   
   // Analyze clipping when image loads and clipping indicators are enabled
   useEffect(() => {
@@ -1412,7 +1488,7 @@ export default function PhotoRenderer({
     isDragging,
     isTouching,
     isSnapping,
-    detectGaps,
+    calculateMathematicalGaps,
     calculateGapBasedMovement,
     hasRecentUserInteraction,
     lastUserInteraction,
