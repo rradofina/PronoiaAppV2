@@ -769,18 +769,25 @@ export default function PhotoSelectionScreen({
     const newTemplateSlots = templateSlots.filter(slot => slot.templateId === templateId);
     
     if (newTemplateSlots.length > 0) {
-      // Find first empty slot or first slot if all filled
+      // Only auto-select if there's an empty slot
       const firstEmptySlot = newTemplateSlots.find(slot => !slot.photoId);
-      const slotToSelect = firstEmptySlot || newTemplateSlots[0];
       
-      console.log('🎯 Auto-selecting slot in new template:', {
-        templateId,
-        slotId: slotToSelect.id,
-        isEmptySlot: !slotToSelect.photoId,
-        totalSlots: newTemplateSlots.length
-      });
-      
-      setSelectedSlot(slotToSelect);
+      if (firstEmptySlot) {
+        console.log('🎯 Auto-selecting first empty slot in new template:', {
+          templateId,
+          slotId: firstEmptySlot.id,
+          totalSlots: newTemplateSlots.length
+        });
+        setSelectedSlot(firstEmptySlot);
+      } else {
+        // All slots filled - don't auto-select for clean viewing
+        console.log('🔧 All slots filled in template - no auto-selection:', {
+          templateId,
+          totalSlots: newTemplateSlots.length,
+          allFilled: true
+        });
+        setSelectedSlot(null);
+      }
     } else {
       // No slots in this template (shouldn't happen but handle gracefully)
       console.warn('⚠️ No slots found for template:', templateId);

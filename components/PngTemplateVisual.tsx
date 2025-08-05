@@ -245,7 +245,7 @@ export default function PngTemplateVisual({
               isInlineEditing 
                 ? 'z-50' // Clean editing experience - no border highlights during editing
                 : isSelected 
-                ? 'border-4 border-blue-500 border-opacity-90 z-40 cursor-pointer shadow-md' // Above overlay (z-30)
+                ? 'border-4 border-blue-500 border-opacity-90 z-40 cursor-pointer' // Above overlay (z-30) - removed shadow for instant deselection
                 : shouldApplyDarkening
                 ? 'pointer-events-none cursor-not-allowed' // Block interaction during editing (but keep photos fully visible)
                 : isPreviewMode
