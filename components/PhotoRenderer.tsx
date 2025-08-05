@@ -1098,11 +1098,21 @@ export default function PhotoRenderer({
     return false;  
   }, []);
 
-  // Reset URL state only when photoUrl represents a different photo
+  // Track the current photo URL to detect actual photo changes
   const [lastPhotoUrl, setLastPhotoUrl] = useState<string>('');
+  const [hasInitialized, setHasInitialized] = useState(false);
+  
   useEffect(() => {
-    // Only reset loading state if URL represents a different photo
-    if (!isSamePhoto(photoUrl, lastPhotoUrl)) {
+    // On first mount, initialize without resetting states
+    if (!hasInitialized && photoUrl) {
+      setLastPhotoUrl(photoUrl);
+      setHasInitialized(true);
+      console.log('📸 PhotoRenderer - Initial photo set:', photoUrl.substring(0, 50) + '...');
+      return;
+    }
+    
+    // Only reset loading state if URL represents a truly different photo
+    if (photoUrl && !isSamePhoto(photoUrl, lastPhotoUrl)) {
       console.log('📸 PhotoRenderer - Different photo detected, resetting loading state:', {
         from: lastPhotoUrl.substring(0, 50) + '...',
         to: photoUrl.substring(0, 50) + '...',
@@ -1113,16 +1123,17 @@ export default function PhotoRenderer({
       setImageLoaded(false);
       setClippingData({ overexposed: null, underexposed: null });
       setLastPhotoUrl(photoUrl);
-    } else {
+    } else if (photoUrl && isSamePhoto(photoUrl, lastPhotoUrl)) {
       console.log('📸 PhotoRenderer - Same photo (URL upgrade), keeping loading state:', {
         from: lastPhotoUrl.substring(0, 50) + '...',
         to: photoUrl.substring(0, 50) + '...',
-        samePhoto: true
+        samePhoto: true,
+        imageLoaded
       });
       // Update the URL reference but keep loading state
       setLastPhotoUrl(photoUrl);
     }
-  }, [photoUrl, lastPhotoUrl, isSamePhoto]);
+  }, [photoUrl, hasInitialized, lastPhotoUrl, isSamePhoto, imageLoaded]);
   
   // Analyze clipping when image loads and clipping indicators are enabled
   useEffect(() => {
@@ -1519,7 +1530,6 @@ export default function PhotoRenderer({
     >
       <img
         ref={imageRef}
-        key={`${photoUrl}-${currentUrlIndex}`} // Force re-render when URL changes
         src={getCurrentUrl()}
         alt={photoAlt}
         className="absolute inset-0"
