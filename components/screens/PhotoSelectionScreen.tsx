@@ -379,18 +379,21 @@ export default function PhotoSelectionScreen({
     loadPrintSizes();
   }, [selectedSize]);
 
-  // Auto-select first empty slot when entering screen (but respect completed templates)
+  // Auto-select first empty slot when entering screen (but respect user actions)
   useEffect(() => {
     if (!selectedSlot && templateSlots.length > 0) {
       const firstEmptySlot = templateSlots.find(slot => !slot.photoId);
       if (firstEmptySlot) {
-        // Only auto-select if we have empty slots (not all templates are complete)
-        setSelectedSlot(firstEmptySlot);
+        // Only auto-select if we have empty slots and not in editing mode
+        // This prevents overriding user actions during photo placement
+        if (viewMode === 'normal') {
+          setSelectedSlot(firstEmptySlot);
+        }
       }
       // Don't auto-select anything if all slots are filled (templates complete)
       // This allows for clean view when templates are completed
     }
-  }, [templateSlots, selectedSlot, setSelectedSlot]);
+  }, [templateSlots, selectedSlot, setSelectedSlot, viewMode]);
 
 
   const onSlotSelect = (slot: TemplateSlot) => {
@@ -781,15 +784,22 @@ export default function PhotoSelectionScreen({
       console.log(`🔧 Template ${currentSlot.templateId}: ${filledSlotsCount}/${totalSlotsInTemplate} slots filled`);
       
       if (filledSlotsCount === totalSlotsInTemplate) {
-        // Template is complete - deselect for clean view
-        console.log('🔧 Template completed - deselecting for clean view');
-        setSelectedSlot(null);
+        // Template is complete - stay on current template instead of jumping to next
+        console.log('🔧 Template completed - staying on current template');
+        setSelectedSlot(currentSlot);
       } else {
-        // Template not complete - auto-select next empty slot in same template
-        const nextEmptySlot = sameTemplateSlots.find(slot => !slot.photoId);
-        if (nextEmptySlot) {
-          console.log('🔧 Auto-selecting next empty slot in same template:', nextEmptySlot.id);
-          setSelectedSlot(nextEmptySlot);
+        // Only auto-select next slot if the photo was placed on the currently selected template
+        const currentlySelectedTemplateId = selectedSlot?.templateId;
+        if (currentlySelectedTemplateId && currentSlot.templateId === currentlySelectedTemplateId) {
+          // Template not complete and we're on the same template - auto-select next empty slot
+          const nextEmptySlot = sameTemplateSlots.find(slot => !slot.photoId);
+          if (nextEmptySlot) {
+            console.log('🔧 Auto-selecting next empty slot in same template:', nextEmptySlot.id);
+            setSelectedSlot(nextEmptySlot);
+          }
+        } else {
+          // Photo was placed on a different template than currently selected - don't auto-select
+          console.log('🔧 Photo placed on different template - not auto-selecting next slot');
         }
       }
     }
@@ -908,7 +918,7 @@ export default function PhotoSelectionScreen({
       setViewMode('normal');
       setInlineEditingSlot(null);
       setInlineEditingPhoto(null);
-      setSelectedSlot(null);
+      // Don't reset selectedSlot - let handleApplyPhotoToSlot handle selection logic
       
     } catch (error) {
       console.error('❌ Error in handleInlineApply:', error);
