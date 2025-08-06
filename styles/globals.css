@@ -3,6 +3,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Root-level viewport fixes for mobile browsers */
+:root {
+  --full-vh: 100vh; /* Will be updated by JavaScript */
+  --vh: 1vh; /* Will be updated by JavaScript */
+}
+
+/* Prevent overscroll and ensure app fits viewport */
+html, body {
+  height: 100%;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Main app container should use dynamic viewport */
+#__next {
+  min-height: 100%;
+  min-height: 100dvh;
+  min-height: var(--full-vh, 100vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 /* Clipping indicator zebra stripe animation */
 @keyframes zebra-stripes {
   0% {
@@ -19,6 +41,7 @@
   .min-h-safe-screen {
     min-height: 100vh;
     min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
+    min-height: calc(var(--full-vh, 100vh)); /* Fallback to JS-calculated height */
   }
   
   /* Fixed-height layout system */
@@ -29,7 +52,10 @@
   
   /* Mobile/Tablet: Account for bottom favorites bar with proper spacing */
   .layout-main-content {
-    height: calc(100vh - 60px - 150px - 8px); /* Added 8px spacing */
+    /* Use dvh (dynamic viewport height) which adjusts when browser UI shows/hides */
+    height: calc(100dvh - 60px - 150px - 8px);
+    /* Fallback for browsers without dvh support */
+    height: calc(var(--full-vh, 100vh) - 60px - 150px - 8px);
     overflow-y: auto;
     margin-bottom: 8px; /* Gap between photo container and favorites bar */
   }
@@ -37,7 +63,8 @@
   /* Desktop: No bottom favorites bar, only subtract header */
   @media (min-width: 1024px) {
     .layout-main-content {
-      height: calc(100vh - 60px);
+      height: calc(100dvh - 60px);
+      height: calc(var(--full-vh, 100vh) - 60px);
       margin-bottom: 0; /* No favorites bar on desktop */
     }
   }
@@ -51,34 +78,9 @@
   /* iPad-specific optimizations */
   @media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
     .layout-main-content {
-      height: calc(100vh - 60px - 150px - 12px); /* More spacing on iPad */
+      height: calc(100dvh - 60px - 150px - 12px);
+      height: calc(var(--full-vh, 100vh) - 60px - 150px - 12px);
       margin-bottom: 12px;
-    }
-    
-    /* Use visualViewport if available (Safari on iPad) */
-    .layout-main-content.use-visual-viewport {
-      height: calc(var(--visual-viewport-height, 100vh) - 60px - 150px - 12px);
-    }
-  }
-  
-  /* Support for browsers with dvh (better viewport handling) */
-  @supports (height: 100dvh) {
-    .layout-main-content {
-      height: calc(100dvh - 60px - 150px - 8px);
-    }
-    
-    /* Desktop with dynamic viewport height support */
-    @media (min-width: 1024px) {
-      .layout-main-content {
-        height: calc(100dvh - 60px);
-      }
-    }
-    
-    /* iPad with dynamic viewport height */
-    @media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
-      .layout-main-content {
-        height: calc(100dvh - 60px - 150px - 12px);
-      }
     }
   }
   

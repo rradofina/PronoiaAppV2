@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Circular App Icons**: Redesigned all PWA icons to be circular with white background
+  - **Previous**: Square icons with colored background
+  - **New**: Circular masked icons with logo centered on white circle
+  - **Implementation**: Updated icon generation script to create circular clipping paths
+  - **File Modified**: `scripts/generate-icons.js`
+  - **Impact**: Browser tabs and installed apps now show distinctive circular logo
+
+- **Dynamic Viewport Height**: Fixed mobile browser viewport issues
+  - **Problem**: App required scrolling due to browser UI (address bar, bookmarks) taking space
+  - **Solution**: Implemented dynamic viewport height detection and CSS adjustments
+  - **Implementation**:
+    - Created `useViewportHeight` hook to track actual available viewport
+    - Updated CSS to use `dvh` (dynamic viewport height) units
+    - Added CSS custom properties updated by JavaScript
+    - Modified main layout containers to use dynamic heights
+  - **Files Created**: `hooks/useViewportHeight.ts`
+  - **Files Modified**: 
+    - `styles/globals.css` - Added dynamic viewport CSS
+    - `pages/_app.tsx` - Integrated viewport hook
+    - `pages/_document.tsx` - Added `minimal-ui` viewport hint
+    - `components/screens/PhotoSelectionScreen.tsx` - Use dynamic height
+  - **Impact**: App now perfectly fits available viewport without scrolling on tablets/mobile
+
 ### Added
 - **Progressive Web App (PWA) Support**: Full "Add to Home Screen" functionality
   - **Web App Manifest**: Created `manifest.json` with app metadata, theme colors, and icon definitions

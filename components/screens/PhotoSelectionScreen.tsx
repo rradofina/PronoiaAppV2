@@ -1242,7 +1242,11 @@ export default function PhotoSelectionScreen({
 
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ touchAction: 'pan-y' }}>
+    <div className="bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ 
+      touchAction: 'pan-y',
+      height: 'var(--full-vh, 100vh)',
+      maxHeight: 'var(--full-vh, 100vh)'
+    }}>
       
       {/* SELECTIVE BLOCKING - Only dim non-interactive areas during editing */}
       {viewMode === 'inline-editing' && (

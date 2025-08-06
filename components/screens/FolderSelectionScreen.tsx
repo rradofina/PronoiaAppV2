@@ -745,7 +745,7 @@ export default function FolderSelectionScreen({
               </div>
 
               <div className="bg-white rounded-lg p-6 shadow-sm">
-                <div className="space-y-3 max-h-96 overflow-y-auto">
+                <div className="space-y-3 max-h-[70vh] overflow-y-auto">
                   {clientFolders
                     .sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime())
                     .map((folder) => (

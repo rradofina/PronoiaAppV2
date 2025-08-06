@@ -3,8 +3,12 @@ import '../styles/globals.css';
 import type { AppProps } from 'next/app';
 import { Toaster } from 'react-hot-toast';
 import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration';
+import { useViewportHeight } from '../hooks/useViewportHeight';
 
 export default function App({ Component, pageProps }: AppProps) {
+  // Track viewport height for mobile browser compatibility
+  useViewportHeight();
+  
   return (
     <>
       <ServiceWorkerRegistration />
