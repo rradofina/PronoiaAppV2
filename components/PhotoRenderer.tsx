@@ -1363,11 +1363,13 @@ export default function PhotoRenderer({
       const deltaY = touch.clientY - lastPointer.y;
       
       const containerRect = containerRef.current.getBoundingClientRect();
-      const normalizedDeltaX = deltaX / containerRect.width;
-      const normalizedDeltaY = deltaY / containerRect.height;
+      const movementX = (deltaX / containerRect.width) / currentTransform.photoScale;
+      const movementY = (deltaY / containerRect.height) / currentTransform.photoScale;
       
-      const newCenterX = Math.max(0, Math.min(1, currentTransform.photoCenterX - normalizedDeltaX));
-      const newCenterY = Math.max(0, Math.min(1, currentTransform.photoCenterY - normalizedDeltaY));
+      // Use same zoom-aware bounds as mouse dragging for consistency
+      const bounds = getPhotoTransformBounds(currentTransform.photoScale);
+      const newCenterX = Math.max(bounds.min, Math.min(bounds.max, currentTransform.photoCenterX - movementX));
+      const newCenterY = Math.max(bounds.min, Math.min(bounds.max, currentTransform.photoCenterY - movementY));
       
       const newTransform = createPhotoTransform(
         currentTransform.photoScale,

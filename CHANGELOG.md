@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `CLAUDE.md` with mandatory changelog documentation guidelines
   - Files: `PLAN.md`, `CHANGELOG.md`, `CLAUDE.md`
 
+### Changed
+- **Photo Movement Boundaries**: Removed restrictive boundaries for zoomed photos to enable creative positioning
+  - **Previous Behavior**: Photos hit invisible walls even when zoomed enough to cover the entire container
+  - **New Behavior**: At 1.5x zoom or higher, photos have unlimited movement freedom for creative control
+  - **Implementation**: Modified `getPhotoTransformBounds()` function to return effectively unlimited bounds (-10 to 10) when photoScale >= 1.5
+  - **File Modified**: `types/index.ts` lines 110-132
+  - **Impact**: Users can now position any part of a zoomed photo anywhere in the placeholder without restrictions
+
+- **Touch Dragging Consistency**: Fixed touch dragging to use same smart bounds system as mouse dragging
+  - **Previous Behavior**: Touch dragging had hardcoded 0-1 bounds that were more restrictive than mouse dragging
+  - **New Behavior**: Touch and mouse dragging now use identical zoom-aware boundary calculations
+  - **Implementation**: Updated touch move handler to use `getPhotoTransformBounds()` and apply scale-adjusted movement
+  - **File Modified**: `components/PhotoRenderer.tsx` lines 1359-1382
+  - **Impact**: Consistent photo manipulation experience across all input methods (mouse, touch, tablet)
+
 ### Fixed
 - **Loading States After Photo Edit**: Fixed persistent loading spinners appearing after photo edits and during slot navigation
   - **Root Cause**: Multiple issues causing unnecessary loading states:

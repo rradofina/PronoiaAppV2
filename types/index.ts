@@ -112,6 +112,18 @@ export function isContainerTransform(transform: ContainerTransform | PhotoTransf
 // At 2x zoom: allows -0.5 to 1.5 (can access all parts of enlarged photo)
 // At 4x zoom: allows -1.5 to 2.5 (can access all parts of heavily enlarged photo)
 export function getPhotoTransformBounds(photoScale: number): { min: number; max: number } {
+  // At scale >= 1.5, photo is large enough to cover most containers
+  // Allow effectively unlimited movement for creative freedom
+  if (photoScale >= 1.5) {
+    return {
+      min: -10,  // Effectively no limit
+      max: 10    // Effectively no limit
+    };
+  }
+
+  // For smaller scales, use progressive bounds to prevent losing photo
+  // At 1x zoom: allows 0 to 1 (keeps photo visible)
+  // At 1.25x zoom: allows -0.125 to 1.125 (some movement freedom)
   const halfExtraRange = (photoScale - 1) / 2;
   return {
     min: 0 - halfExtraRange,
