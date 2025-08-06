@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Progressive Web App (PWA) Support**: Full "Add to Home Screen" functionality
+  - **Web App Manifest**: Created `manifest.json` with app metadata, theme colors, and icon definitions
+  - **App Icons**: Generated 8 icon sizes (72x72 to 512x512) for all device types
+  - **Service Worker**: Implemented offline caching with network-first and cache-first strategies
+  - **PWA Meta Tags**: Added comprehensive meta tags for iOS and Android app installation
+  - **Files Created**: 
+    - `public/manifest.json` - PWA manifest configuration
+    - `public/service-worker.js` - Offline support and caching
+    - `public/icons/` - Complete icon set for all platforms
+    - `components/ServiceWorkerRegistration.tsx` - SW registration component
+    - `scripts/generate-icons.js` - Icon generation utility
+  - **Files Modified**:
+    - `pages/_document.tsx` - Added manifest link and PWA meta tags
+    - `pages/_app.tsx` - Integrated service worker registration
+  - **Impact**: Users can now install the app to their home screen on Chrome, Edge, Safari, and other browsers
+
 - **Project Documentation**: Created comprehensive project planning and documentation
   - New `PLAN.md` file outlining app vision, roadmap, and upcoming features
   - New `CHANGELOG.md` file for tracking all project changes
