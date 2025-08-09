@@ -27,6 +27,7 @@ interface PngTemplateVisualProps {
   // Edit button state and handler
   slotShowingEditButton?: TemplateSlot | null;
   onEditButtonClick?: (slot: TemplateSlot) => void;
+  onChangeButtonClick?: (slot: TemplateSlot) => void;
   // Remove confirmation state and handlers
   slotShowingRemoveConfirmation?: TemplateSlot | null;
   onRemoveButtonClick?: (slot: TemplateSlot) => void;
@@ -51,6 +52,7 @@ export default function PngTemplateVisual({
   holePhotoAssignments = [],
   slotShowingEditButton = null,
   onEditButtonClick,
+  onChangeButtonClick,
   slotShowingRemoveConfirmation = null,
   onRemoveButtonClick,
   onConfirmRemove,
@@ -380,7 +382,7 @@ export default function PngTemplateVisual({
               </div>
             )}
             
-            {/* Edit and Remove buttons positioned INSIDE placeholder (top-right) */}
+            {/* Edit, Change and Remove buttons positioned INSIDE placeholder (top-right) */}
             {slot && slot.photoId && slotShowingEditButton?.id === slot.id && onEditButtonClick && onRemoveButtonClick && (
               <div className="absolute top-2 right-2 flex gap-1 z-70">
                 <button
@@ -389,10 +391,22 @@ export default function PngTemplateVisual({
                     onEditButtonClick(slot);
                   }}
                   className="px-2 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 shadow-lg transition-all duration-200"
-                  title="Edit photo"
+                  title="Edit photo position"
                 >
                   Edit
                 </button>
+                {onChangeButtonClick && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onChangeButtonClick(slot);
+                    }}
+                    className="px-2 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 shadow-lg transition-all duration-200"
+                    title="Change photo"
+                  >
+                    Change
+                  </button>
+                )}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

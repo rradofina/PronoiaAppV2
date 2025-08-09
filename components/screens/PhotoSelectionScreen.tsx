@@ -1,4 +1,4 @@
-import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType, PrintSize, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, createPhotoTransform, ManualPackage, ManualTemplate } from '../../types';
+import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType, PrintSize, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, createPhotoTransform, createSmartPhotoTransformFromSlot, ManualPackage, ManualTemplate } from '../../types';
 import { useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
@@ -23,7 +23,7 @@ import { setupViewportHandler, getViewportInfo } from '../../utils/viewportUtils
 
 
 // Simplified TemplateVisual component
-const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard, isActiveTemplate = true, slotShowingEditButton, onEditButtonClick, slotShowingRemoveConfirmation, onRemoveButtonClick, onConfirmRemove, onCancelRemove }: any) => {
+const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard, isActiveTemplate = true, slotShowingEditButton, onEditButtonClick, onChangeButtonClick, slotShowingRemoveConfirmation, onRemoveButtonClick, onConfirmRemove, onCancelRemove }: any) => {
   // Get templates from both window cache AND database to ensure consistency with swap modal
   const windowTemplates = (window as any).pngTemplates || [];
   const [databaseTemplates, setDatabaseTemplates] = useState<any[]>([]);
@@ -218,6 +218,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
         isActiveTemplate={isActiveTemplate}
         slotShowingEditButton={slotShowingEditButton}
         onEditButtonClick={onEditButtonClick}
+        onChangeButtonClick={onChangeButtonClick}
         slotShowingRemoveConfirmation={slotShowingRemoveConfirmation}
         onRemoveButtonClick={onRemoveButtonClick}
         onConfirmRemove={onConfirmRemove}
@@ -331,6 +332,22 @@ export default function PhotoSelectionScreen({
   const [selectedPhotoForTemplate, setSelectedPhotoForTemplate] = useState<Photo | null>(null);
   const [selectedTemplateForViewer, setSelectedTemplateForViewer] = useState<string | null>(null);
   const [selectedSlotForEditor, setSelectedSlotForEditor] = useState<TemplateSlot | null>(null);
+  const [isSelectingPhoto, setIsSelectingPhoto] = useState(false); // Track when user is selecting photo for empty slot
+  
+  // Handle escape key to close photo selection mode
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isSelectingPhoto) {
+        setIsSelectingPhoto(false);
+        setSelectedSlot(null);
+      }
+    };
+    
+    if (isSelectingPhoto) {
+      window.addEventListener('keydown', handleEscape);
+      return () => window.removeEventListener('keydown', handleEscape);
+    }
+  }, [isSelectingPhoto]);
   
   // Inline editing states
   const [inlineEditingSlot, setInlineEditingSlot] = useState<TemplateSlot | null>(null);
@@ -526,22 +543,73 @@ export default function PhotoSelectionScreen({
       return;
     }
     
-    // In print mode with a selected slot, start inline editing
-    if (selectionMode === 'print' && selectedSlot) {
-      console.log('🔧 STARTING INLINE EDITING:', {
-        slotId: selectedSlot.id,
-        photoName: photo.name,
-        photoId: photo.id
+    // In print mode with selected slot and favorites expanded - start inline editing
+    if (selectionMode === 'print' && selectedSlot && isSelectingPhoto) {
+      console.log('🔧 Starting inline editing from expanded favorites:', {
+        photo: photo.name,
+        slotId: selectedSlot.id
       });
       
+      // Calculate smart transform for initial position, then start inline editing
+      createSmartPhotoTransformFromSlot(photo, selectedSlot)
+        .then(smartTransform => {
+          console.log('📐 Smart transform calculated for initial position:', smartTransform);
+          
+          // Apply photo to slot with smart transform first
+          // This ensures the photo is in the slot for inline editing
+          const updatedSlots = templateSlots.map(s => {
+            if (s.id === selectedSlot.id) {
+              return {
+                ...s,
+                photoId: photo.id,
+                transform: smartTransform
+              };
+            }
+            return s;
+          });
+          setTemplateSlots(updatedSlots);
+          
+          // Now start inline editing so user can adjust if needed
+          setIsSelectingPhoto(false); // Close expanded favorites bar
+          setInlineEditingSlot(selectedSlot);
+          setInlineEditingPhoto(photo);
+          setViewMode('inline-editing');
+          
+          console.log('✅ Photo applied with smart transform - inline editor opened for adjustment');
+        })
+        .catch(error => {
+          console.error('❌ Failed to calculate smart transform, using default:', error);
+          
+          // Fallback: apply with default transform and start editing
+          const defaultTransform = createPhotoTransform(1, 0.5, 0.5);
+          const updatedSlots = templateSlots.map(s => {
+            if (s.id === selectedSlot.id) {
+              return {
+                ...s,
+                photoId: photo.id,
+                transform: defaultTransform
+              };
+            }
+            return s;
+          });
+          setTemplateSlots(updatedSlots);
+          
+          setIsSelectingPhoto(false);
+          setInlineEditingSlot(selectedSlot);
+          setInlineEditingPhoto(photo);
+          setViewMode('inline-editing');
+        });
+      
+      console.log('✅ Starting inline editing with auto-fit Process 1 (smart scale)');
+    } else if (selectionMode === 'print' && selectedSlot) {
+      // In print mode with selected slot but favorites not expanded - start inline editing
+      console.log('🔧 Starting inline editing from photo click');
       setInlineEditingSlot(selectedSlot);
       setInlineEditingPhoto(photo);
       setViewMode('inline-editing');
-      
-      console.log('🔧 Inline editing states set - should trigger UI update');
-    } else {
-      // In photo mode or print mode without selected slot, show photo viewer
-      console.log('🔧 Opening photo viewer - no selected slot or wrong mode');
+    } else if (selectionMode === 'photo') {
+      // In photo mode - show photo viewer for starring/unstarring
+      console.log('🔧 Opening photo viewer in photo mode');
       setSelectedPhotoForViewer(photo);
       setViewMode('photo-viewer');
     }
@@ -626,22 +694,33 @@ export default function PhotoSelectionScreen({
       }
     }
 
-    // Empty slot behavior: select and expand bookmarks
-    console.log('🔧 Empty slot clicked - selecting and expanding bookmarks');
+    // Empty slot behavior: select and trigger photo selection mode
+    console.log('🔧 Empty slot clicked - entering photo selection mode');
     setSelectedSlot(slot);
-    
-    // NOTE: Removed expansion logic - using fixed height layout now
+    setIsSelectingPhoto(true); // Trigger expanded favorites bar
   };
 
-  // Handle edit button click for filled slots
+  // Handle change button click for filled slots - opens favorites bar
+  const handleChangeButtonClick = (slot: TemplateSlot) => {
+    console.log('🔧 Change button clicked - opening favorites bar');
+    
+    // Set the slot as selected and trigger photo selection mode
+    setSelectedSlot(slot);
+    setIsSelectingPhoto(true);
+    setSlotShowingEditButton(null); // Hide the edit buttons
+    
+    console.log('✅ Favorites bar expanded for photo change');
+  };
+  
+  // Handle edit button click for filled slots - starts inline editing
   const handleEditButtonClick = (slot: TemplateSlot) => {
-    console.log('🔧 Edit button clicked - starting inline editing');
+    console.log('🔧 Edit button clicked - starting inline editing for position/zoom');
     
     // Find the existing photo in the photos array
     const existingPhoto = photos.find(photo => photo.id === slot.photoId);
     
     if (existingPhoto) {
-      console.log('🔧 Starting inline editing from edit button:', {
+      console.log('🔧 Starting inline editing:', {
         photo: existingPhoto.name,
         slotId: slot.id
       });
@@ -652,7 +731,7 @@ export default function PhotoSelectionScreen({
       setInlineEditingPhoto(existingPhoto);
       setViewMode('inline-editing');
       
-      console.log('✅ Inline editing started from edit button');
+      console.log('✅ Inline editing started for position/zoom adjustment');
     } else {
       console.error('❌ Photo not found when clicking edit button:', slot.photoId);
     }
@@ -917,23 +996,15 @@ export default function PhotoSelectionScreen({
       console.log(`🔧 Template ${currentSlot.templateId}: ${filledSlotsCount}/${totalSlotsInTemplate} slots filled`);
       
       if (filledSlotsCount === totalSlotsInTemplate) {
-        // Template is complete - stay on current template instead of jumping to next
-        console.log('🔧 Template completed - staying on current template');
-        setSelectedSlot(currentSlot);
+        // Template is complete - deselect for clean viewing
+        console.log('🔧 Template completed - deselecting for clean view');
+        setSelectedSlot(null);
       } else {
-        // Only auto-select next slot if the photo was placed on the currently selected template
-        const currentlySelectedTemplateId = selectedSlot?.templateId;
-        if (currentlySelectedTemplateId && currentSlot.templateId === currentlySelectedTemplateId) {
-          // Template not complete and we're on the same template - auto-select next empty slot
-          const nextEmptySlot = sameTemplateSlots.find(slot => !slot.photoId);
-          if (nextEmptySlot) {
-            console.log('🔧 Auto-selecting next empty slot in same template:', nextEmptySlot.id);
-            setSelectedSlot(nextEmptySlot);
-          }
-        } else {
-          // Photo was placed on a different template than currently selected - don't auto-select
-          console.log('🔧 Photo placed on different template - not auto-selecting next slot');
-        }
+        // Don't auto-select next slot - let user decide what to do next
+        // They may want to edit the photo they just placed
+        console.log('🔧 Photo placed - keeping current slot selected so user can edit if needed');
+        // Keep the current slot selected so user can click it to edit
+        setSelectedSlot(currentSlot);
       }
     }
     
@@ -1261,6 +1332,38 @@ export default function PhotoSelectionScreen({
         </>
       )}
       
+      {/* Photo Selection Overlay - Shows when selecting photo for empty slot */}
+      {isSelectingPhoto && (
+        <>
+          {/* Semi-transparent overlay with instruction */}
+          <div 
+            className="fixed inset-0 z-30 bg-black bg-opacity-40 flex items-start justify-center pt-20 lg:hidden animate-fade-in"
+            onClick={() => {
+              setIsSelectingPhoto(false);
+              setSelectedSlot(null);
+            }}
+          >
+            <div 
+              className="bg-white rounded-2xl px-8 py-6 mx-4 shadow-2xl transform animate-slide-down"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center">
+                <div className="text-4xl mb-3">🖼️</div>
+                <p className="text-xl font-semibold text-gray-800">
+                  Select a photo to fill the slot
+                </p>
+                <p className="text-sm text-gray-600 mt-3">
+                  Choose from your favorites below
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Tap outside or press ESC to cancel
+                </p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+      
       {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
       <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
         PhotoSelectionScreen.tsx
@@ -1298,13 +1401,17 @@ export default function PhotoSelectionScreen({
 
           {/* MAIN CONTENT AREA - CALCULATED FIXED HEIGHT */}
           <div 
-            className={`layout-main-content relative z-40 ${
+            className={`layout-main-content relative z-40 transition-all duration-300 ${
               viewMode === 'inline-editing' && selectionMode === 'print' 
                 ? 'editing-mode' // Custom class to help with styling
                 : ''
             }`}
             style={{ 
-              touchAction: 'manipulation'
+              touchAction: 'manipulation',
+              // Add padding when favorites bar is expanded to prevent template cutoff
+              paddingBottom: isSelectingPhoto ? 'calc(40vh - 150px)' : '0px',
+              // Smooth transition for padding changes
+              transition: 'padding-bottom 300ms cubic-bezier(0.4, 0, 0.2, 1)'
             }}
           >
             {selectionMode === 'photo' ? (
@@ -1321,7 +1428,7 @@ export default function PhotoSelectionScreen({
               />
             ) : (
               // Print mode: Show templates in Cover Flow
-              <div className="h-full" onClick={handleBackgroundClick}>
+              <div className="h-full overflow-hidden" onClick={handleBackgroundClick}>
                   <TemplateGrid
                     templateSlots={templateSlots}
                     photos={photos}
@@ -1341,6 +1448,7 @@ export default function PhotoSelectionScreen({
                         skipStateGuard={isApplyingPhoto}
                         slotShowingEditButton={slotShowingEditButton}
                         onEditButtonClick={handleEditButtonClick}
+                        onChangeButtonClick={handleChangeButtonClick}
                         slotShowingRemoveConfirmation={slotShowingRemoveConfirmation}
                         onRemoveButtonClick={handleRemoveButtonClick}
                         onConfirmRemove={handleConfirmRemove}
@@ -1357,13 +1465,11 @@ export default function PhotoSelectionScreen({
           </div>
         </div>
 
-        {/* FIXED-HEIGHT FAVORITES BAR - Mobile/Tablet */}
-        <div 
-          className="lg:hidden bg-white shadow-lg border-t layout-favorites relative z-40"
-          style={{ 
-            touchAction: 'pan-x' // Allow horizontal scrolling for photo bar
-          }}
-        >
+        {/* FAVORITES BAR - Mobile/Tablet */}
+        <div className="lg:hidden">
+          {/* Spacer to maintain layout when favorites bar is fixed */}
+          <div style={{ height: '150px' }} />
+          
           {selectionMode === 'photo' ? (
             // Photo Selection Mode: Show Favorites Bar - FIXED HEIGHT
             <FavoritesBar
@@ -1377,17 +1483,17 @@ export default function PhotoSelectionScreen({
               isExpanded={false} // No expansion needed - fixed height
             />
           ) : (
-            // Print Filling Mode: Show Favorites Bar - FIXED HEIGHT
+            // Print Filling Mode: Show Favorites Bar - EXPANDED when selecting
             <FavoritesBar
               favoritedPhotos={getDisplayPhotos()}
               onPhotoClick={handlePhotoClick}
               onRemoveFavorite={handleToggleFavorite}
-              isActiveInteractionArea={viewMode === 'inline-editing'}
+              isActiveInteractionArea={viewMode === 'inline-editing' || isSelectingPhoto}
               layout="horizontal"
               showRemoveButtons={false}
               usedPhotoIds={getUsedPhotoIds()}
-              isExpanded={false} // No expansion needed - fixed height
-              adaptivePhotoSize="medium" // Fixed medium size for 150px height
+              isExpanded={isSelectingPhoto} // Expand when selecting photo for slot
+              adaptivePhotoSize={isSelectingPhoto ? "large" : "medium"} // Larger photos when expanded
             />
           )}
         </div>

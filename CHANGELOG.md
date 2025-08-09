@@ -7,7 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2025-08-09] - Template Change Auto-Fit Fix
+## [2025-08-09] - Critical Photo Editing & Auto-Fit Fixes
+
+### Fixed
+- **2-Process Auto-Fit Not Working**: Restored the "double adjustment" functionality for photos
+  - **Change Button Fix**: Now properly calculates smart transform (Process 1) when selecting new photo via Change button
+  - **Normal Photo Addition Fix**: Empty slots now correctly apply smart scale when photos are added
+  - **Implementation**: Added `createSmartPhotoTransformFromSlot()` call in `handlePhotoClick` for both scenarios
+  - **Files Modified**: `components/screens/PhotoSelectionScreen.tsx` (lines 547-603)
+  - **Impact**: Photos now auto-fit correctly to fill slots without gaps on initial placement
+
+- **Immediate Editing After Photo Selection**: Fixed workflow to allow instant editing
+  - **Previous Issue**: Photos were applied and interaction ended, preventing immediate adjustments
+  - **Solution**: Modified to start inline editing mode immediately after photo selection
+  - **Workflow**: Select photo → Apply with smart transform → Open inline editor → User can adjust
+  - **Files Modified**: `components/screens/PhotoSelectionScreen.tsx` (lines 547-603)
+  - **Impact**: Users can now immediately edit zoom/position after selecting any photo
+
+- **Cannot Edit Photos After Placement**: Fixed auto-selection preventing photo editing
+  - **Root Cause**: System was auto-selecting next empty slot after photo placement
+  - **Solution**: Modified selection logic to keep current slot selected so user can edit if desired
+  - **Files Modified**: `components/screens/PhotoSelectionScreen.tsx` (lines 965-975)
+  - **Impact**: Users can now click placed photos to edit zoom/position without interference
+
+- **Zoom/Frame/Crop Working Correctly**: Verified inline editing functionality
+  - **Edit Button**: Properly triggers inline editing mode with existing transforms preserved
+  - **Change Button**: Now opens inline editor for immediate adjustments
+  - **Existing Logic**: `components/InlinePhotoEditor.tsx` already handles both cases correctly
+  - **Impact**: Full editing capabilities restored for photo positioning and zooming
+
+## [2025-08-09] - Template Change Auto-Fit Fix & Enhanced Photo Selection UX
+
+### Changed
+- **Enhanced Photo Editing Workflow**: Clear separation between Edit and Change functions
+  - Added "Change" button (green) for selecting a different photo via favorites bar
+  - Edit button (blue) for adjusting position/zoom with inline editor
+  - Remove button (red) for deleting photos
+  - Change button properly applies auto-fit transform to new photos
+  - Three distinct functions for better user experience
+  - Files Modified: `components/screens/PhotoSelectionScreen.tsx`, `components/PngTemplateVisual.tsx`
+
+## [Previous - Same Day]
+
+### Added
+- **Enhanced Photo Selection Mode**: Intuitive mobile/tablet experience for filling empty slots
+  - **Expanded Favorites Bar**: When tapping "Tap to add" on empty slot, favorites bar expands upward showing larger photos
+  - **Visual Overlay**: Clear instruction overlay "Select a photo to fill the slot" guides users
+  - **Smooth Animations**: Height-based expansion animation with proper positioning
+  - **Responsive Heights**: 50% viewport on mobile, 40% on tablets for optimal viewing
+  - **Auto-Collapse**: Bar automatically collapses when photo is selected or cancelled
+  - **Escape Support**: Press ESC or tap outside to cancel selection
+  - **Files Modified**: 
+    - `components/screens/PhotoSelectionScreen.tsx` - Added isSelectingPhoto state and overlay
+    - `components/FavoritesBar.tsx` - Enhanced with dynamic expansion and larger photo sizes
+    - `styles/globals.css` - Added animation classes
+  - **Impact**: Foolproof and intuitive photo selection process on touch devices
+
+## [Previous - Same Day] - Template Change Auto-Fit Fix
 
 ### Fixed
 - **Template Change Transform Bug**: Photos now properly auto-fit when changing templates

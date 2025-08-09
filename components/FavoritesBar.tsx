@@ -61,14 +61,40 @@ export default function FavoritesBar({
   
   const safeViewport = getSafeViewportInfo();
   
-  // SIMPLIFIED: Fixed photo height for 150px container
+  // ADAPTIVE: Photo height based on expansion state and size preference
   const getAdaptivePhotoHeight = () => {
-    // For 150px container height, optimal photo height is ~100px (h-24 + padding)
+    if (isExpanded) {
+      // Expanded mode: much larger photos for easier selection
+      switch (adaptivePhotoSize) {
+        case 'large': return 'h-64'; // 256px - maximizes space usage
+        case 'medium': return 'h-48'; // 192px - balanced size
+        case 'small': return 'h-32'; // 128px - compact but visible
+        default: return 'h-56'; // 224px - good default for expanded view
+      }
+    }
+    // Normal mode: standard size
     return 'h-24'; // 96px - perfect for 150px container with padding
   };
   
-  // SIMPLIFIED: Fixed height calculation - no complex viewport calculations needed
-  const containerHeight = 'h-full'; // Use full available height from parent container
+  // DYNAMIC: Container height based on expansion state
+  const getContainerHeight = () => {
+    if (!isExpanded) {
+      return '150px'; // Fixed height when collapsed
+    }
+    // Expanded mode: take up more space for photo selection
+    if (typeof window !== 'undefined') {
+      const viewportHeight = window.innerHeight;
+      const isMobile = viewportHeight < 768;
+      const isTablet = viewportHeight >= 768 && viewportHeight < 1024;
+      
+      if (isMobile) {
+        return '50vh'; // 50% of viewport on mobile
+      } else if (isTablet) {
+        return '40vh'; // 40% of viewport on tablet
+      }
+    }
+    return '35vh'; // Default expansion height
+  };
   const containerRef = useRef<HTMLDivElement>(null);
   
   // DEVELOPMENT: Clipping monitoring and warnings
@@ -102,7 +128,7 @@ export default function FavoritesBar({
         layout
       });
     }
-  }, [isExpanded, containerHeight, layout]);
+  }, [isExpanded, layout]);
   
   // Note: Enhanced viewport-aware expansion with clipping prevention
   
@@ -110,7 +136,7 @@ export default function FavoritesBar({
     return (
       <div className={`flex items-center justify-center transition-all duration-300 ease-in-out ${
         layout === 'horizontal' 
-          ? `${containerHeight} border-t`
+          ? `h-full border-t`
           : 'h-full'
       } ${
         isActiveInteractionArea 
@@ -139,20 +165,23 @@ export default function FavoritesBar({
     return (
       <div 
         ref={containerRef}
-        className={`border-t overflow-hidden transition-all duration-300 ease-in-out favorites-bar-safe ${
-          containerHeight
-        } ${
+        className={`fixed bottom-0 left-0 right-0 z-50 border-t overflow-hidden favorites-bar-safe transition-all duration-300 ${
           isActiveInteractionArea 
-            ? 'bg-yellow-50 border-yellow-300 border-t-2 shadow-lg' 
+            ? 'bg-yellow-50 border-yellow-300 border-t-2' 
             : isExpanded
-            ? 'bg-blue-50 border-blue-300 border-t-2 shadow-lg'
+            ? 'bg-blue-50 border-blue-300 border-t-2'
             : 'bg-white'
+        } ${
+          isExpanded ? 'shadow-2xl' : 'shadow-lg'
         }`}
         style={{
-          // CSS SAFETY: Add viewport-based max height to prevent clipping
-          maxHeight: '100vh',
+          // Dynamic height based on expansion state
+          height: getContainerHeight(),
+          maxHeight: isExpanded ? '60vh' : '150px',
           // CSS SAFETY: Add fallback overflow handling
-          overflowY: 'auto'
+          overflowY: 'auto',
+          // Smooth transition for height changes
+          transition: 'height 300ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 300ms ease-out'
         }}
       >
         <div className="h-full flex flex-col">
@@ -165,14 +194,15 @@ export default function FavoritesBar({
                 'text-gray-700 border-gray-300'
           }`}>
             {isActiveInteractionArea ? '⚡ ' : isExpanded ? '📌 ' : ''}Favorites ({favoritedPhotos.length})
-            {isActiveInteractionArea && <div className="text-xs text-yellow-600">Tap to fill slot</div>}
+            {isActiveInteractionArea && isExpanded && <div className="text-xs font-bold text-yellow-700">Select a photo to fill the slot</div>}
+            {isActiveInteractionArea && !isExpanded && <div className="text-xs text-yellow-600">Tap to fill slot</div>}
             {isExpanded && !isActiveInteractionArea && <div className="text-xs text-blue-600">Slot selected - choose photo</div>}
           </div>
           
           {/* Photos section - takes remaining space */}
           <div className="flex-1 overflow-x-auto flex items-center">
-            <div className={`flex px-3 py-3 transition-all duration-300 ease-in-out ${
-              isExpanded ? 'space-x-4' : 'space-x-2'
+            <div className={`flex px-3 transition-all duration-300 ease-in-out ${
+              isExpanded ? 'space-x-6 py-2' : 'space-x-2 py-3'
             }`} style={{ touchAction: 'pan-x' }}>
               {displayPhotos.map((photo) => {
                 const isUsed = usedPhotoIds.has(photo.id);
@@ -188,13 +218,14 @@ export default function FavoritesBar({
                       isUsed
                         ? 'border-green-400 shadow-md' // Used photos get green border
                         : isActiveInteractionArea 
-                        ? 'border-yellow-400 hover:border-yellow-500 shadow-md hover:shadow-lg hover:scale-105' 
+                        ? 'border-yellow-400 hover:border-yellow-500 shadow-lg hover:shadow-xl hover:scale-110 cursor-pointer' 
                         : isExpanded
-                        ? 'border-blue-400 hover:border-blue-500 shadow-md hover:shadow-lg hover:scale-105'
+                        ? 'border-blue-400 hover:border-blue-500 shadow-lg hover:shadow-xl hover:scale-110 cursor-pointer'
                         : 'border-gray-200 hover:border-blue-400'
                     }`} style={{
                       width: isExpanded ? 'auto' : '64px',
-                      aspectRatio: isExpanded ? 'auto' : '1'
+                      aspectRatio: isExpanded ? '3/4' : '1',
+                      minWidth: isExpanded ? '192px' : 'auto'
                     }}>
                       <img
                         src={photo.thumbnailUrl || photo.url}
@@ -229,8 +260,8 @@ export default function FavoritesBar({
                   )}
                   
                   {/* Star indicator */}
-                  <div className={`absolute bottom-0 right-0 bg-yellow-500 text-white rounded-full flex items-center justify-center transition-all duration-300 ease-in-out ${
-                    isExpanded ? 'w-6 h-6 text-base' : 'w-4 h-4 text-xs'
+                  <div className={`absolute bottom-1 right-1 bg-yellow-500 text-white rounded-full flex items-center justify-center transition-all duration-300 ease-in-out ${
+                    isExpanded ? 'w-8 h-8 text-lg' : 'w-4 h-4 text-xs'
                   }`}>
                     ⭐
                   </div>
