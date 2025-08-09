@@ -45,6 +45,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `styles/globals.css` (updated height calculations for mobile layout)
   - **Impact**: Mobile and tablet users can now navigate back to packages and finalize selections
 
+### Changed
+- **Improved Mobile Navigation Layout**: Swapped Back button with mode toggle for better UX
+  - **Mobile Nav Bar**: Now shows mode toggle (Select Photos/Fill Templates) and Finalize button
+  - **Back Button**: Moved to header on mobile for consistency with app patterns
+  - **Confirmation Dialog**: Added "Are you sure?" dialog when backing out with selections
+  - **Progress Display**: Shows number of photos selected and slots remaining in confirmation
+  - **Files Modified**: `components/screens/PhotoSelectionScreen.tsx`
+  - **Impact**: More intuitive navigation flow and prevents accidental loss of work
+
 ## [2025-08-09] - Template Change Auto-Fit Fix & Enhanced Photo Selection UX
 
 ### Changed

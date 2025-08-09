@@ -359,6 +359,9 @@ export default function PhotoSelectionScreen({
   // Remove confirmation state
   const [slotShowingRemoveConfirmation, setSlotShowingRemoveConfirmation] = useState<TemplateSlot | null>(null);
   
+  // Back navigation confirmation
+  const [showBackConfirmation, setShowBackConfirmation] = useState(false);
+  
   // Template management states (simplified)
   const [showTemplateSwapper, setShowTemplateSwapper] = useState(false);
   const [templateToSwap, setTemplateToSwap] = useState<{ templateId: string; templateName: string; slots: TemplateSlot[] } | null>(null);
@@ -1191,6 +1194,31 @@ export default function PhotoSelectionScreen({
     // NOTE: Removed collapse logic - using fixed height layout now
   };
 
+  // Handle back navigation with confirmation
+  const handleBackWithConfirmation = () => {
+    // Check if user has made any selections
+    const hasSelections = templateSlots.some(slot => slot.photoId);
+    
+    if (hasSelections) {
+      // Show confirmation dialog
+      setShowBackConfirmation(true);
+    } else {
+      // No selections made, go back directly
+      handleBack();
+    }
+  };
+
+  // Confirm back navigation
+  const confirmBackNavigation = () => {
+    setShowBackConfirmation(false);
+    handleBack();
+  };
+
+  // Cancel back navigation
+  const cancelBackNavigation = () => {
+    setShowBackConfirmation(false);
+  };
+
   // Get photos used in templates
   const getUsedPhotoIds = () => {
     const usedIds = new Set<string>();
@@ -1387,16 +1415,29 @@ export default function PhotoSelectionScreen({
               </div>
             </div>
             
-            <button
-              onClick={handleModeToggle}
-              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                selectionMode === 'photo'
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              } ${viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''}`}
-            >
-              {selectionMode === 'photo' ? '📷 Ready to Fill Prints' : '⭐ Back to Photo Selection'}
-            </button>
+            <div className="flex items-center gap-3">
+              {/* Mode toggle button for desktop */}
+              <button
+                onClick={handleModeToggle}
+                className={`hidden lg:block px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                  selectionMode === 'photo'
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                } ${viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''}`}
+              >
+                {selectionMode === 'photo' ? '📷 Ready to Fill Prints' : '⭐ Back to Photo Selection'}
+              </button>
+              
+              {/* Back button for mobile - visible in header on mobile only */}
+              <button
+                onClick={handleBackWithConfirmation}
+                className={`lg:hidden px-4 py-2 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 ${
+                  viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
+                }`}
+              >
+                ← Back
+              </button>
+            </div>
           </div>
 
           {/* MAIN CONTENT AREA - CALCULATED FIXED HEIGHT */}
@@ -1465,20 +1506,22 @@ export default function PhotoSelectionScreen({
           </div>
         </div>
 
-        {/* MOBILE NAVIGATION BAR - Back and Finalize buttons */}
+        {/* MOBILE NAVIGATION BAR - Mode toggle and Finalize buttons */}
         <div className="lg:hidden fixed bottom-[150px] left-0 right-0 z-40 bg-white border-t shadow-lg">
           <div className="flex p-3 gap-3">
             <button
-              onClick={handleBack}
-              className={`flex-1 px-4 py-2 rounded-lg font-medium text-gray-600 bg-gray-100 border border-gray-300 hover:bg-gray-200 transition-all duration-200 text-sm ${
-                viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
-              }`}
+              onClick={handleModeToggle}
+              className={`flex-1 px-3 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
+                selectionMode === 'photo'
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              } ${viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''}`}
             >
-              ← Back
+              {selectionMode === 'photo' ? '📷 Fill Templates' : '⭐ Select Photos'}
             </button>
             <button
               onClick={handlePhotoContinue}
-              className={`flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md ${
+              className={`flex-1 bg-green-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-green-700 transition-all duration-200 shadow-md text-sm ${
                 viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
               }`}
             >
@@ -1588,7 +1631,7 @@ export default function PhotoSelectionScreen({
           <div className="p-4 border-t bg-gray-50">
             <div className="space-y-2">
               <button
-                onClick={handleBack}
+                onClick={handleBackWithConfirmation}
                 className={`w-full px-4 py-2 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm ${
                   viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
                 }`}
@@ -1792,6 +1835,80 @@ export default function PhotoSelectionScreen({
         onConfirmSwap={handleConfirmTemplateSwap}
         TemplateVisual={TemplateVisual}
       />
+
+      {/* Back Navigation Confirmation Dialog */}
+      <Transition appear show={showBackConfirmation} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={cancelBackNavigation}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-50" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <Dialog.Title
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-gray-900 text-center"
+                  >
+                    Are you sure you want to go back?
+                  </Dialog.Title>
+                  
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-500 text-center">
+                      You have selected photos for your prints. Going back will lose your current selections.
+                    </p>
+                    
+                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="text-sm text-yellow-800">
+                        <strong>Current Progress:</strong>
+                        <div className="mt-1">
+                          • {templateSlots.filter(s => s.photoId).length} photos selected
+                          <br />
+                          • {templateSlots.filter(s => !s.photoId).length} slots remaining
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      type="button"
+                      className="flex-1 inline-flex justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      onClick={cancelBackNavigation}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="flex-1 inline-flex justify-center rounded-lg border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                      onClick={confirmBackNavigation}
+                    >
+                      Yes, Go Back
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
 
     </div>
   );
