@@ -358,96 +358,72 @@ export default function TemplateSwapModal({
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-4">
                         {filteredTemplates.map((template) => {
                           const isSelected = selectedNewTemplate?.id === template.id;
+                          const isCurrent = template.template_type === templateToSwap.slots[0]?.templateType;
                           const slotCountDiff = template.holes_data?.length !== templateToSwap.slots.length;
                             
                             return (
                               <div
                                 key={template.id}
-                                className={`bg-white rounded-lg p-6 transition-all duration-200 shadow-sm hover:shadow-md ${
-                                  isSelected
-                                    ? 'ring-2 ring-blue-500 bg-blue-50' 
-                                    : 'hover:bg-gray-50 cursor-pointer'
+                                className={`bg-white rounded-lg p-6 transition-all duration-200 shadow-sm ${
+                                  isCurrent
+                                    ? 'ring-2 ring-gray-400 bg-gray-100 opacity-75 cursor-not-allowed'
+                                    : isSelected
+                                    ? 'ring-2 ring-blue-500 bg-blue-50 hover:shadow-md' 
+                                    : 'hover:bg-gray-50 hover:shadow-md cursor-pointer'
                                 }`}
-                                onClick={() => !isSelected ? handleTemplateSelect(template) : null}
+                                onClick={() => !isCurrent && !isSelected ? handleTemplateSelect(template) : null}
                               >
                                 <div className="text-center mb-4">
-                                  <h4 className="font-semibold text-gray-900 text-lg mb-2">
+                                  <h4 className="font-semibold text-gray-900 text-lg">
                                     {template.name}
                                   </h4>
-                                  <p className="text-gray-600 text-sm">
-                                    {template.holes_data?.length || 1} photo{(template.holes_data?.length || 1) !== 1 ? 's' : ''} • {template.print_size}
-                                  </p>
-                                  <p className="text-xs text-gray-500 italic mt-1">
-                                    {template.template_type.charAt(0).toUpperCase() + template.template_type.slice(1)} style
-                                  </p>
+                                  {isCurrent && (
+                                    <span className="inline-block mt-2 px-2 py-1 bg-gray-300 text-gray-700 text-xs font-medium rounded">
+                                      Current Template
+                                    </span>
+                                  )}
                                 </div>
                                 
-                                {slotCountDiff && (
+                                {slotCountDiff && template.holes_data?.length! < templateToSwap.slots.length && (
                                   <div className="mb-3 p-2 bg-orange-50 border border-orange-200 rounded-lg">
                                     <div className="text-xs text-orange-700 font-medium">
-                                      ⚠️ Slot count: {template.holes_data?.length || 1} (current: {templateToSwap.slots.length})
+                                      ⚠️ Some photos will be removed
                                     </div>
                                     <div className="text-xs text-orange-600 mt-1">
-                                      {template.holes_data?.length! > templateToSwap.slots.length 
-                                        ? 'Empty slots will be added' 
-                                        : 'Excess photos will be removed'}
-                                    </div>
-                                    <div className="text-xs text-blue-600 mt-1 font-medium">
-                                      Photos will auto-fit to new template
+                                      This template has {template.holes_data?.length || 1} slot{(template.holes_data?.length || 1) !== 1 ? 's' : ''}, but you have {templateToSwap.slots.length} photos
                                     </div>
                                   </div>
                                 )}
                                 <div className="w-full bg-gray-50 rounded-lg overflow-hidden relative flex items-center justify-center aspect-[2/3] mb-4">
-                            {template.sample_image_url ? (
-                              <img
-                                src={(() => {
-                                  let url = template.sample_image_url;
-                                  // Convert Google Drive sharing URL to direct image URL
-                                  if (url.includes('drive.google.com')) {
-                                    const fileId = url.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
-                                    if (fileId) {
-                                      url = `https://lh3.googleusercontent.com/d/${fileId}`;
-                                    }
-                                  }
-                                  return url;
-                                })()}
-                                alt={`${template.name} sample`}
-                                className="max-w-full max-h-full object-contain"
-                                onError={(e) => {
-                                  // Fallback to template visual if sample image fails
-                                  e.currentTarget.style.display = 'none';
-                                  const fallback = e.currentTarget.parentElement?.querySelector('.template-fallback') as HTMLElement;
-                                  if (fallback) fallback.style.display = 'block';
-                                }}
-                              />
-                            ) : null}
-                            {/* Fallback template visual */}
-                            <div className={`template-fallback w-full h-full flex items-center justify-center ${template.sample_image_url ? "hidden" : "block"}`}>
+                            {/* Always show template visual with actual photos */}
+                            <div className="w-full h-full flex items-center justify-center">
                               <TemplateVisual
                                 template={{ id: template.template_type, name: template.name, slots: template.holes_data?.length || 1 }}
-                                slots={Array.from({ length: template.holes_data?.length || 1 }, (_, index) => ({
-                                  id: `preview_${index}`,
-                                  templateId: template.template_type,
-                                  templateName: template.name,
-                                  templateType: template.template_type,
-                                  slotIndex: index,
-                                  photoId: undefined,
-                                }))}
+                                slots={Array.from({ length: template.holes_data?.length || 1 }, (_, index) => {
+                                  // Use actual photos from the folder for preview
+                                  // Similar to how Package Selection shows sample photos
+                                  const photoId = photos.length > 0 
+                                    ? photos[index % photos.length].id
+                                    : undefined;
+                                  
+                                  return {
+                                    id: `preview_${index}`,
+                                    templateId: template.template_type,
+                                    templateName: template.name,
+                                    templateType: template.template_type,
+                                    slotIndex: index,
+                                    photoId: photoId,
+                                  };
+                                })}
                                 onSlotClick={() => {}} // No interaction in preview
-                                photos={[]}
+                                photos={photos}
                                 selectedSlot={null}
                               />
                             </div>
                           </div>
-                          {isSelected && (
-                            <div className="text-center mb-3 text-blue-600 font-medium">
-                              ✓ Selected
-                            </div>
-                          )}
-                          
                           {/* Show buttons as a separate row when selected */}
                           {isSelected && (
-                            <div className="mt-4 pt-3 border-t border-gray-200">
+                            <div className="mt-4">
                               <p className="text-sm text-gray-700 text-center mb-3">
                                 Confirm template change?
                                 <span className="block text-blue-600 text-xs mt-1">

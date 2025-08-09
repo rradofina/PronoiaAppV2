@@ -541,8 +541,8 @@ export default function PhotoSelectionScreen({
 
     // Check if we're in inline editing mode first
     if (viewMode === 'inline-editing') {
-      console.log('🔧 Already in inline editing mode - delegating to handleInlinePhotoSelect');
-      handleInlinePhotoSelect(photo);
+      console.log('🔧 In inline editing mode - photo selection disabled');
+      // Don't allow photo switching during editing - user must save or cancel first
       return;
     }
     
@@ -1365,25 +1365,25 @@ export default function PhotoSelectionScreen({
         <>
           {/* Semi-transparent overlay with instruction */}
           <div 
-            className="fixed inset-0 z-30 bg-black bg-opacity-40 flex items-start justify-center pt-20 animate-fade-in"
+            className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center animate-fade-in"
             onClick={() => {
               setIsSelectingPhoto(false);
               setSelectedSlot(null);
             }}
           >
             <div 
-              className="bg-white rounded-2xl px-8 py-6 mx-4 shadow-2xl transform animate-slide-down"
+              className="bg-white rounded-2xl px-12 py-10 mx-4 shadow-2xl transform animate-slide-down"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="text-center">
-                <div className="text-4xl mb-3">🖼️</div>
-                <p className="text-xl font-semibold text-gray-800">
+                <div className="text-6xl mb-4">🖼️</div>
+                <p className="text-2xl font-semibold text-gray-800">
                   Select a photo to fill the slot
                 </p>
-                <p className="text-sm text-gray-600 mt-3">
+                <p className="text-base text-gray-600 mt-4">
                   Choose from your favorites below
                 </p>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-sm text-gray-500 mt-3">
                   Tap outside or press ESC to cancel
                 </p>
               </div>
@@ -1531,7 +1531,7 @@ export default function PhotoSelectionScreen({
         </div>
 
         {/* UNIFIED FAVORITES BAR - All screen sizes */}
-        <div>
+        <div className={viewMode === 'inline-editing' ? 'opacity-50 pointer-events-none' : ''}>
           {/* Spacer to maintain layout when favorites bar and nav bar are fixed */}
           <div style={{ height: '210px' }} /> {/* Increased from 150px to account for nav bar (60px) */}
           

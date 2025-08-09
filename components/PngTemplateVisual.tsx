@@ -391,9 +391,9 @@ export default function PngTemplateVisual({
                     onEditButtonClick(slot);
                   }}
                   className="px-2 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 shadow-lg transition-all duration-200"
-                  title="Edit photo position"
+                  title="Crop and zoom photo"
                 >
-                  Edit
+                  Crop & Zoom
                 </button>
                 {onChangeButtonClick && (
                   <button
@@ -404,7 +404,7 @@ export default function PngTemplateVisual({
                     className="px-2 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 shadow-lg transition-all duration-200"
                     title="Change photo"
                   >
-                    Change
+                    Change Photo
                   </button>
                 )}
                 <button
@@ -415,7 +415,7 @@ export default function PngTemplateVisual({
                   className="px-2 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700 shadow-lg transition-all duration-200"
                   title="Remove photo"
                 >
-                  Remove
+                  Remove Photo
                 </button>
               </div>
             )}
