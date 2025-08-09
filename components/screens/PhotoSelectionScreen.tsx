@@ -843,11 +843,7 @@ export default function PhotoSelectionScreen({
     console.log('🔧 Template switched - selection cleared for manual slot selection:', {
       templateId,
       totalSlots: newTemplateSlots.length
-    }); else {
-      // No slots in this template (shouldn't happen but handle gracefully)
-      console.warn('⚠️ No slots found for template:', templateId);
-      setSelectedSlot(null);
-    }
+    });
   };
 
   // Template editor
@@ -1169,6 +1165,10 @@ export default function PhotoSelectionScreen({
 
   // Handle back navigation with confirmation
   const handleBackWithConfirmation = () => {
+    // Reset photo selection state before navigating back
+    setIsSelectingPhoto(false);
+    setSelectedSlot(null);
+    
     // Check if user has made any selections
     const hasSelections = templateSlots.some(slot => slot.photoId);
     
@@ -1184,6 +1184,8 @@ export default function PhotoSelectionScreen({
   // Confirm back navigation
   const confirmBackNavigation = () => {
     setShowBackConfirmation(false);
+    setIsSelectingPhoto(false); // Ensure overlay is cleared
+    setSelectedSlot(null); // Clear selected slot
     handleBack();
   };
 
@@ -1339,9 +1341,13 @@ export default function PhotoSelectionScreen({
           {/* Semi-transparent overlay with instruction */}
           <div 
             className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center animate-fade-in"
-            onClick={() => {
-              setIsSelectingPhoto(false);
-              setSelectedSlot(null);
+            onClick={(e) => {
+              // Only close if clicking directly on overlay, not on child elements
+              if (e.target === e.currentTarget) {
+                setIsSelectingPhoto(false);
+                setSelectedSlot(null);
+                console.log('📌 Photo selection overlay cancelled');
+              }
             }}
           >
             <div 
