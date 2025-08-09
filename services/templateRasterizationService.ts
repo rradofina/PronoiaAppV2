@@ -361,35 +361,16 @@ class TemplateRasterizationService {
   }
 
   /**
-   * Load image from URL with CORS handling
+   * Load image from URL
    */
   private async loadImage(url: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      
-      // Check if this is a Google Drive URL that doesn't support CORS
-      const isGoogleDriveUrl = url.includes('lh3.googleusercontent.com') || 
-                               url.includes('drive.google.com') ||
-                               url.includes('googleusercontent.com');
-      
-      // Only set crossOrigin for non-Google Drive URLs
-      // Google Drive images don't support anonymous CORS
-      if (!isGoogleDriveUrl) {
-        img.crossOrigin = 'anonymous';
-      }
-      
+      img.crossOrigin = 'anonymous';
       img.onload = () => resolve(img);
       img.onerror = (e) => {
         console.error('Failed to load image:', url, e);
-        // Try without crossOrigin as fallback
-        if (!isGoogleDriveUrl) {
-          const fallbackImg = new Image();
-          fallbackImg.onload = () => resolve(fallbackImg);
-          fallbackImg.onerror = () => reject(new Error(`Failed to load image: ${url}`));
-          fallbackImg.src = url;
-        } else {
-          reject(new Error(`Failed to load image: ${url}`));
-        }
+        reject(new Error(`Failed to load image: ${url}`));
       };
       img.src = url;
     });
