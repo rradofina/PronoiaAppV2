@@ -98,14 +98,15 @@ html, body {
     flex-shrink: 0;
   }
   
-  /* Mobile/Tablet: Account for bottom favorites bar with proper spacing */
+  /* Mobile/Tablet: Account for bottom favorites bar AND navigation bar with proper spacing */
   .layout-main-content {
     /* Use dvh (dynamic viewport height) which adjusts when browser UI shows/hides */
-    height: calc(100dvh - 60px - 150px - 8px);
+    /* Header: 60px, Navigation bar: 60px, Favorites bar: 150px, Gaps: 8px */
+    height: calc(100dvh - 60px - 60px - 150px - 8px);
     /* Fallback for browsers without dvh support */
-    height: calc(var(--full-vh, 100vh) - 60px - 150px - 8px);
+    height: calc(var(--full-vh, 100vh) - 60px - 60px - 150px - 8px);
     overflow-y: auto;
-    margin-bottom: 8px; /* Gap between photo container and favorites bar */
+    margin-bottom: 8px; /* Gap between photo container and navigation bar */
   }
   
   /* Desktop: No bottom favorites bar, only subtract header */
@@ -126,8 +127,9 @@ html, body {
   /* iPad-specific optimizations */
   @media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
     .layout-main-content {
-      height: calc(100dvh - 60px - 150px - 12px);
-      height: calc(var(--full-vh, 100vh) - 60px - 150px - 12px);
+      /* Header: 60px, Navigation bar: 60px, Favorites bar: 150px, Gaps: 12px */
+      height: calc(100dvh - 60px - 60px - 150px - 12px);
+      height: calc(var(--full-vh, 100vh) - 60px - 60px - 150px - 12px);
       margin-bottom: 12px;
     }
   }

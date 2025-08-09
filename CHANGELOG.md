@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2025-08-09] - Critical Photo Editing & Auto-Fit Fixes
+## [2025-08-09] - Critical Photo Editing, Auto-Fit & Mobile Navigation Fixes
 
 ### Fixed
 - **2-Process Auto-Fit Not Working**: Restored the "double adjustment" functionality for photos
@@ -35,6 +35,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Change Button**: Now opens inline editor for immediate adjustments
   - **Existing Logic**: `components/InlinePhotoEditor.tsx` already handles both cases correctly
   - **Impact**: Full editing capabilities restored for photo positioning and zooming
+
+- **Missing Mobile Navigation**: Added Back and Finalize buttons for mobile/tablet users
+  - **Problem**: Navigation buttons were only in desktop sidebar, completely missing on mobile
+  - **Solution**: Added fixed bottom navigation bar above favorites bar on mobile/tablet
+  - **Layout**: Positioned between main content and favorites bar with proper z-index
+  - **Files Modified**: 
+    - `components/screens/PhotoSelectionScreen.tsx` (lines 1468-1488)
+    - `styles/globals.css` (updated height calculations for mobile layout)
+  - **Impact**: Mobile and tablet users can now navigate back to packages and finalize selections
 
 ## [2025-08-09] - Template Change Auto-Fit Fix & Enhanced Photo Selection UX
 

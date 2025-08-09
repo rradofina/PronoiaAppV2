@@ -1465,10 +1465,32 @@ export default function PhotoSelectionScreen({
           </div>
         </div>
 
+        {/* MOBILE NAVIGATION BAR - Back and Finalize buttons */}
+        <div className="lg:hidden fixed bottom-[150px] left-0 right-0 z-40 bg-white border-t shadow-lg">
+          <div className="flex p-3 gap-3">
+            <button
+              onClick={handleBack}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium text-gray-600 bg-gray-100 border border-gray-300 hover:bg-gray-200 transition-all duration-200 text-sm ${
+                viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
+              }`}
+            >
+              ← Back
+            </button>
+            <button
+              onClick={handlePhotoContinue}
+              className={`flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md ${
+                viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
+              }`}
+            >
+              Finalize ✓
+            </button>
+          </div>
+        </div>
+
         {/* FAVORITES BAR - Mobile/Tablet */}
         <div className="lg:hidden">
-          {/* Spacer to maintain layout when favorites bar is fixed */}
-          <div style={{ height: '150px' }} />
+          {/* Spacer to maintain layout when favorites bar and nav bar are fixed */}
+          <div style={{ height: '210px' }} /> {/* Increased from 150px to account for nav bar (60px) */}
           
           {selectionMode === 'photo' ? (
             // Photo Selection Mode: Show Favorites Bar - FIXED HEIGHT
