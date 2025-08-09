@@ -252,7 +252,7 @@ class TemplateRasterizationService {
   }
 
   /**
-   * Draw photo with PhotoTransform - FIXED to match UI CSS behavior exactly
+   * Draw photo with PhotoTransform - Using native Canvas transform methods
    */
   private drawPhotoWithTransform(
     img: HTMLImageElement,
@@ -269,55 +269,54 @@ class TemplateRasterizationService {
     this.ctx.clip();
 
     // 2. Calculate object-fit: contain scale (same as PhotoRenderer with transforms)
-    // PhotoRenderer uses 'contain' when transform exists, not 'cover'
     const containScale = Math.min(hole.width / img.width, hole.height / img.height);
     
-    // 3. Use the original photoScale without clamping to match UI behavior
-    // This allows zoom out (scale < 1.0) just like in PhotoRenderer
+    // 3. Get transform values
     const photoScale = transform.photoScale;
-    
-    // 4. Use original photoCenterX/Y without clamping to match UI behavior
     const photoCenterX = transform.photoCenterX;
     const photoCenterY = transform.photoCenterY;
     
-    // 5. Calculate the photo's rendered size after object-fit: contain
-    // This is the size BEFORE the transform scale is applied
+    // 4. Calculate the photo's rendered size after object-fit: contain
     const renderedWidth = img.width * containScale;
     const renderedHeight = img.height * containScale;
     
-    // 6. Apply transform scale to the already-contained dimensions
-    // This matches how CSS applies transform to the object-fit result
-    const finalWidth = renderedWidth * photoScale;
-    const finalHeight = renderedHeight * photoScale;
-    const finalScale = containScale * photoScale; // Combined scale for logging
-    
-    // 7. EXACT CSS REPLICATION: Match browser's object-fit:contain + transform behavior
-    // The key insight: CSS transform percentages are relative to the SCALED element size
-    
-    // Step 1: Calculate translation percentages (same as CSS)
-    const translateXPercent = (0.5 - photoCenterX) * 100;
-    const translateYPercent = (0.5 - photoCenterY) * 100;
-    
-    // Step 2: Translation in pixels - relative to the RENDERED size (before scale transform)
-    // CSS translate percentages are relative to the element's size BEFORE scale is applied
-    const translateXPixels = (translateXPercent / 100) * renderedWidth;
-    const translateYPixels = (translateYPercent / 100) * renderedHeight;
-    
-    // Step 3: Calculate where the contained image sits (centered in hole)
-    // With object-fit:contain, the image is scaled and then centered
+    // 5. Calculate where the contained image sits (centered in hole)
     const containedX = hole.x + (hole.width - renderedWidth) / 2;
     const containedY = hole.y + (hole.height - renderedHeight) / 2;
     
-    // The center of the contained image (before any transform)
-    const baseCenterX = containedX + renderedWidth / 2;
-    const baseCenterY = containedY + renderedHeight / 2;
+    // 6. NATIVE CANVAS TRANSFORMS - Replicate CSS transform-origin: center center
+    // Move origin to center of the contained image (this is our transform-origin)
+    const centerX = containedX + renderedWidth / 2;
+    const centerY = containedY + renderedHeight / 2;
     
-    // Step 4: Apply translation and scale from the contained position
-    // The final position accounts for scaling and translation
-    const finalX = baseCenterX - (finalWidth / 2) + translateXPixels;
-    const finalY = baseCenterY - (finalHeight / 2) + translateYPixels;
+    // Move canvas origin to the center point
+    this.ctx.translate(centerX, centerY);
     
-    console.log('🎨 CSS-EXACT RASTERIZATION:', {
+    // 7. Apply CSS transforms in order (translate then scale)
+    // CRITICAL FIX: CSS translate percentages are relative to the ELEMENT size (hole size),
+    // NOT the contained image size! The element has "absolute inset-0" making it the hole size.
+    const translateXPercent = (0.5 - photoCenterX) * 100;
+    const translateYPercent = (0.5 - photoCenterY) * 100;
+    const translateXPixels = (translateXPercent / 100) * hole.width;
+    const translateYPixels = (translateYPercent / 100) * hole.height;
+    
+    // Apply translation
+    this.ctx.translate(translateXPixels, translateYPixels);
+    
+    // Apply scale
+    this.ctx.scale(photoScale, photoScale);
+    
+    // 8. Draw image centered at origin (since we've moved the origin to center)
+    // We need to offset by half the rendered size to center it
+    this.ctx.drawImage(
+      img, 
+      -renderedWidth / 2, 
+      -renderedHeight / 2, 
+      renderedWidth, 
+      renderedHeight
+    );
+    
+    console.log('🎨 NATIVE TRANSFORM RASTERIZATION:', {
       originalImage: { width: img.width, height: img.height },
       hole: { x: hole.x, y: hole.y, width: hole.width, height: hole.height },
       containScale: containScale.toFixed(3),
@@ -326,24 +325,22 @@ class TemplateRasterizationService {
         photoCenterX: photoCenterX.toFixed(3),
         photoCenterY: photoCenterY.toFixed(3)
       },
-      calculatedValues: {
-        finalScale: finalScale.toFixed(3),
-        finalSize: `${finalWidth.toFixed(1)}x${finalHeight.toFixed(1)}`,
-        translation: {
+      positioning: {
+        containedPosition: { x: containedX.toFixed(1), y: containedY.toFixed(1) },
+        renderedSize: `${renderedWidth.toFixed(1)}x${renderedHeight.toFixed(1)}`,
+        transformOrigin: { x: centerX.toFixed(1), y: centerY.toFixed(1) }
+      },
+      transforms: {
+        translate: {
           percentX: translateXPercent.toFixed(1) + '%',
           percentY: translateYPercent.toFixed(1) + '%',
           pixelsX: translateXPixels.toFixed(1),
           pixelsY: translateYPixels.toFixed(1)
         },
-        baseCenter: { x: baseCenterX.toFixed(1), y: baseCenterY.toFixed(1) },
-        finalPosition: { x: finalX.toFixed(1), y: finalY.toFixed(1) }
+        scale: photoScale.toFixed(3)
       },
-      cssEquivalent: `object-fit:contain; transform: translate(${translateXPercent.toFixed(1)}%, ${translateYPercent.toFixed(1)}%) scale(${photoScale.toFixed(3)})`
+      cssEquivalent: `object-fit:contain; transform: translate(${translateXPercent.toFixed(1)}%, ${translateYPercent.toFixed(1)}%) scale(${photoScale.toFixed(3)}); transform-origin: center`
     });
-
-    // 7. Draw the photo at the calculated position and scale
-    // Use original image dimensions as source, scaled dimensions as destination
-    this.ctx.drawImage(img, 0, 0, img.width, img.height, finalX, finalY, finalWidth, finalHeight);
 
     this.ctx.restore();
   }

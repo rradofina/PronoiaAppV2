@@ -71,10 +71,15 @@ function convertPhotoToCSS(photoTransform: PhotoTransform, previewMode: boolean 
   
   console.log('🎨 PHOTO CSS CONVERSION:', {
     input: photoTransform,
-    translation: { translateX, translateY },
+    translation: { 
+      translateX: `${translateX}%`, 
+      translateY: `${translateY}%`,
+      note: 'CSS translate % is relative to element size after object-fit'
+    },
     cssTransform,
     previewMode,
     objectFit: previewMode ? 'cover' : 'contain',
+    transformOrigin: 'center center (default)',
     note: previewMode 
       ? 'Preview mode: object-cover fills hole completely, may crop photo'
       : 'Edit mode: object-contain shows full photo with potential letterboxing'
