@@ -189,9 +189,10 @@ export default function TemplateSwapModal({
     });
     
     const newSlots: TemplateSlot[] = Array.from({ length: newSlotsCount }, (_, index) => {
-      // Smart photo preservation logic
+      // Smart photo preservation logic - preserve photo but NOT transform
       let preservedPhoto = templateToSwap.slots[index]?.photoId;
-      let preservedTransform = templateToSwap.slots[index]?.transform;
+      // IMPORTANT: Set transform to undefined to trigger auto-fit recalculation
+      // This ensures the 2-step auto-fit runs for the new template's aspect ratio
       
       // If new template has fewer slots than old, try to preserve the first photos
       if (newSlotsCount < oldSlotsCount && !preservedPhoto && index === 0) {
@@ -199,8 +200,7 @@ export default function TemplateSwapModal({
         const firstPhotoSlot = templateToSwap.slots.find(s => s.photoId);
         if (firstPhotoSlot) {
           preservedPhoto = firstPhotoSlot.photoId;
-          preservedTransform = firstPhotoSlot.transform;
-          console.log(`📸 Preserving first photo from slot ${firstPhotoSlot.slotIndex} to new slot 0`);
+          console.log(`📸 Preserving first photo from slot ${firstPhotoSlot.slotIndex} to new slot 0 (transform will be recalculated)`);
         }
       }
       
@@ -211,7 +211,7 @@ export default function TemplateSwapModal({
         templateType: selectedNewTemplate.template_type,
         slotIndex: index,
         photoId: preservedPhoto,
-        transform: preservedTransform,
+        transform: undefined, // Set to undefined to trigger auto-fit recalculation
         printSize: templateToSwap.slots[0]?.printSize || '4R',
       };
     });
@@ -334,9 +334,9 @@ export default function TemplateSwapModal({
                   <span className="font-medium text-blue-600">
                     Showing all {currentPrintSize} templates (Solo, Collage, Photo Cards, Photo Strip).
                   </span>
-                  {templateToSwap.slots.length > 1 && (
+                  {templateToSwap.slots.some(s => s.photoId) && (
                     <span className="block mt-1 text-orange-600">
-                      Currently has {templateToSwap.slots.length} slots - photos will be preserved where possible.
+                      ⚠️ Photos will be automatically repositioned to fit the new template layout.
                     </span>
                   )}
                 </p>
@@ -355,7 +355,7 @@ export default function TemplateSwapModal({
                         </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-4">
                         {filteredTemplates.map((template) => {
                           const isSelected = selectedNewTemplate?.id === template.id;
                           const slotCountDiff = template.holes_data?.length !== templateToSwap.slots.length;
@@ -363,20 +363,23 @@ export default function TemplateSwapModal({
                             return (
                               <div
                                 key={template.id}
-                                className={`border rounded-xl p-4 transition-all duration-200 shadow-sm hover:shadow-md ${
+                                className={`bg-white rounded-lg p-6 transition-all duration-200 shadow-sm hover:shadow-md ${
                                   isSelected
-                                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' 
-                                    : 'border-gray-200 hover:border-blue-300 cursor-pointer hover:bg-gray-50'
+                                    ? 'ring-2 ring-blue-500 bg-blue-50' 
+                                    : 'hover:bg-gray-50 cursor-pointer'
                                 }`}
                                 onClick={() => !isSelected ? handleTemplateSelect(template) : null}
                               >
-                                <div className="flex items-center justify-between mb-3">
-                                  <h4 className="font-semibold text-gray-900 text-sm">
+                                <div className="text-center mb-4">
+                                  <h4 className="font-semibold text-gray-900 text-lg mb-2">
                                     {template.name}
                                   </h4>
-                                  <div className="text-xs bg-gray-100 px-2 py-1 rounded-full text-gray-600">
-                                    {template.template_type}
-                                  </div>
+                                  <p className="text-gray-600 text-sm">
+                                    {template.holes_data?.length || 1} photo{(template.holes_data?.length || 1) !== 1 ? 's' : ''} • {template.print_size}
+                                  </p>
+                                  <p className="text-xs text-gray-500 italic mt-1">
+                                    {template.template_type.charAt(0).toUpperCase() + template.template_type.slice(1)} style
+                                  </p>
                                 </div>
                                 
                                 {slotCountDiff && (
@@ -385,11 +388,16 @@ export default function TemplateSwapModal({
                                       ⚠️ Slot count: {template.holes_data?.length || 1} (current: {templateToSwap.slots.length})
                                     </div>
                                     <div className="text-xs text-orange-600 mt-1">
-                                      {template.holes_data?.length! > templateToSwap.slots.length ? 'Empty slots will be added' : 'Some photos may be lost'}
+                                      {template.holes_data?.length! > templateToSwap.slots.length 
+                                        ? 'Empty slots will be added' 
+                                        : 'Excess photos will be removed'}
+                                    </div>
+                                    <div className="text-xs text-blue-600 mt-1 font-medium">
+                                      Photos will auto-fit to new template
                                     </div>
                                   </div>
                                 )}
-                                <div className="w-full bg-gray-100 rounded overflow-hidden relative flex items-center justify-center h-64 md:h-80 lg:h-64">
+                                <div className="w-full bg-gray-50 rounded-lg overflow-hidden relative flex items-center justify-center aspect-[2/3] mb-4">
                             {template.sample_image_url ? (
                               <img
                                 src={(() => {
@@ -431,37 +439,28 @@ export default function TemplateSwapModal({
                               />
                             </div>
                           </div>
-                          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                            <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                              {template.print_size}
-                            </span>
-                            <span>
-                              {template.holes_data?.length || 1} slot{(template.holes_data?.length || 1) !== 1 ? 's' : ''}
-                            </span>
-                            {template.sample_image_url && (
-                              <span className="text-green-600 font-medium">✓ Preview</span>
-                            )}
-                          </div>
-                          
-                          {/* Show confirmation buttons when this template is selected */}
                           {isSelected && (
-                            <div className="mt-3 md:mt-4 pt-2 md:pt-3 border-t border-gray-200">
-                              <p className="text-xs md:text-sm text-gray-700 text-center mb-2 md:mb-3">
-                                Replace "<span className="font-medium">{templateToSwap.templateName}</span>" with "<span className="font-medium">{template.name}</span>"?
-                                {slotCountDiff && (
-                                  <span className="block text-orange-600 font-medium mt-1">
-                                    ⚠️ Slot count will change: {templateToSwap.slots.length} → {template.holes_data?.length || 1}
-                                    {templateToSwap.slots.length > (template.holes_data?.length || 1) ? ' (some photos may be lost)' : ' (empty slots will be added)'}
-                                  </span>
-                                )}
+                            <div className="text-center mb-3 text-blue-600 font-medium">
+                              ✓ Selected
+                            </div>
+                          )}
+                          
+                          {/* Show buttons as a separate row when selected */}
+                          {isSelected && (
+                            <div className="mt-4 pt-3 border-t border-gray-200">
+                              <p className="text-sm text-gray-700 text-center mb-3">
+                                Confirm template change?
+                                <span className="block text-blue-600 text-xs mt-1">
+                                  ✨ Photos will auto-fit to new layout
+                                </span>
                               </p>
-                              <div className="flex justify-center space-x-2 md:space-x-3">
+                              <div className="flex justify-center space-x-3">
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleCancel();
+                                    setSelectedNewTemplate(null);
                                   }}
-                                  className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
                                 >
                                   Cancel
                                 </button>
@@ -470,9 +469,9 @@ export default function TemplateSwapModal({
                                     e.stopPropagation();
                                     handleConfirmSwap();
                                   }}
-                                  className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
                                 >
-                                  Use This Template
+                                  Use Template
                                 </button>
                               </div>
                             </div>

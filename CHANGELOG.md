@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-09] - Template Change Auto-Fit Fix
+
+### Fixed
+- **Template Change Transform Bug**: Photos now properly auto-fit when changing templates
+  - **Root Cause**: Old transform values were being preserved when switching between templates with different aspect ratios
+  - **Solution**: Set transform to `undefined` when changing templates to trigger 2-step auto-fit recalculation
+  - **Files Modified**: `components/TemplateSwapModal.tsx`
+  - **Impact**: Photos now correctly reposition when switching between templates (e.g., Solo to Photo Strip)
+  - **Commit**: Pending
+
+
+### Changed
+- **Template Selection Modal UI**: Updated to match main template selection page design
+  - **Layout**: Changed from 3-column to responsive 4-column grid on larger screens
+  - **Styling**: Consistent card design with centered text and preview images
+  - **Visual Hierarchy**: Better template information display with photo count and style type
+  - **Interaction**: Cleaner selection state with blue ring and background
+  - **Files Modified**: `components/TemplateSwapModal.tsx`
+  - **Impact**: More consistent and professional UI across the application
+
+## [Previous Updates]
+
 ### Changed
 - **Circular App Icons**: Redesigned all PWA icons to be circular with white background
   - **Previous**: Square icons with colored background
