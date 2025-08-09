@@ -360,12 +360,43 @@ class GoogleDriveService {
     return `https://drive.google.com/thumbnail?id=${fileId}&sz=s${size}`;
   }
 
+  async checkFolderExists(parentFolderId: string, folderName: string): Promise<string | null> {
+    try {
+      if (!this.isSignedIn()) {
+        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
+      }
+
+      const response = await window.gapi.client.drive.files.list({
+        q: `'${parentFolderId}' in parents and name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        fields: 'files(id, name)',
+        pageSize: 1
+      });
+
+      if (response.result.files && response.result.files.length > 0) {
+        return response.result.files[0].id;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to check folder existence:', error);
+      return null;
+    }
+  }
+
   async createOutputFolder(parentFolderId: string, folderName: string): Promise<string> {
     try {
       if (!this.isSignedIn()) {
         throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
       }
 
+      // First check if folder already exists
+      const existingFolderId = await this.checkFolderExists(parentFolderId, folderName);
+      if (existingFolderId) {
+        console.log(`Folder "${folderName}" already exists with ID: ${existingFolderId}`);
+        return existingFolderId;
+      }
+
+      // Create new folder if it doesn't exist
       const response = await window.gapi.client.drive.files.create({
         resource: {
           name: folderName,
@@ -375,6 +406,7 @@ class GoogleDriveService {
         fields: 'id',
       });
 
+      console.log(`Created new folder "${folderName}" with ID: ${response.result.id}`);
       return response.result.id;
     } catch (error) {
       console.error('Failed to create output folder:', error);

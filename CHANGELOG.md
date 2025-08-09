@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2025-08-09] - Critical Photo Editing, Auto-Fit & Mobile Navigation Fixes
+## [2025-08-09] - Critical Photo Editing, Auto-Fit, Mobile Navigation & Prints Folder Management
 
 ### Fixed
 - **2-Process Auto-Fit Not Working**: Restored the "double adjustment" functionality for photos
@@ -53,6 +53,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Progress Display**: Shows number of photos selected and slots remaining in confirmation
   - **Files Modified**: `components/screens/PhotoSelectionScreen.tsx`
   - **Impact**: More intuitive navigation flow and prevents accidental loss of work
+
+### Added
+- **Automatic Prints Folder Creation**: Creates organized folder structure in Google Drive
+  - **Folder Naming**: Creates "Prints - [Client Folder Name]" inside selected client folder
+  - **Duplicate Prevention**: Checks if folder exists before creating to avoid duplicates
+  - **Content Detection**: Checks if existing folder has files to prevent overwriting
+  - **User Feedback**: Shows dialog if prints already exist, directing to contact staff
+  - **Files Modified**: 
+    - `services/googleDriveService.ts` - Added `checkFolderExists()` and `getFolderContents()`
+    - `pages/index.tsx` - Implemented `handlePhotoContinue()` with folder management
+  - **Impact**: Organized file structure and protection against accidental overwrites
 
 ## [2025-08-09] - Template Change Auto-Fit Fix & Enhanced Photo Selection UX
 

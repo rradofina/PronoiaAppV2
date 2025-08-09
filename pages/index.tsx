@@ -1,5 +1,6 @@
 // Updated: Latest version with template modals and tablet optimization..
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
 import useAuthStore from '../stores/authStore';
 import useDriveStore from '../stores/driveStore';
 import useSessionStore from '../stores/sessionStore';
@@ -20,6 +21,7 @@ import { manualTemplateService } from '../services/manualTemplateService';
 import { manualPackageService } from '../services/manualPackageService';
 import { templateCacheService } from '../services/templateCacheService';
 import { printSizeService } from '../services/printSizeService';
+import { templateRasterizationService } from '../services/templateRasterizationService';
 
 declare global {
   interface Window {
@@ -220,6 +222,10 @@ export default function Home() {
   const [additionalPrints, setAdditionalPrints] = useState(0);
   const [templateRefreshTrigger, setTemplateRefreshTrigger] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [printsFolderId, setPrintsFolderId] = useState<string | null>(null);
+  const [showExistingPrintsDialog, setShowExistingPrintsDialog] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; templateName: string } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Load main folder from localStorage on initial render
   useEffect(() => {
@@ -675,6 +681,142 @@ export default function Home() {
     }
   };
 
+  const handlePhotoContinue = async () => {
+    console.log('📸 Finalizing photo selections...');
+    
+    if (!selectedClientFolder) {
+      alert('No client folder selected. Please go back and select a folder.');
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      // Create the prints folder name
+      const printsFolderName = `Prints - ${selectedClientFolder.name}`;
+      
+      console.log(`📁 Checking/Creating prints folder: ${printsFolderName}`);
+      
+      // Check if folder exists and create if needed
+      const folderId = await googleDriveService.createOutputFolder(
+        selectedClientFolder.id,
+        printsFolderName
+      );
+      
+      // Check if folder has content
+      const folderContents = await googleDriveService.getFolderContents(folderId);
+      
+      if (folderContents.length > 0) {
+        // Folder has existing prints
+        console.log('⚠️ Prints folder already has content');
+        setIsUploading(false);
+        setShowExistingPrintsDialog(true);
+        return;
+      }
+      
+      // Save the prints folder ID for later use
+      setPrintsFolderId(folderId);
+      
+      console.log(`✅ Prints folder ready: ${folderId}`);
+      
+      // Group templates by templateName for rasterization
+      const templateGroups = new Map<string, TemplateSlot[]>();
+      templateSlots.forEach(slot => {
+        if (!slot.templateName) return;
+        if (!templateGroups.has(slot.templateName)) {
+          templateGroups.set(slot.templateName, []);
+        }
+        templateGroups.get(slot.templateName)!.push(slot);
+      });
+
+      console.log(`📋 Preparing to rasterize ${templateGroups.size} templates`);
+      setUploadProgress({ current: 0, total: templateGroups.size, templateName: 'Preparing...' });
+
+      // Get available print sizes for template lookup
+      const availablePrintSizes = await printSizeService.getAvailablePrintSizes();
+
+      let uploadedCount = 0;
+      const errors: string[] = [];
+
+      // Process each template group
+      for (const [templateName, slots] of templateGroups.entries()) {
+        try {
+          console.log(`🎨 Rasterizing template: ${templateName}`);
+          setUploadProgress({ 
+            current: uploadedCount, 
+            total: templateGroups.size, 
+            templateName: templateName 
+          });
+
+          // Find the manual template for this template group
+          const firstSlot = slots[0];
+          if (!firstSlot) continue;
+
+          // Get all templates to find the matching manual template
+          const allTemplates = await manualTemplateService.getAllTemplates();
+          const manualTemplate = allTemplates.find(t => 
+            t.template_type === firstSlot.templateType && 
+            t.print_size === (firstSlot.printSize || (availablePrintSizes.length > 0 ? availablePrintSizes[0].name : ''))
+          );
+
+          if (!manualTemplate) {
+            console.error(`Manual template not found for type: ${firstSlot.templateType}`);
+            errors.push(`Template not found: ${templateName}`);
+            continue;
+          }
+
+          console.log('📝 Found manual template:', manualTemplate.name);
+
+          // Rasterize the template
+          const rasterized = await templateRasterizationService.rasterizeTemplate(
+            manualTemplate,
+            slots,
+            localPhotos,
+            {
+              format: 'jpeg',
+              quality: 0.95,
+              includeBackground: true
+            }
+          );
+
+          console.log(`📤 Uploading template: ${templateName}`);
+
+          // Upload to Google Drive
+          const fileName = `${templateName.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
+          await googleDriveService.uploadFile(
+            rasterized.blob,
+            fileName,
+            folderId,
+            'image/jpeg'
+          );
+
+          uploadedCount++;
+          console.log(`✅ Uploaded: ${fileName}`);
+
+        } catch (error) {
+          console.error(`❌ Failed to process template ${templateName}:`, error);
+          errors.push(`Failed: ${templateName}`);
+        }
+      }
+
+      setUploadProgress(null);
+      setIsUploading(false);
+
+      // Show completion message
+      if (errors.length > 0) {
+        alert(`Templates uploaded with some errors:\n\n✅ Successful: ${uploadedCount}/${templateGroups.size}\n❌ Failed: ${errors.join(', ')}\n\nCheck the prints folder in Google Drive.`);
+      } else {
+        alert(`✅ All templates uploaded successfully!\n\n${uploadedCount} templates have been saved to the prints folder in Google Drive.`);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error during finalization:', error);
+      alert('Failed to finalize prints. Please try again.');
+      setUploadProgress(null);
+      setIsUploading(false);
+    }
+  };
+
   const handlePackageContinue = async (effectiveTemplates?: ManualTemplate[]) => {
     if (selectedPackage && clientName.trim()) {
       try {
@@ -1105,7 +1247,7 @@ export default function Home() {
             setSelectedSlot={setSelectedSlot}
             photos={localPhotos}
             getTotalTemplateCount={getTotalTemplateCount}
-            handlePhotoContinue={() => alert('Photo selection complete!')}
+            handlePhotoContinue={handlePhotoContinue}
             handlePhotoSelect={handlePhotoSelect}
             handleSlotSelect={handleSlotSelect}
             handleBack={handleBack}
@@ -1183,6 +1325,145 @@ export default function Home() {
       </div>
       
       {renderScreen()}
+
+      {/* Existing Prints Dialog */}
+      <Transition appear show={showExistingPrintsDialog} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => setShowExistingPrintsDialog(false)}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-50" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <Dialog.Title
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-gray-900 text-center"
+                  >
+                    Prints Already Created
+                  </Dialog.Title>
+                  
+                  <div className="mt-4">
+                    <div className="text-center">
+                      <div className="text-5xl mb-4">📁</div>
+                      <p className="text-sm text-gray-600 mb-4">
+                        A prints folder already exists with files inside for this client.
+                      </p>
+                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800 font-medium">
+                          Please contact Pronoia staff for assistance with existing prints.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <button
+                      type="button"
+                      className="w-full inline-flex justify-center rounded-lg border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      onClick={() => setShowExistingPrintsDialog(false)}
+                    >
+                      Understood
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* Upload Progress Modal */}
+      <Transition appear show={isUploading} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => {}}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-50" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <Dialog.Title
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-gray-900 text-center mb-4"
+                  >
+                    Uploading Templates
+                  </Dialog.Title>
+                  
+                  <div className="mt-2">
+                    {uploadProgress && (
+                      <>
+                        <div className="mb-4">
+                          <div className="flex justify-between text-sm text-gray-600 mb-2">
+                            <span>Processing: {uploadProgress.templateName}</span>
+                            <span>{uploadProgress.current + 1} / {uploadProgress.total}</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div 
+                              className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                              style={{ width: `${((uploadProgress.current + 0.5) / uploadProgress.total) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="text-center">
+                          <div className="inline-flex items-center">
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span className="text-sm text-gray-600">Rasterizing and uploading...</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="mt-6 text-center text-xs text-gray-500">
+                    Please wait while your templates are being uploaded to Google Drive.
+                    <br />
+                    Do not close this window.
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
     </div>
   );
 }
