@@ -1212,12 +1212,6 @@ export default function PhotoSelectionScreen({
     }
   };
 
-  // Confirm finalize with incomplete slots
-  const confirmIncompleteFinalize = () => {
-    setShowIncompleteWarning(false);
-    handlePhotoContinue();
-  };
-
   // Cancel incomplete finalize
   const cancelIncompleteFinalize = () => {
     setShowIncompleteWarning(false);
@@ -1836,24 +1830,17 @@ export default function PhotoSelectionScreen({
                     </div>
                     
                     <p className="text-sm text-gray-500 text-center mt-3">
-                      Please fill all slots before finalizing, or empty slots will appear blank in the final prints.
+                      Please fill all slots before finalizing. Empty slots cannot be processed.
                     </p>
                   </div>
 
-                  <div className="mt-6 flex justify-center gap-3">
+                  <div className="mt-6 flex justify-center">
                     <button
                       type="button"
-                      className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                       onClick={cancelIncompleteFinalize}
                     >
                       Go Back & Fill Slots
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
-                      onClick={confirmIncompleteFinalize}
-                    >
-                      Continue Anyway
                     </button>
                   </div>
                 </Dialog.Panel>
