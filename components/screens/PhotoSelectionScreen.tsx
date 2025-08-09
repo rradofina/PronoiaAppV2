@@ -362,6 +362,9 @@ export default function PhotoSelectionScreen({
   // Back navigation confirmation
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   
+  // Incomplete slots warning
+  const [showIncompleteWarning, setShowIncompleteWarning] = useState(false);
+  
   // Template management states (simplified)
   const [showTemplateSwapper, setShowTemplateSwapper] = useState(false);
   const [templateToSwap, setTemplateToSwap] = useState<{ templateId: string; templateName: string; slots: TemplateSlot[] } | null>(null);
@@ -1194,6 +1197,32 @@ export default function PhotoSelectionScreen({
     setShowBackConfirmation(false);
   };
 
+  // Handle finalize with validation
+  const handleFinalizeClick = () => {
+    // Count empty slots
+    const emptySlots = templateSlots.filter(slot => !slot.photoId);
+    const filledSlots = templateSlots.filter(slot => slot.photoId);
+    
+    if (emptySlots.length > 0) {
+      // Show warning if there are empty slots
+      setShowIncompleteWarning(true);
+    } else {
+      // All slots filled, proceed normally
+      handlePhotoContinue();
+    }
+  };
+
+  // Confirm finalize with incomplete slots
+  const confirmIncompleteFinalize = () => {
+    setShowIncompleteWarning(false);
+    handlePhotoContinue();
+  };
+
+  // Cancel incomplete finalize
+  const cancelIncompleteFinalize = () => {
+    setShowIncompleteWarning(false);
+  };
+
   // Get photos used in templates
   const getUsedPhotoIds = () => {
     const usedIds = new Set<string>();
@@ -1499,12 +1528,16 @@ export default function PhotoSelectionScreen({
               {selectionMode === 'photo' ? '📷 Fill Templates' : '⭐ Select Photos'}
             </button>
             <button
-              onClick={handlePhotoContinue}
-              className={`flex-1 bg-green-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-green-700 transition-all duration-200 shadow-md text-sm ${
+              onClick={handleFinalizeClick}
+              className={`flex-1 ${
+                templateSlots.every(slot => slot.photoId) 
+                  ? 'bg-green-600 hover:bg-green-700' 
+                  : 'bg-orange-500 hover:bg-orange-600'
+              } text-white px-3 py-2 rounded-lg font-medium transition-all duration-200 shadow-md text-sm ${
                 viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
               }`}
             >
-              Finalize ✓
+              Finalize ({templateSlots.filter(s => s.photoId).length}/{templateSlots.length}) ✓
             </button>
           </div>
         </div>
@@ -1728,6 +1761,107 @@ export default function PhotoSelectionScreen({
         onConfirmSwap={handleConfirmTemplateSwap}
         TemplateVisual={TemplateVisual}
       />
+
+      {/* Incomplete Slots Warning Dialog */}
+      <Transition appear show={showIncompleteWarning} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={cancelIncompleteFinalize}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-50" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <Dialog.Title
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-gray-900 text-center"
+                  >
+                    ⚠️ Some slots are empty
+                  </Dialog.Title>
+                  
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-600 text-center">
+                      Not all template slots have photos. You have {templateSlots.filter(s => !s.photoId).length} empty slot{templateSlots.filter(s => !s.photoId).length !== 1 ? 's' : ''}.
+                    </p>
+                    
+                    <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                      <div className="text-sm text-orange-800">
+                        <strong>Template Status:</strong>
+                        <div className="mt-1">
+                          • {templateSlots.filter(s => s.photoId).length} of {templateSlots.length} slots filled
+                          <br />
+                          • {templateSlots.filter(s => !s.photoId).length} slot{templateSlots.filter(s => !s.photoId).length !== 1 ? 's' : ''} still empty
+                        </div>
+                      </div>
+                      
+                      {/* Show which templates have empty slots */}
+                      <div className="mt-2 text-xs text-orange-700">
+                        {(() => {
+                          const templatesWithEmpty = Array.from(
+                            new Set(
+                              templateSlots
+                                .filter(s => !s.photoId)
+                                .map(s => s.templateName)
+                            )
+                          );
+                          return templatesWithEmpty.length > 0 && (
+                            <>
+                              <strong>Templates needing photos:</strong>
+                              <ul className="mt-1 list-disc list-inside">
+                                {templatesWithEmpty.map((name, i) => (
+                                  <li key={i}>{name}</li>
+                                ))}
+                              </ul>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                    
+                    <p className="text-sm text-gray-500 text-center mt-3">
+                      Please fill all slots before finalizing, or empty slots will appear blank in the final prints.
+                    </p>
+                  </div>
+
+                  <div className="mt-6 flex justify-center gap-3">
+                    <button
+                      type="button"
+                      className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      onClick={cancelIncompleteFinalize}
+                    >
+                      Go Back & Fill Slots
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
+                      onClick={confirmIncompleteFinalize}
+                    >
+                      Continue Anyway
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
 
       {/* Back Navigation Confirmation Dialog */}
       <Transition appear show={showBackConfirmation} as={Fragment}>
