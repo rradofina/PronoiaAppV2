@@ -1341,7 +1341,7 @@ export default function PhotoSelectionScreen({
 
 
   return (
-    <div className="bg-gray-50 flex flex-col lg:flex-row overflow-hidden" style={{ 
+    <div className="bg-gray-50 flex flex-col overflow-hidden" style={{ 
       touchAction: 'pan-y',
       height: 'var(--full-vh, 100vh)',
       maxHeight: 'var(--full-vh, 100vh)'
@@ -1365,7 +1365,7 @@ export default function PhotoSelectionScreen({
         <>
           {/* Semi-transparent overlay with instruction */}
           <div 
-            className="fixed inset-0 z-30 bg-black bg-opacity-40 flex items-start justify-center pt-20 lg:hidden animate-fade-in"
+            className="fixed inset-0 z-30 bg-black bg-opacity-40 flex items-start justify-center pt-20 animate-fade-in"
             onClick={() => {
               setIsSelectingPhoto(false);
               setSelectedSlot(null);
@@ -1398,7 +1398,7 @@ export default function PhotoSelectionScreen({
       </div>
 
       {/* FIXED-HEIGHT LAYOUT: Main Content Area */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Photo Grid Section */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Mode Header with Toggle - FIXED HEIGHT */}
@@ -1419,7 +1419,7 @@ export default function PhotoSelectionScreen({
               {/* Mode toggle button for desktop */}
               <button
                 onClick={handleModeToggle}
-                className={`hidden lg:block px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                className={`hidden px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                   selectionMode === 'photo'
                     ? 'bg-blue-600 text-white hover:bg-blue-700'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -1431,7 +1431,7 @@ export default function PhotoSelectionScreen({
               {/* Back button for mobile - visible in header on mobile only */}
               <button
                 onClick={handleBackWithConfirmation}
-                className={`lg:hidden px-4 py-2 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 ${
+                className={`px-4 py-2 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 ${
                   viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
                 }`}
               >
@@ -1506,8 +1506,8 @@ export default function PhotoSelectionScreen({
           </div>
         </div>
 
-        {/* MOBILE NAVIGATION BAR - Mode toggle and Finalize buttons */}
-        <div className="lg:hidden fixed bottom-[150px] left-0 right-0 z-40 bg-white border-t shadow-lg">
+        {/* UNIFIED NAVIGATION BAR - Mode toggle and Finalize buttons (all screen sizes) */}
+        <div className="fixed bottom-[150px] left-0 right-0 z-40 bg-white border-t shadow-lg">
           <div className="flex p-3 gap-3">
             <button
               onClick={handleModeToggle}
@@ -1530,8 +1530,8 @@ export default function PhotoSelectionScreen({
           </div>
         </div>
 
-        {/* FAVORITES BAR - Mobile/Tablet */}
-        <div className="lg:hidden">
+        {/* UNIFIED FAVORITES BAR - All screen sizes */}
+        <div>
           {/* Spacer to maintain layout when favorites bar and nav bar are fixed */}
           <div style={{ height: '210px' }} /> {/* Increased from 150px to account for nav bar (60px) */}
           
@@ -1563,92 +1563,6 @@ export default function PhotoSelectionScreen({
           )}
         </div>
 
-        {/* Desktop: Vertical right sidebar */}
-        <div className="hidden lg:flex bg-white shadow-lg border-l flex-shrink-0 flex-col relative" style={{ width: '320px' }}>
-          {selectionMode === 'photo' ? (
-            // Photo Selection Mode: Show Favorites using unified component
-            <>
-              <div className="p-4 border-b">
-                <h2 className="text-sm font-bold text-gray-800 text-center">⭐ Your Favorites</h2>
-                <div className="text-xs text-gray-600 text-center">
-                  {favoritedPhotos.size} favorites • {calculatePhotoLimit() - getUsedPhotoIds().size} photos available
-                </div>
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <FavoritesBar
-                  favoritedPhotos={getUnusedFavorites()}
-                  onPhotoClick={handlePhotoClick}
-                  onRemoveFavorite={handleToggleFavorite}
-                  isActiveInteractionArea={viewMode === 'inline-editing'}
-                  layout="vertical"
-                  showRemoveButtons={true}
-                  usedPhotoIds={getUsedPhotoIds()}
-                  isExpanded={false}
-                  adaptivePhotoSize="medium"
-                />
-              </div>
-            </>
-          ) : (
-            // Print Filling Mode: Show Favorites using unified component
-            <>
-              <div className="p-4 border-b">
-                <div className="flex items-center justify-between mb-2">
-                  <button 
-                    onClick={openAddPrintModal}
-                    className={`bg-green-600 text-white px-2 py-1 rounded-lg font-medium hover:bg-green-700 flex items-center space-x-1 text-xs ${
-                      viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
-                    }`}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                    </svg>
-                    <span>Add Template</span>
-                  </button>
-                </div>
-                <h2 className="text-sm font-bold text-gray-800 text-center">⭐ Your Favorites</h2>
-                <div className="text-xs text-gray-600 text-center">
-                  {getDisplayPhotos().length} available • Tap to fill slots
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-hidden">
-                <FavoritesBar
-                  favoritedPhotos={getDisplayPhotos()}
-                  onPhotoClick={handlePhotoClick}
-                  onRemoveFavorite={handleToggleFavorite}
-                  isActiveInteractionArea={viewMode === 'inline-editing'}
-                  layout="vertical"
-                  showRemoveButtons={false}
-                  usedPhotoIds={getUsedPhotoIds()}
-                  isExpanded={false}
-                  adaptivePhotoSize="medium"
-                />
-              </div>
-            </>
-          )}
-
-          {/* Desktop Navigation in Sidebar */}
-          <div className="p-4 border-t bg-gray-50">
-            <div className="space-y-2">
-              <button
-                onClick={handleBackWithConfirmation}
-                className={`w-full px-4 py-2 rounded-lg font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm ${
-                  viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
-                }`}
-              >
-                ← Back to Package
-              </button>
-              <button
-                onClick={handlePhotoContinue}
-                className={`w-full bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md ${
-                  viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
-                }`}
-              >
-                Finalize Selections
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
 
 

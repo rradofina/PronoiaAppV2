@@ -276,32 +276,29 @@ class TemplateRasterizationService {
     const finalWidth = img.width * finalScale;
     const finalHeight = img.height * finalScale;
     
-    // 7. FRAMING FIX: Match CSS transform order exactly - translate first, then scale
-    // CSS: translate(X%, Y%) scale(S) with transform-origin: center center
+    // 7. EXACT CSS REPLICATION: Match browser's object-fit:cover + transform behavior
+    // The key insight: CSS transform percentages are relative to the SCALED element size
     
-    // Step 1: Calculate translation relative to COVER-SCALED size (not final scaled)
-    // This matches how CSS calculates percentage before applying the scale transform
+    // Step 1: Calculate translation percentages (same as CSS)
     const translateXPercent = (0.5 - clampedCenterX) * 100;
     const translateYPercent = (0.5 - clampedCenterY) * 100;
     
-    // CRITICAL: Use renderedWidth/Height (cover-scaled) as reference, not finalWidth/Height
-    const translateXPixels = (translateXPercent / 100) * renderedWidth;
-    const translateYPixels = (translateYPercent / 100) * renderedHeight;
+    // Step 2: Translation in pixels - relative to the FINAL scaled size
+    // This is where the magic happens - we use finalWidth/Height for percentage calculation
+    const translateXPixels = (translateXPercent / 100) * finalWidth;
+    const translateYPixels = (translateYPercent / 100) * finalHeight;
     
-    // Step 2: Position cover-scaled photo at hole center
-    const holeCenterX = hole.x + hole.width / 2;
-    const holeCenterY = hole.y + hole.height / 2;
+    // Step 3: Calculate the base position (centered in hole)
+    // This is where object-fit:cover would place the image before transforms
+    const baseCenterX = hole.x + hole.width / 2;
+    const baseCenterY = hole.y + hole.height / 2;
     
-    // Step 3: Apply translation (like CSS translate)
-    const translatedCenterX = holeCenterX + translateXPixels;
-    const translatedCenterY = holeCenterY + translateYPixels;
+    // Step 4: Apply translation from the center
+    // The image is drawn from its top-left corner, so we offset by half its size
+    const finalX = baseCenterX - (finalWidth / 2) + translateXPixels;
+    const finalY = baseCenterY - (finalHeight / 2) + translateYPixels;
     
-    // Step 4: Apply user scale from the translated center (like CSS scale with transform-origin: center)
-    // Final position accounts for the scale expansion from center
-    const finalX = translatedCenterX - (finalWidth / 2);
-    const finalY = translatedCenterY - (finalHeight / 2);
-    
-    console.log('🎨 FRAMING FIX - Matching CSS transform order exactly:', {
+    console.log('🎨 CSS-EXACT RASTERIZATION:', {
       originalImage: { width: img.width, height: img.height },
       hole: { x: hole.x, y: hole.y, width: hole.width, height: hole.height },
       coverScale: coverScale.toFixed(3),
@@ -315,30 +312,19 @@ class TemplateRasterizationService {
         photoCenterX: clampedCenterX.toFixed(3),
         photoCenterY: clampedCenterY.toFixed(3)
       },
-      clamping: {
-        scaleWasClamped: wasClampedScale,
-        positionWasClamped: wasClampedPosition,
-        reason: wasClampedScale ? 'photoScale < 1.0 would break coverage' : 'none'
-      },
-      cssTransformOrder: {
-        step1_coverScale: coverScale.toFixed(3),
-        step2_translate: {
+      calculatedValues: {
+        finalScale: finalScale.toFixed(3),
+        finalSize: `${finalWidth.toFixed(1)}x${finalHeight.toFixed(1)}`,
+        translation: {
           percentX: translateXPercent.toFixed(1) + '%',
           percentY: translateYPercent.toFixed(1) + '%',
           pixelsX: translateXPixels.toFixed(1),
-          pixelsY: translateYPixels.toFixed(1),
-          referenceSize: `${renderedWidth.toFixed(1)}x${renderedHeight.toFixed(1)} (cover-scaled)`
+          pixelsY: translateYPixels.toFixed(1)
         },
-        step3_userScale: clampedPhotoScale.toFixed(3),
-        step4_finalSize: `${finalWidth.toFixed(1)}x${finalHeight.toFixed(1)}`
-      },
-      positioning: {
-        holeCenter: { x: holeCenterX.toFixed(1), y: holeCenterY.toFixed(1) },
-        afterTranslation: { x: translatedCenterX.toFixed(1), y: translatedCenterY.toFixed(1) },
+        baseCenter: { x: baseCenterX.toFixed(1), y: baseCenterY.toFixed(1) },
         finalPosition: { x: finalX.toFixed(1), y: finalY.toFixed(1) }
       },
-      coverageGuarantee: finalScale >= coverScale ? '✅ MAINTAINED' : '❌ BROKEN',
-      cssEquivalent: `translate(${translateXPercent.toFixed(1)}%, ${translateYPercent.toFixed(1)}%) scale(${clampedPhotoScale.toFixed(3)})`
+      cssEquivalent: `object-fit:cover; transform: translate(${translateXPercent.toFixed(1)}%, ${translateYPercent.toFixed(1)}%) scale(${clampedPhotoScale.toFixed(3)})`
     });
 
     // 7. Draw the photo at the calculated position and scale
@@ -375,14 +361,36 @@ class TemplateRasterizationService {
   }
 
   /**
-   * Load image from URL
+   * Load image from URL with CORS handling
    */
   private async loadImage(url: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
+      
+      // Check if this is a Google Drive URL that doesn't support CORS
+      const isGoogleDriveUrl = url.includes('lh3.googleusercontent.com') || 
+                               url.includes('drive.google.com') ||
+                               url.includes('googleusercontent.com');
+      
+      // Only set crossOrigin for non-Google Drive URLs
+      // Google Drive images don't support anonymous CORS
+      if (!isGoogleDriveUrl) {
+        img.crossOrigin = 'anonymous';
+      }
+      
       img.onload = () => resolve(img);
-      img.onerror = (e) => reject(new Error(`Failed to load image: ${url}. Error: ${e}`));
+      img.onerror = (e) => {
+        console.error('Failed to load image:', url, e);
+        // Try without crossOrigin as fallback
+        if (!isGoogleDriveUrl) {
+          const fallbackImg = new Image();
+          fallbackImg.onload = () => resolve(fallbackImg);
+          fallbackImg.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+          fallbackImg.src = url;
+        } else {
+          reject(new Error(`Failed to load image: ${url}`));
+        }
+      };
       img.src = url;
     });
   }
