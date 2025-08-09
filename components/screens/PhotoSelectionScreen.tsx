@@ -426,21 +426,8 @@ export default function PhotoSelectionScreen({
     loadPrintSizes();
   }, [selectedSize]);
 
-  // Auto-select first empty slot when entering screen (but respect user actions)
-  useEffect(() => {
-    if (!selectedSlot && templateSlots.length > 0) {
-      const firstEmptySlot = templateSlots.find(slot => !slot.photoId);
-      if (firstEmptySlot) {
-        // Only auto-select if we have empty slots and not in editing mode
-        // This prevents overriding user actions during photo placement
-        if (viewMode === 'normal') {
-          setSelectedSlot(firstEmptySlot);
-        }
-      }
-      // Don't auto-select anything if all slots are filled (templates complete)
-      // This allows for clean view when templates are completed
-    }
-  }, [templateSlots, selectedSlot, setSelectedSlot, viewMode]);
+  // No auto-selection - user must manually select slots
+  // This gives the user full control over which slot to work with
 
 
   const onSlotSelect = (slot: TemplateSlot) => {
@@ -850,27 +837,13 @@ export default function PhotoSelectionScreen({
     // Get slots for the new template
     const newTemplateSlots = templateSlots.filter(slot => slot.templateId === templateId);
     
-    if (newTemplateSlots.length > 0) {
-      // Only auto-select if there's an empty slot
-      const firstEmptySlot = newTemplateSlots.find(slot => !slot.photoId);
-      
-      if (firstEmptySlot) {
-        console.log('🎯 Auto-selecting first empty slot in new template:', {
-          templateId,
-          slotId: firstEmptySlot.id,
-          totalSlots: newTemplateSlots.length
-        });
-        setSelectedSlot(firstEmptySlot);
-      } else {
-        // All slots filled - don't auto-select for clean viewing
-        console.log('🔧 All slots filled in template - no auto-selection:', {
-          templateId,
-          totalSlots: newTemplateSlots.length,
-          allFilled: true
-        });
-        setSelectedSlot(null);
-      }
-    } else {
+    // When switching templates, clear selection
+    // User must manually select a slot they want to work with
+    setSelectedSlot(null);
+    console.log('🔧 Template switched - selection cleared for manual slot selection:', {
+      templateId,
+      totalSlots: newTemplateSlots.length
+    }); else {
       // No slots in this template (shouldn't happen but handle gracefully)
       console.warn('⚠️ No slots found for template:', templateId);
       setSelectedSlot(null);
