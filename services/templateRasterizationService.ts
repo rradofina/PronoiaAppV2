@@ -203,9 +203,23 @@ class TemplateRasterizationService {
     const photoUrl = highResUrls[0] || photo.url;
     const img = await this.loadImage(photoUrl);
 
+    // Debug slot to hole mapping
+    console.log('🎯 Slot to Hole Mapping:', {
+      slotId: slot.id,
+      slotIndex: slot.slotIndex,
+      slotTemplateType: slot.templateType,
+      templateType: template.template_type,
+      templateHolesCount: template.holes_data?.length || 0,
+      availableIndexes: template.holes_data ? template.holes_data.map((_, i) => i) : []
+    });
+
     const originalHole = template.holes_data[slot.slotIndex];
     if (!originalHole) {
-      console.warn(`⚠️ No hole data found for slot index ${slot.slotIndex}`);
+      console.error(`❌ No hole data found for slot index ${slot.slotIndex}`, {
+        slotIndex: slot.slotIndex,
+        availableHoles: template.holes_data?.length || 0,
+        template: template.name
+      });
       return;
     }
 
@@ -254,63 +268,63 @@ class TemplateRasterizationService {
     this.ctx.rect(hole.x, hole.y, hole.width, hole.height);
     this.ctx.clip();
 
-    // 2. Calculate object-fit: cover scale (same as UI)
-    const coverScale = Math.max(hole.width / img.width, hole.height / img.height);
+    // 2. Calculate object-fit: contain scale (same as PhotoRenderer with transforms)
+    // PhotoRenderer uses 'contain' when transform exists, not 'cover'
+    const containScale = Math.min(hole.width / img.width, hole.height / img.height);
     
-    // 3. SQUISHING FIX: Clamp photoScale to prevent coverage issues
-    // photoScale < 1.0 would make finalScale < coverScale, breaking hole coverage
-    const clampedPhotoScale = Math.max(1.0, transform.photoScale);
-    const wasClampedScale = clampedPhotoScale !== transform.photoScale;
+    // 3. Use the original photoScale without clamping to match UI behavior
+    // This allows zoom out (scale < 1.0) just like in PhotoRenderer
+    const photoScale = transform.photoScale;
     
-    // 4. Clamp photoCenterX/Y to valid bounds to prevent positioning issues
-    const clampedCenterX = Math.max(0, Math.min(1, transform.photoCenterX));
-    const clampedCenterY = Math.max(0, Math.min(1, transform.photoCenterY));
-    const wasClampedPosition = clampedCenterX !== transform.photoCenterX || clampedCenterY !== transform.photoCenterY;
+    // 4. Use original photoCenterX/Y without clamping to match UI behavior
+    const photoCenterX = transform.photoCenterX;
+    const photoCenterY = transform.photoCenterY;
     
-    // 5. Calculate the photo's rendered size after object-fit: cover
-    const renderedWidth = img.width * coverScale;
-    const renderedHeight = img.height * coverScale;
+    // 5. Calculate the photo's rendered size after object-fit: contain
+    // This is the size BEFORE the transform scale is applied
+    const renderedWidth = img.width * containScale;
+    const renderedHeight = img.height * containScale;
     
-    // 6. Apply clamped zoom scale (ensures coverage is maintained)
-    const finalScale = coverScale * clampedPhotoScale;
-    const finalWidth = img.width * finalScale;
-    const finalHeight = img.height * finalScale;
+    // 6. Apply transform scale to the already-contained dimensions
+    // This matches how CSS applies transform to the object-fit result
+    const finalWidth = renderedWidth * photoScale;
+    const finalHeight = renderedHeight * photoScale;
+    const finalScale = containScale * photoScale; // Combined scale for logging
     
-    // 7. EXACT CSS REPLICATION: Match browser's object-fit:cover + transform behavior
+    // 7. EXACT CSS REPLICATION: Match browser's object-fit:contain + transform behavior
     // The key insight: CSS transform percentages are relative to the SCALED element size
     
     // Step 1: Calculate translation percentages (same as CSS)
-    const translateXPercent = (0.5 - clampedCenterX) * 100;
-    const translateYPercent = (0.5 - clampedCenterY) * 100;
+    const translateXPercent = (0.5 - photoCenterX) * 100;
+    const translateYPercent = (0.5 - photoCenterY) * 100;
     
-    // Step 2: Translation in pixels - relative to the FINAL scaled size
-    // This is where the magic happens - we use finalWidth/Height for percentage calculation
-    const translateXPixels = (translateXPercent / 100) * finalWidth;
-    const translateYPixels = (translateYPercent / 100) * finalHeight;
+    // Step 2: Translation in pixels - relative to the RENDERED size (before scale transform)
+    // CSS translate percentages are relative to the element's size BEFORE scale is applied
+    const translateXPixels = (translateXPercent / 100) * renderedWidth;
+    const translateYPixels = (translateYPercent / 100) * renderedHeight;
     
-    // Step 3: Calculate the base position (centered in hole)
-    // This is where object-fit:cover would place the image before transforms
-    const baseCenterX = hole.x + hole.width / 2;
-    const baseCenterY = hole.y + hole.height / 2;
+    // Step 3: Calculate where the contained image sits (centered in hole)
+    // With object-fit:contain, the image is scaled and then centered
+    const containedX = hole.x + (hole.width - renderedWidth) / 2;
+    const containedY = hole.y + (hole.height - renderedHeight) / 2;
     
-    // Step 4: Apply translation from the center
-    // The image is drawn from its top-left corner, so we offset by half its size
+    // The center of the contained image (before any transform)
+    const baseCenterX = containedX + renderedWidth / 2;
+    const baseCenterY = containedY + renderedHeight / 2;
+    
+    // Step 4: Apply translation and scale from the contained position
+    // The final position accounts for scaling and translation
     const finalX = baseCenterX - (finalWidth / 2) + translateXPixels;
     const finalY = baseCenterY - (finalHeight / 2) + translateYPixels;
     
     console.log('🎨 CSS-EXACT RASTERIZATION:', {
       originalImage: { width: img.width, height: img.height },
       hole: { x: hole.x, y: hole.y, width: hole.width, height: hole.height },
-      coverScale: coverScale.toFixed(3),
-      userTransform: {
-        photoScale: transform.photoScale.toFixed(3),
-        photoCenterX: transform.photoCenterX.toFixed(3),
-        photoCenterY: transform.photoCenterY.toFixed(3)
-      },
-      clampedTransform: {
-        photoScale: clampedPhotoScale.toFixed(3),
-        photoCenterX: clampedCenterX.toFixed(3),
-        photoCenterY: clampedCenterY.toFixed(3)
+      containScale: containScale.toFixed(3),
+      transform: {
+        photoScale: photoScale.toFixed(3),
+        photoCenterX: photoCenterX.toFixed(3),
+        photoCenterY: photoCenterY.toFixed(3)
       },
       calculatedValues: {
         finalScale: finalScale.toFixed(3),
@@ -324,17 +338,18 @@ class TemplateRasterizationService {
         baseCenter: { x: baseCenterX.toFixed(1), y: baseCenterY.toFixed(1) },
         finalPosition: { x: finalX.toFixed(1), y: finalY.toFixed(1) }
       },
-      cssEquivalent: `object-fit:cover; transform: translate(${translateXPercent.toFixed(1)}%, ${translateYPercent.toFixed(1)}%) scale(${clampedPhotoScale.toFixed(3)})`
+      cssEquivalent: `object-fit:contain; transform: translate(${translateXPercent.toFixed(1)}%, ${translateYPercent.toFixed(1)}%) scale(${photoScale.toFixed(3)})`
     });
 
     // 7. Draw the photo at the calculated position and scale
-    this.ctx.drawImage(img, finalX, finalY, finalWidth, finalHeight);
+    // Use original image dimensions as source, scaled dimensions as destination
+    this.ctx.drawImage(img, 0, 0, img.width, img.height, finalX, finalY, finalWidth, finalHeight);
 
     this.ctx.restore();
   }
 
   /**
-   * Draw photo fit in hole (object-fit: contain behavior)
+   * Draw photo fit in hole (object-fit: cover behavior)
    */
   private drawPhotoFitInHole(
     img: HTMLImageElement,
@@ -348,10 +363,13 @@ class TemplateRasterizationService {
     this.ctx.rect(hole.x, hole.y, hole.width, hole.height);
     this.ctx.clip();
 
-    const scale = Math.min(hole.width / img.width, hole.height / img.height);
+    // Use Math.max for object-fit: cover (fills entire hole)
+    // This matches PhotoRenderer's default behavior
+    const scale = Math.max(hole.width / img.width, hole.height / img.height);
     const scaledWidth = img.width * scale;
     const scaledHeight = img.height * scale;
 
+    // Center the scaled image in the hole
     const offsetX = (hole.width - scaledWidth) / 2;
     const offsetY = (hole.height - scaledHeight) / 2;
 
