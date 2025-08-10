@@ -133,6 +133,73 @@ class PhotoCacheService {
   }
 
   /**
+   * Batch preload multiple photos efficiently
+   * @param photos Array of photos to preload
+   * @param options Preloading options
+   */
+  async batchPreloadPhotos(
+    photos: Photo[], 
+    options: { 
+      priority?: 'high' | 'normal' | 'low';
+      concurrency?: number;
+      onProgress?: (loaded: number, total: number) => void;
+    } = {}
+  ): Promise<void> {
+    const { 
+      priority = 'normal', 
+      concurrency = 3,
+      onProgress 
+    } = options;
+    
+    // Filter out already cached photos
+    const photosToPreload = photos.filter(photo => {
+      const photoId = photo.googleDriveId || photo.id;
+      return !this.cache.has(photoId) && !this.loadingQueue.has(photoId);
+    });
+    
+    if (photosToPreload.length === 0) {
+      console.log('📦 All photos already cached');
+      return;
+    }
+    
+    console.log(`🚀 Batch preloading ${photosToPreload.length} photos with priority: ${priority}`);
+    
+    let loaded = 0;
+    const total = photosToPreload.length;
+    
+    // Process in chunks for better performance
+    const chunks: Photo[][] = [];
+    for (let i = 0; i < photosToPreload.length; i += concurrency) {
+      chunks.push(photosToPreload.slice(i, i + concurrency));
+    }
+    
+    for (const chunk of chunks) {
+      await Promise.all(
+        chunk.map(async photo => {
+          try {
+            await this.preloadPhoto(photo);
+            loaded++;
+            if (onProgress) {
+              onProgress(loaded, total);
+            }
+          } catch (error) {
+            console.error(`Failed to preload ${photo.name}:`, error);
+          }
+        })
+      );
+      
+      // Add delay between chunks for lower priority
+      if (priority === 'low') {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } else if (priority === 'normal') {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    }
+    
+    console.log(`✅ Batch preload complete: ${loaded}/${total} photos loaded`);
+  }
+
+  /**
    * Load photo blob from Google Drive service
    */
   private async loadPhotoBlob(photo: Photo): Promise<string> {

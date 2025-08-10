@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TemplateSlot, Photo } from '../types';
+import { useSwipeGesture } from '../hooks/useSwipeGesture';
 
 interface TemplateGridProps {
   templateSlots: TemplateSlot[];
@@ -35,10 +36,6 @@ export default function TemplateGrid({
   
   // Cover Flow state
   const [currentIndex, setCurrentIndex] = useState(0);
-  
-  // Touch swipe state for coverflow navigation
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
-  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
   
   // Container-aware sizing state
   const containerRef = useRef<HTMLDivElement>(null);
@@ -231,41 +228,21 @@ export default function TemplateGrid({
     };
   };
 
-  // Touch swipe handlers for coverflow navigation
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (layout !== 'coverflow') return;
-    const touch = e.touches[0];
-    setTouchStart({ x: touch.clientX, y: touch.clientY });
-    setTouchEnd(null);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (layout !== 'coverflow') return;
-    const touch = e.touches[0];
-    setTouchEnd({ x: touch.clientX, y: touch.clientY });
-  };
-
-  const handleTouchEnd = () => {
-    if (layout !== 'coverflow' || !touchStart || !touchEnd) return;
-    
-    const deltaX = touchStart.x - touchEnd.x;
-    const deltaY = touchStart.y - touchEnd.y;
-    const isHorizontalSwipe = Math.abs(deltaX) > Math.abs(deltaY);
-    const minSwipeDistance = 50;
-
-    if (isHorizontalSwipe && Math.abs(deltaX) > minSwipeDistance) {
-      if (deltaX > 0) {
-        // Swiped left - go to next template
+  // Use swipe gesture hook for coverflow navigation
+  const { handlers: swipeHandlers } = useSwipeGesture({
+    onSwipeLeft: () => {
+      if (layout === 'coverflow') {
         navigateToTemplate(currentIndex + 1);
-      } else {
-        // Swiped right - go to previous template
+      }
+    },
+    onSwipeRight: () => {
+      if (layout === 'coverflow') {
         navigateToTemplate(currentIndex - 1);
       }
-    }
-    
-    setTouchStart(null);
-    setTouchEnd(null);
-  };
+    },
+    minSwipeDistance: 50,
+    swipeThreshold: 0.25, // 25% of container width
+  });
 
   return (
     <div 
@@ -275,9 +252,7 @@ export default function TemplateGrid({
         touchAction: layout === 'horizontal' ? 'pan-x' : layout === 'coverflow' ? 'pan-x' : 'auto',
         perspective: layout === 'coverflow' ? '1000px' : 'none'
       }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      {...(layout === 'coverflow' ? swipeHandlers : {})}
     >
       {templateGroups.map(({ templateId, templateName, slots }, index) => {
         // Check if this template contains the currently editing slot

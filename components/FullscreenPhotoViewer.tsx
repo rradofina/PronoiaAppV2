@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Photo, TemplateSlot } from '../types';
+import { photoCacheService } from '../services/photoCacheService';
+import { useSwipeGesture } from '../hooks/useSwipeGesture';
 
 interface FullscreenPhotoViewerProps {
   photo: Photo;
@@ -29,35 +31,162 @@ export default function FullscreenPhotoViewer({
     photo ? photos.findIndex(p => p.id === photo.id) : 0
   );
   
+  // Image cache to store loaded URLs for instant switching
+  const imageCache = useRef<Map<string, { url: string; loaded: boolean }>>(new Map());
+  const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
+  
   // Update photo index when a new photo is selected (only when photo prop changes)
   useEffect(() => {
     if (photo && isVisible) {
       const newIndex = photos.findIndex(p => p.id === photo.id);
       if (newIndex !== -1) {
         setCurrentPhotoIndex(newIndex);
-        setCurrentUrlIndex(0); // Reset URL index for new photo
-        setImageLoaded(false);
-        setImageError(false);
+        // Don't reset image state if we have this photo cached
+        const cached = imageCache.current.get(photo.id);
+        if (!cached || !cached.loaded) {
+          setCurrentUrlIndex(0);
+          setImageLoaded(false);
+          setImageError(false);
+        }
       }
     }
-  }, [photo?.id, isVisible, photos]); // Removed currentPhotoIndex from dependencies to prevent loop
+  }, [photo?.id, isVisible, photos]);
   
-  // Reset image states when photo index changes (for navigation)
+  // Aggressive preloading when viewer opens or photo changes
   useEffect(() => {
-    setCurrentUrlIndex(0);
-    setImageLoaded(false);
-    setImageError(false);
-  }, [currentPhotoIndex]);
-
-  // Handle favorite toggle
-  const handleToggleFavorite = () => {
-    if (onToggleFavorite && currentPhoto) {
-      onToggleFavorite(currentPhoto.id);
+    if (!isVisible || photos.length === 0) return;
+    
+    // Always preload adjacent photos first (highest priority)
+    const adjacentIndices = [
+      currentPhotoIndex,
+      currentPhotoIndex > 0 ? currentPhotoIndex - 1 : photos.length - 1,
+      currentPhotoIndex < photos.length - 1 ? currentPhotoIndex + 1 : 0
+    ];
+    
+    adjacentIndices.forEach(index => {
+      const photoToPreload = photos[index];
+      if (photoToPreload && !imageCache.current.has(photoToPreload.id)) {
+        const img = new Image();
+        const urls = getFallbackUrls(photoToPreload);
+        if (urls.length > 0) {
+          img.src = urls[0];
+          img.onload = () => {
+            imageCache.current.set(photoToPreload.id, { url: urls[0], loaded: true });
+            console.log(`✅ Preloaded: ${photoToPreload.name}`);
+          };
+          preloadedImages.current.set(photoToPreload.id, img);
+        }
+        photoCacheService.preloadPhoto(photoToPreload);
+      }
+    });
+    
+    // Then preload wider radius
+    const preloadRadius = 5;
+    const preloadIndices: number[] = [];
+    
+    for (let i = -preloadRadius; i <= preloadRadius; i++) {
+      if (Math.abs(i) <= 1) continue; // Skip adjacent ones, already loaded
+      let index = currentPhotoIndex + i;
+      if (index < 0) index = photos.length + index;
+      if (index >= photos.length) index = index - photos.length;
+      if (index >= 0 && index < photos.length) {
+        preloadIndices.push(index);
+      }
     }
-  };
+    
+    // Preload remaining nearby photos
+    setTimeout(() => {
+      preloadIndices.forEach(index => {
+        const photoToPreload = photos[index];
+        if (photoToPreload && !preloadedImages.current.has(photoToPreload.id)) {
+          const img = new Image();
+          const urls = getFallbackUrls(photoToPreload);
+          if (urls.length > 0) {
+            img.src = urls[0];
+            img.onload = () => {
+              imageCache.current.set(photoToPreload.id, { url: urls[0], loaded: true });
+            };
+            preloadedImages.current.set(photoToPreload.id, img);
+          }
+          photoCacheService.preloadPhoto(photoToPreload);
+        }
+      });
+    }, 100);
+    
+    // Preload all remaining photos in background
+    setTimeout(() => {
+      photos.forEach((p, index) => {
+        if (!preloadedImages.current.has(p.id)) {
+          photoCacheService.preloadPhoto(p);
+        }
+      });
+    }, 2000);
+  }, [currentPhotoIndex, photos, isVisible]);
+  
+  // Don't reset image states on navigation to prevent flashing
+  // Only reset URL index if we don't have the photo cached
+  useEffect(() => {
+    const currentPhoto = photos[currentPhotoIndex];
+    if (currentPhoto) {
+      const cached = imageCache.current.get(currentPhoto.id);
+      if (!cached || !cached.loaded) {
+        setCurrentUrlIndex(0);
+        // Don't reset imageLoaded/imageError here - it causes flashing
+      }
+    }
+  }, [currentPhotoIndex, photos]);
+
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
+  const [swipeProgress, setSwipeProgress] = useState(0); // -1 to 1 for swipe animation
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  
+  // Navigation handlers (defined early for use in swipe hook)
+  const handlePrevious = () => {
+    const newIndex = currentPhotoIndex > 0 ? currentPhotoIndex - 1 : photos.length - 1;
+    // Ensure the new index is valid before updating
+    if (newIndex >= 0 && newIndex < photos.length && photos[newIndex]) {
+      console.log(`📸 Previous: ${currentPhotoIndex} → ${newIndex} (${photos[newIndex]?.name || 'unknown'})`);
+      setIsTransitioning(true);
+      setCurrentPhotoIndex(newIndex);
+      // Single consistent transition duration
+      setTimeout(() => setIsTransitioning(false), 350);
+    } else {
+      console.error('Invalid previous index:', newIndex);
+    }
+  };
+
+  const handleNext = () => {
+    const newIndex = currentPhotoIndex < photos.length - 1 ? currentPhotoIndex + 1 : 0;
+    // Ensure the new index is valid before updating
+    if (newIndex >= 0 && newIndex < photos.length && photos[newIndex]) {
+      console.log(`📸 Next: ${currentPhotoIndex} → ${newIndex} (${photos[newIndex]?.name || 'unknown'})`);
+      setIsTransitioning(true);
+      setCurrentPhotoIndex(newIndex);
+      // Single consistent transition duration
+      setTimeout(() => setIsTransitioning(false), 350);
+    } else {
+      console.error('Invalid next index:', newIndex);
+    }
+  };
+  
+  // Swipe gesture setup - MUST be before any conditional returns
+  const { handlers: swipeHandlers, isSwiping } = useSwipeGesture({
+    onSwipeLeft: handleNext,
+    onSwipeRight: handlePrevious,
+    onSwipeProgress: (progress) => {
+      setSwipeProgress(progress);
+    },
+    onSwipeStart: () => {
+      setIsTransitioning(false); // Disable transitions during swipe
+    },
+    onSwipeEnd: () => {
+      setSwipeProgress(0);
+      // Don't interfere with navigation transition timing
+    },
+    swipeThreshold: 0.25, // 25% of screen width to trigger navigation
+  });
   
   // Generate fallback URLs for fullscreen viewer - prioritize high resolution
   const getFallbackUrls = (photo: Photo) => {
@@ -87,12 +216,18 @@ export default function FullscreenPhotoViewer({
     return fallbacks.filter(Boolean);
   };
   
-  const getCurrentUrl = () => {
-    const fallbackUrls = getFallbackUrls(currentPhoto);
-    if (currentUrlIndex < fallbackUrls.length) {
-      return fallbackUrls[currentUrlIndex];
+  const getPhotoUrl = (photo: Photo, urlIndex: number = 0) => {
+    // Try to get from cache first
+    const cached = imageCache.current.get(photo.id);
+    if (cached && cached.loaded) {
+      return cached.url;
     }
-    return currentPhoto.url; // Final fallback
+    // Otherwise get from fallback URLs
+    const fallbackUrls = getFallbackUrls(photo);
+    if (urlIndex < fallbackUrls.length) {
+      return fallbackUrls[urlIndex];
+    }
+    return photo.url; // Final fallback
   };
 
   if (!isVisible || !photo || photos.length === 0) return null;
@@ -103,33 +238,24 @@ export default function FullscreenPhotoViewer({
   // Calculate current photo's favorite status
   const currentPhotoFavorited = currentPhoto ? favoritedPhotos.has(currentPhoto.id) : false;
   
+  // Handle favorite toggle
+  const handleToggleFavorite = () => {
+    if (onToggleFavorite && currentPhoto) {
+      onToggleFavorite(currentPhoto.id);
+    }
+  };
+  
   // Ensure currentPhotoIndex is within valid bounds
   if (currentPhotoIndex < 0 || currentPhotoIndex >= photos.length) {
     console.warn('Photo index out of bounds:', currentPhotoIndex, 'photos length:', photos.length);
     setCurrentPhotoIndex(photo ? photos.findIndex(p => p.id === photo.id) : 0);
   }
-
-  const handlePrevious = () => {
-    const newIndex = currentPhotoIndex > 0 ? currentPhotoIndex - 1 : photos.length - 1;
-    // Ensure the new index is valid before updating
-    if (newIndex >= 0 && newIndex < photos.length && photos[newIndex]) {
-      console.log(`📸 Previous: ${currentPhotoIndex} → ${newIndex} (${photos[newIndex].name})`);
-      setCurrentPhotoIndex(newIndex);
-    } else {
-      console.error('Invalid previous index:', newIndex);
-    }
-  };
-
-  const handleNext = () => {
-    const newIndex = currentPhotoIndex < photos.length - 1 ? currentPhotoIndex + 1 : 0;
-    // Ensure the new index is valid before updating
-    if (newIndex >= 0 && newIndex < photos.length && photos[newIndex]) {
-      console.log(`📸 Next: ${currentPhotoIndex} → ${newIndex} (${photos[newIndex].name})`);
-      setCurrentPhotoIndex(newIndex);
-    } else {
-      console.error('Invalid next index:', newIndex);
-    }
-  };
+  
+  // Get previous and next photos for carousel
+  const previousPhotoIndex = currentPhotoIndex > 0 ? currentPhotoIndex - 1 : photos.length - 1;
+  const nextPhotoIndex = currentPhotoIndex < photos.length - 1 ? currentPhotoIndex + 1 : 0;
+  const previousPhoto = photos[previousPhotoIndex];
+  const nextPhoto = photos[nextPhotoIndex];
 
   return (
     <div className={`fixed inset-0 ${isDimmed ? 'z-30' : 'z-50'} bg-black ${isDimmed ? 'bg-opacity-50' : 'bg-opacity-95'} flex flex-col h-screen transition-all duration-300`}>
@@ -175,8 +301,12 @@ export default function FullscreenPhotoViewer({
         {!onToggleFavorite && <div className="w-6" />} {/* Spacer when no favorites button */}
       </div>
 
-      {/* Photo Display */}
-      <div className="flex-1 flex items-center justify-center relative min-h-0">
+      {/* Photo Display - Carousel Container */}
+      <div 
+        className="flex-1 flex items-center justify-center relative min-h-0 overflow-hidden"
+        {...swipeHandlers}
+        style={{ touchAction: 'pan-y pinch-zoom' }}
+      >
         {/* Previous Button */}
         <button
           onClick={(e) => {
@@ -185,81 +315,85 @@ export default function FullscreenPhotoViewer({
             console.log('🔙 Previous button clicked');
             handlePrevious();
           }}
-          className={`absolute left-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg ${isDimmed ? 'opacity-30 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
+          className={`absolute left-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg ${isDimmed || isSwiping ? 'opacity-30 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
         >
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
 
-        {/* Photo */}
+        {/* Carousel Container - holds 3 photos for smooth sliding */}
         <div className="relative w-full h-full flex items-center justify-center">
-          <img
-            key={`${currentPhoto.id}-${currentUrlIndex}`} // Force re-render when photo or URL changes
-            src={getCurrentUrl()}
+          {/* Previous Photo */}
+          <div 
+            className="absolute w-full h-full flex items-center justify-center"
+            style={{ 
+              transform: `translateX(${-100 - (swipeProgress * 100)}%)`,
+              transition: isTransitioning && !isSwiping ? 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+            }}
+          >
+            {previousPhoto && (
+              <img
+                src={getPhotoUrl(previousPhoto)}
+                alt={previousPhoto.name}
+                className="max-w-full max-h-full object-contain"
+                style={{ pointerEvents: 'none' }}
+              />
+            )}
+          </div>
+
+          {/* Current Photo */}
+          <div 
+            className="absolute w-full h-full flex items-center justify-center"
+            style={{ 
+              transform: `translateX(${-swipeProgress * 100}%)`,
+              transition: isTransitioning && !isSwiping ? 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+            }}
+          >
+            <img
+            src={getPhotoUrl(currentPhoto, currentUrlIndex)}
             alt={currentPhoto.name}
             className="max-w-full max-h-full object-contain"
             onLoad={() => {
-              const fallbackUrls = getFallbackUrls(currentPhoto);
-              console.log(`✅ Photo loaded successfully: ${currentPhoto.name} (URL ${currentUrlIndex + 1}/${fallbackUrls.length})`);
-              setImageLoaded(true);
-              setImageError(false);
+              console.log(`✅ Photo loaded: ${currentPhoto.name}`);
+              // Cache this successful URL
+              const url = getPhotoUrl(currentPhoto, currentUrlIndex);
+              imageCache.current.set(currentPhoto.id, { url, loaded: true });
             }}
             onError={() => {
               const fallbackUrls = getFallbackUrls(currentPhoto);
-              console.error(`❌ Failed to load ${currentPhoto.name} with URL ${currentUrlIndex + 1}/${fallbackUrls.length}:`, {
-                url: getCurrentUrl()
-              });
+              console.error(`❌ Failed to load ${currentPhoto.name}`);
               
               // Try next fallback URL
               if (currentUrlIndex < fallbackUrls.length - 1) {
-                console.log(`🔄 Trying fallback URL ${currentUrlIndex + 2}/${fallbackUrls.length} for ${currentPhoto.name}`);
+                console.log(`🔄 Trying fallback URL ${currentUrlIndex + 2}/${fallbackUrls.length}`);
                 setCurrentUrlIndex(prev => prev + 1);
-                setImageLoaded(false);
-                setImageError(false);
-              } else {
-                // All URLs failed
-                console.error(`💥 All URLs failed for ${currentPhoto.name}`);
-                setImageError(true);
-                setImageLoaded(false);
               }
             }}
             style={{ 
-              display: imageLoaded && !imageError ? 'block' : 'none',
               pointerEvents: 'auto'
             }}
             crossOrigin="anonymous"
           />
-          
-          {/* Loading/Error state */}
-          {(!imageLoaded || imageError) && (
-            <div className="flex items-center justify-center text-white">
-              <div className="text-center">
-                <div className="text-4xl mb-4">
-                  {imageError ? '❌' : '⏳'}
-                </div>
-                <p className="text-lg">
-                  {imageError ? 'Failed to load image' : 'Loading...'}
-                </p>
-                {imageError && (
-                  <div className="mt-4 text-sm text-gray-400">
-                    <p>Photo: {currentPhoto.name}</p>
-                    <p>All {getFallbackUrls(currentPhoto).length} URLs failed</p>
-                    <button 
-                      onClick={() => {
-                        setImageError(false);
-                        setImageLoaded(false);
-                        setCurrentUrlIndex(0); // Start over with first URL
-                      }}
-                      className="mt-2 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          </div>
+
+          {/* Next Photo */}
+          <div 
+            className="absolute w-full h-full flex items-center justify-center"
+            style={{ 
+              transform: `translateX(${100 - (swipeProgress * 100)}%)`,
+              transition: isTransitioning && !isSwiping ? 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+            }}
+          >
+            {nextPhoto && (
+              <img
+                src={getPhotoUrl(nextPhoto)}
+                alt={nextPhoto.name}
+                className="max-w-full max-h-full object-contain"
+                style={{ pointerEvents: 'none' }}
+              />
+            )}
+          </div>
         </div>
 
         {/* Next Button */}
@@ -270,7 +404,7 @@ export default function FullscreenPhotoViewer({
             console.log('➡️ Next button clicked');
             handleNext();
           }}
-          className={`absolute right-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg ${isDimmed ? 'opacity-30 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
+          className={`absolute right-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg ${isDimmed || isSwiping ? 'opacity-30 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
         >
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

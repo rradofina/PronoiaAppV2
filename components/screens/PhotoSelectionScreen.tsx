@@ -12,6 +12,7 @@ import SlidingTemplateBar from '../SlidingTemplateBar';
 import { manualTemplateService } from '../../services/manualTemplateService';
 import { templateRasterizationService } from '../../services/templateRasterizationService';
 import { printSizeService } from '../../services/printSizeService';
+import { photoCacheService } from '../../services/photoCacheService';
 import PngTemplateVisual from '../PngTemplateVisual';
 import PhotoGrid from '../PhotoGrid';
 import TemplateGrid from '../TemplateGrid';
@@ -383,6 +384,47 @@ export default function PhotoSelectionScreen({
     
     return cleanup;
   }, []);
+
+  // Batch preload all photos when screen mounts
+  useEffect(() => {
+    if (photos && photos.length > 0) {
+      console.log(`🚀 Starting batch preload of ${photos.length} photos`);
+      
+      // First, preload favorited photos with highest priority
+      if (favoritedPhotos.size > 0) {
+        const favPhotos = photos.filter(p => favoritedPhotos.has(p.id));
+        console.log(`⭐ Prioritizing preload of ${favPhotos.length} favorited photos`);
+        photoCacheService.batchPreloadPhotos(favPhotos, { 
+          priority: 'high',
+          concurrency: 5 
+        });
+      }
+      
+      // Then preload first 20 photos with high priority
+      const visiblePhotos = photos.slice(0, 20);
+      photoCacheService.batchPreloadPhotos(visiblePhotos, { 
+        priority: 'high',
+        concurrency: 4
+      });
+      
+      // Preload remaining photos in background with lower priority
+      if (photos.length > 20) {
+        setTimeout(() => {
+          const remainingPhotos = photos.slice(20);
+          console.log(`📦 Preloading remaining ${remainingPhotos.length} photos in background`);
+          photoCacheService.batchPreloadPhotos(remainingPhotos, { 
+            priority: 'low',
+            concurrency: 2,
+            onProgress: (loaded, total) => {
+              if (loaded % 10 === 0 || loaded === total) {
+                console.log(`📊 Background preload progress: ${loaded}/${total}`);
+              }
+            }
+          });
+        }, 1000);
+      }
+    }
+  }, [photos]); // Removed favoritedPhotos dependency to avoid re-preloading on favorite changes
 
   // Load available templates
   useEffect(() => {
