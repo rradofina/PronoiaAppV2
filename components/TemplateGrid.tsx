@@ -304,8 +304,8 @@ export default function TemplateGrid({
             
             {showActions && (
               <div className="flex items-center space-x-1 sm:space-x-2 ml-2">
-                {/* Download button for all templates */}
-                {onDownloadTemplate && (
+                {/* Download button hidden per user request */}
+                {/* {onDownloadTemplate && (
                   <button
                     onClick={() => {
                       if (isEditingMode) {
@@ -323,7 +323,7 @@ export default function TemplateGrid({
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                   </button>
-                )}
+                )} */}
                 
                 {/* Change Template button for all templates */}
                 {onSwapTemplate && (

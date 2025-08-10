@@ -122,7 +122,8 @@ export function usePhotoDebug({
       <div>Touching: {isTouching ? 'Yes' : 'No'}</div>
       <div>Snapping: {isSnapping ? 'Yes' : 'No'}</div>
       
-      <div className="mt-2 border-t border-gray-600 pt-2">
+      {/* Gap Detection section hidden per user request */}
+      {/* <div className="mt-2 border-t border-gray-600 pt-2">
         <div className="font-semibold">Gap Detection:</div>
         {errorMessage ? (
           <div className="text-red-300">Gap detection failed</div>
@@ -136,7 +137,7 @@ export function usePhotoDebug({
             </div>
           </>
         )}
-      </div>
+      </div> */}
       
       <div className="mt-2 border-t border-gray-600 pt-2">
         <div className="font-semibold">Action Plan:</div>
@@ -166,13 +167,8 @@ export function usePhotoDebug({
     </div>
   );
 
-  const gapIndicator = gapData.hasGaps ? (
-    <div className="absolute inset-0 pointer-events-none z-40">
-      <div className="absolute top-2 left-2 bg-yellow-600 text-white text-xs px-2 py-1 rounded">
-        {gapData.gapCount} gap{gapData.gapCount > 1 ? 's' : ''}
-      </div>
-    </div>
-  ) : null;
+  // Gap indicator hidden per user request
+  const gapIndicator = null;
 
   return { debugInfo, gapIndicator };
 }

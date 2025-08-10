@@ -621,8 +621,8 @@ export default function PhotoRenderer({
     const gapTop = Math.max(0, photoTop);
     const gapBottom = Math.max(0, containerHeight - photoBottom);
     
-    // Post-snap validation uses allowance threshold (user requested >0px)
-    const POST_SNAP_THRESHOLD = 5; // 5px allowance for post-snap validation
+    // Post-snap validation uses zero tolerance - ANY gap counts (matching initial detection)
+    const POST_SNAP_THRESHOLD = 0; // Zero tolerance - detect ANY gap amount
     
     const hasLeftGap = gapLeft > POST_SNAP_THRESHOLD;
     const hasRightGap = gapRight > POST_SNAP_THRESHOLD;

@@ -289,7 +289,7 @@ export default function InlinePhotoEditor({
         interactive={true}
         onTransformChange={handleTransformChange}
         className="w-full h-full"
-        debug={true}  // Enable debug UI to test gap detection fix
+        debug={false}  // Debug UI disabled per user request
         fallbackUrls={photo ? getHighResPhotoUrls(photo) : []}
         showClippingIndicators={true} // Enable clipping indicators
         finalizationRef={finalizationRef} // Pass ref for finalization method access
