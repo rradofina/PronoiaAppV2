@@ -32,6 +32,9 @@ interface PhotoRendererProps {
   // Interaction state callback
   onInteractionChange?: (isInteracting: boolean) => void;
   
+  // Callback for when user starts interacting (dragging/zooming)
+  onInteractionStart?: () => void;
+  
   // Smart reset callback for intelligent photo repositioning
   onSmartReset?: () => Promise<PhotoTransform>;
   
@@ -114,6 +117,7 @@ export default function PhotoRenderer({
   showClippingIndicators = false,
   finalizationRef,
   onInteractionChange,
+  onInteractionStart,
   onSmartReset
 }: PhotoRendererProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -974,24 +978,33 @@ export default function PhotoRenderer({
         
         if (transformsAreDifferent) {
           console.log('⚙️ EXECUTING TRANSFORM CHANGE...');
+          console.log('🎬 Starting smooth animation to close gaps');
+          
+          // First, enable the animation transition
           setIsSnapping(true);
-          setCurrentTransform(finalizedTransform);
-          console.log('✅ Transform state updated');
           
-          if (onTransformChange) {
-            console.log('📡 Calling onTransformChange callback...');
-            onTransformChange(finalizedTransform);
-            console.log('✅ Callback executed');
-          } else {
-            console.log('⚠️ No onTransformChange callback provided');
-          }
+          // Use requestAnimationFrame to ensure the transition is applied before the transform changes
+          // This forces React to render with isSnapping=true first, then apply the new transform
+          requestAnimationFrame(() => {
+            console.log('🎯 Applying new transform with animation');
+            setCurrentTransform(finalizedTransform);
+            
+            if (onTransformChange) {
+              console.log('📡 Calling onTransformChange callback...');
+              onTransformChange(finalizedTransform);
+              console.log('✅ Callback executed');
+            } else {
+              console.log('⚠️ No onTransformChange callback provided');
+            }
+          });
           
+          // Wait for animation to complete before resolving
           setTimeout(() => {
             setIsSnapping(false);
             console.log('✅ FINALIZATION COMPLETE - Animation finished');
             if (debug) console.log('✅ Gap-based finalization complete');
             resolve(finalizedTransform);
-          }, 350);
+          }, 450); // Slightly longer than animation duration to ensure completion
         } else {
           console.log('ℹ️ NO CHANGE: Transforms are identical, resolving with current');
           resolve(currentTransform);
@@ -1328,8 +1341,13 @@ export default function PhotoRenderer({
       // Interactive mode with no provided transform - use current state
       return {
         ...convertPhotoToCSS(currentTransform, previewMode),
-        // Add smooth spring animation when auto-fitting
-        transition: isSnapping ? 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none'
+        // Add smooth spring animation when auto-fitting or snapping to close gaps
+        // Using a slightly bouncy easing for a satisfying "snap into place" feel
+        transition: isSnapping 
+          ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' 
+          : isDragging || isTouching 
+            ? 'none'  // No transition during manual interaction
+            : 'transform 0.15s ease-out'  // Subtle transition for other state changes
       };
     }
   })();
@@ -1355,6 +1373,11 @@ export default function PhotoRenderer({
     
     setIsTouching(true);
     handleInteractionStart();
+    
+    // Call the onInteractionStart callback when user begins touching
+    if (onInteractionStart) {
+      onInteractionStart();
+    }
     
     if (e.touches.length === 2) {
       // Two finger pinch - start zoom
@@ -1452,6 +1475,12 @@ export default function PhotoRenderer({
     setIsDragging(true);
     setLastPointer({ x: e.clientX, y: e.clientY });
     handleInteractionStart();
+    
+    // Call the onInteractionStart callback when user begins interacting
+    if (onInteractionStart) {
+      onInteractionStart();
+    }
+    
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 
@@ -1573,6 +1602,10 @@ export default function PhotoRenderer({
         className="absolute inset-0"
         style={{
           ...photoStyle,
+          // Ensure transition is applied when snapping
+          transition: isSnapping 
+            ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' 
+            : photoStyle.transition || 'none',
           // Improve image quality
           imageRendering: 'auto',
           backfaceVisibility: 'hidden',

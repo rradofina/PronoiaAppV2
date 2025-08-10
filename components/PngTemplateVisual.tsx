@@ -327,7 +327,15 @@ export default function PngTemplateVisual({
                     photoUrl={photoUrl}
                     photoAlt={`Photo ${holeIndex + 1}`}
                     transform={slot?.transform}
-                    interactive={false}
+                    interactive={slotShowingEditButton?.id === slot.id}
+                    onInteractionStart={
+                      slotShowingEditButton?.id === slot.id && onEditButtonClick
+                        ? () => {
+                            console.log('🎯 Photo interaction started - triggering edit mode');
+                            onEditButtonClick(slot);
+                          }
+                        : undefined
+                    }
                     previewMode={isPreviewMode}
                     className="w-full h-full"
                     fallbackUrls={slot && photos.find(p => p.id === slot.photoId) ? getHighResPhotoUrls(photos.find(p => p.id === slot.photoId)!) : []}
