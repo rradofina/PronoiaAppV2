@@ -706,7 +706,7 @@ export default function Home() {
       // Check if folder has content
       const folderContents = await googleDriveService.getFolderContents(folderId);
       
-      if (folderContents.length > 0) {
+      if (folderContents.files && folderContents.files.length > 0) {
         // Folder has existing prints
         console.log('⚠️ Prints folder already has content');
         setIsUploading(false);
