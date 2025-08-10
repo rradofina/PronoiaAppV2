@@ -141,6 +141,7 @@ export default function FullscreenPhotoViewer({
   const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
   const [swipeProgress, setSwipeProgress] = useState(0); // -1 to 1 for swipe animation
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [photoOffset, setPhotoOffset] = useState(0); // Tracks which photo set we're showing
   
   // Navigation handlers (defined early for use in swipe hook)
   const handlePrevious = () => {
@@ -168,39 +169,35 @@ export default function FullscreenPhotoViewer({
   // Swipe gesture setup - MUST be before any conditional returns
   const { handlers: swipeHandlers, isSwiping } = useSwipeGesture({
     onSwipeLeft: () => {
-      // Store current progress before changing
-      const currentProgress = swipeProgress;
-      
-      // Change photo immediately
-      handleNext();
-      
-      // Start from where the swipe ended, adjusted for new photo positions
-      // After changing index, what was "next" is now "current", so adjust
-      setSwipeProgress(currentProgress - 1); // Shift back by one photo width
       setIsTransitioning(true);
       
-      // Animate to final position
+      // Animate to completion
       requestAnimationFrame(() => {
-        setSwipeProgress(0);
-        setTimeout(() => setIsTransitioning(false), 300);
+        setSwipeProgress(1); // Complete the swipe animation
+        
+        // After animation completes
+        setTimeout(() => {
+          handleNext(); // Update index
+          setPhotoOffset(prev => prev + 1); // Track that we moved one photo forward
+          setSwipeProgress(0); // This is now just for tracking gesture, not position
+          setIsTransitioning(false);
+        }, 300); // Match CSS transition duration
       });
     },
     onSwipeRight: () => {
-      // Store current progress before changing
-      const currentProgress = swipeProgress;
-      
-      // Change photo immediately
-      handlePrevious();
-      
-      // Start from where the swipe ended, adjusted for new photo positions
-      // After changing index, what was "previous" is now "current", so adjust
-      setSwipeProgress(currentProgress + 1); // Shift forward by one photo width
       setIsTransitioning(true);
       
-      // Animate to final position
+      // Animate to completion
       requestAnimationFrame(() => {
-        setSwipeProgress(0);
-        setTimeout(() => setIsTransitioning(false), 300);
+        setSwipeProgress(-1); // Complete the swipe animation
+        
+        // After animation completes
+        setTimeout(() => {
+          handlePrevious(); // Update index
+          setPhotoOffset(prev => prev - 1); // Track that we moved one photo backward
+          setSwipeProgress(0); // This is now just for tracking gesture, not position
+          setIsTransitioning(false);
+        }, 300); // Match CSS transition duration
       });
     },
     onSwipeProgress: (progress) => {
@@ -286,11 +283,7 @@ export default function FullscreenPhotoViewer({
     setCurrentPhotoIndex(photo ? photos.findIndex(p => p.id === photo.id) : 0);
   }
   
-  // Get previous and next photos for carousel
-  const previousPhotoIndex = currentPhotoIndex > 0 ? currentPhotoIndex - 1 : photos.length - 1;
-  const nextPhotoIndex = currentPhotoIndex < photos.length - 1 ? currentPhotoIndex + 1 : 0;
-  const previousPhoto = photos[previousPhotoIndex];
-  const nextPhoto = photos[nextPhotoIndex];
+  // Photo is now handled in the map loop
 
   return (
     <div className={`fixed inset-0 ${isDimmed ? 'z-30' : 'z-50'} bg-black ${isDimmed ? 'bg-opacity-50' : 'bg-opacity-95'} flex flex-col h-screen transition-all duration-300`}>
@@ -359,76 +352,53 @@ export default function FullscreenPhotoViewer({
 
         {/* Carousel Container - holds 3 photos for smooth sliding */}
         <div className="relative w-full h-full flex items-center justify-center">
-          {/* Previous Photo */}
-          <div 
-            className="absolute w-full h-full flex items-center justify-center"
-            style={{ 
-              transform: `translateX(${-100 - (swipeProgress * 100)}%)`,
-              transition: isTransitioning && !isSwiping ? 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
-            }}
-          >
-            {previousPhoto && (
-              <img
-                src={getPhotoUrl(previousPhoto)}
-                alt={previousPhoto.name}
-                className="max-w-full max-h-full object-contain"
-                style={{ pointerEvents: 'none' }}
-              />
-            )}
-          </div>
-
-          {/* Current Photo */}
-          <div 
-            className="absolute w-full h-full flex items-center justify-center"
-            style={{ 
-              transform: `translateX(${-swipeProgress * 100}%)`,
-              transition: isTransitioning && !isSwiping ? 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
-            }}
-          >
-            <img
-            src={getPhotoUrl(currentPhoto, currentUrlIndex)}
-            alt={currentPhoto.name}
-            className="max-w-full max-h-full object-contain"
-            onLoad={() => {
-              console.log(`✅ Photo loaded: ${currentPhoto.name}`);
-              // Cache this successful URL
-              const url = getPhotoUrl(currentPhoto, currentUrlIndex);
-              imageCache.current.set(currentPhoto.id, { url, loaded: true });
-            }}
-            onError={() => {
-              const fallbackUrls = getFallbackUrls(currentPhoto);
-              console.error(`❌ Failed to load ${currentPhoto.name}`);
-              
-              // Try next fallback URL
-              if (currentUrlIndex < fallbackUrls.length - 1) {
-                console.log(`🔄 Trying fallback URL ${currentUrlIndex + 2}/${fallbackUrls.length}`);
-                setCurrentUrlIndex(prev => prev + 1);
-              }
-            }}
-            style={{ 
-              pointerEvents: 'auto'
-            }}
-            crossOrigin="anonymous"
-          />
-          </div>
-
-          {/* Next Photo */}
-          <div 
-            className="absolute w-full h-full flex items-center justify-center"
-            style={{ 
-              transform: `translateX(${100 - (swipeProgress * 100)}%)`,
-              transition: isTransitioning && !isSwiping ? 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
-            }}
-          >
-            {nextPhoto && (
-              <img
-                src={getPhotoUrl(nextPhoto)}
-                alt={nextPhoto.name}
-                className="max-w-full max-h-full object-contain"
-                style={{ pointerEvents: 'none' }}
-              />
-            )}
-          </div>
+          {/* Render 5 photos for smooth infinite scrolling */}
+          {[-2, -1, 0, 1, 2].map(offset => {
+            const photoIndex = (currentPhotoIndex + offset + photos.length * 100) % photos.length;
+            const photo = photos[photoIndex];
+            if (!photo) return null;
+            
+            // Calculate position based on offset and swipe progress
+            const basePosition = offset * 100; // -200, -100, 0, 100, 200
+            const swipeOffset = -swipeProgress * 100; // Swipe movement
+            const finalPosition = basePosition + swipeOffset;
+            
+            return (
+              <div
+                key={`${photo.id}-${offset}`}
+                className="absolute w-full h-full flex items-center justify-center"
+                style={{
+                  transform: `translateX(${finalPosition}%)`,
+                  transition: isTransitioning && !isSwiping ? 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+                }}
+              >
+                <img
+                  src={getPhotoUrl(photo, offset === 0 ? currentUrlIndex : 0)}
+                  alt={photo.name}
+                  className="max-w-full max-h-full object-contain"
+                  onLoad={() => {
+                    if (offset === 0) {
+                      console.log(`✅ Photo loaded: ${photo.name}`);
+                      const url = getPhotoUrl(photo, currentUrlIndex);
+                      imageCache.current.set(photo.id, { url, loaded: true });
+                    }
+                  }}
+                  onError={() => {
+                    if (offset === 0) {
+                      const fallbackUrls = getFallbackUrls(photo);
+                      console.error(`❌ Failed to load ${photo.name}`);
+                      if (currentUrlIndex < fallbackUrls.length - 1) {
+                        console.log(`🔄 Trying fallback URL ${currentUrlIndex + 2}/${fallbackUrls.length}`);
+                        setCurrentUrlIndex(prev => prev + 1);
+                      }
+                    }
+                  }}
+                  style={{ pointerEvents: offset === 0 ? 'auto' : 'none' }}
+                  crossOrigin="anonymous"
+                />
+              </div>
+            );
+          })}
         </div>
 
         {/* Next Button */}
