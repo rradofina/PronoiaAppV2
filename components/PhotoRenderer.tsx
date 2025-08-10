@@ -746,12 +746,34 @@ export default function PhotoRenderer({
       // To move left: increase photoCenterX
       horizontalMovement = (gaps.left / containerRect.width);
       horizontalDescription = `left ${gaps.left.toFixed(1)}px`;
+      
+      if (debug) {
+        console.log('🔍 LEFT GAP MOVEMENT CALCULATION:', {
+          gap: gaps.left,
+          containerWidth: containerRect.width,
+          movement: horizontalMovement,
+          currentPhotoCenterX: currentTransform.photoCenterX,
+          newPhotoCenterX: currentTransform.photoCenterX + horizontalMovement,
+          expectedTranslateChange: `${-(horizontalMovement * 100).toFixed(1)}%`
+        });
+      }
     }
     if (significantGaps.right) {  // NOT else if - need to check both for proper 2-gap handling
       // Gap on right → photo is too far left → needs to move RIGHT
       // To move right: decrease photoCenterX
       horizontalMovement = -(gaps.right / containerRect.width);
       horizontalDescription = `right ${gaps.right.toFixed(1)}px`;
+      
+      if (debug) {
+        console.log('🔍 RIGHT GAP MOVEMENT CALCULATION:', {
+          gap: gaps.right,
+          containerWidth: containerRect.width,
+          movement: horizontalMovement,
+          currentPhotoCenterX: currentTransform.photoCenterX,
+          newPhotoCenterX: currentTransform.photoCenterX + horizontalMovement,
+          expectedTranslateChange: `${-(horizontalMovement * 100).toFixed(1)}%`
+        });
+      }
     }
     
     // Vertical movement - check BOTH top and bottom (for 2-gap cases)
@@ -806,7 +828,20 @@ export default function PhotoRenderer({
     console.log('✅ POST-SNAP VALIDATION PASSED: Movement is safe, proceeding');
     
     if (debug) {
+      // Get photo dimensions for debugging
+      const mathGaps = calculateMathematicalGaps();
+      
       console.log('📐 Gap-Based Movement Calculation:', {
+        photoInfo: {
+          renderedSize: mathGaps.photoSize,
+          photoScale: currentTransform.photoScale,
+          aspectRatio: (mathGaps.photoSize.width / mathGaps.photoSize.height).toFixed(3)
+        },
+        containerInfo: {
+          width: containerRect.width,
+          height: containerRect.height,
+          aspectRatio: (containerRect.width / containerRect.height).toFixed(3)
+        },
         gapCount,
         gaps,
         significantGaps,
