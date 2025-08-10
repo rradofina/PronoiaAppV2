@@ -6,6 +6,7 @@ import TemplateSelectionModal from './TemplateSelectionModal';
 import AddPrintsModal from './AddPrintsModal';
 import { getSamplePhotosForTemplate } from '../utils/samplePhotoUtils';
 import { createPhotoTransform, PhotoTransform } from '../types';
+import { getPrintSizeDimensions } from '../utils/printSizeDimensions';
 
 // Create smart preview transform that optimizes photo for hole aspect ratio with gap-free auto-fit
 function createPreviewTransform(holeAspectRatio: number, photoAspectRatio: number | null = null): PhotoTransform {
@@ -316,7 +317,11 @@ export default function PackageTemplatePreview({
                 <div 
                   className="bg-white rounded border border-gray-200 overflow-hidden mb-1 flex items-center justify-center"
                   style={{
-                    aspectRatio: `${template.holes_data && template.holes_data.length > 0 ? '1200/1800' : '2/3'}`,
+                    aspectRatio: template.dimensions 
+                      ? `${template.dimensions.width}/${template.dimensions.height}`
+                      : template.print_size === 'A4' ? '2480/3508'
+                      : template.print_size === '5R' ? '1500/2100'
+                      : '1200/1800', // Default to 4R
                     minHeight: '250px',
                     maxHeight: '500px'
                   }}
@@ -329,10 +334,7 @@ export default function PackageTemplatePreview({
                         templateType: template.template_type,
                         driveFileId: template.drive_file_id,
                         holes: template.holes_data || [],
-                        dimensions: template.dimensions || {
-                          width: 1200,
-                          height: 1800
-                        },
+                        dimensions: template.dimensions || getPrintSizeDimensions(template.print_size),
                         printSize: template.print_size,
                         pngUrl: (() => {
                           // Robust PNG URL construction (matches PngTemplateVisual logic)

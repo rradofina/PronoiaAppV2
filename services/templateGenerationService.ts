@@ -12,11 +12,11 @@ class TemplateGenerationService {
   private async initializeCanvas(template?: Template): Promise<void> {
     if (typeof window === 'undefined') return;
 
-    let dimensions = { width: 1200, height: 1800 }; // Default fallback
+    let dimensions = { width: 1200, height: 1800 }; // Default fallback for 4R
     
     if (template) {
-      // Get dynamic dimensions from template configuration
-      dimensions = await templateConfigService.getTemplateDimensions(template.type, '4R');
+      // Get dynamic dimensions from template configuration using actual print size
+      dimensions = await templateConfigService.getTemplateDimensions(template.type, template.printSize || '4R');
     }
 
     this.canvas = document.createElement('canvas');

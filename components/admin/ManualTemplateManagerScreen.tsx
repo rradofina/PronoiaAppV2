@@ -8,6 +8,7 @@ import {
   GoogleAuth 
 } from '../../types';
 import { manualTemplateService } from '../../services/manualTemplateService';
+import { getPrintSizeDimensions } from '../../utils/printSizeDimensions';
 import { templateConfigService } from '../../services/templateConfigService';
 import { printSizeService } from '../../services/printSizeService';
 import HeaderNavigation from '../HeaderNavigation';
@@ -495,7 +496,7 @@ export default function ManualTemplateManagerScreen({
         setFormData(prev => ({
           ...prev,
           holes_data: JSON.stringify(detectedData.holes || [], null, 2),
-          dimensions: JSON.stringify(detectedData.dimensions || { width: 1200, height: 1800 }, null, 2),
+          dimensions: JSON.stringify(detectedData.dimensions || getPrintSizeDimensions(prev.print_size), null, 2),
           template_type: detectedData.templateType || prev.template_type
         }));
         

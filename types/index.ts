@@ -297,9 +297,9 @@ export function getHoleDimensions(slot: TemplateSlot): { width: number; height: 
       }))
     });
     
-    // Find the template that matches this slot
+    // Find the template that matches this slot (templateType now contains the unique template ID)
     const pngTemplate = pngTemplates.find((t: any) => {
-      return t.template_type === slot.templateType && t.print_size === slot.printSize;
+      return t.id.toString() === slot.templateType;
     });
     
     if (!pngTemplate || !pngTemplate.holes) {

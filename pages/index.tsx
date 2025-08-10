@@ -891,7 +891,7 @@ export default function Home() {
               id: `${template.id}_${templateIndex}_${slotIndex}`,
               templateId: `${template.id}_${templateIndex}`,
               templateName,
-              templateType: template.template_type,
+              templateType: template.id.toString(), // Use unique template ID instead of generic type
               printSize: template.print_size,
               slotIndex,
               photoId: undefined
@@ -911,7 +911,7 @@ export default function Home() {
                 id: `${templateId}_${slotIndex}`,
                 templateId,
                 templateName,
-                templateType: templateToRepeat.template_type,
+                templateType: templateToRepeat.id.toString(), // Use unique template ID instead of generic type
                 printSize: templateToRepeat.print_size,
                 slotIndex,
                 photoId: undefined

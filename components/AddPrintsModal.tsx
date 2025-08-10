@@ -6,6 +6,7 @@ import PngTemplateVisual from './PngTemplateVisual';
 import { getSamplePhotosForTemplate } from '../utils/samplePhotoUtils';
 import { createPhotoTransform } from '../types';
 import { PRINT_SIZE_ORDER } from '../utils/constants';
+import { getPrintSizeDimensions } from '../utils/printSizeDimensions';
 
 interface AddPrintsModalProps {
   isOpen: boolean;
@@ -197,7 +198,11 @@ export default function AddPrintsModal({
                             <div 
                               className="bg-white rounded border border-gray-200 overflow-hidden mb-2 flex items-center justify-center"
                               style={{
-                                aspectRatio: '1200/1800',
+                                aspectRatio: template.dimensions 
+                                  ? `${template.dimensions.width}/${template.dimensions.height}`
+                                  : template.print_size === 'A4' ? '2480/3508'
+                                  : template.print_size === '5R' ? '1500/2100'
+                                  : '1200/1800', // Default to 4R
                                 minHeight: '180px',
                                 maxHeight: '220px'
                               }}
@@ -210,10 +215,7 @@ export default function AddPrintsModal({
                                     templateType: template.template_type,
                                     driveFileId: template.drive_file_id,
                                     holes: template.holes_data || [],
-                                    dimensions: template.dimensions || {
-                                      width: 1200,
-                                      height: 1800
-                                    },
+                                    dimensions: template.dimensions || getPrintSizeDimensions(template.print_size),
                                     printSize: template.print_size,
                                     pngUrl: (() => {
                                       const fileId = template.drive_file_id?.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1] || template.drive_file_id;

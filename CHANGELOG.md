@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-10] - Complete A4 Template Display Fix & Template Matching Bug
+
+### Fixed  
+- **A4 Solo Templates Showing as 4R Solo in Fill Templates**: Fixed critical template matching bug
+  - **Root Cause**: Template matching was using generic `template_type` field ("solo") instead of unique template ID, causing all solo templates to match the first one found (usually 4R)
+  - **Solution**: Changed slot creation to store unique template ID instead of generic type, and updated matching logic to find templates by ID
+  - **Files Modified**:
+    - `pages/index.tsx` (lines 894, 914) - Store template.id instead of template.template_type in slots
+    - `components/screens/PhotoSelectionScreen.tsx` (line 151) - Match templates by unique ID instead of generic type
+    - `types/index.ts` (line 302) - Updated getHoleDimensions to match templates by ID for 2-step auto-fill
+  - **Impact**: Each template is now uniquely identified, so A4 Solo and 4R Solo templates are properly distinguished, and 2-step auto-fill process works correctly
+
+- **A4 Templates Reverting to 4R in Fill Templates Screen**: Fixed template selection priority issue
+  - **Root Cause**: PhotoSelectionScreen was loading ALL templates from database instead of using the specific templates selected in the package
+  - **Solution**: Changed template priority to use window templates (selected from package) over database templates
+  - **File Modified**: `components/screens/PhotoSelectionScreen.tsx` (line 57)
+  - **Impact**: Templates now correctly maintain their type when transitioning from "Select Package" to "Fill Templates" screen
+
+- **A4 Templates Showing with Wrong Aspect Ratio**: Comprehensive fix for hardcoded 4R dimensions throughout codebase
+  - **Root Cause**: Multiple layers of hardcoded 4R dimensions (1200×1800) forcing all templates into 4R shape
+  - **Solution**: Created centralized print size dimensions utility and removed all hardcoded 4R assumptions
+  - **Files Modified**: 
+    - Created `utils/printSizeDimensions.ts` - Centralized helper for print size dimensions
+    - `components/PngTemplateVisual.tsx` - Removed hardcoded 4R validation, now uses dynamic dimensions
+    - `components/AddPrintsModal.tsx` - Dynamic aspect ratios and dimension fallbacks
+    - `components/PackageTemplatePreview.tsx` - Uses getPrintSizeDimensions for fallbacks
+    - `components/TemplateSelectionModal.tsx` - Dynamic dimension handling
+    - `services/templateGenerationService.ts` - Fixed hardcoded '4R' parameter, now uses actual print_size
+    - `components/admin/ManualTemplateManagerScreen.tsx` - Dynamic defaults based on selected print size
+  - **Implementation**: 
+    - Created `getPrintSizeDimensions()` helper function returning proper dimensions for each print size
+    - All dimension fallbacks now use `getPrintSizeDimensions(template.print_size)` instead of hardcoded 4R
+    - PngTemplateVisual validation now compares against correct print size dimensions
+    - Template generation service uses actual template print_size instead of hardcoded '4R'
+  - **Impact**: A4 templates now display, validate, and render with correct A4 proportions (2480×3508) throughout the entire application
+
 ## [2025-08-09] - Critical Photo Editing, Auto-Fit, Mobile Navigation & Prints Folder Management
 
 ### Fixed

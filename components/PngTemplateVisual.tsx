@@ -4,6 +4,7 @@ import { PngTemplate } from '../services/pngTemplateService';
 import PhotoRenderer from './PhotoRenderer';
 import InlinePhotoEditor from './InlinePhotoEditor';
 import { getHighResPhotoUrls } from '../utils/photoUrlUtils';
+import { getPrintSizeDimensions } from '../utils/printSizeDimensions';
 
 interface PngTemplateVisualProps {
   pngTemplate: PngTemplate;
@@ -100,7 +101,8 @@ export default function PngTemplateVisual({
                  (fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : null);
   
   // Calculate aspect ratios and container behavior
-  const expectedAspectRatio = 2/3; // 1200/1800 for 4R
+  const expectedDimensions = getPrintSizeDimensions(pngTemplate.printSize);
+  const expectedAspectRatio = expectedDimensions.width / expectedDimensions.height;
   const actualAspectRatio = pngTemplate.dimensions.width / pngTemplate.dimensions.height;
   const aspectRatioMatch = Math.abs(actualAspectRatio - expectedAspectRatio) < 0.01;
   
@@ -116,7 +118,7 @@ export default function PngTemplateVisual({
     
     // Dimensions
     storedDimensions: pngTemplate.dimensions,
-    correctDimensions: { width: 1200, height: 1800 },
+    correctDimensions: expectedDimensions,
     
     // Aspect Ratios
     storedAspectRatio: actualAspectRatio.toFixed(3),
@@ -134,7 +136,7 @@ export default function PngTemplateVisual({
     
     // Fix needed
     fixNeeded: !aspectRatioMatch ? 
-      `Change stored dimensions from ${pngTemplate.dimensions.width}×${pngTemplate.dimensions.height} to 1200×1800` :
+      `Change stored dimensions from ${pngTemplate.dimensions.width}×${pngTemplate.dimensions.height} to ${expectedDimensions.width}×${expectedDimensions.height}` :
       'No fix needed',
     
     slotsConnected: thisTemplateSlots.length,

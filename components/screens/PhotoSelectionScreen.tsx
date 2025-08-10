@@ -53,8 +53,8 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
     loadAllTemplates();
   }, []);
   
-  // Use database templates (consistent with swap modal) or fall back to window templates
-  const pngTemplates = databaseTemplates.length > 0 ? databaseTemplates : windowTemplates;
+  // Use window templates (selected from package) or fall back to database templates
+  const pngTemplates = windowTemplates.length > 0 ? windowTemplates : databaseTemplates;
   
   // Find PNG template using slot's templateType for better accuracy after swaps
   const templateType = slots[0]?.templateType || template.id;
@@ -147,8 +147,8 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
   let pngTemplate = null;
   
   if (pngTemplates.length > 0 && templateType) {
-    // Find exact template_type match
-    const candidateTemplate = pngTemplates.find((t: any) => t.template_type === templateType);
+    // Find exact template by ID (templateType now contains the unique template ID)
+    const candidateTemplate = pngTemplates.find((t: any) => t.id.toString() === templateType);
     
     if (candidateTemplate) {
       // Strict compatibility check: template holes must match expected slots
