@@ -284,9 +284,14 @@ export default function PhotoRenderer({
     const baseCenterY = containerHeight / 2;
     
     // Step 5: Apply photo positioning transforms (photoCenterX/Y affect where photo is positioned)
-    // photoCenterX: 0.5 = center, 0.0 = left edge, 1.0 = right edge
-    const translateX = (0.5 - currentTransform.photoCenterX) * renderedWidth;
-    const translateY = (0.5 - currentTransform.photoCenterY) * renderedHeight;
+    // Calculate percentage-based translation, then convert to pixels
+    // CSS translate % is relative to container, but photoCenterX/Y movement is relative to image scale
+    const translateXPercent = (0.5 - currentTransform.photoCenterX);
+    const translateYPercent = (0.5 - currentTransform.photoCenterY);
+    
+    // Convert percentage to pixels (CSS translate % is relative to container dimensions)
+    const translateX = translateXPercent * containerWidth;
+    const translateY = translateYPercent * containerHeight;
     
     // Step 6: Calculate final photo boundaries
     const photoLeft = baseCenterX - (renderedWidth / 2) + translateX;
@@ -611,33 +616,30 @@ export default function PhotoRenderer({
       };
     }
     
-    // Calculate how the photo would fit in the container
-    const containerAspect = containerWidth / containerHeight;
-    const photoAspect = photoNaturalWidth / photoNaturalHeight;
+    // Calculate object-fit: contain scale (matching the main calculation)
+    const containScale = Math.min(
+      containerWidth / photoNaturalWidth,
+      containerHeight / photoNaturalHeight
+    );
     
-    let fitWidth, fitHeight;
-    if (photoAspect > containerAspect) {
-      // Photo is wider - fit by width
-      fitWidth = containerWidth;
-      fitHeight = containerWidth / photoAspect;
-    } else {
-      // Photo is taller - fit by height
-      fitHeight = containerHeight;
-      fitWidth = containerHeight * photoAspect;
-    }
+    // Apply the transform scale
+    const finalScale = containScale * scale;
     
-    // Apply scale
-    const scaledWidth = fitWidth * scale;
-    const scaledHeight = fitHeight * scale;
+    // Calculate rendered dimensions
+    const scaledWidth = photoNaturalWidth * finalScale;
+    const scaledHeight = photoNaturalHeight * finalScale;
     
-    // Calculate photo position based on center coordinates
-    const photoCenterXPx = newCenterX * scaledWidth;
-    const photoCenterYPx = newCenterY * scaledHeight;
+    // Calculate translation (matching the fixed calculation - relative to container!)
+    const translateX = (0.5 - newCenterX) * containerWidth;
+    const translateY = (0.5 - newCenterY) * containerHeight;
     
     // Calculate photo edges relative to container
-    const photoLeft = (containerWidth / 2) - photoCenterXPx;
+    const baseCenterX = containerWidth / 2;
+    const baseCenterY = containerHeight / 2;
+    
+    const photoLeft = baseCenterX - (scaledWidth / 2) + translateX;
     const photoRight = photoLeft + scaledWidth;
-    const photoTop = (containerHeight / 2) - photoCenterYPx;
+    const photoTop = baseCenterY - (scaledHeight / 2) + translateY;
     const photoBottom = photoTop + scaledHeight;
     
     // Calculate gaps (positive values indicate empty space)
@@ -718,35 +720,43 @@ export default function PhotoRenderer({
       };
     }
     
-    // Calculate movement based on gaps (convert pixels to percentage of photo transform)
+    // Calculate movement based on gaps (convert pixels to photoCenterX/Y units)
     let horizontalMovement = 0;
     let verticalMovement = 0;
     let horizontalDescription = 'no change';
     let verticalDescription = 'no change';
     
-    // Get actual photo dimensions for correct scaling
-    const { photoSize } = calculateMathematicalGaps();
+    // CRITICAL: photoCenterX/Y movement calculation
+    // CSS transform: translate((0.5 - photoCenterX) * 100%, ...)
+    // The percentage is relative to CONTAINER size due to absolute inset-0
+    // To move photo RIGHT by X pixels: translateX needs to increase by X
+    // Since translateX = (0.5 - photoCenterX) * containerWidth, 
+    // to increase translateX, we decrease photoCenterX
     
-    // Horizontal movement (FIXED: Use photo dimensions not container dimensions)
+    // Horizontal movement
     if (significantGaps.left) {
-      // Gap on left → positive movement = move right in CSS coords = move left visually
-      horizontalMovement = (gaps.left / photoSize.width) / currentTransform.photoScale;
-      horizontalDescription = `move left ${gaps.left.toFixed(1)}px`;
+      // Gap on left → photo needs to move RIGHT to close gap
+      // To move right by gap pixels: decrease photoCenterX
+      horizontalMovement = -(gaps.left / containerRect.width);
+      horizontalDescription = `move right ${gaps.left.toFixed(1)}px`;
     } else if (significantGaps.right) {
-      // Gap on right → negative movement = move left in CSS coords = move right visually
-      horizontalMovement = -(gaps.right / photoSize.width) / currentTransform.photoScale;
-      horizontalDescription = `move right ${gaps.right.toFixed(1)}px`;
+      // Gap on right → photo needs to move LEFT to close gap
+      // To move left by gap pixels: increase photoCenterX
+      horizontalMovement = (gaps.right / containerRect.width);
+      horizontalDescription = `move left ${gaps.right.toFixed(1)}px`;
     }
     
-    // Vertical movement (FIXED: Use photo dimensions not container dimensions)
+    // Vertical movement
     if (significantGaps.top) {
-      // Gap on top → positive movement = move up in CSS coords
-      verticalMovement = (gaps.top / photoSize.height) / currentTransform.photoScale;
-      verticalDescription = `move up ${gaps.top.toFixed(1)}px`;
+      // Gap on top → photo needs to move DOWN to close gap
+      // To move down by gap pixels: decrease photoCenterY
+      verticalMovement = -(gaps.top / containerRect.height);
+      verticalDescription = `move down ${gaps.top.toFixed(1)}px`;
     } else if (significantGaps.bottom) {
-      // Gap on bottom → negative movement = move down in CSS coords
-      verticalMovement = -(gaps.bottom / photoSize.height) / currentTransform.photoScale;
-      verticalDescription = `move down ${gaps.bottom.toFixed(1)}px`;
+      // Gap on bottom → photo needs to move UP to close gap
+      // To move up by gap pixels: increase photoCenterY
+      verticalMovement = (gaps.bottom / containerRect.height);
+      verticalDescription = `move up ${gaps.bottom.toFixed(1)}px`;
     }
     
     // Apply movements to current position (no artificial bounds - allow true edge positioning)
