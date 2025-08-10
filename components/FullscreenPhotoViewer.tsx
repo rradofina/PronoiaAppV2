@@ -148,10 +148,7 @@ export default function FullscreenPhotoViewer({
     // Ensure the new index is valid before updating
     if (newIndex >= 0 && newIndex < photos.length && photos[newIndex]) {
       console.log(`📸 Previous: ${currentPhotoIndex} → ${newIndex} (${photos[newIndex]?.name || 'unknown'})`);
-      setIsTransitioning(true);
       setCurrentPhotoIndex(newIndex);
-      // Single consistent transition duration
-      setTimeout(() => setIsTransitioning(false), 350);
     } else {
       console.error('Invalid previous index:', newIndex);
     }
@@ -162,10 +159,7 @@ export default function FullscreenPhotoViewer({
     // Ensure the new index is valid before updating
     if (newIndex >= 0 && newIndex < photos.length && photos[newIndex]) {
       console.log(`📸 Next: ${currentPhotoIndex} → ${newIndex} (${photos[newIndex]?.name || 'unknown'})`);
-      setIsTransitioning(true);
       setCurrentPhotoIndex(newIndex);
-      // Single consistent transition duration
-      setTimeout(() => setIsTransitioning(false), 350);
     } else {
       console.error('Invalid next index:', newIndex);
     }
@@ -173,8 +167,42 @@ export default function FullscreenPhotoViewer({
   
   // Swipe gesture setup - MUST be before any conditional returns
   const { handlers: swipeHandlers, isSwiping } = useSwipeGesture({
-    onSwipeLeft: handleNext,
-    onSwipeRight: handlePrevious,
+    onSwipeLeft: () => {
+      // Store current progress before changing
+      const currentProgress = swipeProgress;
+      
+      // Change photo immediately
+      handleNext();
+      
+      // Start from where the swipe ended, adjusted for new photo positions
+      // After changing index, what was "next" is now "current", so adjust
+      setSwipeProgress(currentProgress - 1); // Shift back by one photo width
+      setIsTransitioning(true);
+      
+      // Animate to final position
+      requestAnimationFrame(() => {
+        setSwipeProgress(0);
+        setTimeout(() => setIsTransitioning(false), 300);
+      });
+    },
+    onSwipeRight: () => {
+      // Store current progress before changing
+      const currentProgress = swipeProgress;
+      
+      // Change photo immediately
+      handlePrevious();
+      
+      // Start from where the swipe ended, adjusted for new photo positions
+      // After changing index, what was "previous" is now "current", so adjust
+      setSwipeProgress(currentProgress + 1); // Shift forward by one photo width
+      setIsTransitioning(true);
+      
+      // Animate to final position
+      requestAnimationFrame(() => {
+        setSwipeProgress(0);
+        setTimeout(() => setIsTransitioning(false), 300);
+      });
+    },
     onSwipeProgress: (progress) => {
       setSwipeProgress(progress);
     },
@@ -182,8 +210,15 @@ export default function FullscreenPhotoViewer({
       setIsTransitioning(false); // Disable transitions during swipe
     },
     onSwipeEnd: () => {
-      setSwipeProgress(0);
-      // Don't interfere with navigation transition timing
+      // Check if swipe didn't trigger navigation (cancelled swipe)
+      if (Math.abs(swipeProgress) > 0 && Math.abs(swipeProgress) < 0.25) {
+        // Animate back to center
+        setIsTransitioning(true);
+        requestAnimationFrame(() => {
+          setSwipeProgress(0);
+          setTimeout(() => setIsTransitioning(false), 300);
+        });
+      }
     },
     swipeThreshold: 0.25, // 25% of screen width to trigger navigation
   });

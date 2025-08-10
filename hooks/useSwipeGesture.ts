@@ -67,8 +67,7 @@ export function useSwipeGesture({
     if (!isSwiping && isHorizontalSwipe && Math.abs(deltaX) > 10) {
       setIsSwiping(true);
       onSwipeStart?.();
-      // Prevent vertical scrolling during horizontal swipe
-      e.preventDefault();
+      // Note: preventDefault not needed - CSS touch-action handles scroll prevention
     }
     
     // Calculate and report progress if swiping
@@ -103,6 +102,7 @@ export function useSwipeGesture({
       (Math.abs(deltaX) > swipeDistanceThreshold || velocity > 0.5);
     
     if (shouldTriggerSwipe) {
+      // Don't reset progress here - let the component handle the animation
       if (deltaX > 0) {
         // Swiped left - go to next
         onSwipeLeft?.();
@@ -111,8 +111,8 @@ export function useSwipeGesture({
         onSwipeRight?.();
       }
     } else if (isSwiping) {
-      // Swipe was cancelled - reset to original position
-      onSwipeProgress?.(0);
+      // Swipe was cancelled - component will handle the reset animation
+      // Just call onSwipeEnd to notify
     }
     
     // Clean up
