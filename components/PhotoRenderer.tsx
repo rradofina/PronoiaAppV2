@@ -371,12 +371,13 @@ export default function PhotoRenderer({
 
     try {
     
-    // Use DOM-based gap detection for visual accuracy (zoom-independent)
-    // This measures actual visual gaps that the user sees, regardless of internal scaling
-    const imageRect = imageRef.current.getBoundingClientRect();
+    // Use MATHEMATICAL calculation for accurate gap detection
+    // This properly accounts for object-fit:contain and all transforms
+    // Fixes the "invisible container" issue where DOM returns element bounds, not photo bounds
+    const mathResult = calculateMathematicalGaps();
     const containerRect = containerRef.current.getBoundingClientRect();
     
-    if (imageRect.width === 0 || imageRect.height === 0) {
+    if (mathResult.photoSize.width === 0 || mathResult.photoSize.height === 0) {
       return { 
         hasGaps: false, 
         gapCount: 0,
@@ -385,32 +386,34 @@ export default function PhotoRenderer({
       };
     }
     
-    // Add comprehensive coordinate debugging for horizontal gap issues
+    // Use the mathematically calculated photo edges and gaps
+    const { photoEdges, gaps: mathGaps } = mathResult;
+    
+    // Add comprehensive coordinate debugging
     if (debug) {
-      console.log('🔍 COORDINATE DEBUG (HORIZONTAL GAP INVESTIGATION):', {
-        imageRect: {
-          left: imageRect.left,
-          right: imageRect.right,
-          top: imageRect.top,
-          bottom: imageRect.bottom,
-          width: imageRect.width,
-          height: imageRect.height
+      console.log('🔍 MATHEMATICAL GAP DETECTION:', {
+        photoEdges: {
+          left: photoEdges.left.toFixed(1),
+          right: photoEdges.right.toFixed(1),
+          top: photoEdges.top.toFixed(1),
+          bottom: photoEdges.bottom.toFixed(1)
         },
-        containerRect: {
-          left: containerRect.left,
-          right: containerRect.right,
-          top: containerRect.top,
-          bottom: containerRect.bottom,
-          width: containerRect.width,
-          height: containerRect.height
+        containerBounds: {
+          left: 0,
+          right: containerRect.width.toFixed(1),
+          top: 0,
+          bottom: containerRect.height.toFixed(1)
         },
-        calculations: {
-          'imageRect.left > containerRect.left': imageRect.left > containerRect.left,
-          'imageRect.right < containerRect.right': imageRect.right < containerRect.right,
-          'imageRect.left - containerRect.left': imageRect.left - containerRect.left,
-          'containerRect.right - imageRect.right': containerRect.right - imageRect.right,
-          'imageRect.top > containerRect.top': imageRect.top > containerRect.top,
-          'imageRect.bottom < containerRect.bottom': imageRect.bottom < containerRect.bottom
+        calculatedGaps: {
+          left: mathGaps.left.toFixed(1),
+          right: mathGaps.right.toFixed(1),
+          top: mathGaps.top.toFixed(1),
+          bottom: mathGaps.bottom.toFixed(1)
+        },
+        photoInfo: {
+          width: mathResult.photoSize.width.toFixed(1),
+          height: mathResult.photoSize.height.toFixed(1),
+          scale: currentTransform.photoScale.toFixed(3)
         },
         transforms: {
           photoCenterX: currentTransform.photoCenterX,
@@ -420,42 +423,12 @@ export default function PhotoRenderer({
       });
     }
 
-    // Back to basics: Simple DOM measurement
-    // Use direct getBoundingClientRect measurements with minimal processing
+    // Use the mathematical gaps directly
+    const rawGapLeft = mathGaps.left;
+    const rawGapRight = mathGaps.right;
+    const rawGapTop = mathGaps.top;
+    const rawGapBottom = mathGaps.bottom;
     
-    const rawGapLeft = Math.max(0, imageRect.left - containerRect.left);
-    const rawGapRight = Math.max(0, containerRect.right - imageRect.right);
-    const rawGapTop = Math.max(0, imageRect.top - containerRect.top);
-    const rawGapBottom = Math.max(0, containerRect.bottom - imageRect.bottom);
-    
-    // Simple debugging
-    if (debug) {
-      console.log('🔍 SIMPLE DOM GAP DETECTION:', {
-        imageRect: {
-          left: imageRect.left.toFixed(1),
-          right: imageRect.right.toFixed(1),
-          top: imageRect.top.toFixed(1),
-          bottom: imageRect.bottom.toFixed(1),
-          width: imageRect.width.toFixed(1),
-          height: imageRect.height.toFixed(1)
-        },
-        containerRect: {
-          left: containerRect.left.toFixed(1),
-          right: containerRect.right.toFixed(1),
-          top: containerRect.top.toFixed(1),
-          bottom: containerRect.bottom.toFixed(1),
-          width: containerRect.width.toFixed(1),
-          height: containerRect.height.toFixed(1)
-        },
-        rawGaps: {
-          left: rawGapLeft.toFixed(1),
-          right: rawGapRight.toFixed(1),
-          top: rawGapTop.toFixed(1),
-          bottom: rawGapBottom.toFixed(1)
-        },
-        approach: 'Simple DOM measurement - back to basics'
-      });
-    }
     
     // Step 2: Use precise rounding for accurate gap measurement
     // Round to 0.1px precision to avoid floating point errors while preserving accuracy
@@ -466,14 +439,14 @@ export default function PhotoRenderer({
     
     // Add simplified gap calculation debugging
     if (debug) {
-      console.log('🧮 SIMPLIFIED GAP CALCULATION (DIRECT DOM MEASUREMENT):', {
+      console.log('🧮 FINAL GAP CALCULATION (MATHEMATICAL):', {
         containerSize: {
           width: containerRect.width.toFixed(1),
           height: containerRect.height.toFixed(1)
         },
-        imageSize: {
-          width: imageRect.width.toFixed(1),
-          height: imageRect.height.toFixed(1)
+        photoSize: {
+          width: mathResult.photoSize.width.toFixed(1),
+          height: mathResult.photoSize.height.toFixed(1)
         },
         finalPixelGaps: {
           left: visualGapLeft.toFixed(1),
@@ -481,7 +454,7 @@ export default function PhotoRenderer({
           top: visualGapTop.toFixed(1),
           bottom: visualGapBottom.toFixed(1)
         },
-        approach: 'Direct DOM measurement without complex offset corrections',
+        approach: 'Mathematical calculation accounting for object-fit and transforms',
         precision: 'Rounded to 0.1px for accuracy'
       });
     }
@@ -520,29 +493,25 @@ export default function PhotoRenderer({
     const hasAnyGaps = gapCount > 0;
     
     if (debug) {
-      console.log('🔍 Gap Detection (VISUAL DOM-BASED - ZOOM INDEPENDENT):', {
-        imageRect: {
-          left: imageRect.left.toFixed(1),
-          right: imageRect.right.toFixed(1),
-          top: imageRect.top.toFixed(1),
-          bottom: imageRect.bottom.toFixed(1),
-          width: imageRect.width.toFixed(1),
-          height: imageRect.height.toFixed(1)
+      console.log('🔍 Gap Detection (MATHEMATICAL - ACCURATE AT ALL ZOOM LEVELS):', {
+        photoPosition: {
+          left: photoEdges.left.toFixed(1),
+          right: photoEdges.right.toFixed(1),
+          top: photoEdges.top.toFixed(1),
+          bottom: photoEdges.bottom.toFixed(1),
+          width: mathResult.photoSize.width.toFixed(1),
+          height: mathResult.photoSize.height.toFixed(1)
         },
-        containerRect: {
-          left: containerRect.left.toFixed(1),
-          right: containerRect.right.toFixed(1),
-          top: containerRect.top.toFixed(1),
-          bottom: containerRect.bottom.toFixed(1),
+        containerSize: {
           width: containerRect.width.toFixed(1),
           height: containerRect.height.toFixed(1)
         },
-        visualGaps: {
+        detectedGaps: {
           left: gapLeft,
           right: gapRight,
           top: gapTop,
           bottom: gapBottom,
-          note: 'Based on actual visual positioning, independent of zoom level'
+          note: 'Calculated from actual photo bounds, not element bounds'
         },
         result: {
           significantGaps: { left: hasLeftGap, right: hasRightGap, top: hasTopGap, bottom: hasBottomGap },
@@ -579,7 +548,7 @@ export default function PhotoRenderer({
       };
     }
     
-  }, [debug]);
+  }, [debug, calculateMathematicalGaps, currentTransform]);
 
   // Post-snap gap validation - simulates gaps after movement to detect if photo is too small
   const detectPostSnapGaps = useCallback((
