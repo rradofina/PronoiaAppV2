@@ -723,41 +723,58 @@ export default function PhotoRenderer({
     // Calculate movement based on gaps (convert pixels to photoCenterX/Y units)
     let horizontalMovement = 0;
     let verticalMovement = 0;
-    let horizontalDescription = 'no change';
-    let verticalDescription = 'no change';
+    let horizontalDescription = '';
+    let verticalDescription = '';
     
-    // CRITICAL: photoCenterX/Y movement calculation
-    // CSS transform: translate((0.5 - photoCenterX) * 100%, ...)
-    // The percentage is relative to CONTAINER size due to absolute inset-0
-    // To move photo RIGHT by X pixels: translateX needs to increase by X
-    // Since translateX = (0.5 - photoCenterX) * containerWidth, 
-    // to increase translateX, we decrease photoCenterX
+    // CRITICAL: Understanding gaps and movement
+    // Gap on TOP = empty space above photo = photo is too LOW = needs to move UP
+    // Gap on BOTTOM = empty space below photo = photo is too HIGH = needs to move DOWN
+    // Gap on LEFT = empty space to left of photo = photo is too far RIGHT = needs to move LEFT
+    // Gap on RIGHT = empty space to right of photo = photo is too far LEFT = needs to move RIGHT
+    //
+    // CSS transform: translate((0.5 - photoCenterX) * containerWidth, ...)
+    // To move photo LEFT: translateX decreases, so photoCenterX must INCREASE
+    // To move photo RIGHT: translateX increases, so photoCenterX must DECREASE
+    // To move photo UP: translateY decreases, so photoCenterY must INCREASE
+    // To move photo DOWN: translateY increases, so photoCenterY must DECREASE
     
-    // Horizontal movement
+    // Horizontal movement - check BOTH left and right (for 2-gap cases)
+    // Note: We shouldn't have both left AND right gaps (that would be 4 gaps total)
+    // But we need separate if statements to handle 2-gap cases like left+top
     if (significantGaps.left) {
-      // Gap on left → photo needs to move RIGHT to close gap
-      // To move right by gap pixels: decrease photoCenterX
-      horizontalMovement = -(gaps.left / containerRect.width);
-      horizontalDescription = `move right ${gaps.left.toFixed(1)}px`;
-    } else if (significantGaps.right) {
-      // Gap on right → photo needs to move LEFT to close gap
-      // To move left by gap pixels: increase photoCenterX
-      horizontalMovement = (gaps.right / containerRect.width);
-      horizontalDescription = `move left ${gaps.right.toFixed(1)}px`;
+      // Gap on left → photo is too far right → needs to move LEFT
+      // To move left: increase photoCenterX
+      horizontalMovement = (gaps.left / containerRect.width);
+      horizontalDescription = `left ${gaps.left.toFixed(1)}px`;
+    }
+    if (significantGaps.right) {  // NOT else if - need to check both for proper 2-gap handling
+      // Gap on right → photo is too far left → needs to move RIGHT
+      // To move right: decrease photoCenterX
+      horizontalMovement = -(gaps.right / containerRect.width);
+      horizontalDescription = `right ${gaps.right.toFixed(1)}px`;
     }
     
-    // Vertical movement
+    // Vertical movement - check BOTH top and bottom (for 2-gap cases)
+    // Note: We shouldn't have both top AND bottom gaps (that would be 4 gaps total)
+    // But we need separate if statements to handle 2-gap cases like left+top
     if (significantGaps.top) {
-      // Gap on top → photo needs to move DOWN to close gap
-      // To move down by gap pixels: decrease photoCenterY
-      verticalMovement = -(gaps.top / containerRect.height);
-      verticalDescription = `move down ${gaps.top.toFixed(1)}px`;
-    } else if (significantGaps.bottom) {
-      // Gap on bottom → photo needs to move UP to close gap
-      // To move up by gap pixels: increase photoCenterY
-      verticalMovement = (gaps.bottom / containerRect.height);
-      verticalDescription = `move up ${gaps.bottom.toFixed(1)}px`;
+      // Gap on top → photo is too low → needs to move UP
+      // To move up: increase photoCenterY
+      verticalMovement = (gaps.top / containerRect.height);
+      verticalDescription = `up ${gaps.top.toFixed(1)}px`;
     }
+    if (significantGaps.bottom) {  // NOT else if - need to check both for proper 2-gap handling
+      // Gap on bottom → photo is too high → needs to move DOWN
+      // To move down: decrease photoCenterY
+      verticalMovement = -(gaps.bottom / containerRect.height);
+      verticalDescription = `down ${gaps.bottom.toFixed(1)}px`;
+    }
+    
+    // Combine descriptions for 2-gap cases
+    const movementDescriptions = {
+      horizontal: horizontalDescription || 'no change',
+      vertical: verticalDescription || 'no change'
+    };
     
     // Apply movements to current position (no artificial bounds - allow true edge positioning)
     const newCenterX = currentTransform.photoCenterX + horizontalMovement;
@@ -808,7 +825,7 @@ export default function PhotoRenderer({
       action: 'move-by-gaps',
       newCenterX,
       newCenterY,
-      movements: { horizontal: horizontalDescription, vertical: verticalDescription }
+      movements: movementDescriptions
     };
   }, [currentTransform, debug, detectPostSnapGaps]);
 
