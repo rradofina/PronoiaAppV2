@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-11] - Photo Viewer Black Flash Fix
+
+### Fixed
+- **Eliminated Black Flash in Photo Viewer**:
+  - File: `components/FullscreenPhotoViewer.tsx`
+  - Added `ProgressiveImage` component for smooth loading
+  - Shows thumbnail immediately (no black screen)
+  - Loads high-res (2400px) in background
+  - Smooth transition with subtle blur effect
+  - Preloads both thumbnail and high-res for adjacent photos
+  - Commit: `01ffddd`
+
 ## [2025-08-11] - Photo Viewer Resolution Enhancement
 
 ### Changed
