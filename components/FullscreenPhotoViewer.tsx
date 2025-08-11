@@ -224,12 +224,13 @@ export default function FullscreenPhotoViewer({
   const getFallbackUrls = (photo: Photo) => {
     const fallbacks = [];
     
-    // For fullscreen, prioritize high resolution first
+    // For fullscreen, prioritize high resolution first - optimized for tablets
     if (photo.thumbnailUrl) {
-      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s1600')); // =s1600 (high res for fullscreen)
+      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s2400')); // =s2400 (ultra high res for tablets)
+      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s1800')); // =s1800 (high quality)
       fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s1200')); // =s1200 (good quality)
       fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s800')); // =s800 (medium quality)
-      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s600')); // =s600 (lower quality)
+      fallbacks.push(photo.thumbnailUrl.replace('=s220', '=s600')); // =s600 (lower quality fallback)
     }
     
     // Try direct Google Drive link (often highest quality)
