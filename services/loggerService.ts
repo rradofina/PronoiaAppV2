@@ -69,26 +69,28 @@ export class LoggerService {
       this.logs.shift(); // Remove oldest log
     }
 
-    // Console output with formatting
-    const timestamp = entry.timestamp.toISOString().slice(11, 23);
-    const emoji = this.getLevelEmoji(level);
-    const categoryFormatted = `[${category}]`;
-    
-    const consoleMessage = `${timestamp} ${emoji} ${categoryFormatted} ${message}`;
-    
-    switch (level) {
-      case 'debug':
-        console.debug(consoleMessage, data || '');
-        break;
-      case 'info':
-        console.info(consoleMessage, data || '');
-        break;
-      case 'warn':
-        console.warn(consoleMessage, data || '');
-        break;
-      case 'error':
-        console.error(consoleMessage, data || '');
-        break;
+    // Console output with formatting (only in development or for errors)
+    if (process.env.NODE_ENV === 'development' || level === 'error') {
+      const timestamp = entry.timestamp.toISOString().slice(11, 23);
+      const emoji = this.getLevelEmoji(level);
+      const categoryFormatted = `[${category}]`;
+      
+      const consoleMessage = `${timestamp} ${emoji} ${categoryFormatted} ${message}`;
+      
+      switch (level) {
+        case 'debug':
+          console.debug(consoleMessage, data || '');
+          break;
+        case 'info':
+          console.info(consoleMessage, data || '');
+          break;
+        case 'warn':
+          console.warn(consoleMessage, data || '');
+          break;
+        case 'error':
+          console.error(consoleMessage, data || '');
+          break;
+      }
     }
   }
 

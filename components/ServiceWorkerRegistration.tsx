@@ -1,16 +1,19 @@
 import { useEffect } from 'react';
+import { logger } from '../services/loggerService';
 
 export default function ServiceWorkerRegistration() {
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
+    let updateInterval: NodeJS.Timeout;
+    
+    const handleLoad = () => {
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
         navigator.serviceWorker
           .register('/service-worker.js')
           .then((registration) => {
-            console.log('Service Worker registered successfully:', registration.scope);
+            logger.info('SERVICE_WORKER', 'Service Worker registered successfully', { scope: registration.scope });
             
             // Check for updates periodically
-            setInterval(() => {
+            updateInterval = setInterval(() => {
               registration.update();
             }, 60000); // Check every minute
             
@@ -21,17 +24,31 @@ export default function ServiceWorkerRegistration() {
                 newWorker.addEventListener('statechange', () => {
                   if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                     // New service worker available, prompt for update
-                    console.log('New content available; please refresh.');
+                    logger.info('SERVICE_WORKER', 'New content available; please refresh.');
                   }
                 });
               }
             });
           })
           .catch((error) => {
-            console.error('Service Worker registration failed:', error);
+            logger.error('SERVICE_WORKER', 'Service Worker registration failed', error);
           });
-      });
+      }
+    };
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('load', handleLoad);
     }
+    
+    // Cleanup function
+    return () => {
+      if (updateInterval) {
+        clearInterval(updateInterval);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('load', handleLoad);
+      }
+    };
   }, []);
 
   return null;

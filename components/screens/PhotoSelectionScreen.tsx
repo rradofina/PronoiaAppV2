@@ -2,6 +2,7 @@ import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType, PrintSize, Phot
 import { useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
+import toast from 'react-hot-toast';
 import InlineTemplateEditor from '../InlineTemplateEditor';
 import InlinePhotoEditor from '../InlinePhotoEditor';
 import FullscreenPhotoViewer from '../FullscreenPhotoViewer';
@@ -1373,8 +1374,14 @@ export default function PhotoSelectionScreen({
       console.log('✅ Template download completed');
     } catch (error) {
       console.error('❌ Template download failed:', error);
-      // TODO: Show user-friendly error message
-      alert(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Show user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Unable to download template. Please try again. ${errorMessage}`, {
+        duration: 5000,
+        style: {
+          maxWidth: '500px',
+        }
+      });
     }
   };
 

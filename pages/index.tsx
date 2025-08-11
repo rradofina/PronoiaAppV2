@@ -1007,19 +1007,14 @@ export default function Home() {
     }
 
     try {
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-      const clientSecret = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET; // Note: Client secret should be server-side, but for simplicity assuming it's available
-
-      const response = await fetch('https://oauth2.googleapis.com/token', {
+      // Call server-side API to refresh token securely
+      const response = await fetch('/api/auth/refresh', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/json'
         },
-        body: new URLSearchParams({
-          client_id: clientId || '',
-          client_secret: clientSecret || '', // WARNING: Client secret in client-side is insecure; move to server
-          refresh_token: refreshToken,
-          grant_type: 'refresh_token'
+        body: JSON.stringify({
+          refresh_token: refreshToken
         })
       });
 

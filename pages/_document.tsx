@@ -11,11 +11,6 @@ export default function Document() {
         <meta name="theme-color" content="#000000" />
         <meta name="msapplication-TileColor" content="#000000" />
         
-        {/* Mobile-optimized viewport configuration */}
-        <meta 
-          name="viewport" 
-          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, minimal-ui"
-        />
         
         {/* PWA and mobile app meta tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -33,9 +28,6 @@ export default function Document() {
         {/* Favicon */}
         <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-72x72.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-72x72.png" />
-        
-        {/* Splash screens for iOS */}
-        <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </Head>
       <body>

@@ -14,7 +14,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { email, setupKey } = req.body;
 
     // Basic security check - require a setup key
-    const expectedSetupKey = process.env.ADMIN_SETUP_KEY || 'setup-admin-2024';
+    const expectedSetupKey = process.env.ADMIN_SETUP_KEY;
+    if (!expectedSetupKey) {
+      console.error('ADMIN_SETUP_KEY environment variable is not configured');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
     if (setupKey !== expectedSetupKey) {
       return res.status(401).json({ error: 'Invalid setup key' });
     }

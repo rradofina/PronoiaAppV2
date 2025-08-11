@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-11] - Security Fixes and Code Quality Improvements
+
+### Security
+- **Removed Admin Setup Key Hardcoded Fallback**: 
+  - File: `pages/api/admin/setup.ts` (lines 17-24)
+  - Removed insecure fallback value `'setup-admin-2024'`
+  - Now requires `ADMIN_SETUP_KEY` environment variable to be set
+  - Returns proper error if not configured
+
+- **Fixed Token Refresh Security Issue**:
+  - Created new server-side endpoint: `pages/api/auth/refresh.ts`
+  - Updated client code in `pages/index.tsx` (lines 1009-1019)
+  - Removed attempt to use non-existent `NEXT_PUBLIC_GOOGLE_CLIENT_SECRET`
+  - Token refresh now handled securely server-side with `GOOGLE_OAUTH_SECRET`
+
+### Fixed
+- **Viewport Meta Tag Warning**:
+  - Moved viewport meta tag from `pages/_document.tsx` to `pages/_app.tsx`
+  - Added proper Next.js Head import and implementation
+  - Removed duplicate from _document.tsx (lines 14-18)
+
+- **Service Worker Memory Leak**:
+  - File: `components/ServiceWorkerRegistration.tsx`
+  - Added cleanup function to clear setInterval on unmount
+  - Added cleanup for window 'load' event listener
+  - Properly track interval ID for cleanup
+
+- **Duplicate Meta Tags**:
+  - File: `pages/_document.tsx`
+  - Removed duplicate `apple-mobile-web-app-capable` meta tag (line 38)
+  - Cleaned up redundant metadata
+
+### Changed
+- **Console Logging Improvements**:
+  - Updated `services/loggerService.ts` to only output console logs in development or for errors
+  - Updated `components/ServiceWorkerRegistration.tsx` to use logger service
+  - Production builds now have minimal console output
+
+- **TODO Comments Resolved**:
+  - `components/screens/PhotoSelectionScreen.tsx` (line 1376): Added user-friendly toast error message
+  - `services/templateExportService.ts` (line 142): Documented duplicate handling strategy
+  - `services/templateExportService.ts` (line 480): Added detailed error message for Drive upload requirement
+
+### Added
+- **Environment Variables Documentation**:
+  - Created `.env.example` file with all required environment variables
+  - Includes setup instructions and generation commands
+  - Documents optional configuration values
+
 ## [2025-08-10] - Complete A4 Template Display Fix & Template Matching Bug
 
 ### Fixed  

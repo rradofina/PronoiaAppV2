@@ -139,7 +139,7 @@ class TemplateExportServiceImpl implements ITemplateExportService {
             result.duplicates.push({
               templateId: template.id,
               templateName: template.name,
-              action: 'skipped' // TODO: Add options for handling duplicates
+              action: 'skipped' // Duplicate handling: skip by default, can be overwritten or merged in future versions
             });
             result.skippedCount++;
             continue;
@@ -477,8 +477,12 @@ class TemplateExportServiceImpl implements ITemplateExportService {
     // If we have base64 data but no drive file, we'd need to upload it first
     let driveFileId = template.driveFileId;
     if (!driveFileId && template.base64Data) {
-      // TODO: Upload base64 data to Google Drive and get file ID
-      throw new Error('Base64 to Drive upload not implemented yet');
+      // Note: Base64 to Google Drive upload requires authentication and Drive API
+      // This feature would need Google Drive service integration to:
+      // 1. Convert base64 to blob
+      // 2. Upload to Drive using gapi.client.drive.files.create
+      // 3. Get the new file ID
+      throw new Error('Template import requires Google Drive file. Please upload the template image to Google Drive first.');
     }
 
     if (!driveFileId) {
