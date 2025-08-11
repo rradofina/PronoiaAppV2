@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Photo, TemplateSlot } from '../types';
 import { photoCacheService } from '../services/photoCacheService';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
-import { usePinchZoom } from '../hooks/usePinchZoom';
+import ZoomableImage from './ZoomableImage';
 
 interface FullscreenPhotoViewerProps {
   photo: Photo;
@@ -228,31 +228,7 @@ export default function FullscreenPhotoViewer({
   const [swipeProgress, setSwipeProgress] = useState(0); // -1 to 1 for swipe animation
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [photoOffset, setPhotoOffset] = useState(0); // Tracks which photo set we're showing
-  
-  // Pinch zoom setup
-  const photoContainerRef = useRef<HTMLDivElement | null>(null);
-  const { 
-    zoomState, 
-    isZoomed, 
-    isPinching, 
-    resetZoom, 
-    handlers: zoomHandlers,
-    setContainerRef 
-  } = usePinchZoom({
-    minScale: 1,
-    maxScale: 4,
-    doubleTapScale: 2.5,
-    onZoomChange: (scale) => {
-      console.log(`🔍 Zoom level: ${scale.toFixed(2)}x`);
-    }
-  });
-  
-  // Reset zoom when photo changes
-  useEffect(() => {
-    if (isZoomed) {
-      resetZoom();
-    }
-  }, [currentPhotoIndex]);
+  const [isZoomed, setIsZoomed] = useState(false); // Track zoom state for current photo
   
   // Navigation handlers (defined early for use in swipe hook)
   const handlePrevious = () => {
@@ -276,6 +252,11 @@ export default function FullscreenPhotoViewer({
       console.error('Invalid next index:', newIndex);
     }
   };
+  
+  // Reset zoom when photo changes
+  useEffect(() => {
+    setIsZoomed(false);
+  }, [currentPhotoIndex]);
   
   // Swipe gesture setup - MUST be before any conditional returns
   const { handlers: swipeHandlers, isSwiping } = useSwipeGesture({
@@ -449,16 +430,9 @@ export default function FullscreenPhotoViewer({
 
       {/* Photo Display - Carousel Container */}
       <div 
-        ref={(ref) => {
-          if (ref) {
-            photoContainerRef.current = ref;
-            setContainerRef(ref);
-          }
-        }}
         className="flex-1 flex items-center justify-center relative min-h-0 overflow-hidden"
         {...(!isZoomed ? swipeHandlers : {})}
-        {...zoomHandlers}
-        style={{ touchAction: isZoomed ? 'none' : 'pan-y' }}
+        style={{ touchAction: 'none' }}
       >
         {/* Previous Button */}
         <button
@@ -466,10 +440,7 @@ export default function FullscreenPhotoViewer({
             e.preventDefault();
             e.stopPropagation();
             // Don't allow navigation when zoomed
-            if (isZoomed) {
-              resetZoom();
-              return;
-            }
+            if (isZoomed) return;
             console.log('🔙 Previous button clicked');
             handlePrevious();
           }}
@@ -498,26 +469,36 @@ export default function FullscreenPhotoViewer({
                 key={`${photo.id}-${offset}`}
                 className="absolute w-full h-full flex items-center justify-center"
                 style={{
-                  transform: `translateX(${finalPosition}%)${
-                    offset === 0 ? ` scale(${zoomState.scale}) translate(${zoomState.x / zoomState.scale}px, ${zoomState.y / zoomState.scale}px)` : ''
-                  }`,
-                  transition: isTransitioning && !isSwiping && !isPinching ? 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
-                  transformOrigin: 'center center'
+                  transform: `translateX(${finalPosition}%)`,
+                  transition: isTransitioning && !isSwiping ? 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+                  pointerEvents: offset === 0 ? 'auto' : 'none', // Only current photo can be interacted with
                 }}
               >
-                <ProgressiveImage
-                  photo={photo}
-                  lowResSrc={photo.thumbnailUrl || photo.url} // Start with thumbnail
-                  highResSrc={photo.thumbnailUrl ? photo.thumbnailUrl.replace('=s220', '=s2400') : photo.url} // Load high res
-                  alt={photo.name}
-                  className="max-w-full max-h-full object-contain select-none"
-                  imageCache={imageCache}
-                  onHighResLoad={() => {
-                    if (offset === 0) {
-                      console.log(`✅ High-res loaded: ${photo.name}`);
-                    }
-                  }}
-                />
+                {offset === 0 ? (
+                  // Current photo - use ZoomableImage for zoom support
+                  <ZoomableImage
+                    lowResSrc={photo.thumbnailUrl || photo.url}
+                    highResSrc={photo.thumbnailUrl ? photo.thumbnailUrl.replace('=s220', '=s2400') : photo.url}
+                    alt={photo.name}
+                    className="w-full h-full"
+                    onZoomChange={setIsZoomed}
+                    imageCache={imageCache}
+                    photoId={photo.id}
+                  />
+                ) : (
+                  // Adjacent photos - use regular ProgressiveImage
+                  <ProgressiveImage
+                    photo={photo}
+                    lowResSrc={photo.thumbnailUrl || photo.url}
+                    highResSrc={photo.thumbnailUrl ? photo.thumbnailUrl.replace('=s220', '=s2400') : photo.url}
+                    alt={photo.name}
+                    className="max-w-full max-h-full object-contain select-none"
+                    imageCache={imageCache}
+                    onHighResLoad={() => {
+                      console.log(`✅ Preloaded: ${photo.name}`);
+                    }}
+                  />
+                )}
               </div>
             );
           })}
@@ -529,10 +510,7 @@ export default function FullscreenPhotoViewer({
             e.preventDefault();
             e.stopPropagation();
             // Don't allow navigation when zoomed
-            if (isZoomed) {
-              resetZoom();
-              return;
-            }
+            if (isZoomed) return;
             console.log('➡️ Next button clicked');
             handleNext();
           }}

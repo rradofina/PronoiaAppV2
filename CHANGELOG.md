@@ -7,18 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2025-08-11] - Pinch Zoom and Photo Viewer Enhancements
+## [2025-08-11] - Complete Photo Viewer Zoom Fixes
+
+### Fixed
+- **Zoom State Not Resetting**:
+  - File: `components/ZoomableImage.tsx`
+  - Issue: Swipe navigation stayed disabled after zooming back to 1x
+  - Root Cause: onZoomChange only called when setting target, not during animation
+  - Solution: Track zoom state in animation loop with 1.01 threshold
+  - Now properly enables swipe when scale returns close to 1.0
+  - Commit: Current
+
+## [2025-08-11] - Photo Viewer Centering and Progressive Loading
+
+### Fixed
+- **Photo Centering in Viewer**:
+  - File: `components/ZoomableImage.tsx`
+  - Added `flex items-center justify-center` to container
+  - Photos now properly centered in viewport
+  - Commit: Current
+
+- **Black Flash Completely Eliminated**:
+  - File: `components/ZoomableImage.tsx`
+  - Added progressive loading support to ZoomableImage
+  - Shows low-res thumbnail immediately
+  - Loads high-res in background with blur transition
+  - Uses same image cache as ProgressiveImage
+  - Commit: Current
+
+- **Auto-Recenter on Zoom Out**:
+  - File: `components/ZoomableImage.tsx`
+  - Automatically resets to center when scale <= 1.0
+  - Added rubber band effect when pinching below minimum
+  - Bounce-back animation when releasing under-zoom
+  - Smooth spring-like return to center
+  - Commit: Current
+
+## [2025-08-11] - Smooth Zoom Implementation and Photo Viewer Enhancements
 
 ### Added
-- **Pinch-to-Zoom Functionality**:
-  - File: `hooks/usePinchZoom.ts` (new file)
-  - Full multi-touch pinch gesture support
-  - Zoom range from 1x to 4x
-  - Double-tap to zoom in/out (2.5x zoom level)
-  - Pan support when zoomed in with boundary constraints
-  - Smooth zoom animations and transitions
-  - Prevents swipe navigation when zoomed
-  - Commit: Pending
+- **ZoomableImage Component with Buttery Smooth Zoom**:
+  - File: `components/ZoomableImage.tsx` (new file)
+  - **Smooth 60fps animations** using requestAnimationFrame with easing
+  - **Multi-platform support**:
+    - Touch: Pinch-to-zoom with two fingers
+    - Mouse: Ctrl+scroll wheel zoom
+    - Trackpad: Native pinch gestures
+    - Click-and-drag panning when zoomed
+  - **Smart zoom features**:
+    - Zoom range from 1x to 5x
+    - Double-tap to zoom (2.5x) with focus on tap point
+    - Zoom centers on cursor/pinch point
+    - Constrained panning within image bounds
+  - **Smooth interpolation** with 0.15 easing factor for natural feel
+  - Commit: `271951f` (initial), current (improved)
 
 ### Fixed
 - **Eliminated Black Flash on Photo Navigation**:
@@ -29,15 +71,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Only shows blur effect for truly new images, not cached ones
   - Maintains photo ID tracking to prevent unnecessary reloads
   - Impact: Smooth, instant transitions between photos without black flash
-  - Commit: Pending
+  - Commit: `271951f`
 
 ### Changed
-- **Enhanced Photo Viewer Touch Controls**:
-  - Integrated pinch zoom with existing swipe gestures
-  - Navigation buttons disabled when zoomed (tap to reset zoom)
-  - Touch action dynamically adjusts based on zoom state
-  - Added `select-none` class to prevent text selection on images
-  - Transform origin set to center for natural zoom behavior
+- **Complete Zoom System Rewrite**:
+  - Replaced `usePinchZoom` hook with dedicated `ZoomableImage` component
+  - Separated zoom container from carousel for clean gesture handling
+  - Only current photo uses ZoomableImage (adjacent photos use ProgressiveImage)
+  - Smooth real-time zoom updates instead of instant state changes
+  - All input methods now supported (touch, mouse, trackpad)
+  - Transform calculations simplified for smoother performance
+
+### Removed
+- **Removed usePinchZoom Hook**: Replaced with better ZoomableImage component
 
 ## [2025-08-11] - Photo Viewer Black Flash Fix
 
