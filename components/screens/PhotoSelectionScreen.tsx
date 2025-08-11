@@ -18,6 +18,7 @@ import PngTemplateVisual from '../PngTemplateVisual';
 import PhotoGrid from '../PhotoGrid';
 import TemplateGrid from '../TemplateGrid';
 import TemplateSelectionModal from '../TemplateSelectionModal';
+import AddPrintsModal from '../AddPrintsModal';
 import FavoritesBar from '../FavoritesBar';
 import OriginalTemplateVisual from '../TemplateVisual';
 import { setupViewportHandler, getViewportInfo } from '../../utils/viewportUtils';
@@ -308,11 +309,6 @@ export default function PhotoSelectionScreen({
   });
   
   const [editingTemplate, setEditingTemplate] = useState<TemplateSlot[] | null>(null);
-  const [showAddPrintModal, setShowAddPrintModal] = useState(false);
-  const [selectedType, setSelectedType] = useState<TemplateType | null>(null);
-  const [selectedSize, setSelectedSize] = useState<PrintSize>('');
-  const [availablePrintSizes, setAvailablePrintSizes] = useState<{name: PrintSize; label: string}[]>([]);
-  const [addPrintQuantity, setAddPrintQuantity] = useState(1);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<ManualTemplate[]>([]);
   const [isApplyingPhoto, setIsApplyingPhoto] = useState(false);
@@ -372,6 +368,9 @@ export default function PhotoSelectionScreen({
   const [templateToChange, setTemplateToChange] = useState<{template: ManualTemplate, index: number} | null>(null);
   const [templateToView, setTemplateToView] = useState<{ templateId: string; templateName: string; slots: TemplateSlot[] } | null>(null);
   const [templateReplacements, setTemplateReplacements] = useState<Record<number, ManualTemplate>>({});
+  
+  // Add Prints modal state
+  const [showAddPrintsModal, setShowAddPrintsModal] = useState(false);
 
   // Setup viewport handling for iPad Safari compatibility
   useEffect(() => {
@@ -449,29 +448,6 @@ export default function PhotoSelectionScreen({
     loadTemplates();
   }, []);
 
-  // Load available print sizes dynamically
-  useEffect(() => {
-    const loadPrintSizes = async () => {
-      try {
-        const printSizeConfigs = await printSizeService.getAvailablePrintSizes();
-        const printSizeOptions = printSizeConfigs.map(config => ({
-          name: config.name,
-          label: config.label
-        }));
-        setAvailablePrintSizes(printSizeOptions);
-        
-        // Set default print size if none selected
-        if (!selectedSize && printSizeOptions.length > 0) {
-          setSelectedSize(printSizeOptions[0].name);
-        }
-      } catch (error) {
-        console.error('Error loading print sizes:', error);
-        setAvailablePrintSizes([]);
-      }
-    };
-    
-    loadPrintSizes();
-  }, [selectedSize]);
 
   // No auto-selection - user must manually select slots
   // This gives the user full control over which slot to work with
@@ -497,50 +473,31 @@ export default function PhotoSelectionScreen({
     setTemplateSlots(updatedSlots);
   };
 
-  const openAddPrintModal = () => {
-    setAddPrintQuantity(1); // Reset quantity when opening the modal
-    setShowAddPrintModal(true);
-  };
 
-  const handleConfirmAddPrint = () => {
-    if (selectedType) {
-      // Find template from database templates
-      const template = availableTemplates.find((t: ManualTemplate) => 
-        t.template_type === selectedType && t.print_size === selectedSize
-      );
-      
-      if (template) {
-        const newSlotsToAdd: TemplateSlot[] = [];
-        // Find the next available index for a new template to ensure unique IDs
-        const existingTemplateIds = new Set(templateSlots.map(s => s.templateId));
-        const nextTemplateIndex = existingTemplateIds.size;
-        
-        for (let i = 0; i < addPrintQuantity; i++) {
-          const newTemplateId = `${template.id}_${nextTemplateIndex + i}`;
-          
-          for (let slotIndex = 0; slotIndex < template.holes_data.length; slotIndex++) {
-            newSlotsToAdd.push({
-              id: `${newTemplateId}_${slotIndex}`,
-              templateId: newTemplateId,
-              templateName: `${template.name} (Additional)`,
-              templateType: selectedType,
-              printSize: selectedSize,
-              slotIndex,
-              photoId: undefined
-            });
-          }
-        }
-        setTemplateSlots([...templateSlots, ...newSlotsToAdd]);
-      } else {
-        console.error('❌ Template not found for type:', selectedType, 'size:', selectedSize);
-      }
+  const handleTemplateAdd = (template: ManualTemplate) => {
+    // Create new slots for the added template
+    const newSlotsToAdd: TemplateSlot[] = [];
+    
+    // Find the next available index for a new template to ensure unique IDs
+    const existingTemplateIds = new Set(templateSlots.map(s => s.templateId));
+    const nextTemplateIndex = existingTemplateIds.size;
+    
+    const newTemplateId = `${template.id}_${nextTemplateIndex}`;
+    
+    for (let slotIndex = 0; slotIndex < template.holes_data.length; slotIndex++) {
+      newSlotsToAdd.push({
+        id: `${newTemplateId}_${slotIndex}`,
+        templateId: newTemplateId,
+        templateName: `${template.name} (Additional)`,
+        templateType: template.template_type as TemplateType,
+        printSize: template.print_size as PrintSize,
+        slotIndex,
+        photoId: undefined
+      });
     }
-    setShowAddPrintModal(false);
-    setSelectedType(null);
-    // Reset to first available print size instead of hardcoded '4R'
-    if (availablePrintSizes.length > 0) {
-      setSelectedSize(availablePrintSizes[0].name);
-    }
+    
+    setTemplateSlots([...templateSlots, ...newSlotsToAdd]);
+    toast.success(`Added ${template.name} template`);
   };
 
   const handleDeletePrint = (templateIdToDelete: string) => {
@@ -1400,7 +1357,7 @@ export default function PhotoSelectionScreen({
       const allTemplates = await manualTemplateService.getAllTemplates();
       const manualTemplate = allTemplates.find(t => 
         t.template_type === firstSlot.templateType && 
-        t.print_size === (firstSlot.printSize || (availablePrintSizes.length > 0 ? availablePrintSizes[0].name : ''))
+        t.print_size === (firstSlot.printSize || '4R')
       );
 
       if (!manualTemplate) {
@@ -1540,6 +1497,19 @@ export default function PhotoSelectionScreen({
               >
                 ← Back
               </button>
+              
+              {/* Add Prints button - only in print mode */}
+              {selectionMode === 'print' && (
+                <button
+                  onClick={() => setShowAddPrintsModal(true)}
+                  className={`px-4 py-2 rounded-lg font-medium bg-green-600 text-white hover:bg-green-700 transition-all duration-200 flex items-center gap-2 ${
+                    viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
+                  }`}
+                >
+                  <span className="text-lg">+</span>
+                  <span>Add Prints</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1685,118 +1655,13 @@ export default function PhotoSelectionScreen({
         />
       )}
 
-      <Transition appear show={showAddPrintModal} as={Fragment}>
-        <Dialog as="div" className="relative z-10" onClose={() => setShowAddPrintModal(false)}>
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-black bg-opacity-25" />
-          </Transition.Child>
-
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4 text-center">
-              <Transition.Child
-                as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 scale-95"
-                enterTo="opacity-100 scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 scale-100"
-                leaveTo="opacity-0 scale-95"
-              >
-                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-                  <Dialog.Title
-                    as="h3"
-                    className="text-lg font-medium leading-6 text-gray-900"
-                  >
-                    Add New Print
-                  </Dialog.Title>
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700">PNG Template</label>
-                    <select
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      value={selectedType || ''}
-                      onChange={(e) => setSelectedType(e.target.value as TemplateType)}
-                    >
-                      <option value="">Select template</option>
-                      {availableTemplates
-                        .filter((t: ManualTemplate) => t.print_size === selectedSize)
-                        .map((t: ManualTemplate) => (
-                          <option key={t.id} value={t.template_type}>
-                            {t.name} ({t.holes_data.length} slots)
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700">Print Size</label>
-                    <select
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      value={selectedSize}
-                      onChange={(e) => setSelectedSize(e.target.value as PrintSize)}
-                      disabled={!selectedType}
-                    >
-                      {availablePrintSizes.map(size => (
-                        <option key={size.name} value={size.name}>
-                          {size.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700">Quantity</label>
-                    <div className="mt-1 flex items-center rounded-md border border-gray-300 w-min">
-                      <button
-                        type="button"
-                        className="px-3 py-1 border-r border-gray-300 text-gray-600 hover:bg-gray-100 rounded-l-md"
-                        onClick={() => setAddPrintQuantity(q => Math.max(1, q - 1))}
-                      >
-                        -
-                      </button>
-                      <input
-                        type="text"
-                        readOnly
-                        value={addPrintQuantity}
-                        className="w-12 text-center border-none bg-transparent"
-                      />
-                      <button
-                        type="button"
-                        className="px-3 py-1 border-l border-gray-300 text-gray-600 hover:bg-gray-100 rounded-r-md"
-                        onClick={() => setAddPrintQuantity(q => q + 1)}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mt-6 flex justify-end space-x-3">
-                    <button
-                      type="button"
-                      className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                      onClick={() => setShowAddPrintModal(false)}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700"
-                      onClick={handleConfirmAddPrint}
-                      disabled={!selectedType}
-                    >
-                      Add
-                    </button>
-                  </div>
-                </Dialog.Panel>
-              </Transition.Child>
-            </div>
-          </div>
-        </Dialog>
-      </Transition>
+      {/* Add Prints Modal */}
+      <AddPrintsModal
+        isOpen={showAddPrintsModal}
+        onClose={() => setShowAddPrintsModal(false)}
+        onTemplateAdd={handleTemplateAdd}
+        availablePhotos={photos}
+      />
 
       {/* New Workflow Components */}
       

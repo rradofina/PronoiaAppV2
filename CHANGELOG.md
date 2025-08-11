@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-11] - Add Prints Button in Fill Templates Screen
+
+### Added
+- **Add Prints Button in Template Filling Mode**:
+  - File: `components/screens/PhotoSelectionScreen.tsx`
+  - Added green "Add Prints" button next to Back button in header
+  - Only visible in print mode (Fill Templates)
+  - Uses same AddPrintsModal component as Package Selection screen
+  - Consistent UI/UX across screens
+  - Commit: Current
+
+### Changed
+- **Replaced Simple Modal with AddPrintsModal**:
+  - Removed basic template addition dialog
+  - Now uses full-featured AddPrintsModal with better template selection
+  - Supports all print sizes and template types
+  - Better visual preview of templates
+
+### Removed
+- **Old Add Print Implementation**:
+  - Removed simple modal dialog (lines 1685-1796)
+  - Removed unused state variables and handlers
+  - Cleaned up unnecessary print size loading logic
+
 ## [2025-08-11] - Complete Photo Viewer Zoom Fixes
 
 ### Fixed
