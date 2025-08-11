@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-11] - Template Change Functionality Fix
+
+### Fixed
+- **Template Change in Fill Templates Screen**:
+  - Replaced complex `TemplateSwapModal` with simpler `TemplateSelectionModal`
+  - Files: `components/screens/PhotoSelectionScreen.tsx`, `components/TemplateGrid.tsx`
+  - Now uses position-based replacement like Select Package screen
+  - Fixes template matching by unique ID instead of generic type
+  - Preserves photo assignments correctly when changing templates
+  - Resolves issues with A4, 5R, and 4R template confusion
+  - Commit: `9e8654c`
+
+### Changed
+- **Simplified Template Swap Logic**:
+  - Track template index for position-based replacement
+  - Keep original slots unchanged, only update template reference
+  - Reset transforms for recalculation with new template dimensions
+  - Consistent behavior between Select Package and Fill Templates screens
+
 ## [2025-08-11] - Security Fixes and Code Quality Improvements
 
 ### Security
