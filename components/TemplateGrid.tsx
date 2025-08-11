@@ -7,7 +7,7 @@ interface TemplateGridProps {
   photos: Photo[];
   selectedSlot: TemplateSlot | null;
   onSlotClick: (slot: TemplateSlot) => void;
-  onSwapTemplate?: (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => void;
+  onSwapTemplate?: (template: { templateId: string; templateName: string; slots: TemplateSlot[] }, index: number) => void;
   onDeleteTemplate?: (templateId: string) => void;
   onDownloadTemplate?: (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => void;
   TemplateVisual: React.ComponentType<any>;
@@ -308,7 +308,7 @@ export default function TemplateGrid({
                         console.log('🚫 Template swap blocked - editing in progress');
                         return;
                       }
-                      onSwapTemplate({ templateId, templateName, slots });
+                      onSwapTemplate({ templateId, templateName, slots }, index);
                     }}
                     className={`bg-gray-500 text-white px-2 sm:px-3 py-1 rounded-md text-xs font-medium hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 shadow-sm ${
                       isEditingMode ? 'opacity-50 cursor-not-allowed' : ''

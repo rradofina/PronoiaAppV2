@@ -17,7 +17,7 @@ import { photoCacheService } from '../../services/photoCacheService';
 import PngTemplateVisual from '../PngTemplateVisual';
 import PhotoGrid from '../PhotoGrid';
 import TemplateGrid from '../TemplateGrid';
-import TemplateSwapModal from '../TemplateSwapModal';
+import TemplateSelectionModal from '../TemplateSelectionModal';
 import FavoritesBar from '../FavoritesBar';
 import OriginalTemplateVisual from '../TemplateVisual';
 import { setupViewportHandler, getViewportInfo } from '../../utils/viewportUtils';
@@ -368,9 +368,10 @@ export default function PhotoSelectionScreen({
   const [showIncompleteWarning, setShowIncompleteWarning] = useState(false);
   
   // Template management states (simplified)
-  const [showTemplateSwapper, setShowTemplateSwapper] = useState(false);
-  const [templateToSwap, setTemplateToSwap] = useState<{ templateId: string; templateName: string; slots: TemplateSlot[] } | null>(null);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateToChange, setTemplateToChange] = useState<{template: ManualTemplate, index: number} | null>(null);
   const [templateToView, setTemplateToView] = useState<{ templateId: string; templateName: string; slots: TemplateSlot[] } | null>(null);
+  const [templateReplacements, setTemplateReplacements] = useState<Record<number, ManualTemplate>>({});
 
   // Setup viewport handling for iPad Safari compatibility
   useEffect(() => {
@@ -1296,42 +1297,93 @@ export default function PhotoSelectionScreen({
     return photos; // Photo mode shows all photos normally
   };
 
-  // Template management handlers
-
-  const handleConfirmTemplateSwap = (newTemplate: ManualTemplate, updatedSlots: TemplateSlot[]) => {
-    console.log('🔄 PhotoSelectionScreen - Template swap confirmed:', {
-      newTemplate: {
-        id: newTemplate.id,
-        name: newTemplate.name,
-        template_type: newTemplate.template_type
-      },
-      updatedSlotsCount: updatedSlots.length,
-      updatedSlots: updatedSlots.map(s => ({ 
-        id: s.id, 
-        templateId: s.templateId, 
-        templateType: s.templateType, 
-        photoId: s.photoId 
-      }))
+  // Get template groups for tracking positions
+  const getTemplateGroups = () => {
+    const groups: { templateId: string; templateName: string; slots: TemplateSlot[] }[] = [];
+    const groupMap = new Map<string, TemplateSlot[]>();
+    
+    templateSlots.forEach(slot => {
+      if (!groupMap.has(slot.templateId)) {
+        groupMap.set(slot.templateId, []);
+      }
+      groupMap.get(slot.templateId)?.push(slot);
     });
     
-    // Force React to detect the change by creating completely new array with new object references
-    const forceUpdatedSlots = updatedSlots.map(slot => ({ ...slot }));
+    groupMap.forEach((slots, templateId) => {
+      if (slots.length > 0) {
+        groups.push({
+          templateId,
+          templateName: slots[0].templateName,
+          slots
+        });
+      }
+    });
     
-    console.log('🔄 PhotoSelectionScreen - Setting template slots with forced new references');
-    setTemplateSlots(forceUpdatedSlots);
-    setTemplateToSwap(null);
-    console.log('🔄 PhotoSelectionScreen - Template swap state update completed');
+    return groups;
+  };
+
+  // Template management handlers
+
+  const handleConfirmTemplateSwap = (newTemplate: ManualTemplate) => {
+    if (!templateToChange) return;
+    
+    console.log('🔄 Template replacement confirmed:', {
+      position: templateToChange.index,
+      oldTemplate: templateToChange.template.name,
+      newTemplate: newTemplate.name
+    });
+    
+    // Store the replacement by position
+    setTemplateReplacements(prev => ({
+      ...prev,
+      [templateToChange.index]: newTemplate
+    }));
+    
+    // Update slots for the new template (only update templateType to new template ID)
+    const templateGroups = getTemplateGroups();
+    const targetGroup = templateGroups[templateToChange.index];
+    if (targetGroup) {
+      const updatedSlots = templateSlots.map(slot => {
+        if (slot.templateId === targetGroup.templateId) {
+          return {
+            ...slot,
+            templateType: newTemplate.id.toString(), // Update to new template ID
+            // Keep photo assignments but reset transforms for recalculation
+            transform: undefined
+          };
+        }
+        return slot;
+      });
+      setTemplateSlots(updatedSlots);
+    }
+    
+    setShowTemplateModal(false);
+    setTemplateToChange(null);
   };
 
   const handleCloseTemplateSwap = () => {
-    setShowTemplateSwapper(false);
-    setTemplateToSwap(null);
+    setShowTemplateModal(false);
+    setTemplateToChange(null);
   };
 
-  const handleSwapTemplate = (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => {
-    console.log('🔄 Template swap requested:', template);
-    setTemplateToSwap(template);
-    setShowTemplateSwapper(true);
+  const handleSwapTemplate = (template: { templateId: string; templateName: string; slots: TemplateSlot[] }, index: number) => {
+    console.log('🔄 Template change requested:', { template: template.templateName, index });
+    
+    // Get the current template for this position
+    const currentSlot = template.slots[0];
+    if (!currentSlot) return;
+    
+    // Find the manual template for this position
+    manualTemplateService.getAllTemplates().then(allTemplates => {
+      const currentTemplate = allTemplates.find(t => 
+        t.id.toString() === currentSlot.templateType
+      );
+      
+      if (currentTemplate) {
+        setTemplateToChange({ template: currentTemplate, index });
+        setShowTemplateModal(true);
+      }
+    });
   };
 
   const handleDownloadTemplate = async (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => {
@@ -1793,17 +1845,16 @@ export default function PhotoSelectionScreen({
       />
 
 
-      {/* Template Swapper Modal */}
-      <TemplateSwapModal
-        isOpen={showTemplateSwapper}
-        onClose={handleCloseTemplateSwap}
-        templateToSwap={templateToSwap}
-        templateSlots={templateSlots}
-        photos={photos}
-        selectedPackage={selectedPackage as ManualPackage}
-        onConfirmSwap={handleConfirmTemplateSwap}
-        TemplateVisual={TemplateVisual}
-      />
+      {/* Template Selection Modal */}
+      {templateToChange && (
+        <TemplateSelectionModal
+          isOpen={showTemplateModal}
+          onClose={handleCloseTemplateSwap}
+          currentTemplate={templateToChange}
+          availablePhotos={photos}
+          onTemplateSelect={handleConfirmTemplateSwap}
+        />
+      )}
 
       {/* Incomplete Slots Warning Dialog */}
       <Transition appear show={showIncompleteWarning} as={Fragment}>
