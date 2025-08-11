@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-11] - Pinch Zoom and Photo Viewer Enhancements
+
+### Added
+- **Pinch-to-Zoom Functionality**:
+  - File: `hooks/usePinchZoom.ts` (new file)
+  - Full multi-touch pinch gesture support
+  - Zoom range from 1x to 4x
+  - Double-tap to zoom in/out (2.5x zoom level)
+  - Pan support when zoomed in with boundary constraints
+  - Smooth zoom animations and transitions
+  - Prevents swipe navigation when zoomed
+  - Commit: Pending
+
+### Fixed
+- **Eliminated Black Flash on Photo Navigation**:
+  - File: `components/FullscreenPhotoViewer.tsx`
+  - Root Cause: ProgressiveImage component was resetting state for every photo change
+  - Solution: Enhanced image caching to detect when photos are already loaded
+  - Now checks imageCache before resetting image state
+  - Only shows blur effect for truly new images, not cached ones
+  - Maintains photo ID tracking to prevent unnecessary reloads
+  - Impact: Smooth, instant transitions between photos without black flash
+  - Commit: Pending
+
+### Changed
+- **Enhanced Photo Viewer Touch Controls**:
+  - Integrated pinch zoom with existing swipe gestures
+  - Navigation buttons disabled when zoomed (tap to reset zoom)
+  - Touch action dynamically adjusts based on zoom state
+  - Added `select-none` class to prevent text selection on images
+  - Transform origin set to center for natural zoom behavior
+
 ## [2025-08-11] - Photo Viewer Black Flash Fix
 
 ### Fixed

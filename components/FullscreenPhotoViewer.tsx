@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Photo, TemplateSlot } from '../types';
 import { photoCacheService } from '../services/photoCacheService';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
+import { usePinchZoom } from '../hooks/usePinchZoom';
 
 interface FullscreenPhotoViewerProps {
   photo: Photo;
@@ -23,7 +24,8 @@ const ProgressiveImage = ({
   highResSrc, 
   alt, 
   className,
-  onHighResLoad
+  onHighResLoad,
+  imageCache
 }: {
   photo: Photo;
   lowResSrc: string;
@@ -31,32 +33,55 @@ const ProgressiveImage = ({
   alt: string;
   className: string;
   onHighResLoad?: () => void;
+  imageCache: React.MutableRefObject<Map<string, { url: string; loaded: boolean }>>;
 }) => {
-  const [currentSrc, setCurrentSrc] = useState(lowResSrc);
-  const [isHighResLoaded, setIsHighResLoaded] = useState(false);
+  // Check if we already have this image cached
+  const cached = imageCache.current.get(photo.id);
+  const [currentSrc, setCurrentSrc] = useState(cached?.loaded ? cached.url : lowResSrc);
+  const [isHighResLoaded, setIsHighResLoaded] = useState(cached?.loaded || false);
   const highResRef = useRef<HTMLImageElement | null>(null);
+  const lastPhotoId = useRef<string>(photo.id);
   
   useEffect(() => {
-    // Reset when photo changes
-    setCurrentSrc(lowResSrc);
-    setIsHighResLoaded(false);
-    
-    // Load high res in background
-    const img = new Image();
-    img.src = highResSrc;
-    img.onload = () => {
-      setIsHighResLoaded(true);
-      setCurrentSrc(highResSrc);
-      if (onHighResLoad) onHighResLoad();
-    };
-    highResRef.current = img;
+    // Only reset if it's actually a different photo
+    if (photo.id !== lastPhotoId.current) {
+      lastPhotoId.current = photo.id;
+      
+      // Check cache first
+      const cached = imageCache.current.get(photo.id);
+      if (cached?.loaded) {
+        // Already have high-res cached, use it immediately
+        setCurrentSrc(cached.url);
+        setIsHighResLoaded(true);
+        return;
+      }
+      
+      // Not cached, start with low res
+      setCurrentSrc(lowResSrc);
+      setIsHighResLoaded(false);
+      
+      // Load high res in background
+      const img = new Image();
+      img.src = highResSrc;
+      img.onload = () => {
+        // Double-check we're still showing the same photo
+        if (photo.id === lastPhotoId.current) {
+          setIsHighResLoaded(true);
+          setCurrentSrc(highResSrc);
+          // Cache it
+          imageCache.current.set(photo.id, { url: highResSrc, loaded: true });
+          if (onHighResLoad) onHighResLoad();
+        }
+      };
+      highResRef.current = img;
+    }
     
     return () => {
       if (highResRef.current) {
         highResRef.current.onload = null;
       }
     };
-  }, [photo.id, lowResSrc, highResSrc]);
+  }, [photo.id, lowResSrc, highResSrc, imageCache, onHighResLoad]);
   
   return (
     <img
@@ -204,6 +229,31 @@ export default function FullscreenPhotoViewer({
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [photoOffset, setPhotoOffset] = useState(0); // Tracks which photo set we're showing
   
+  // Pinch zoom setup
+  const photoContainerRef = useRef<HTMLDivElement | null>(null);
+  const { 
+    zoomState, 
+    isZoomed, 
+    isPinching, 
+    resetZoom, 
+    handlers: zoomHandlers,
+    setContainerRef 
+  } = usePinchZoom({
+    minScale: 1,
+    maxScale: 4,
+    doubleTapScale: 2.5,
+    onZoomChange: (scale) => {
+      console.log(`🔍 Zoom level: ${scale.toFixed(2)}x`);
+    }
+  });
+  
+  // Reset zoom when photo changes
+  useEffect(() => {
+    if (isZoomed) {
+      resetZoom();
+    }
+  }, [currentPhotoIndex]);
+  
   // Navigation handlers (defined early for use in swipe hook)
   const handlePrevious = () => {
     const newIndex = currentPhotoIndex > 0 ? currentPhotoIndex - 1 : photos.length - 1;
@@ -230,6 +280,9 @@ export default function FullscreenPhotoViewer({
   // Swipe gesture setup - MUST be before any conditional returns
   const { handlers: swipeHandlers, isSwiping } = useSwipeGesture({
     onSwipeLeft: () => {
+      // Don't allow swiping when zoomed
+      if (isZoomed) return;
+      
       setIsTransitioning(true);
       
       // Animate to completion
@@ -246,6 +299,9 @@ export default function FullscreenPhotoViewer({
       });
     },
     onSwipeRight: () => {
+      // Don't allow swiping when zoomed
+      if (isZoomed) return;
+      
       setIsTransitioning(true);
       
       // Animate to completion
@@ -393,19 +449,31 @@ export default function FullscreenPhotoViewer({
 
       {/* Photo Display - Carousel Container */}
       <div 
+        ref={(ref) => {
+          if (ref) {
+            photoContainerRef.current = ref;
+            setContainerRef(ref);
+          }
+        }}
         className="flex-1 flex items-center justify-center relative min-h-0 overflow-hidden"
-        {...swipeHandlers}
-        style={{ touchAction: 'pan-y pinch-zoom' }}
+        {...(!isZoomed ? swipeHandlers : {})}
+        {...zoomHandlers}
+        style={{ touchAction: isZoomed ? 'none' : 'pan-y' }}
       >
         {/* Previous Button */}
         <button
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            // Don't allow navigation when zoomed
+            if (isZoomed) {
+              resetZoom();
+              return;
+            }
             console.log('🔙 Previous button clicked');
             handlePrevious();
           }}
-          className={`absolute left-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg ${isDimmed || isSwiping ? 'opacity-30 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
+          className={`absolute left-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg ${isDimmed || isSwiping || isZoomed ? 'opacity-30 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
         >
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -430,8 +498,11 @@ export default function FullscreenPhotoViewer({
                 key={`${photo.id}-${offset}`}
                 className="absolute w-full h-full flex items-center justify-center"
                 style={{
-                  transform: `translateX(${finalPosition}%)`,
-                  transition: isTransitioning && !isSwiping ? 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+                  transform: `translateX(${finalPosition}%)${
+                    offset === 0 ? ` scale(${zoomState.scale}) translate(${zoomState.x / zoomState.scale}px, ${zoomState.y / zoomState.scale}px)` : ''
+                  }`,
+                  transition: isTransitioning && !isSwiping && !isPinching ? 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+                  transformOrigin: 'center center'
                 }}
               >
                 <ProgressiveImage
@@ -439,12 +510,11 @@ export default function FullscreenPhotoViewer({
                   lowResSrc={photo.thumbnailUrl || photo.url} // Start with thumbnail
                   highResSrc={photo.thumbnailUrl ? photo.thumbnailUrl.replace('=s220', '=s2400') : photo.url} // Load high res
                   alt={photo.name}
-                  className="max-w-full max-h-full object-contain"
+                  className="max-w-full max-h-full object-contain select-none"
+                  imageCache={imageCache}
                   onHighResLoad={() => {
                     if (offset === 0) {
                       console.log(`✅ High-res loaded: ${photo.name}`);
-                      const url = photo.thumbnailUrl ? photo.thumbnailUrl.replace('=s220', '=s2400') : photo.url;
-                      imageCache.current.set(photo.id, { url, loaded: true });
                     }
                   }}
                 />
@@ -458,10 +528,15 @@ export default function FullscreenPhotoViewer({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            // Don't allow navigation when zoomed
+            if (isZoomed) {
+              resetZoom();
+              return;
+            }
             console.log('➡️ Next button clicked');
             handleNext();
           }}
-          className={`absolute right-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg ${isDimmed || isSwiping ? 'opacity-30 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
+          className={`absolute right-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg ${isDimmed || isSwiping || isZoomed ? 'opacity-30 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
         >
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
