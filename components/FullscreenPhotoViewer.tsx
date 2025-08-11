@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Photo, TemplateSlot } from '../types';
 import { photoCacheService } from '../services/photoCacheService';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
@@ -15,6 +15,62 @@ interface FullscreenPhotoViewerProps {
   favoritedPhotos?: Set<string>; // Pass the entire favorites set instead of individual status
   onToggleFavorite?: (photoId: string) => void;
 }
+
+// Progressive Image Component - loads low res first, then high res
+const ProgressiveImage = ({ 
+  photo, 
+  lowResSrc, 
+  highResSrc, 
+  alt, 
+  className,
+  onHighResLoad
+}: {
+  photo: Photo;
+  lowResSrc: string;
+  highResSrc: string;
+  alt: string;
+  className: string;
+  onHighResLoad?: () => void;
+}) => {
+  const [currentSrc, setCurrentSrc] = useState(lowResSrc);
+  const [isHighResLoaded, setIsHighResLoaded] = useState(false);
+  const highResRef = useRef<HTMLImageElement | null>(null);
+  
+  useEffect(() => {
+    // Reset when photo changes
+    setCurrentSrc(lowResSrc);
+    setIsHighResLoaded(false);
+    
+    // Load high res in background
+    const img = new Image();
+    img.src = highResSrc;
+    img.onload = () => {
+      setIsHighResLoaded(true);
+      setCurrentSrc(highResSrc);
+      if (onHighResLoad) onHighResLoad();
+    };
+    highResRef.current = img;
+    
+    return () => {
+      if (highResRef.current) {
+        highResRef.current.onload = null;
+      }
+    };
+  }, [photo.id, lowResSrc, highResSrc]);
+  
+  return (
+    <img
+      src={currentSrc}
+      alt={alt}
+      className={className}
+      style={{
+        filter: !isHighResLoaded ? 'blur(2px)' : 'none',
+        transition: 'filter 0.3s ease-in-out'
+      }}
+      crossOrigin="anonymous"
+    />
+  );
+};
 
 export default function FullscreenPhotoViewer({
   photo,
@@ -66,16 +122,21 @@ export default function FullscreenPhotoViewer({
     adjacentIndices.forEach(index => {
       const photoToPreload = photos[index];
       if (photoToPreload && !imageCache.current.has(photoToPreload.id)) {
+        // Preload thumbnail first (fast)
+        const thumbImg = new Image();
+        thumbImg.src = photoToPreload.thumbnailUrl || photoToPreload.url;
+        
+        // Then preload high res
         const img = new Image();
-        const urls = getFallbackUrls(photoToPreload);
-        if (urls.length > 0) {
-          img.src = urls[0];
-          img.onload = () => {
-            imageCache.current.set(photoToPreload.id, { url: urls[0], loaded: true });
-            console.log(`✅ Preloaded: ${photoToPreload.name}`);
-          };
-          preloadedImages.current.set(photoToPreload.id, img);
-        }
+        const highResUrl = photoToPreload.thumbnailUrl ? 
+          photoToPreload.thumbnailUrl.replace('=s220', '=s2400') : 
+          photoToPreload.url;
+        img.src = highResUrl;
+        img.onload = () => {
+          imageCache.current.set(photoToPreload.id, { url: highResUrl, loaded: true });
+          console.log(`✅ Preloaded high-res: ${photoToPreload.name}`);
+        };
+        preloadedImages.current.set(photoToPreload.id, img);
         photoCacheService.preloadPhoto(photoToPreload);
       }
     });
@@ -373,29 +434,19 @@ export default function FullscreenPhotoViewer({
                   transition: isTransitioning && !isSwiping ? 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
                 }}
               >
-                <img
-                  src={getPhotoUrl(photo, offset === 0 ? currentUrlIndex : 0)}
+                <ProgressiveImage
+                  photo={photo}
+                  lowResSrc={photo.thumbnailUrl || photo.url} // Start with thumbnail
+                  highResSrc={photo.thumbnailUrl ? photo.thumbnailUrl.replace('=s220', '=s2400') : photo.url} // Load high res
                   alt={photo.name}
                   className="max-w-full max-h-full object-contain"
-                  onLoad={() => {
+                  onHighResLoad={() => {
                     if (offset === 0) {
-                      console.log(`✅ Photo loaded: ${photo.name}`);
-                      const url = getPhotoUrl(photo, currentUrlIndex);
+                      console.log(`✅ High-res loaded: ${photo.name}`);
+                      const url = photo.thumbnailUrl ? photo.thumbnailUrl.replace('=s220', '=s2400') : photo.url;
                       imageCache.current.set(photo.id, { url, loaded: true });
                     }
                   }}
-                  onError={() => {
-                    if (offset === 0) {
-                      const fallbackUrls = getFallbackUrls(photo);
-                      console.error(`❌ Failed to load ${photo.name}`);
-                      if (currentUrlIndex < fallbackUrls.length - 1) {
-                        console.log(`🔄 Trying fallback URL ${currentUrlIndex + 2}/${fallbackUrls.length}`);
-                        setCurrentUrlIndex(prev => prev + 1);
-                      }
-                    }
-                  }}
-                  style={{ pointerEvents: offset === 0 ? 'auto' : 'none' }}
-                  crossOrigin="anonymous"
                 />
               </div>
             );
