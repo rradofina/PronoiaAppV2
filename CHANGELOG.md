@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-11] - Photo Viewer Resolution Enhancement
+
+### Changed
+- **Increased Photo Viewer Resolution**:
+  - File: `components/FullscreenPhotoViewer.tsx` (lines 229-233)
+  - Primary resolution increased from 1600px to 2400px
+  - Added 1800px as intermediate fallback
+  - Better image quality on tablet displays
+  - Resolution chain: 2400px → 1800px → 1200px → 800px → 600px
+  - Commit: `1ac702b`
+
 ## [2025-08-11] - Template Change Functionality Fix
 
 ### Fixed
