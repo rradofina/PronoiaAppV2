@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Root Cause: onZoomChange only called when setting target, not during animation
   - Solution: Track zoom state in animation loop with 1.01 threshold
   - Now properly enables swipe when scale returns close to 1.0
+  - Commit: `b8579ee`
+
+- **Black Flash During Photo Transitions**:
+  - File: `components/FullscreenPhotoViewer.tsx`
+  - Issue: Black flash when swiping between photos
+  - Root Cause: Component swapping from ProgressiveImage to ZoomableImage
+  - Solution: Use ZoomableImage for all carousel photos with isActive prop
+  - Only current photo (offset === 0) can be zoomed/panned
+  - Eliminates component remounting and black flash
   - Commit: Current
 
 ## [2025-08-11] - Photo Viewer Centering and Progressive Loading

@@ -5,6 +5,7 @@ interface ZoomableImageProps {
   highResSrc: string;
   alt: string;
   className?: string;
+  isActive?: boolean; // Whether this image can be zoomed/panned
   onZoomChange?: (isZoomed: boolean) => void;
   imageCache?: React.MutableRefObject<Map<string, { url: string; loaded: boolean }>>;
   photoId?: string;
@@ -27,6 +28,7 @@ export default function ZoomableImage({
   highResSrc, 
   alt, 
   className = '',
+  isActive = true,
   onZoomChange,
   imageCache,
   photoId
@@ -202,6 +204,8 @@ export default function ZoomableImage({
   
   // Handle touch start
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!isActive) return; // Ignore if not active
+    
     if (e.touches.length === 1) {
       // Single touch - check for double tap or start pan
       const now = Date.now();
@@ -245,10 +249,12 @@ export default function ZoomableImage({
       touchStartRef.current = { x: center.x, y: center.y, distance: initialPinchDistance.current };
       lastTouchRef.current = { x: transform.x, y: transform.y };
     }
-  }, [transform, resetZoom, setTargetTransform]);
+  }, [isActive, transform, resetZoom, setTargetTransform]);
   
   // Handle touch move
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isActive) return; // Ignore if not active
+    
     if (isPinching && e.touches.length === 2) {
       e.preventDefault();
       
@@ -298,7 +304,7 @@ export default function ZoomableImage({
         });
       }
     }
-  }, [isPinching, isPanning, transform.scale, setTargetTransform]);
+  }, [isActive, isPinching, isPanning, transform.scale, setTargetTransform]);
   
   // Handle touch end
   const handleTouchEnd = useCallback(() => {
@@ -313,6 +319,7 @@ export default function ZoomableImage({
   
   // Mouse wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (!isActive) return; // Ignore if not active
     e.preventDefault();
     
     const rect = containerRef.current?.getBoundingClientRect();
@@ -334,20 +341,22 @@ export default function ZoomableImage({
       x: mouseX - (mouseX - transform.x) * scaleRatio,
       y: mouseY - (mouseY - transform.y) * scaleRatio
     });
-  }, [transform, setTargetTransform]);
+  }, [isActive, transform, setTargetTransform]);
   
   // Mouse down - start drag
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!isActive) return; // Ignore if not active
     if (transform.scale > 1) {
       e.preventDefault();
       setIsPanning(true);
       mouseStartRef.current = { x: e.clientX, y: e.clientY };
       lastTouchRef.current = { x: transform.x, y: transform.y };
     }
-  }, [transform]);
+  }, [isActive, transform]);
   
   // Mouse move - drag pan
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isActive) return; // Ignore if not active
     if (isPanning && mouseStartRef.current && lastTouchRef.current) {
       e.preventDefault();
       
@@ -360,7 +369,7 @@ export default function ZoomableImage({
         y: lastTouchRef.current.y + deltaY
       });
     }
-  }, [isPanning, transform.scale, setTargetTransform]);
+  }, [isActive, isPanning, transform.scale, setTargetTransform]);
   
   // Mouse up - end drag
   const handleMouseUp = useCallback(() => {
@@ -385,7 +394,7 @@ export default function ZoomableImage({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       style={{
-        cursor: transform.scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default',
+        cursor: isActive && transform.scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default',
         touchAction: 'none', // Prevent browser gestures
       }}
     >

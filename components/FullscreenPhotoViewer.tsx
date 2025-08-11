@@ -474,31 +474,17 @@ export default function FullscreenPhotoViewer({
                   pointerEvents: offset === 0 ? 'auto' : 'none', // Only current photo can be interacted with
                 }}
               >
-                {offset === 0 ? (
-                  // Current photo - use ZoomableImage for zoom support
-                  <ZoomableImage
-                    lowResSrc={photo.thumbnailUrl || photo.url}
-                    highResSrc={photo.thumbnailUrl ? photo.thumbnailUrl.replace('=s220', '=s2400') : photo.url}
-                    alt={photo.name}
-                    className="w-full h-full"
-                    onZoomChange={setIsZoomed}
-                    imageCache={imageCache}
-                    photoId={photo.id}
-                  />
-                ) : (
-                  // Adjacent photos - use regular ProgressiveImage
-                  <ProgressiveImage
-                    photo={photo}
-                    lowResSrc={photo.thumbnailUrl || photo.url}
-                    highResSrc={photo.thumbnailUrl ? photo.thumbnailUrl.replace('=s220', '=s2400') : photo.url}
-                    alt={photo.name}
-                    className="max-w-full max-h-full object-contain select-none"
-                    imageCache={imageCache}
-                    onHighResLoad={() => {
-                      console.log(`✅ Preloaded: ${photo.name}`);
-                    }}
-                  />
-                )}
+                {/* Use ZoomableImage for all photos to prevent component swapping */}
+                <ZoomableImage
+                  lowResSrc={photo.thumbnailUrl || photo.url}
+                  highResSrc={photo.thumbnailUrl ? photo.thumbnailUrl.replace('=s220', '=s2400') : photo.url}
+                  alt={photo.name}
+                  className="w-full h-full"
+                  isActive={offset === 0} // Only current photo can be zoomed
+                  onZoomChange={offset === 0 ? setIsZoomed : undefined}
+                  imageCache={imageCache}
+                  photoId={photo.id}
+                />
               </div>
             );
           })}
