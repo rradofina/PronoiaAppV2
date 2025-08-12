@@ -1322,7 +1322,9 @@ export default function PhotoSelectionScreen({
     console.log('🔄 Template replacement confirmed:', {
       position: templateToChange.index,
       oldTemplate: templateToChange.template.name,
-      newTemplate: newTemplate.name
+      newTemplate: newTemplate.name,
+      oldHoles: templateToChange.template.holes_data?.length || 0,
+      newHoles: newTemplate.holes_data?.length || 0
     });
     
     // Store the replacement by position
@@ -1331,21 +1333,50 @@ export default function PhotoSelectionScreen({
       [templateToChange.index]: newTemplate
     }));
     
-    // Update slots for the new template (only update templateType to new template ID)
+    // Update slots for the new template
     const templateGroups = getTemplateGroups();
     const targetGroup = templateGroups[templateToChange.index];
     if (targetGroup) {
-      const updatedSlots = templateSlots.map(slot => {
-        if (slot.templateId === targetGroup.templateId) {
-          return {
-            ...slot,
-            templateType: newTemplate.id.toString(), // Update to new template ID
-            // Keep photo assignments but reset transforms for recalculation
-            transform: undefined
-          };
-        }
-        return slot;
+      // Get the old slots for this template
+      const oldSlots = templateSlots.filter(slot => slot.templateId === targetGroup.templateId);
+      
+      // Create new slots based on the new template's hole count
+      const newHoleCount = newTemplate.holes_data?.length || 0;
+      const newSlots: TemplateSlot[] = [];
+      
+      // Generate new slots for the new template
+      for (let i = 0; i < newHoleCount; i++) {
+        const oldSlot = oldSlots[i]; // Try to preserve photo from corresponding old slot
+        
+        newSlots.push({
+          id: `${newTemplate.id}_slot_${i}_${Date.now()}`,
+          templateId: targetGroup.templateId, // Keep the same group ID
+          templateName: newTemplate.name,
+          templateType: newTemplate.id.toString(),
+          printSize: newTemplate.print_size,
+          slotIndex: i,
+          photoId: oldSlot?.photoId || undefined, // Preserve photo if available
+          transform: undefined // Reset transform for recalculation
+        });
+      }
+      
+      console.log('📝 Creating new slots for template swap:', {
+        oldSlotCount: oldSlots.length,
+        newSlotCount: newSlots.length,
+        preservedPhotos: newSlots.filter(s => s.photoId).length
       });
+      
+      // Replace old slots with new slots
+      const updatedSlots = templateSlots.filter(slot => slot.templateId !== targetGroup.templateId).concat(newSlots);
+      
+      // Sort to maintain order
+      updatedSlots.sort((a, b) => {
+        const aGroup = templateGroups.findIndex(g => g.templateId === a.templateId);
+        const bGroup = templateGroups.findIndex(g => g.templateId === b.templateId);
+        if (aGroup !== bGroup) return aGroup - bGroup;
+        return (a.slotIndex || 0) - (b.slotIndex || 0);
+      });
+      
       setTemplateSlots(updatedSlots);
     }
     
@@ -1359,22 +1390,59 @@ export default function PhotoSelectionScreen({
   };
 
   const handleSwapTemplate = (template: { templateId: string; templateName: string; slots: TemplateSlot[] }, index: number) => {
-    console.log('🔄 Template change requested:', { template: template.templateName, index });
+    console.log('🔄 Template change requested:', { 
+      templateName: template.templateName, 
+      templateId: template.templateId,
+      index,
+      slots: template.slots.length 
+    });
     
     // Get the current template for this position
     const currentSlot = template.slots[0];
-    if (!currentSlot) return;
+    if (!currentSlot) {
+      console.error('❌ No slots found in template');
+      return;
+    }
     
     // Find the manual template for this position
     manualTemplateService.getAllTemplates().then(allTemplates => {
-      const currentTemplate = allTemplates.find(t => 
+      // Try multiple ways to find the template
+      let currentTemplate = allTemplates.find(t => 
         t.id.toString() === currentSlot.templateType
       );
       
+      // If not found by templateType, try by template ID
+      if (!currentTemplate) {
+        currentTemplate = allTemplates.find(t => 
+          t.id.toString() === template.templateId
+        );
+      }
+      
+      // If still not found, try by matching print size and template type
+      if (!currentTemplate && currentSlot.printSize) {
+        currentTemplate = allTemplates.find(t => 
+          t.print_size === currentSlot.printSize &&
+          t.template_type === currentSlot.templateType.replace(/[0-9-]/g, '') // Remove numbers/UUIDs
+        );
+      }
+      
       if (currentTemplate) {
+        console.log('✅ Found template for change:', {
+          id: currentTemplate.id,
+          name: currentTemplate.name,
+          type: currentTemplate.template_type
+        });
         setTemplateToChange({ template: currentTemplate, index });
         setShowTemplateModal(true);
+      } else {
+        console.error('❌ Could not find template for change:', {
+          searchedType: currentSlot.templateType,
+          searchedId: template.templateId,
+          availableTemplates: allTemplates.map(t => ({ id: t.id, name: t.name }))
+        });
       }
+    }).catch(error => {
+      console.error('❌ Error loading templates:', error);
     });
   };
 

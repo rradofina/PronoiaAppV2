@@ -10,10 +10,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_OAUTH_SECRET;
 
-  // Determine the redirect URI based on the environment
-  const redirectUri = process.env.NODE_ENV === 'production'
-    ? 'https://pronoia-app.vercel.app/api/auth/callback'
-    : 'http://localhost:3000/api/auth/callback';
+  // Always use localhost for local development, even in production mode
+  const host = req.headers.host || 'localhost:3000';
+  const protocol = host.includes('localhost') ? 'http' : 'https';
+  const redirectUri = `${protocol}://${host}/api/auth/callback`;
 
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',

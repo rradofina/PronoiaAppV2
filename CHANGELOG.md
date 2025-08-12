@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-12] - Change Template Fix for Fill Templates Screen
+
+### Fixed
+- **Change Template Incompatibility Errors**:
+  - Issue: All templates showing as "incompatible" with error "Template holes: 1, Expected slots: 1" even when counts matched
+  - Root Cause: `handleConfirmTemplateSwap` only updated templateType but kept old slot structure, causing mismatch when new template had different hole count
+  - Solution: Completely recreate slots for new template based on its hole count while preserving photos where possible
+  - File: `components/screens/PhotoSelectionScreen.tsx` (lines 1319-1385)
+  - Changes Made:
+    1. Create new slots array based on new template's holes_data length
+    2. Preserve photos from old slots in corresponding positions
+    3. Generate unique slot IDs for new template
+    4. Replace old slots entirely instead of just updating templateType
+  - Impact: Change Template now works exactly like Package Selection without false incompatibility errors
+  - Commit: Current
+
 ## [2025-08-12] - CRITICAL: Fast Refresh Loop Bug Fix
 
 ### 🚨 CRITICAL BUG FIXED
