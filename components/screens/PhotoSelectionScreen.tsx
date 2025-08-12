@@ -150,7 +150,22 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
   
   if (pngTemplates.length > 0 && templateType) {
     // Find exact template by ID (templateType now contains the unique template ID)
-    const candidateTemplate = pngTemplates.find((t: any) => t.id.toString() === templateType);
+    // First try direct UUID match, then fall back to type+size matching for compatibility
+    let candidateTemplate = pngTemplates.find((t: any) => t.id === templateType || t.id.toString() === templateType);
+    
+    // If not found by UUID, try matching by template_type and print_size (for dynamically added templates)
+    if (!candidateTemplate && slots[0]) {
+      candidateTemplate = pngTemplates.find((t: any) => 
+        t.template_type === slots[0].templateType && 
+        t.print_size === slots[0].printSize
+      );
+      console.log('🔄 Fallback template matching by type+size:', {
+        searchedType: slots[0].templateType,
+        searchedSize: slots[0].printSize,
+        found: !!candidateTemplate,
+        candidateName: candidateTemplate?.name
+      });
+    }
     
     if (candidateTemplate) {
       // Strict compatibility check: template holes must match expected slots
@@ -489,10 +504,30 @@ export default function PhotoSelectionScreen({
         id: `${newTemplateId}_${slotIndex}`,
         templateId: newTemplateId,
         templateName: `${template.name} (Additional)`,
-        templateType: template.template_type as TemplateType,
+        templateType: template.id.toString() as TemplateType,
         printSize: template.print_size as PrintSize,
         slotIndex,
         photoId: undefined
+      });
+    }
+    
+    // Add the template to window cache so it can be found later
+    const windowTemplates = (window as any).pngTemplates || [];
+    const convertedTemplate = {
+      ...template,
+      holes: template.holes_data,
+      driveFileId: template.drive_file_id
+    };
+    
+    // Check if template already exists in cache
+    const existsInCache = windowTemplates.some((t: any) => t.id === template.id);
+    if (!existsInCache) {
+      windowTemplates.push(convertedTemplate);
+      (window as any).pngTemplates = windowTemplates;
+      console.log('✅ Added template to window cache:', {
+        templateId: template.id,
+        templateName: template.name,
+        cacheSize: windowTemplates.length
       });
     }
     

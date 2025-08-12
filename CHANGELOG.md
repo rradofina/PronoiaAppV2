@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-11] - Template UUID Lookup and Caching Fix
+
+### Fixed
+- **Template UUID Not Found Error**:
+  - Issue: Templates added via "Add Prints" showed "No template found for type: [UUID]" error
+  - Root Cause: Templates weren't being added to window.pngTemplates cache, causing lookup failures
+  - Solution: 
+    1. Updated template lookup to try UUID match first, then fall back to type+size matching
+    2. Added templates to window cache when using "Add Prints" button
+  - Files Modified:
+    - `components/screens/PhotoSelectionScreen.tsx` (lines 154-168) - Enhanced template matching logic
+    - `components/screens/PhotoSelectionScreen.tsx` (lines 514-532) - Add templates to window cache
+  - Impact: Templates added dynamically now render correctly without errors
+  - Commit: Current
+
+## [2025-08-11] - Template Rendering Error Fix for Add Prints
+
+### Fixed
+- **Template Rendering Error in Add Prints**:
+  - Issue: Templates added via "Add Prints" button showed "Template found but incompatible" error
+  - Root Cause: templateType was storing generic type ("solo") instead of unique template ID
+  - Solution: Changed templateType to use `template.id.toString()` matching Package Selection behavior
+  - File: `components/screens/PhotoSelectionScreen.tsx` (line 507)
+  - Impact: All template types (A4 Solo, 5R Solo, Photo Strip) now render correctly when added
+  - Commit: Current
+
 ## [2025-08-11] - Add Prints Button in Fill Templates Screen
 
 ### Added
