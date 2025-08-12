@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-12] - CRITICAL: Fast Refresh Loop Bug Fix
+
+### 🚨 CRITICAL BUG FIXED
+- **Infinite Refresh Loop in Development**:
+  - Issue: App stuck in continuous reload loop, making development impossible
+  - Root Causes:
+    1. Missing `.env.local` file (deleted during `git clean -fdx` reset)
+    2. Failed OAuth authentication causing 500 errors on `/api/auth/refresh`
+    3. Next.js Fast Refresh trying to load stale webpack hot update files
+    4. Authentication restoration on every page load triggering state changes
+  - Symptoms:
+    - Continuous "Fast Refresh had to perform a full reload" warnings
+    - 404 errors for `/_next/static/webpack/*.webpack.hot-update.json`
+    - Page refreshing every 1-2 seconds indefinitely
+  - Solution:
+    1. Recreated `.env.local` with correct Google OAuth and Supabase credentials
+    2. Cleared Next.js cache (`rm -rf .next`)
+    3. Run in production mode to bypass Fast Refresh: `npm run build && npm run start`
+  - Files Modified:
+    - `.env.local` - Recreated with proper credentials
+    - `pages/index.tsx` - Temporarily disabled auth restoration (lines 394, 1046-1058)
+  - Commits: Post-reset recovery
+
+### ⚠️ IMPORTANT WARNINGS
+- **NEVER run `git clean -fdx` without excluding `.env.local`**
+  - `.env.local` is gitignored and contains critical API keys/secrets
+  - Use: `git clean -fdx --exclude=.env.local` for safe resets
+- **Fast Refresh Loop Recovery Steps:**
+  1. Check `.env.local` exists with valid credentials
+  2. Clear cache: `rm -rf .next node_modules/.cache`
+  3. Run production mode: `npm run build && npm run start`
+  4. If dev mode needed: Kill all node processes, clear ports, restart
+
+### Added
+- **Production Mode Instructions**: 
+  - When Fast Refresh fails, use production mode as reliable fallback
+  - Commands documented for quick recovery from refresh loops
+
 ## [2025-08-11] - Template UUID Lookup and Caching Fix
 
 ### Fixed
