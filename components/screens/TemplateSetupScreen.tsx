@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { pngTemplateService } from '../../services/pngTemplateService';
 import { supabase } from '../../lib/supabase/client';
+import { useAlert } from '../../contexts/AlertContext';
 
 interface TemplateSetupScreenProps {
   onComplete: () => void;
@@ -12,6 +13,7 @@ export default function TemplateSetupScreen({ onComplete, onBack }: TemplateSetu
   const [folderUrl, setFolderUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
+  const { showError, showSuccess, showInfo } = useAlert();
 
   useEffect(() => {
     loadCurrentSettings();
@@ -43,7 +45,7 @@ export default function TemplateSetupScreen({ onComplete, onBack }: TemplateSetu
     const cleanId = extractFolderIdFromUrl(folderUrl || folderId);
     
     if (!cleanId) {
-      alert('Please enter a valid Google Drive folder ID or URL');
+      showError('Invalid Input', 'Please enter a valid Google Drive folder ID or URL');
       return;
     }
 
@@ -58,13 +60,13 @@ export default function TemplateSetupScreen({ onComplete, onBack }: TemplateSetu
       setTemplates(loadedTemplates);
       
       if (loadedTemplates.length > 0) {
-        alert(`Success! Found ${loadedTemplates.length} templates. You can now continue.`);
+        showSuccess('Templates Loaded', `Found ${loadedTemplates.length} templates. You can now continue.`);
       } else {
-        alert('Templates saved but no PNG files found in 4R folder. Please add templates.');
+        showInfo('No Templates Found', 'Templates saved but no PNG files found in 4R folder. Please add templates.');
       }
     } catch (error) {
       console.error('Error saving folder ID:', error);
-      alert('Failed to configure template folder: ' + (error instanceof Error ? error.message : String(error)));
+      showError('Configuration Failed', 'Failed to configure template folder: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setIsLoading(false);
     }

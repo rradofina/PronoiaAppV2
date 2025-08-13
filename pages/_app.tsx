@@ -5,6 +5,7 @@ import Head from 'next/head';
 import { Toaster } from 'react-hot-toast';
 import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration';
 import { useViewportHeight } from '../hooks/useViewportHeight';
+import { AlertProvider } from '../contexts/AlertContext';
 
 export default function App({ Component, pageProps }: AppProps) {
   // Track viewport height for mobile browser compatibility
@@ -20,7 +21,9 @@ export default function App({ Component, pageProps }: AppProps) {
         />
       </Head>
       <ServiceWorkerRegistration />
-      <Component {...pageProps} />
+      <AlertProvider>
+        <Component {...pageProps} />
+      </AlertProvider>
       <Toaster
         position="top-center"
         toastOptions={{

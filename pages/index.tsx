@@ -6,6 +6,7 @@ import useDriveStore from '../stores/driveStore';
 import useSessionStore from '../stores/sessionStore';
 import useTemplateStore from '../stores/templateStore';
 import useUiStore from '../stores/uiStore';
+import { useAlert } from '../contexts/AlertContext';
 import { DriveFolder, TemplateSlot, Photo, TemplateTypeInfo, Package, TemplateType, ManualTemplate } from '../types';
 import DriveSetupScreen from '../components/screens/DriveSetupScreen';
 import FolderSelectionScreen from '../components/screens/FolderSelectionScreen';
@@ -175,6 +176,9 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot }: 
 };
 
 export default function Home() {
+  // Alert Hook
+  const { showSuccess, showError, showWarning, showInfo } = useAlert();
+  
   // Auth Store
   const { googleAuth, isGapiLoaded, setGoogleAuth, setIsGapiLoaded, syncWithSupabase } = useAuthStore();
   
@@ -433,7 +437,7 @@ export default function Home() {
     addEvent('Using redirect-based OAuth flow');
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) {
-      alert('Google Client ID not configured.');
+      showError('Configuration Error', 'Google Client ID not configured.');
       return;
     }
     
@@ -503,7 +507,7 @@ export default function Home() {
         errorMessage = 'Authentication expired.';
         clearStoredAuth();
       }
-      alert(errorMessage);
+      showError('Sign In Failed', errorMessage);
     } finally {
       setIsConnecting(false);
     }
@@ -526,13 +530,13 @@ export default function Home() {
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
 
         if (error) {
-            alert(`Failed to get Google Drive permissions. Error: ${error}`);
+            showError('Permission Error', `Failed to get Google Drive permissions. Error: ${error}`);
             setIsConnecting(false);
             return;
         }
         
         if (state !== storedState) {
-            alert('Security error: state mismatch. Please try again.');
+            showError('Security Error', 'State mismatch. Please try again.');
             setIsConnecting(false);
             return;
         }
@@ -586,7 +590,7 @@ export default function Home() {
       setCurrentScreen('folder-selection');
     } catch (error) {
       console.error('Failed to load client folders:', error);
-      alert('Failed to load client folders. Please try again.');
+      showError('Load Failed', 'Failed to load client folders. Please try again.');
     }
   };
 
@@ -604,7 +608,7 @@ export default function Home() {
       // CRITICAL DEBUG: Check if we actually have photos
       if (drivePhotos.length === 0) {
         console.error('❌ NO PHOTOS FOUND IN FOLDER - This is the problem!');
-        alert('No photos found in the selected folder. Make sure the folder contains image files.');
+        showWarning('No photos found', 'Make sure the selected folder contains image files.');
         return;
       }
       
@@ -615,7 +619,7 @@ export default function Home() {
       // setCurrentScreen('package'); // Removed - package selection now happens in FolderSelectionScreen
     } catch (error) {
       console.error('❌ Failed to load photos:', error);
-      alert('Failed to load photos from the selected folder.');
+      showError('Failed to load photos', 'Unable to load photos from the selected folder. Please try again.');
     }
   };
 
@@ -685,7 +689,7 @@ export default function Home() {
     console.log('📸 Finalizing photo selections...');
     
     if (!selectedClientFolder) {
-      alert('No client folder selected. Please go back and select a folder.');
+      showWarning('No client folder selected', 'Please go back and select a folder.');
       return;
     }
 
@@ -754,13 +758,22 @@ export default function Home() {
 
           // Get all templates to find the matching manual template
           const allTemplates = await manualTemplateService.getAllTemplates();
-          const manualTemplate = allTemplates.find(t => 
-            t.template_type === firstSlot.templateType && 
-            t.print_size === (firstSlot.printSize || (availablePrintSizes.length > 0 ? availablePrintSizes[0].name : ''))
+          
+          // First try to find template by exact ID (for templates added via Package Manager)
+          let manualTemplate = allTemplates.find(t => 
+            t.id.toString() === firstSlot.templateType
           );
 
+          // If not found by ID, try to find by type and print size (for standard templates)
           if (!manualTemplate) {
-            console.error(`Manual template not found for type: ${firstSlot.templateType}`);
+            manualTemplate = allTemplates.find(t => 
+              t.template_type === firstSlot.templateType && 
+              t.print_size === (firstSlot.printSize || (availablePrintSizes.length > 0 ? availablePrintSizes[0].name : ''))
+            );
+          }
+
+          if (!manualTemplate) {
+            console.error(`Manual template not found for: ${firstSlot.templateType} (type/id) with print size: ${firstSlot.printSize}`);
             errors.push(`Template not found: ${templateName}`);
             continue;
           }
@@ -804,14 +817,20 @@ export default function Home() {
 
       // Show completion message
       if (errors.length > 0) {
-        alert(`Templates uploaded with some errors:\n\n✅ Successful: ${uploadedCount}/${templateGroups.size}\n❌ Failed: ${errors.join(', ')}\n\nCheck the prints folder in Google Drive.`);
+        showWarning(
+          'Templates uploaded with some errors',
+          `✅ Successful: ${uploadedCount}/${templateGroups.size}\n❌ Failed: ${errors.join(', ')}\n\nCheck the prints folder in Google Drive.`
+        );
       } else {
-        alert(`✅ All templates uploaded successfully!\n\n${uploadedCount} templates have been saved to the prints folder in Google Drive.`);
+        showSuccess(
+          'All templates uploaded successfully!',
+          `${uploadedCount} templates have been saved to the prints folder in Google Drive.`
+        );
       }
       
     } catch (error) {
       console.error('❌ Error during finalization:', error);
-      alert('Failed to finalize prints. Please try again.');
+      showError('Failed to finalize prints', 'Please try again. Check the console for more details.');
       setUploadProgress(null);
       setIsUploading(false);
     }
@@ -927,7 +946,7 @@ export default function Home() {
         setCurrentScreen('photos');
       } catch (error) {
         console.error('Error loading package templates:', error);
-        alert(`Failed to load templates: ${error instanceof Error ? error.message : 'Please check your template configuration.'}`);
+        showError('Template Load Failed', `Failed to load templates: ${error instanceof Error ? error.message : 'Please check your template configuration.'}`);
       }
     }
   };

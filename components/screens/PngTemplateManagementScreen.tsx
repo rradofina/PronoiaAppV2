@@ -3,6 +3,7 @@ import { ManualTemplate } from '../../types';
 import { manualTemplateService } from '../../services/manualTemplateService';
 import { GoogleAuth } from '../../types';
 import HeaderNavigation from '../HeaderNavigation';
+import { useAlert } from '../../contexts/AlertContext';
 
 interface TemplateCardProps {
   template: ManualTemplate;
@@ -227,6 +228,7 @@ export default function PngTemplateManagementScreen({
     template_type: '', // Dynamic template type - populated from database
     print_size: '' // Dynamic print size - populated from database
   });
+  const { showError } = useAlert();
 
   const loadTemplates = async (forceRefresh = false) => {
     setIsLoading(true);
@@ -285,7 +287,7 @@ export default function PngTemplateManagementScreen({
       handleRefresh();
     } catch (error) {
       console.error('Failed to update template:', error);
-      alert('Failed to update template. Please try again.');
+      showError('Update Failed', 'Failed to update template. Please try again.');
     }
   };
 

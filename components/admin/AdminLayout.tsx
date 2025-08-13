@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useAdminStore } from '../../stores/adminStore';
 import useAuthStore from '../../stores/authStore';
 import { ADMIN_ROUTES, getAdminPageTitle } from '../../middleware/adminAuth';
+import { useAlert } from '../../contexts/AlertContext';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -63,6 +64,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { showWarning } = useAlert();
   
   const {
     isAdminAuthenticated,
@@ -94,14 +96,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     if (!isCheckingAdminAuth) {
       if (!googleAuth.isSignedIn) {
         console.log('❌ Redirecting: Not signed in', googleAuth);
-        alert('DEBUG: Not signed in to Google. Please sign in first at localhost:3000');
+        showWarning('Not signed in', 'Not signed in to Google. Please sign in first at localhost:3000');
         setTimeout(() => router.push('/'), 3000);
         return;
       }
       
       if (!isAdminAuthenticated) {
         console.log('❌ Redirecting: Not admin authenticated', { isAdminAuthenticated, adminUser });
-        alert('DEBUG: Not admin authenticated. Check console for details.');
+        showWarning('Access Denied', 'Not admin authenticated. Check console for details.');
         setTimeout(() => router.push('/'), 3000);
         return;
       }

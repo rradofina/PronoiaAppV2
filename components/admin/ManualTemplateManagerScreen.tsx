@@ -12,6 +12,7 @@ import { getPrintSizeDimensions } from '../../utils/printSizeDimensions';
 import { templateConfigService } from '../../services/templateConfigService';
 import { printSizeService } from '../../services/printSizeService';
 import HeaderNavigation from '../HeaderNavigation';
+import { useAlert } from '../../contexts/AlertContext';
 
 interface ManualTemplateManagerScreenProps {
   googleAuth: GoogleAuth;
@@ -58,6 +59,7 @@ export default function ManualTemplateManagerScreen({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const { showSuccess } = useAlert();
   const [editingTemplate, setEditingTemplate] = useState<ManualTemplate | null>(null);
   const [formData, setFormData] = useState<TemplateFormData>(EMPTY_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -519,7 +521,10 @@ export default function ManualTemplateManagerScreen({
         // Show success message
         const holesCount = detectedData.holes?.length || 0;
         const templateType = detectedData.templateType || 'unknown';
-        alert(`✅ Auto-detection successful!\n\nDetected:\n• ${holesCount} photo holes\n• Template type: ${templateType}\n• Template dimensions: ${detectedData.dimensions.width}×${detectedData.dimensions.height}\n\nThe form fields have been automatically populated.`);
+        showSuccess(
+          'Auto-detection successful!',
+          `Detected:\n• ${holesCount} photo holes\n• Template type: ${templateType}\n• Template dimensions: ${detectedData.dimensions.width}×${detectedData.dimensions.height}\n\nThe form fields have been automatically populated.`
+        );
       } else {
         throw new Error('Could not detect template structure. Please ensure the file contains magenta (#FF00FF) photo holes.');
       }
