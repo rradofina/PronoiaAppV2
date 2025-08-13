@@ -116,7 +116,7 @@ export default function PackageSelectionScreen({
               loading={isLoadingTemplates}
               onTemplateAdd={(template) => {
                 // Add the new template to the list
-                setTemplates([...templates, { ...template, _isFromAddition: true }]);
+                setTemplates([...templates, template]);
                 console.log('Template added:', template.name);
               }}
               onTemplateDelete={(templateIndex) => {

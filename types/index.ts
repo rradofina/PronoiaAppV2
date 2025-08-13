@@ -35,7 +35,7 @@ async function getRealPhotoDimensions(photo: Photo): Promise<{ width: number; he
 }
 
 // Core types used throughout the application
-export type Screen = 'drive-setup' | 'folder-selection' | 'package' | 'template' | 'template-setup' | 'photos' | 'preview' | 'complete' | 'png-template-management' | 'template-folder-selection' | 'manual-template-manager' | 'manual-package-manager';
+export type Screen = 'drive-setup' | 'folder-selection' | 'package' | 'template' | 'template-setup' | 'photos' | 'preview' | 'complete' | 'png-template-management' | 'template-folder-selection' | 'manual-template-manager' | 'manual-package-manager' | 'admin-settings';
 
 export interface DriveFolder {
   id: string;
