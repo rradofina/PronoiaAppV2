@@ -132,10 +132,12 @@ class TemplateRasterizationService {
       
       if (driveFileId.includes('drive.google.com')) {
         const match = driveFileId.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        pngUrl = match ? `https://lh3.googleusercontent.com/d/${match[1]}` : '';
+        // Request high resolution version with =w4000 parameter
+        pngUrl = match ? `https://lh3.googleusercontent.com/d/${match[1]}=w4000` : '';
         if (!pngUrl) throw new Error('Invalid Google Drive URL format');
       } else {
-        pngUrl = `https://lh3.googleusercontent.com/d/${driveFileId}`;
+        // Request high resolution version with =w4000 parameter
+        pngUrl = `https://lh3.googleusercontent.com/d/${driveFileId}=w4000`;
       }
 
       const img = await this.loadImage(pngUrl);
@@ -158,12 +160,15 @@ class TemplateRasterizationService {
       
       if (fileId.includes('drive.google.com')) {
         const match = fileId.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        pngUrl = match ? `https://lh3.googleusercontent.com/d/${match[1]}` : '';
+        // Request high resolution version with =w4000 parameter for full quality
+        pngUrl = match ? `https://lh3.googleusercontent.com/d/${match[1]}=w4000` : '';
         if (!pngUrl) throw new Error('Invalid Google Drive URL format');
       } else {
-        pngUrl = `https://lh3.googleusercontent.com/d/${fileId}`;
+        // Request high resolution version with =w4000 parameter for full quality
+        pngUrl = `https://lh3.googleusercontent.com/d/${fileId}=w4000`;
       }
 
+      console.log('🔗 Loading PNG template from:', pngUrl);
       const img = await this.loadImage(pngUrl);
       
       // Scale the PNG to fit the expected canvas dimensions (for proper DPI)
