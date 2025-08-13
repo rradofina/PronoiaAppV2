@@ -45,6 +45,7 @@ interface PackageTemplatePreviewProps {
   loading?: boolean;
   onTemplateReplace?: (packageId: string, templateIndex: number, newTemplate: ManualTemplate) => void; // Position-based dispatch callback
   onTemplateAdd?: (template: ManualTemplate) => void; // Callback for adding new templates to package
+  onTemplateDelete?: (templateIndex: number) => void; // Callback for deleting additional templates
 }
 
 export default function PackageTemplatePreview({
@@ -57,7 +58,8 @@ export default function PackageTemplatePreview({
   availablePhotos = [],
   loading = false,
   onTemplateReplace,
-  onTemplateAdd
+  onTemplateAdd,
+  onTemplateDelete
 }: PackageTemplatePreviewProps) {
   
   // Modal state for template selection
@@ -298,19 +300,41 @@ export default function PackageTemplatePreview({
                 {/* Template Header with Name and Change Button */}
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
-                    <h4 className="font-medium text-gray-900 text-sm truncate">
+                    <h4 className="font-medium text-gray-900 text-sm truncate flex items-center">
                       {template.name}
+                      {/* Badge for additional templates */}
+                      {(template as any)._isFromAddition && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                          Added
+                        </span>
+                      )}
                     </h4>
                     <div className="text-xs text-gray-500 mt-1">
                       {template.holes_data?.length || 0} photo slot{(template.holes_data?.length || 0) !== 1 ? 's' : ''}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleChangeTemplate(template, index)}
-                    className="ml-2 bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 whitespace-nowrap"
-                  >
-                    Change Template
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleChangeTemplate(template, index)}
+                      className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 whitespace-nowrap"
+                    >
+                      Change Template
+                    </button>
+                    {/* Delete button for additional templates only */}
+                    {(template as any)._isFromAddition && onTemplateDelete && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Are you sure you want to delete "${template.name}"?`)) {
+                            onTemplateDelete(index);
+                          }
+                        }}
+                        className="bg-red-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 whitespace-nowrap"
+                        title="Delete this added template"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Template Visual Preview with Sample Photos */}

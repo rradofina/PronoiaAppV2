@@ -31,6 +31,7 @@ type TemplateAction =
   // Session-based template customizations (client modifications)
   | { type: 'REPLACE_TEMPLATE_IN_SESSION'; packageId: string; templateIndex: number; newTemplate: ManualTemplate }
   | { type: 'ADD_TEMPLATE_TO_SESSION'; packageId: string; template: ManualTemplate }
+  | { type: 'DELETE_TEMPLATE_FROM_SESSION'; packageId: string; templateIndex: number }
   | { type: 'CLEAR_SESSION_OVERRIDES'; packageId?: string }
   
   // UI state management
@@ -127,6 +128,45 @@ function templateReducer(state: TemplateState, action: TemplateAction): Template
           [action.packageId]: {
             ...currentSessionOverrides,
             additions: [...currentSessionOverrides.additions, action.template]
+          }
+        }
+      };
+    
+    case 'DELETE_TEMPLATE_FROM_SESSION':
+      const deleteOverrides = state.sessionOverrides[action.packageId];
+      if (!deleteOverrides || !deleteOverrides.additions) {
+        return state;
+      }
+      
+      // Calculate the actual index in additions array
+      // We need to account for base templates when determining which addition to delete
+      const baseTemplateCount = state.basePackageTemplates[action.packageId]?.length || 0;
+      const additionIndex = action.templateIndex - baseTemplateCount;
+      
+      if (additionIndex < 0 || additionIndex >= deleteOverrides.additions.length) {
+        console.warn('⚠️ Invalid template index for deletion:', {
+          templateIndex: action.templateIndex,
+          baseTemplateCount,
+          additionIndex,
+          totalAdditions: deleteOverrides.additions.length
+        });
+        return state;
+      }
+      
+      console.log('🗑️ SESSION-BASED TEMPLATE DELETION:', {
+        packageId: action.packageId,
+        templateIndex: action.templateIndex,
+        additionIndex,
+        deletedTemplate: deleteOverrides.additions[additionIndex]?.name
+      });
+      
+      return {
+        ...state,
+        sessionOverrides: {
+          ...state.sessionOverrides,
+          [action.packageId]: {
+            ...deleteOverrides,
+            additions: deleteOverrides.additions.filter((_, index) => index !== additionIndex)
           }
         }
       };
@@ -449,6 +489,31 @@ export default function FolderSelectionScreen({
       dispatchTemplate({ 
         type: 'SET_ERROR', 
         error: `Failed to add template: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      });
+    }
+  }, []);
+  
+  // Delete template from session (only for additions)
+  const handleTemplateDelete = useCallback((packageId: string, templateIndex: number) => {
+    console.log('🗑️ Deleting template from session:', {
+      packageId,
+      templateIndex
+    });
+    
+    try {
+      // Delete template from session overrides
+      dispatchTemplate({
+        type: 'DELETE_TEMPLATE_FROM_SESSION',
+        packageId,
+        templateIndex
+      });
+      
+      console.log('✅ Template deleted from session successfully');
+    } catch (error) {
+      console.error('❌ Failed to delete template from session:', error);
+      dispatchTemplate({ 
+        type: 'SET_ERROR', 
+        error: `Failed to delete template: ${error instanceof Error ? error.message : 'Unknown error'}` 
       });
     }
   }, []);
@@ -927,6 +992,9 @@ export default function FolderSelectionScreen({
                                           onTemplateAdd={(newTemplate) => 
                                             handleTemplateAdd(pkg.id.toString(), newTemplate)
                                           }
+                                          onTemplateDelete={(templateIndex) =>
+                                            handleTemplateDelete(pkg.id.toString(), templateIndex)
+                                          }
                                         />
                                       )}
                                     </AnimatedTemplateReveal>
@@ -1042,6 +1110,9 @@ export default function FolderSelectionScreen({
                                         }
                                         onTemplateAdd={(newTemplate) => 
                                           handleTemplateAdd(pkg.id.toString(), newTemplate)
+                                        }
+                                        onTemplateDelete={(templateIndex) =>
+                                          handleTemplateDelete(pkg.id.toString(), templateIndex)
                                         }
                                       />
                                     )}
