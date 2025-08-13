@@ -27,6 +27,7 @@ export default function PackageSelectionScreen({
   const [templates, setTemplates] = useState<ManualTemplate[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [templateError, setTemplateError] = useState<string | null>(null);
+  const [originalTemplateCount, setOriginalTemplateCount] = useState(0);
   
   // Load templates when component mounts or selected package changes
   useEffect(() => {
@@ -38,9 +39,11 @@ export default function PackageSelectionScreen({
           const packageWithTemplates = await manualPackageService.getPackageWithTemplates(selectedPackage.id);
           if (packageWithTemplates && packageWithTemplates.templates) {
             setTemplates(packageWithTemplates.templates);
+            setOriginalTemplateCount(packageWithTemplates.templates.length); // Track original count
             console.log('✅ Loaded templates for package:', packageWithTemplates.templates.length);
           } else {
             setTemplates([]);
+            setOriginalTemplateCount(0);
             setTemplateError('No templates found for this package');
           }
         } catch (error) {
@@ -106,18 +109,25 @@ export default function PackageSelectionScreen({
               templates={templates}
               packageName={selectedPackage.name}
               packageId={selectedPackage.id.toString()}
+              originalTemplateCount={originalTemplateCount}
               onContinue={() => {
+                // Mark templates as additional if they're beyond the original count
+                const templatesWithFlags = templates.map((template, index) => ({
+                  ...template,
+                  _isFromAddition: index >= originalTemplateCount
+                }));
                 // Pass the current templates (including added ones) to handlePackageContinue
-                console.log('📋 Continuing with templates:', templates.length);
-                handlePackageContinue(templates);
+                console.log('📋 Continuing with templates:', templates.length, `(${originalTemplateCount} original, ${templates.length - originalTemplateCount} additional)`);
+                handlePackageContinue(templatesWithFlags);
               }}
               onChangePackage={handleBack}
               availablePhotos={photos}
               loading={isLoadingTemplates}
               onTemplateAdd={(template) => {
                 // Add the new template to the list
-                setTemplates([...templates, template]);
-                console.log('Template added:', template.name);
+                const newTemplates = [...templates, template];
+                setTemplates(newTemplates);
+                console.log('✅ Template added:', template.name);
               }}
               onTemplateDelete={(templateIndex) => {
                 // Remove the template at the specified index

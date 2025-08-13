@@ -39,6 +39,7 @@ interface PackageTemplatePreviewProps {
   templates: ManualTemplate[];
   packageName: string;
   packageId: string; // Package ID for template replacement
+  originalTemplateCount: number; // Number of templates in original package
   onContinue: () => void;
   onChangePackage: () => void;
   onTemplateSelect?: (template: ManualTemplate) => void;
@@ -53,6 +54,7 @@ export default function PackageTemplatePreview({
   templates,
   packageName,
   packageId,
+  originalTemplateCount,
   onContinue,
   onChangePackage,
   onTemplateSelect,
@@ -320,6 +322,14 @@ export default function PackageTemplatePreview({
                 {/* Template Header with Name and Change Button */}
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1 min-w-0">
+                    {/* Additional Print Badge */}
+                    {index >= originalTemplateCount && (
+                      <div className="mb-1">
+                        <span className="inline-block bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                          Additional Print
+                        </span>
+                      </div>
+                    )}
                     <h4 className="font-medium text-gray-900 text-sm truncate">
                       {template.name}
                     </h4>
@@ -336,7 +346,7 @@ export default function PackageTemplatePreview({
                       <span className="sm:hidden">Change</span>
                     </button>
                     {/* Delete button for additional templates only */}
-                    {(template as any)._isFromAddition && onTemplateDelete && (
+                    {index >= originalTemplateCount && onTemplateDelete && (
                       <button
                         onClick={() => handleDeleteClick(index, template.name)}
                         className="text-gray-400 hover:text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 rounded p-0.5"

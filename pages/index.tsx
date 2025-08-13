@@ -750,7 +750,7 @@ export default function Home() {
       // Folder has existing prints
       console.log('⚠️ Prints folder already has content');
       setShowExistingPrintsDialog(true);
-      throw new Error('FOLDER_HAS_CONTENT');
+      return null; // Return null to indicate folder has content
     }
     
     setPrintsFolderId(folderId);
@@ -779,7 +779,7 @@ export default function Home() {
       // Folder has existing photos
       console.log('⚠️ Photos folder already has content');
       setShowExistingPrintsDialog(true);
-      throw new Error('FOLDER_HAS_CONTENT');
+      return null; // Return null to indicate folder has content
     }
     
     console.log(`✅ Photos folder ready: ${folderId}`);
@@ -800,6 +800,13 @@ export default function Home() {
 
     try {
       const folderId = await ensurePrintsFolder();
+      
+      // Check if folder setup failed due to existing content
+      if (!folderId) {
+        console.log('❌ Cannot upload - folder has existing content');
+        setIsUploading(false);
+        return;
+      }
       
       // Group templates by templateName for generation
       const templateGroups = new Map<string, TemplateSlot[]>();
@@ -944,6 +951,13 @@ export default function Home() {
 
     try {
       const folderId = await ensurePhotosFolder();
+      
+      // Check if folder setup failed due to existing content
+      if (!folderId) {
+        console.log('❌ Cannot upload - folder has existing content');
+        setIsUploading(false);
+        return;
+      }
       
       console.log(`📋 Preparing to upload ${favoritedPhotos.length} photos`);
       setUploadProgress({ 
