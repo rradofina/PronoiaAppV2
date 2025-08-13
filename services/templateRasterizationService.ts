@@ -54,6 +54,8 @@ class TemplateRasterizationService {
 
   /**
    * Generate rasterized template from manual template and slots
+   * Creates images with correct pixel dimensions for printing at 300 DPI
+   * (DPI metadata will show 96 due to browser limitations, but pixel count is correct)
    */
   async rasterizeTemplate(
     template: ManualTemplate,
@@ -413,6 +415,8 @@ class TemplateRasterizationService {
 
   /**
    * Convert canvas to blob
+   * Note: Browser canvas API doesn't support DPI metadata, so images will show 96 DPI
+   * but have correct pixel dimensions for printing at 300 DPI when printed at intended size
    */
   private async canvasToBlob(format: 'jpeg' | 'png', quality: number = 0.95): Promise<Blob> {
     return new Promise((resolve, reject) => {
