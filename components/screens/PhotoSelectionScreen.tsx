@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import toast from 'react-hot-toast';
+import ConfirmationModal from '../ConfirmationModal';
 import InlineTemplateEditor from '../InlineTemplateEditor';
 import InlinePhotoEditor from '../InlinePhotoEditor';
 import FullscreenPhotoViewer from '../FullscreenPhotoViewer';
@@ -396,6 +397,10 @@ export default function PhotoSelectionScreen({
   
   // Add Prints modal state
   const [showAddPrintsModal, setShowAddPrintsModal] = useState(false);
+  
+  // Delete confirmation modal state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
 
   // Setup viewport handling for iPad Safari compatibility
   useEffect(() => {
@@ -564,7 +569,16 @@ export default function PhotoSelectionScreen({
       return;
     }
     
-    if (window.confirm('Are you sure you want to delete this added print? This will remove any photos placed in it.')) {
+    // Store the template ID and show confirmation modal
+    setTemplateToDelete(templateIdToDelete);
+    setShowDeleteConfirm(true);
+  };
+  
+  const handleConfirmDelete = () => {
+    if (!templateToDelete) return;
+    
+    // Original delete logic moved here
+    const templateIdToDelete = templateToDelete;
       // Get current template groups before deletion
       const currentGroups = Object.values(
         templateSlots.reduce((acc, slot) => {
@@ -628,7 +642,12 @@ export default function PhotoSelectionScreen({
           setTemplateToNavigate(targetTemplateId);
         }
       }
-    }
+      
+      // Clear the state after deletion
+      setTemplateToDelete(null);
+      setShowDeleteConfirm(false);
+      
+      toast.success('Template deleted successfully');
   };
 
   // New workflow handlers
@@ -1921,6 +1940,21 @@ export default function PhotoSelectionScreen({
         onClose={() => setShowAddPrintsModal(false)}
         onTemplateAdd={handleTemplateAdd}
         availablePhotos={photos}
+      />
+      
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setTemplateToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Remove Template"
+        message="Are you sure you want to remove this template? Any photos placed in it will be removed."
+        confirmText="Remove"
+        cancelText="Cancel"
+        confirmButtonClass="bg-gray-600 hover:bg-gray-700"
       />
 
       {/* New Workflow Components */}

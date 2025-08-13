@@ -391,8 +391,8 @@ export default function TemplateGrid({
                       }
                       onDeleteTemplate(templateId);
                     }}
-                    title="Delete Print"
-                    className={`bg-red-600 text-white rounded-full p-1 sm:p-1.5 shadow-sm hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ${
+                    title="Remove Print"
+                    className={`text-gray-400 hover:text-gray-600 rounded-full p-1 sm:p-1.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 ${
                       isEditingMode ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   >

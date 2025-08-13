@@ -4,6 +4,7 @@ import { AnimatedTemplateItem } from './animations/AnimatedTemplateReveal';
 import PngTemplateVisual from './PngTemplateVisual';
 import TemplateSelectionModal from './TemplateSelectionModal';
 import AddPrintsModal from './AddPrintsModal';
+import ConfirmationModal from './ConfirmationModal';
 import { getSamplePhotosForTemplate } from '../utils/samplePhotoUtils';
 import { createPhotoTransform, PhotoTransform } from '../types';
 import { getPrintSizeDimensions } from '../utils/printSizeDimensions';
@@ -69,6 +70,10 @@ export default function PackageTemplatePreview({
   // Modal state for adding prints
   const [showAddPrintsModal, setShowAddPrintsModal] = useState(false);
   
+  // Confirmation modal state for deletion
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<{index: number, name: string} | null>(null);
+  
   // Use templates directly from props since parent manages state
   const currentTemplates = templates;
 
@@ -112,6 +117,18 @@ export default function PackageTemplatePreview({
 
   const handleAddPrints = () => {
     setShowAddPrintsModal(true);
+  };
+  
+  const handleDeleteClick = (index: number, templateName: string) => {
+    setTemplateToDelete({ index, name: templateName });
+    setShowDeleteConfirm(true);
+  };
+  
+  const handleConfirmDelete = () => {
+    if (templateToDelete && onTemplateDelete) {
+      onTemplateDelete(templateToDelete.index);
+      setTemplateToDelete(null);
+    }
   };
 
   const handleTemplateAdd = (template: ManualTemplate) => {
@@ -323,15 +340,13 @@ export default function PackageTemplatePreview({
                     {/* Delete button for additional templates only */}
                     {(template as any)._isFromAddition && onTemplateDelete && (
                       <button
-                        onClick={() => {
-                          if (window.confirm(`Are you sure you want to delete "${template.name}"?`)) {
-                            onTemplateDelete(index);
-                          }
-                        }}
-                        className="bg-red-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 whitespace-nowrap"
-                        title="Delete this added template"
+                        onClick={() => handleDeleteClick(index, template.name)}
+                        className="ml-1 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 rounded"
+                        title="Remove this added template"
                       >
-                        Delete
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
                     )}
                   </div>
@@ -434,6 +449,21 @@ export default function PackageTemplatePreview({
         onClose={() => setShowAddPrintsModal(false)}
         onTemplateAdd={handleTemplateAdd}
         availablePhotos={availablePhotos}
+      />
+      
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setTemplateToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Remove Template"
+        message={`Are you sure you want to remove "${templateToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Remove"
+        cancelText="Cancel"
+        confirmButtonClass="bg-gray-600 hover:bg-gray-700"
       />
     </div>
   );
