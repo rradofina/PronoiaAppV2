@@ -23,6 +23,7 @@ import { manualPackageService } from '../services/manualPackageService';
 import { templateCacheService } from '../services/templateCacheService';
 import { printSizeService } from '../services/printSizeService';
 import { templateRasterizationService } from '../services/templateRasterizationService';
+import { getPrintSizeDimensions } from '../utils/printSizeDimensions';
 
 declare global {
   interface Window {
@@ -780,7 +781,13 @@ export default function Home() {
 
           console.log('📝 Found manual template:', manualTemplate.name);
 
-          // Rasterize the template
+          // Get the correct DPI for the template's print size
+          const printDimensions = getPrintSizeDimensions(manualTemplate.print_size);
+          const dpi = printDimensions.dpi || 300; // Default to 300 DPI if not specified
+
+          console.log('🖨️ Using DPI for', manualTemplate.print_size, ':', dpi);
+
+          // Rasterize the template with correct DPI
           const rasterized = await templateRasterizationService.rasterizeTemplate(
             manualTemplate,
             slots,
@@ -788,7 +795,8 @@ export default function Home() {
             {
               format: 'jpeg',
               quality: 0.95,
-              includeBackground: true
+              includeBackground: true,
+              dpi: dpi // Pass the correct DPI for the print size
             }
           );
 

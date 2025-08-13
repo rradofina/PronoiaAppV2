@@ -6,6 +6,7 @@
 
 import { TemplateSlot, Photo, PhotoTransform, isPhotoTransform, ManualTemplate } from '../types';
 import { getHighResPhotoUrls } from '../utils/photoUrlUtils';
+import { getPrintSizeDimensions } from '../utils/printSizeDimensions';
 
 export interface RasterizedTemplate {
   blob: Blob;
@@ -70,16 +71,26 @@ class TemplateRasterizationService {
     };
 
     try {
-      // CLIPPING FIX: Use PNG natural dimensions for canvas to show full template
-      let canvasWidth = template.dimensions.width;
-      let canvasHeight = template.dimensions.height;
+      // Use the correct dimensions for the print size with proper DPI
+      const expectedDimensions = getPrintSizeDimensions(template.print_size);
+      let canvasWidth = expectedDimensions.width;
+      let canvasHeight = expectedDimensions.height;
       
+      // Log dimension information for debugging
+      console.log('📐 Template dimensions:', {
+        printSize: template.print_size,
+        expectedDimensions: expectedDimensions,
+        storedDimensions: template.dimensions,
+        dpi: settings.dpi
+      });
+      
+      // If PNG has different dimensions, we'll scale it to match expected dimensions
       if (template.drive_file_id) {
         const pngDimensions = await this.getPngNaturalDimensions(template.drive_file_id);
         if (pngDimensions) {
-          canvasWidth = pngDimensions.width;
-          canvasHeight = pngDimensions.height;
-          console.log('🎨 Using PNG natural dimensions for canvas:', pngDimensions);
+          console.log('🖼️ PNG natural dimensions:', pngDimensions);
+          // We keep the expected dimensions to ensure proper DPI
+          // The PNG will be scaled to fit during drawTemplateBackground
         }
       }
       
@@ -155,20 +166,24 @@ class TemplateRasterizationService {
 
       const img = await this.loadImage(pngUrl);
       
-      // CLIPPING FIX: Draw PNG at natural 1:1 scale (no scaling)
-      // Canvas is already sized to match PNG dimensions
-      this.templateScale = 1;
+      // Scale the PNG to fit the expected canvas dimensions (for proper DPI)
+      const scaleX = this.canvas.width / img.width;
+      const scaleY = this.canvas.height / img.height;
+      
+      // Store the scale for coordinate transformation
+      this.templateScale = Math.min(scaleX, scaleY);
       this.templateOffsetX = 0;
       this.templateOffsetY = 0;
       
-      console.log('🎨 Drawing PNG at natural 1:1 scale:', {
+      console.log('🎨 Scaling PNG to match print size dimensions:', {
         pngSize: { width: img.width, height: img.height },
         canvasSize: { width: this.canvas.width, height: this.canvas.height },
-        scale: this.templateScale,
-        offset: { x: this.templateOffsetX, y: this.templateOffsetY }
+        scaleFactors: { x: scaleX.toFixed(3), y: scaleY.toFixed(3) },
+        finalScale: this.templateScale.toFixed(3)
       });
       
-      this.ctx.drawImage(img, 0, 0, img.width, img.height);
+      // Draw the PNG scaled to fill the canvas (maintaining expected dimensions)
+      this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
     } catch (error) {
       console.warn('⚠️ Failed to load template background, continuing without it:', error);
     }
