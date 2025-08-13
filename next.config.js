@@ -41,13 +41,36 @@ const nextConfig = {
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
-  webpack: (config) => {
+  webpack: (config, { dev, isServer }) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
       canvas: false,
       encoding: false,
     };
+    
+    // Fix for Fast Refresh infinite loop issue
+    if (dev && !isServer) {
+      config.watchOptions = {
+        ...config.watchOptions,
+        ignored: ['**/node_modules/**', '**/.next/**'],
+        poll: false, // Disable polling
+      };
+      
+      // Disable aggressive hot reloading that causes loops
+      config.devServer = {
+        ...config.devServer,
+        hot: true,
+        liveReload: false, // Prevent automatic page reloads
+      };
+    }
+    
     return config;
+  },
+  
+  // Disable Fast Refresh for problematic files
+  onDemandEntries: {
+    maxInactiveAge: 60 * 1000, // Increase inactive age
+    pagesBufferLength: 5, // Increase buffer
   },
   async headers() {
     return [

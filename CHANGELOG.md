@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-13] - Add Prints Enhancement with Template Selection and Animation
+
+### Changed
+- **Add Prints Modal - Selection-First Approach**:
+  - Changed from immediate add to selection-first interface (consistent with Change Template)
+  - Users must now select a template before confirming the addition
+  - Selected templates show green highlight border (removed blocking overlay)
+  - Added persistent Cancel and Add Template buttons at bottom of modal
+  - Buttons remain visible during loading/error states for better UX
+  - Files Modified:
+    - `components/AddPrintsModal.tsx` - Added selection state, made buttons persistent, removed blocking indicator
+  - Impact: More intuitive and consistent user experience across template operations
+  - Commit: Current
+
+### Added
+- **Auto-Navigation to Newly Added Templates**:
+  - When template is added, coverflow automatically navigates to show it centered
+  - Smooth transition animation to the new template position
+  - Template "pops out" with scale animation to draw attention
+  - Files Modified:
+    - `components/screens/PhotoSelectionScreen.tsx` - Added templateToNavigate state
+    - `components/TemplateGrid.tsx` - Added auto-navigation logic and animation support
+    - `styles/globals.css` - Added template-pop keyframe animation
+  - Impact: Users immediately see the template they just added, improving workflow
+  - Commit: Current
+
+- **Auto-Navigation After Template Deletion**:
+  - When deleting a template, automatically navigate to the next available template
+  - If deleted template was last, navigate to previous template
+  - Maintains user context and flow after deletion
+  - Files Modified:
+    - `components/screens/PhotoSelectionScreen.tsx` - Updated handleDeletePrint with auto-navigation logic
+  - Impact: Smoother workflow when managing multiple templates
+  - Commit: Current
+
 ## [2025-08-13] - Unfavoriting Protection for Photos in Template Slots
 
 ### Added

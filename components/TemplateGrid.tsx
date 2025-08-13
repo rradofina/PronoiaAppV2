@@ -16,6 +16,8 @@ interface TemplateGridProps {
   isEditingMode?: boolean;
   editingSlot?: TemplateSlot | null;
   onTemplateChange?: (templateIndex: number, templateId: string) => void;
+  templateToNavigate?: string | null;
+  onNavigationComplete?: () => void;
 }
 
 export default function TemplateGrid({
@@ -31,7 +33,9 @@ export default function TemplateGrid({
   showActions = true,
   isEditingMode = false,
   editingSlot = null,
-  onTemplateChange
+  onTemplateChange,
+  templateToNavigate,
+  onNavigationComplete
 }: TemplateGridProps) {
   
   // Cover Flow state
@@ -74,6 +78,9 @@ export default function TemplateGrid({
       spacing: optimalSpacing
     };
   };
+
+  // State for animation
+  const [animatingTemplateId, setAnimatingTemplateId] = useState<string | null>(null);
 
   // Group slots by template
   const templateGroups = Object.values(
@@ -147,6 +154,54 @@ export default function TemplateGrid({
       resizeObserver.disconnect();
     };
   }, []);
+
+  // Auto-navigate to newly added template
+  useEffect(() => {
+    if (templateToNavigate && layout === 'coverflow') {
+      // Find the index of the template to navigate to
+      const targetIndex = templateGroups.findIndex(group => group.templateId === templateToNavigate);
+      
+      if (targetIndex !== -1 && targetIndex !== currentIndex) {
+        console.log('🚀 Auto-navigating to newly added template:', {
+          templateId: templateToNavigate,
+          targetIndex,
+          currentIndex
+        });
+        
+        // Start animation for the new template
+        setAnimatingTemplateId(templateToNavigate);
+        
+        // Navigate to the template with a slight delay for visual effect
+        const navigationTimer = setTimeout(() => {
+          navigateToTemplate(targetIndex);
+          
+          // Clear animation after navigation
+          const animationTimer = setTimeout(() => {
+            setAnimatingTemplateId(null);
+          }, 1000);
+          
+          // Cleanup animation timer
+          return () => clearTimeout(animationTimer);
+        }, 100);
+        
+        // Notify parent that navigation is complete
+        if (onNavigationComplete) {
+          const completeTimer = setTimeout(() => {
+            onNavigationComplete();
+          }, 600);
+          
+          // Cleanup complete timer
+          return () => clearTimeout(completeTimer);
+        }
+        
+        // Cleanup navigation timer
+        return () => clearTimeout(navigationTimer);
+      } else if (targetIndex !== -1 && onNavigationComplete) {
+        // Already at the target, just notify completion
+        onNavigationComplete();
+      }
+    }
+  }, [templateToNavigate, layout, onNavigationComplete]); // Removed templateGroups and currentIndex to prevent loops
 
   // Keyboard navigation for Cover Flow
   useEffect(() => {
@@ -259,10 +314,12 @@ export default function TemplateGrid({
         const isCurrentEditingTemplate = editingSlot && slots.some(slot => slot.id === editingSlot.id);
         const shouldBlock = isEditingMode && !isCurrentEditingTemplate;
         
+        const isAnimating = animatingTemplateId === templateId;
+        
         return (
           <div 
             key={templateId} 
-            className={`${itemClasses} ${shouldBlock ? 'pointer-events-none brightness-75' : ''}`}
+            className={`${itemClasses} ${shouldBlock ? 'pointer-events-none brightness-75' : ''} ${isAnimating ? 'animate-template-pop' : ''}`}
             style={{
               ...itemStyle,
               ...getCoverFlowStyle(index)

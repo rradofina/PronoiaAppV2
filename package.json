@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:clean": "npx kill-port 3000 3001 3002 3003 3004 && npx rimraf .next node_modules/.cache && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

@@ -29,15 +29,21 @@ export default function AddPrintsModal({
   const [groupedTemplates, setGroupedTemplates] = useState<GroupedTemplates>({});
   const [printSizes, setPrintSizes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<ManualTemplate | null>(null);
 
   // Load templates grouped by print size
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      // Reset selection when modal closes
+      setSelectedTemplate(null);
+      return;
+    }
 
     const loadTemplates = async () => {
       try {
         setLoading(true);
         setError(null);
+        setSelectedTemplate(null); // Reset selection when opening
 
         console.log('🔄 Loading templates for Add Prints modal...');
 
@@ -87,13 +93,29 @@ export default function AddPrintsModal({
   }, [isOpen]);
 
   const handleTemplateSelect = (template: ManualTemplate) => {
-    console.log('➕ Adding template to package:', {
+    console.log('✅ Template selected:', {
       templateId: template.id,
       templateName: template.name,
       printSize: template.print_size
     });
     
-    onTemplateAdd(template);
+    setSelectedTemplate(template);
+  };
+
+  const handleConfirmAdd = () => {
+    if (!selectedTemplate) {
+      console.log('⚠️ No template selected for adding');
+      return;
+    }
+
+    console.log('➕ Adding template to package:', {
+      templateId: selectedTemplate.id,
+      templateName: selectedTemplate.name,
+      printSize: selectedTemplate.print_size
+    });
+    
+    onTemplateAdd(selectedTemplate);
+    setSelectedTemplate(null);
     onClose();
   };
 
@@ -101,9 +123,9 @@ export default function AddPrintsModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
           <h2 className="text-xl font-semibold text-gray-900">Add More Prints</h2>
           <button
             onClick={onClose}
@@ -114,7 +136,7 @@ export default function AddPrintsModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+        <div className="p-6 overflow-y-auto flex-1">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -178,10 +200,22 @@ export default function AddPrintsModal({
                           transform: createPhotoTransform(1.0, 0.5, 0.5)
                         }));
 
+                        // Create photo filename assignments for this template's holes
+                        const holePhotoAssignments = (template.holes_data || []).map((hole, holeIndex) => {
+                          const assignedPhoto = availablePhotos[holeIndex % availablePhotos.length];
+                          return assignedPhoto?.name || `Photo ${holeIndex + 1}`;
+                        });
+
+                        const isSelected = selectedTemplate?.id === template.id;
+
                         return (
                           <div
                             key={template.id}
-                            className="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:shadow-md transition-all cursor-pointer hover:border-green-300"
+                            className={`rounded-lg p-3 border-2 transition-all cursor-pointer ${
+                              isSelected 
+                                ? 'bg-green-50 border-green-500 shadow-md' 
+                                : 'bg-gray-50 border-gray-200 hover:shadow-md hover:border-green-300'
+                            }`}
                             onClick={() => handleTemplateSelect(template)}
                           >
                             {/* Template Header */}
@@ -203,8 +237,8 @@ export default function AddPrintsModal({
                                   : template.print_size === 'A4' ? '2480/3508'
                                   : template.print_size === '5R' ? '1500/2100'
                                   : '1200/1800', // Default to 4R
-                                minHeight: '180px',
-                                maxHeight: '220px'
+                                minHeight: '220px',
+                                width: '100%'
                               }}
                             >
                               {template.drive_file_id ? (
@@ -233,6 +267,7 @@ export default function AddPrintsModal({
                                   isEditingMode={false}
                                   isActiveTemplate={false}
                                   debugHoles={false}
+                                  holePhotoAssignments={holePhotoAssignments}
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
@@ -241,10 +276,6 @@ export default function AddPrintsModal({
                               )}
                             </div>
 
-                            {/* Add Button */}
-                            <button className="w-full bg-green-600 text-white py-1.5 px-3 rounded text-sm font-medium hover:bg-green-700 transition-colors">
-                              Add Template
-                            </button>
                           </div>
                         );
                       })}
@@ -254,6 +285,27 @@ export default function AddPrintsModal({
               })}
             </div>
           )}
+        </div>
+
+        {/* Action Buttons - Always visible */}
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 bg-gray-50 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirmAdd}
+            disabled={!selectedTemplate || loading}
+            className={`px-6 py-2.5 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ${
+              selectedTemplate && !loading
+                ? 'text-white bg-green-600 hover:bg-green-700'
+                : 'text-gray-500 bg-gray-300 cursor-not-allowed'
+            }`}
+          >
+            Add Template
+          </button>
         </div>
       </div>
     </div>

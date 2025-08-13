@@ -133,14 +133,9 @@ function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isU
           <button
             onClick={(e) => {
               e.stopPropagation();
-              // Don't allow unfavoriting if photo is used in template
-              if (isUsedInTemplate && isFavorited) {
-                console.log('🚫 Star button disabled - photo in template slot');
-                return;
-              }
+              // Always call onToggleFavorite - it handles the logic and shows toast
               onToggleFavorite(photo.id);
             }}
-            disabled={isUsedInTemplate && isFavorited}
             className={`absolute top-1 right-1 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
               isFavorited 
                 ? 'bg-yellow-500 text-white shadow-lg' 

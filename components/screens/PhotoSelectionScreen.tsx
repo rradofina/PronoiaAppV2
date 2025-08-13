@@ -489,6 +489,8 @@ export default function PhotoSelectionScreen({
   };
 
 
+  const [templateToNavigate, setTemplateToNavigate] = useState<string | null>(null);
+
   const handleTemplateAdd = (template: ManualTemplate) => {
     // Create new slots for the added template
     const newSlotsToAdd: TemplateSlot[] = [];
@@ -531,18 +533,79 @@ export default function PhotoSelectionScreen({
       });
     }
     
+    // Update template slots
     setTemplateSlots([...templateSlots, ...newSlotsToAdd]);
+    
+    // Set the new template ID to navigate to
+    setTemplateToNavigate(newTemplateId);
+    
     toast.success(`Added ${template.name} template`);
   };
 
   const handleDeletePrint = (templateIdToDelete: string) => {
     if (window.confirm('Are you sure you want to delete this print? This will remove any photos placed in it.')) {
+      // Get current template groups before deletion
+      const currentGroups = Object.values(
+        templateSlots.reduce((acc, slot) => {
+          if (!acc[slot.templateId]) {
+            acc[slot.templateId] = {
+              templateId: slot.templateId,
+              templateName: slot.templateName,
+              slots: [],
+            };
+          }
+          acc[slot.templateId].slots.push(slot);
+          return acc;
+        }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
+      );
+      
+      // Find the index of the template being deleted
+      const deletedIndex = currentGroups.findIndex(group => group.templateId === templateIdToDelete);
+      
+      // Remove the template slots
       const newTemplateSlots = templateSlots.filter(s => s.templateId !== templateIdToDelete);
       setTemplateSlots(newTemplateSlots);
 
       // If the currently selected slot was part of the deleted template, deselect it
       if (selectedSlot?.templateId === templateIdToDelete) {
         setSelectedSlot(null);
+      }
+      
+      // Auto-navigate to next available template
+      if (newTemplateSlots.length > 0) {
+        // Get the new template groups after deletion
+        const newGroups = Object.values(
+          newTemplateSlots.reduce((acc, slot) => {
+            if (!acc[slot.templateId]) {
+              acc[slot.templateId] = {
+                templateId: slot.templateId,
+                templateName: slot.templateName,
+                slots: [],
+              };
+            }
+            acc[slot.templateId].slots.push(slot);
+            return acc;
+          }, {} as Record<string, { templateId: string; templateName: string; slots: TemplateSlot[] }>)
+        );
+        
+        if (newGroups.length > 0) {
+          // Determine which template to navigate to
+          let targetTemplateId: string;
+          
+          if (deletedIndex < newGroups.length) {
+            // Navigate to the template at the same index (next template took its place)
+            targetTemplateId = newGroups[deletedIndex].templateId;
+          } else if (deletedIndex > 0) {
+            // Was the last template, navigate to the previous one
+            targetTemplateId = newGroups[deletedIndex - 1].templateId;
+          } else {
+            // Fallback to first template
+            targetTemplateId = newGroups[0].templateId;
+          }
+          
+          console.log('🔄 Auto-navigating after deletion to template:', targetTemplateId);
+          setTemplateToNavigate(targetTemplateId);
+        }
       }
     }
   };
@@ -1707,6 +1770,8 @@ export default function PhotoSelectionScreen({
                     onDeleteTemplate={handleDeletePrint}
                     onDownloadTemplate={handleDownloadTemplate}
                     onTemplateChange={handleTemplateChange}
+                    templateToNavigate={templateToNavigate}
+                    onNavigationComplete={() => setTemplateToNavigate(null)}
                     TemplateVisual={(props: any) => (
                       <TemplateVisual
                         {...props}
