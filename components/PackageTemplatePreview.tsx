@@ -316,32 +316,27 @@ export default function PackageTemplatePreview({
               <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:shadow-md transition-shadow">
                 {/* Template Header with Name and Change Button */}
                 <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900 text-sm truncate flex items-center">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-gray-900 text-sm truncate">
                       {template.name}
-                      {/* Badge for additional templates */}
-                      {(template as any)._isFromAddition && (
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                          Added
-                        </span>
-                      )}
                     </h4>
                     <div className="text-xs text-gray-500 mt-1">
                       {template.holes_data?.length || 0} photo slot{(template.holes_data?.length || 0) !== 1 ? 's' : ''}
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1 flex-shrink-0">
                     <button
                       onClick={() => handleChangeTemplate(template, index)}
-                      className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 whitespace-nowrap"
+                      className="bg-gray-500 text-white px-2 py-1 rounded text-xs font-medium hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1"
                     >
-                      Change Template
+                      <span className="hidden sm:inline">Change Template</span>
+                      <span className="sm:hidden">Change</span>
                     </button>
                     {/* Delete button for additional templates only */}
                     {(template as any)._isFromAddition && onTemplateDelete && (
                       <button
                         onClick={() => handleDeleteClick(index, template.name)}
-                        className="ml-1 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 rounded"
+                        className="text-gray-400 hover:text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 rounded p-0.5"
                         title="Remove this added template"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
