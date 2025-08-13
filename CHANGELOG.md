@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-13] - Fix Additional Prints from Package Selection
+
+### Fixed
+- **Additional Prints from Package Selection**:
+  - Templates added via "Add Prints" in Package Selection screen are now properly marked as additional
+  - Delete button now appears for templates added in Package Selection screen
+  - "Added" badge displays correctly for these templates
+  - Files Modified:
+    - `components/screens/FolderSelectionScreen.tsx` - Added `_isFromAddition` marker to track template source
+    - `pages/index.tsx` - Check marker when creating slots to set `isAdditional` flag
+  - Impact: Users can now delete templates added via Package Selection screen as expected
+  - Commit: Current
+
+## [2025-08-13] - Identify and Manage Additional Prints
+
+### Added
+- **Additional Print Identification**:
+  - Added `isAdditional` flag to TemplateSlot interface to track templates added via "Add Prints" button
+  - Visual "Added" badge on additional templates in purple color for clear identification
+  - Files Modified:
+    - `types/index.ts` - Added `isAdditional?: boolean` to TemplateSlot interface
+    - `components/TemplateGrid.tsx` - Added purple "Added" badge to additional templates
+  - Impact: Users can easily identify which templates are part of the original package vs. added later
+  - Commit: Current
+
+### Changed
+- **Template Creation Logic**:
+  - Original package templates are marked with `isAdditional: false`
+  - Templates added via "Add Prints" are marked with `isAdditional: true`
+  - Removed redundant "(Additional)" suffix from template names
+  - Files Modified:
+    - `pages/index.tsx` - Set isAdditional flag during template slot creation
+    - `components/screens/PhotoSelectionScreen.tsx` - Updated handleTemplateAdd to set flag and remove suffix
+  - Impact: Cleaner template names with proper tracking of template origin
+  - Commit: Current
+
+### Fixed
+- **Delete Protection for Original Templates**:
+  - Only additional prints can be deleted, original package templates are protected
+  - Shows error toast when attempting to delete original package templates
+  - Delete button only appears on templates marked as additional
+  - Files Modified:
+    - `components/TemplateGrid.tsx` - Updated delete button visibility to check isAdditional flag
+    - `components/screens/PhotoSelectionScreen.tsx` - Added protection check in handleDeletePrint
+  - Impact: Prevents accidental deletion of base package templates while allowing flexible management of added prints
+  - Commit: Current
+
 ## [2025-08-13] - Fix Photo Upload Success Messages
 
 ### Fixed

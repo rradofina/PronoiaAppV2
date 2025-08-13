@@ -554,6 +554,7 @@ export interface TemplateSlot {
   photoId?: string;
   transform?: ContainerTransform | PhotoTransform; // Support both formats
   label?: string;
+  isAdditional?: boolean; // Flag to identify templates added via "Add Prints" button
 }
 
 // Legacy PhotoStudioPackage removed - now using manual packages

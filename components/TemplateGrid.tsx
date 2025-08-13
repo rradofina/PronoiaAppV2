@@ -332,6 +332,12 @@ export default function TemplateGrid({
               layout === 'horizontal' ? 'text-xs' : 'text-sm'
             }`}>
               {templateName}
+              {/* Badge for additional templates */}
+              {slots[0]?.isAdditional && (
+                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  Added
+                </span>
+              )}
             </h3>
             
             {showActions && (
@@ -376,7 +382,7 @@ export default function TemplateGrid({
                 )}
                 
                 {/* Delete button for additional templates only */}
-                {onDeleteTemplate && templateName.includes('(Additional)') && (
+                {onDeleteTemplate && slots[0]?.isAdditional && (
                   <button
                     onClick={() => {
                       if (isEditingMode) {

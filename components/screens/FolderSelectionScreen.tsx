@@ -186,19 +186,29 @@ function getEffectiveTemplates(
     return baseTemplates;
   }
   
-  // Start with base templates
-  let effectiveTemplates = [...baseTemplates];
+  // Start with base templates (mark them as NOT additional)
+  let effectiveTemplates = baseTemplates.map(template => ({
+    ...template,
+    _isFromAddition: false // Internal marker to track source
+  }));
   
-  // Apply session replacements
+  // Apply session replacements (replacements are still part of base package)
   Object.entries(sessionOverrides.replacements).forEach(([indexStr, replacementTemplate]) => {
     const index = parseInt(indexStr);
     if (index >= 0 && index < effectiveTemplates.length) {
-      effectiveTemplates[index] = replacementTemplate;
+      effectiveTemplates[index] = {
+        ...replacementTemplate,
+        _isFromAddition: false // Replacements are not additions
+      };
     }
   });
   
-  // Add session additions
-  effectiveTemplates = [...effectiveTemplates, ...sessionOverrides.additions];
+  // Add session additions (mark them as additional)
+  const markedAdditions = sessionOverrides.additions.map(template => ({
+    ...template,
+    _isFromAddition: true // Mark as addition for later processing
+  }));
+  effectiveTemplates = [...effectiveTemplates, ...markedAdditions];
   
   return effectiveTemplates;
 }

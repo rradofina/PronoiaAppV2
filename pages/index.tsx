@@ -1038,7 +1038,13 @@ export default function Home() {
         
         // Add slots for each configured template
         orderedTemplates.forEach((template, templateIndex) => {
-          const templateName = `${template.name} (Print #${templateIndex + 1})`;
+          // Check if this template is from an addition (added via Package Selection screen)
+          const isFromAddition = (template as any)._isFromAddition === true;
+          
+          // Use different naming for additional templates vs base package templates
+          const templateName = isFromAddition 
+            ? template.name // Additional templates: use name as-is
+            : `${template.name} (Print #${templateIndex + 1})`; // Base templates: add print number
           
           // Create slots for each hole in the template
           for (let slotIndex = 0; slotIndex < template.holes_data.length; slotIndex++) {
@@ -1049,7 +1055,8 @@ export default function Home() {
               templateType: template.id.toString(), // Use unique template ID instead of generic type
               printSize: template.print_size,
               slotIndex,
-              photoId: undefined
+              photoId: undefined,
+              isAdditional: isFromAddition // Mark based on whether it's from an addition
             });
           }
         });
@@ -1069,7 +1076,8 @@ export default function Home() {
                 templateType: templateToRepeat.id.toString(), // Use unique template ID instead of generic type
                 printSize: templateToRepeat.print_size,
                 slotIndex,
-                photoId: undefined
+                photoId: undefined,
+                isAdditional: true // Mark as additional print added beyond base package
               });
             }
           }

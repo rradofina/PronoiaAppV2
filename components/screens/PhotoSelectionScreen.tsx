@@ -515,11 +515,12 @@ export default function PhotoSelectionScreen({
       newSlotsToAdd.push({
         id: `${newTemplateId}_${slotIndex}`,
         templateId: newTemplateId,
-        templateName: `${template.name} (Additional)`,
+        templateName: template.name,
         templateType: template.id.toString() as TemplateType,
         printSize: template.print_size as PrintSize,
         slotIndex,
-        photoId: undefined
+        photoId: undefined,
+        isAdditional: true // Mark as additional print added via Add Prints button
       });
     }
     
@@ -553,7 +554,17 @@ export default function PhotoSelectionScreen({
   };
 
   const handleDeletePrint = (templateIdToDelete: string) => {
-    if (window.confirm('Are you sure you want to delete this print? This will remove any photos placed in it.')) {
+    // Check if template is additional (can be deleted) or original (protected)
+    const slotsToDelete = templateSlots.filter(s => s.templateId === templateIdToDelete);
+    if (slotsToDelete.length > 0 && !slotsToDelete[0].isAdditional) {
+      toast.error('Cannot delete original package templates. Only added prints can be removed.', {
+        duration: 4000,
+        icon: '🚫'
+      });
+      return;
+    }
+    
+    if (window.confirm('Are you sure you want to delete this added print? This will remove any photos placed in it.')) {
       // Get current template groups before deletion
       const currentGroups = Object.values(
         templateSlots.reduce((acc, slot) => {
