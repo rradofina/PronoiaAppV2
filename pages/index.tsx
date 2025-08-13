@@ -17,6 +17,7 @@ import PngTemplateManagementScreen from '../components/screens/PngTemplateManage
 import TemplateFolderSelectionScreen from '../components/screens/TemplateFolderSelectionScreen';
 import ManualTemplateManagerScreen from '../components/admin/ManualTemplateManagerScreen';
 import ManualPackageManagerScreen from '../components/admin/ManualPackageManagerScreen';
+import AdminSettingsScreen from '../components/admin/AdminSettingsScreen';
 import googleDriveService from '../services/googleDriveService';
 import { manualTemplateService } from '../services/manualTemplateService';
 import { manualPackageService } from '../services/manualPackageService';
@@ -309,7 +310,30 @@ export default function Home() {
           if (window.gapi && window.gapi.client) {
             window.gapi.client.setToken({ access_token: storedToken });
             googleDriveService.setAccessToken(storedToken);
-            setGoogleAuth({ isSignedIn: true, userEmail: storedEmail || 'Authenticated' });
+            // Try to get stored email, if not available, fetch from Google
+            const userEmail = storedEmail || localStorage.getItem('google_user_email');
+            if (userEmail) {
+              setGoogleAuth({ isSignedIn: true, userEmail });
+            } else {
+              // Fetch email from Google API
+              try {
+                const aboutResponse = await window.gapi.client.drive.about.get({
+                  fields: 'user(emailAddress)'
+                });
+                const email = aboutResponse.result.user?.emailAddress;
+                if (email) {
+                  localStorage.setItem('google_user_email', email);
+                  setGoogleAuth({ isSignedIn: true, userEmail: email });
+                } else {
+                  throw new Error('No email found');
+                }
+              } catch (error) {
+                console.error('Failed to fetch user email during restoration:', error);
+                // Sign out if we can't get email
+                handleSignOut();
+                return;
+              }
+            }
             
             // Test the token by loading folders
             await loadDriveFolders();
@@ -520,7 +544,7 @@ export default function Home() {
 
   // Handle OAuth redirect callback
   useEffect(() => {
-    const handleOAuthRedirect = () => {
+    const handleOAuthRedirect = async () => {
       const hash = window.location.hash.substring(1);
       if (hash) {
         addEvent('OAuth redirect callback detected');
@@ -562,10 +586,25 @@ export default function Home() {
             localStorage.setItem('google_refresh_token', refreshToken);
           }
           
-          // Note: We'll try to get the email after loading folders
-          
-          setGoogleAuth({ isSignedIn: true, userEmail: 'Authenticated' });
-          loadDriveFolders();
+          // Get user email immediately after OAuth
+          try {
+            const aboutResponse = await window.gapi.client.drive.about.get({
+              fields: 'user(emailAddress)'
+            });
+            const email = aboutResponse.result.user?.emailAddress;
+            
+            if (email) {
+              localStorage.setItem('google_user_email', email);
+              setGoogleAuth({ isSignedIn: true, userEmail: email });
+              loadDriveFolders();
+            } else {
+              throw new Error('Failed to get user email');
+            }
+          } catch (error) {
+            console.error('Failed to fetch user email:', error);
+            showError('Authentication Error', 'Could not retrieve your email address. Please try signing in again.');
+            handleSignOut();
+          }
         } else {
           setIsConnecting(false);
         }
@@ -1400,6 +1439,7 @@ export default function Home() {
             handleContinue={() => setCurrentScreen('package')} // Navigate to package screen when package selected
             onManageTemplates={() => setCurrentScreen('manual-template-manager')}
             onManagePackages={() => setCurrentScreen('manual-package-manager')}
+            onAdminSettings={() => setCurrentScreen('admin-settings')}
           />
         );
       case 'package':
@@ -1501,6 +1541,16 @@ export default function Home() {
             onSignOut={handleSignOut}
             onChangeMainFolder={handleChangeMainFolder}
             onBack={() => setCurrentScreen('manual-template-manager')}
+          />
+        );
+      case 'admin-settings':
+        return (
+          <AdminSettingsScreen
+            googleAuth={googleAuth}
+            mainSessionsFolder={mainSessionsFolder}
+            onSignOut={handleSignOut}
+            onChangeMainFolder={handleChangeMainFolder}
+            onBack={() => setCurrentScreen('folder-selection')}
           />
         );
       default:

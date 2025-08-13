@@ -269,6 +269,8 @@ interface FolderSelectionScreenProps {
   onManageTemplates: () => void;
   // New prop for package management
   onManagePackages?: () => void;
+  // New prop for admin settings
+  onAdminSettings?: () => void;
 }
 
 // Transform Google Drive URLs to working image URLs
@@ -412,6 +414,7 @@ export default function FolderSelectionScreen({
   handleContinue,
   onManageTemplates,
   onManagePackages,
+  onAdminSettings,
 }: FolderSelectionScreenProps) {
   const [selectedFolder, setSelectedFolder] = useState<DriveFolder | null>(null);
   const [showPackageSelection, setShowPackageSelection] = useState(false);
@@ -798,6 +801,7 @@ export default function FolderSelectionScreen({
         showMainFolder={true}
         onManageTemplates={onManageTemplates}
         onManagePackages={onManagePackages}
+        onAdminSettings={onAdminSettings}
       />
       
       <div className="p-4">

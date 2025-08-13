@@ -17,6 +17,10 @@ export class SupabaseService {
     google_id: string;
     avatar_url?: string;
   }): Promise<DbUser> {
+    // Validate email - prevent placeholder emails
+    if (!userData.email || userData.email === 'Authenticated' || userData.email.trim() === '') {
+      throw new Error('Invalid email address. Please ensure you are properly authenticated with Google.');
+    }
     // First try to find existing user
     const { data: existingUser } = await supabase
       .from('users')

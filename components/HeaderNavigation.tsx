@@ -9,6 +9,7 @@ interface HeaderNavigationProps {
   showMainFolder?: boolean;
   onManageTemplates?: () => void;
   onManagePackages?: () => void;
+  onAdminSettings?: () => void;
 }
 
 export default function HeaderNavigation({
@@ -19,6 +20,7 @@ export default function HeaderNavigation({
   showMainFolder = true,
   onManageTemplates,
   onManagePackages,
+  onAdminSettings,
 }: HeaderNavigationProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -131,7 +133,21 @@ export default function HeaderNavigation({
                       </button>
                     )}
                     
-                    {(onManageTemplates || onManagePackages) && (
+                    {onAdminSettings && (
+                      <button
+                        onClick={() => {
+                          onAdminSettings();
+                          setIsDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-3"
+                      >
+                        <span className="text-lg">⚙️</span>
+                        <span>Admin Settings</span>
+                        <span className="ml-auto text-xs bg-red-100 text-red-600 px-2 py-1 rounded">Super</span>
+                      </button>
+                    )}
+                    
+                    {(onManageTemplates || onManagePackages || onAdminSettings) && (
                       <div className="border-t border-gray-100 my-1"></div>
                     )}
                     

@@ -69,10 +69,7 @@ export default function PackageSelectionScreen({
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             Selected Package
           </h1>
-          <p className="text-gray-600">
-            Viewing package details for {clientName}
-          </p>
-          <div className="mt-2 text-sm text-blue-600">
+          <div className="text-sm text-blue-600">
             📁 {selectedClientFolder?.name} • {photos.length} photos available
           </div>
         </div>
@@ -80,20 +77,27 @@ export default function PackageSelectionScreen({
         {selectedPackage ? (
           <>
             {/* Selected Package Display */}
-            <div className="bg-white rounded-lg p-6 shadow-md border-2 border-blue-500 mb-6">
-              <div className="text-center">
-                <h3 className="text-2xl font-semibold text-gray-800 mb-2">
-                  {selectedPackage.name}
-                </h3>
-                <div className="text-2xl font-bold text-gray-900 mb-2">
-                  ₱{selectedPackage.price}
+            <div className="bg-white rounded-lg p-4 shadow-md border-2 border-blue-500 mb-6">
+              <div className="flex flex-col space-y-3">
+                {/* Package name and key details in one line */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <h3 className="text-xl font-semibold text-gray-800">
+                    {selectedPackage.name}
+                  </h3>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                    ₱{selectedPackage.price}
+                  </span>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                    {selectedPackage.templateCount} {selectedPackage.templateCount === 1 ? 'Print' : 'Prints'}
+                  </span>
                 </div>
-                <div className="text-lg text-blue-600 font-medium mb-3">
-                  {selectedPackage.templateCount} {selectedPackage.templateCount === 1 ? 'Print' : 'Prints'}
-                </div>
-                <p className="text-gray-600">
-                  {selectedPackage.description}
-                </p>
+                
+                {/* Description */}
+                {selectedPackage.description && (
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    {selectedPackage.description}
+                  </p>
+                )}
               </div>
             </div>
 
