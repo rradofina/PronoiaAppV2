@@ -231,6 +231,7 @@ export default function Home() {
   const [showExistingPrintsDialog, setShowExistingPrintsDialog] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; templateName: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadType, setUploadType] = useState<'templates' | 'photos' | null>(null);
 
   // Load main folder from localStorage on initial render
   useEffect(() => {
@@ -686,45 +687,79 @@ export default function Home() {
     }
   };
 
-  const handlePhotoContinue = async () => {
-    console.log('📸 Finalizing photo selections...');
+  // Create or get the prints folder for template uploads
+  const ensurePrintsFolder = async () => {
+    if (!selectedClientFolder) {
+      throw new Error('No client folder selected');
+    }
+
+    const printsFolderName = `Prints - ${selectedClientFolder.name}`;
+    console.log(`📁 Checking/Creating prints folder: ${printsFolderName}`);
+    
+    const folderId = await googleDriveService.createOutputFolder(
+      selectedClientFolder.id,
+      printsFolderName
+    );
+    
+    // Check if folder has content
+    const folderContents = await googleDriveService.getFolderContents(folderId);
+    
+    if (folderContents.files && folderContents.files.length > 0) {
+      // Folder has existing prints
+      console.log('⚠️ Prints folder already has content');
+      setShowExistingPrintsDialog(true);
+      throw new Error('FOLDER_HAS_CONTENT');
+    }
+    
+    setPrintsFolderId(folderId);
+    console.log(`✅ Prints folder ready: ${folderId}`);
+    return folderId;
+  };
+
+  // Create or get the photos folder for photo uploads
+  const ensurePhotosFolder = async () => {
+    if (!selectedClientFolder) {
+      throw new Error('No client folder selected');
+    }
+
+    const photosFolderName = `Photos - ${selectedClientFolder.name}`;
+    console.log(`📁 Checking/Creating photos folder: ${photosFolderName}`);
+    
+    const folderId = await googleDriveService.createOutputFolder(
+      selectedClientFolder.id,
+      photosFolderName
+    );
+    
+    // Check if folder has content
+    const folderContents = await googleDriveService.getFolderContents(folderId);
+    
+    if (folderContents.files && folderContents.files.length > 0) {
+      // Folder has existing photos
+      console.log('⚠️ Photos folder already has content');
+      setShowExistingPrintsDialog(true);
+      throw new Error('FOLDER_HAS_CONTENT');
+    }
+    
+    console.log(`✅ Photos folder ready: ${folderId}`);
+    return folderId;
+  };
+
+  // Handle template upload (previous handlePhotoContinue logic)
+  const handleTemplateUpload = async () => {
+    console.log('📸 Uploading print templates...');
     
     if (!selectedClientFolder) {
       showWarning('No client folder selected', 'Please go back and select a folder.');
       return;
     }
 
+    setUploadType('templates');
     setIsUploading(true);
 
     try {
-      // Create the prints folder name
-      const printsFolderName = `Prints - ${selectedClientFolder.name}`;
+      const folderId = await ensurePrintsFolder();
       
-      console.log(`📁 Checking/Creating prints folder: ${printsFolderName}`);
-      
-      // Check if folder exists and create if needed
-      const folderId = await googleDriveService.createOutputFolder(
-        selectedClientFolder.id,
-        printsFolderName
-      );
-      
-      // Check if folder has content
-      const folderContents = await googleDriveService.getFolderContents(folderId);
-      
-      if (folderContents.files && folderContents.files.length > 0) {
-        // Folder has existing prints
-        console.log('⚠️ Prints folder already has content');
-        setIsUploading(false);
-        setShowExistingPrintsDialog(true);
-        return;
-      }
-      
-      // Save the prints folder ID for later use
-      setPrintsFolderId(folderId);
-      
-      console.log(`✅ Prints folder ready: ${folderId}`);
-      
-      // Group templates by templateName for rasterization
+      // Group templates by templateName for generation
       const templateGroups = new Map<string, TemplateSlot[]>();
       templateSlots.forEach(slot => {
         if (!slot.templateName) return;
@@ -734,7 +769,7 @@ export default function Home() {
         templateGroups.get(slot.templateName)!.push(slot);
       });
 
-      console.log(`📋 Preparing to rasterize ${templateGroups.size} templates`);
+      console.log(`📋 Preparing to upload ${templateGroups.size} templates`);
       setUploadProgress({ current: 0, total: templateGroups.size, templateName: 'Preparing...' });
 
       // Get available print sizes for template lookup
@@ -746,11 +781,11 @@ export default function Home() {
       // Process each template group
       for (const [templateName, slots] of templateGroups.entries()) {
         try {
-          console.log(`🎨 Rasterizing template: ${templateName}`);
+          console.log(`🎨 Generating template: ${templateName}`);
           setUploadProgress({ 
             current: uploadedCount, 
             total: templateGroups.size, 
-            templateName: templateName 
+            templateName: `Uploading: ${templateName}` 
           });
 
           // Find the manual template for this template group
@@ -787,7 +822,7 @@ export default function Home() {
 
           console.log('🖨️ Using DPI for', manualTemplate.print_size, ':', dpi);
 
-          // Rasterize the template with correct DPI
+          // Generate the template with correct DPI
           const rasterized = await templateRasterizationService.rasterizeTemplate(
             manualTemplate,
             slots,
@@ -821,6 +856,7 @@ export default function Home() {
       }
 
       setUploadProgress(null);
+      setUploadType(null);
       setIsUploading(false);
 
       // Show completion message
@@ -836,12 +872,104 @@ export default function Home() {
         );
       }
       
-    } catch (error) {
-      console.error('❌ Error during finalization:', error);
-      showError('Failed to finalize prints', 'Please try again. Check the console for more details.');
+    } catch (error: any) {
+      console.error('❌ Failed to upload templates:', error);
       setUploadProgress(null);
+      setUploadType(null);
       setIsUploading(false);
+      if (error.message !== 'FOLDER_HAS_CONTENT') {
+        showError('Failed to upload templates', 'Please try again. Check the console for more details.');
+      }
     }
+  };
+
+  // Handle photo upload (copy favorited photos to Drive)
+  const handlePhotoUpload = async (favoritedPhotos: Photo[]) => {
+    console.log('📸 Uploading favorited photos...');
+    
+    if (!selectedClientFolder) {
+      showWarning('No client folder selected', 'Please go back and select a folder.');
+      return;
+    }
+
+    if (favoritedPhotos.length === 0) {
+      showWarning('No photos to upload', 'Please favorite some photos first.');
+      return;
+    }
+
+    setUploadType('photos');
+    setIsUploading(true);
+
+    try {
+      const folderId = await ensurePhotosFolder();
+      
+      console.log(`📋 Preparing to upload ${favoritedPhotos.length} photos`);
+      setUploadProgress({ 
+        current: 0, 
+        total: favoritedPhotos.length, 
+        templateName: 'Uploading photos...' 
+      });
+
+      let uploadedCount = 0;
+      const errors: string[] = [];
+
+      // Copy each favorited photo to the prints folder
+      for (const photo of favoritedPhotos) {
+        try {
+          console.log(`📤 Copying photo: ${photo.name}`);
+          setUploadProgress({ 
+            current: uploadedCount, 
+            total: favoritedPhotos.length, 
+            templateName: `Uploading: ${photo.name}` 
+          });
+
+          // Copy the file to the prints folder
+          await googleDriveService.copyFile(
+            photo.googleDriveId || photo.id,
+            folderId
+          );
+
+          uploadedCount++;
+          console.log(`✅ Uploaded: ${photo.name}`);
+
+        } catch (error) {
+          console.error(`❌ Failed to copy photo ${photo.name}:`, error);
+          errors.push(photo.name);
+        }
+      }
+
+      setUploadProgress(null);
+      setUploadType(null);
+      setIsUploading(false);
+
+      // Show completion message
+      if (errors.length > 0) {
+        showWarning(
+          'Photos uploaded with some errors',
+          `✅ Successful: ${uploadedCount}/${favoritedPhotos.length}\n❌ Failed: ${errors.join(', ')}\n\nCheck the photos folder in Google Drive.`
+        );
+      } else {
+        showSuccess(
+          'All photos uploaded successfully!',
+          `${uploadedCount} photos have been saved to the photos folder in Google Drive.`
+        );
+      }
+
+    } catch (error: any) {
+      console.error('❌ Failed to upload photos:', error);
+      setUploadProgress(null);
+      setUploadType(null);
+      setIsUploading(false);
+      if (error.message !== 'FOLDER_HAS_CONTENT') {
+        showError('Failed to upload photos', 'Please try again. Check the console for more details.');
+      }
+    }
+  };
+
+  // Keep the original handlePhotoContinue for compatibility, now shows the modal
+  const handlePhotoContinue = () => {
+    // This will be called from PhotoSelectionScreen to show the upload options modal
+    console.log('📸 Ready to finalize - showing upload options');
   };
 
   const handlePackageContinue = async (effectiveTemplates?: ManualTemplate[]) => {
@@ -1270,6 +1398,10 @@ export default function Home() {
             photos={localPhotos}
             getTotalTemplateCount={getTotalTemplateCount}
             handlePhotoContinue={handlePhotoContinue}
+            handleTemplateUpload={handleTemplateUpload}
+            handlePhotoUpload={handlePhotoUpload}
+            isUploading={isUploading}
+            uploadProgress={uploadProgress}
             handlePhotoSelect={handlePhotoSelect}
             handleSlotSelect={handleSlotSelect}
             handleBack={handleBack}
@@ -1443,7 +1575,7 @@ export default function Home() {
                     as="h3"
                     className="text-lg font-medium leading-6 text-gray-900 text-center mb-4"
                   >
-                    Uploading Templates
+                    {uploadType === 'photos' ? 'Uploading Photos' : 'Uploading Templates'}
                   </Dialog.Title>
                   
                   <div className="mt-2">
@@ -1468,7 +1600,11 @@ export default function Home() {
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            <span className="text-sm text-gray-600">Rasterizing and uploading...</span>
+                            <span className="text-sm text-gray-600">
+                              {uploadType === 'photos' 
+                                ? 'Uploading your selected photos...' 
+                                : 'Preparing and uploading your prints...'}
+                            </span>
                           </div>
                         </div>
                       </>
@@ -1476,7 +1612,9 @@ export default function Home() {
                   </div>
 
                   <div className="mt-6 text-center text-xs text-gray-500">
-                    Please wait while your templates are being uploaded to Google Drive.
+                    {uploadType === 'photos'
+                      ? 'Please wait while your photos are being uploaded to Google Drive.'
+                      : 'Please wait while your print files are being created and uploaded to Google Drive.'}
                     <br />
                     Do not close this window.
                   </div>

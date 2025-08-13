@@ -13,6 +13,7 @@ import SlidingTemplateBar from '../SlidingTemplateBar';
 import { manualTemplateService } from '../../services/manualTemplateService';
 import { templateRasterizationService } from '../../services/templateRasterizationService';
 import { printSizeService } from '../../services/printSizeService';
+import UploadOptionsModal from '../UploadOptionsModal';
 import { photoCacheService } from '../../services/photoCacheService';
 import PngTemplateVisual from '../PngTemplateVisual';
 import PhotoGrid from '../PhotoGrid';
@@ -292,6 +293,10 @@ interface PhotoSelectionScreenProps {
   photos: Photo[];
   getTotalTemplateCount: () => number;
   handlePhotoContinue: () => void;
+  handleTemplateUpload?: () => void;
+  handlePhotoUpload?: (favoritedPhotos: Photo[]) => void;
+  isUploading?: boolean;
+  uploadProgress?: { current: number; total: number; templateName: string } | null;
   handlePhotoSelect: (photo: Photo) => void;
   handleSlotSelect: (slot: TemplateSlot) => void;
   handleBack: () => void;
@@ -309,6 +314,10 @@ export default function PhotoSelectionScreen({
   photos,
   getTotalTemplateCount,
   handlePhotoContinue,
+  handleTemplateUpload,
+  handlePhotoUpload,
+  isUploading = false,
+  uploadProgress = null,
   handlePhotoSelect,
   handleSlotSelect,
   handleBack,
@@ -377,6 +386,7 @@ export default function PhotoSelectionScreen({
   
   // Incomplete slots warning
   const [showIncompleteWarning, setShowIncompleteWarning] = useState(false);
+  const [showUploadOptions, setShowUploadOptions] = useState(false);
   
   // Template management states (simplified)
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -1337,8 +1347,27 @@ export default function PhotoSelectionScreen({
       // Show warning if there are empty slots
       setShowIncompleteWarning(true);
     } else {
-      // All slots filled, proceed normally
+      // All slots filled, show upload options modal
+      setShowUploadOptions(true);
+    }
+  };
+
+  // Handle upload options
+  const handleUploadTemplatesClick = () => {
+    setShowUploadOptions(false);
+    if (handleTemplateUpload) {
+      handleTemplateUpload();
+    } else {
+      // Fallback to original behavior
       handlePhotoContinue();
+    }
+  };
+
+  const handleUploadPhotosClick = () => {
+    const favoritedPhotosList = photos.filter(photo => favoritedPhotos.has(photo.id));
+    setShowUploadOptions(false);
+    if (handlePhotoUpload) {
+      handlePhotoUpload(favoritedPhotosList);
     }
   };
 
@@ -1940,6 +1969,21 @@ export default function PhotoSelectionScreen({
           onTemplateSelect={handleConfirmTemplateSwap}
         />
       )}
+
+      {/* Upload Options Modal */}
+      <UploadOptionsModal
+        isOpen={showUploadOptions}
+        onClose={() => setShowUploadOptions(false)}
+        onUploadTemplates={handleUploadTemplatesClick}
+        onUploadPhotos={handleUploadPhotosClick}
+        favoritedPhotos={photos.filter(photo => favoritedPhotos.has(photo.id))}
+        isUploading={isUploading}
+        uploadProgress={uploadProgress ? {
+          current: uploadProgress.current,
+          total: uploadProgress.total,
+          message: uploadProgress.templateName
+        } : null}
+      />
 
       {/* Incomplete Slots Warning Dialog */}
       <Transition appear show={showIncompleteWarning} as={Fragment}>

@@ -489,6 +489,47 @@ class GoogleDriveService {
     }
   }
 
+  async copyFile(fileId: string, targetFolderId: string, newName?: string): Promise<string> {
+    try {
+      if (!this.isSignedIn()) {
+        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
+      }
+
+      const requestBody: any = {
+        parents: [targetFolderId]
+      };
+
+      if (newName) {
+        requestBody.name = newName;
+      }
+
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}/copy`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('Failed to copy file:', error);
+        throw new Error(`Failed to copy file: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ File copied successfully: ${result.name} (${result.id})`);
+      return result.id;
+    } catch (error) {
+      console.error('Failed to copy file:', error);
+      throw new Error('Failed to copy file to Google Drive');
+    }
+  }
+
   async downloadPhoto(photoId: string): Promise<Blob> {
     try {
       if (!this.isSignedIn()) {

@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-13] - Fix Photo Upload Success Messages
+
+### Fixed
+- **Corrected Photo Upload Success Messages**:
+  - Success message now correctly says "saved to the photos folder" instead of "prints folder"
+  - Error message now correctly says "Check the photos folder" instead of "prints folder"
+  - Files Modified:
+    - `pages/index.tsx` - Fixed success/warning messages in `handlePhotoUpload`
+  - Impact: Accurate messaging that reflects the actual folder structure
+  - Commit: Current
+
+## [2025-08-13] - Different Upload Messages for Templates vs Photos
+
+### Changed
+- **Distinct Upload Progress Messages**:
+  - Template uploads show: "Uploading Templates" with "Preparing and uploading your prints..."
+  - Photo uploads show: "Uploading Photos" with "Uploading your selected photos..."
+  - Different helper text for each upload type
+  - Removed "Rasterizing" and all technical terminology
+  - Files Modified:
+    - `pages/index.tsx` - Added `uploadType` state and conditional messaging in upload dialog
+  - Impact: Clear distinction between operations with user-friendly language
+  - Commit: Current
+
+## [2025-08-13] - Separate Folders for Templates and Photos
+
+### Changed
+- **Separate Upload Folders**:
+  - Templates and photos now upload to separate folders for better organization
+  - Templates go to `Prints - [Client Name]` folder
+  - Photos go to `Photos - [Client Name]` folder
+  - Completely eliminates any file naming conflicts
+  - Files Modified:
+    - `pages/index.tsx` - Created separate `ensurePhotosFolder` function and reverted `ensurePrintsFolder` to simple version
+  - Impact: Cleaner organization and no possibility of file conflicts between templates and photos
+  - Commit: Current
+
+## [2025-08-13] - Upload Options Dialog and Photo Upload Feature
+
+### Added
+- **Upload Options Modal After Finalize**:
+  - New modal dialog appears after clicking finalize with two upload options
+  - "Upload Print Templates" - Uploads generated print-ready templates (existing functionality)
+  - "Upload Selected Photos" - New feature to copy favorited photos directly to Google Drive
+  - Files Created:
+    - `components/UploadOptionsModal.tsx` - New modal component with dual upload options
+  - Impact: Users can now choose between uploading templates or raw photos
+  - Commit: Current
+
+- **Direct Photo Upload to Google Drive**:
+  - New functionality to copy favorited photos directly to prints folder
+  - No processing or rasterization - preserves original photo quality
+  - Shows progress for each photo being uploaded
+  - Files Modified:
+    - `services/googleDriveService.ts` - Added `copyFile` method for Google Drive API v3 file copying
+    - `pages/index.tsx` - Added `handlePhotoUpload` function for photo copying logic
+  - Impact: Users can backup original photos alongside print templates
+  - Commit: Current
+
+### Changed
+- **Removed Technical Terminology from UI**:
+  - Changed "Rasterizing template" to "Generating template" in logs
+  - Changed progress messages from "Rasterizing" to "Uploading"
+  - Removed the word "rasterization" from all user-facing messages
+  - Files Modified:
+    - `pages/index.tsx` - Updated all progress messages and console logs
+  - Impact: More user-friendly language that non-technical users can understand
+  - Commit: Current
+
+- **Refactored Upload Functionality**:
+  - Split `handlePhotoContinue` into `handleTemplateUpload` and `handlePhotoUpload`
+  - Extracted `ensurePrintsFolder` as reusable function
+  - Better separation of concerns for different upload types
+  - Files Modified:
+    - `pages/index.tsx` - Refactored upload handlers
+    - `components/screens/PhotoSelectionScreen.tsx` - Added modal integration and new props
+  - Impact: Cleaner code architecture and better maintainability
+  - Commit: Current
+
 ## [2025-08-13] - Add Prints Enhancement with Template Selection and Animation
 
 ### Changed
