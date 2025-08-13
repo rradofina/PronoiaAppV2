@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-13] - Unfavoriting Protection for Photos in Template Slots
+
+### Added
+- **Unfavoriting Protection Feature**:
+  - Prevents users from unfavoriting photos that are already placed in template slots
+  - Shows warning toast: "Please remove from template slot first" when attempted
+  - Star button disabled and shows "cursor-not-allowed" for photos in slots
+  - Tooltip changes to "Remove from template slot first" for used photos
+  - Files Modified:
+    - `components/screens/PhotoSelectionScreen.tsx` (lines 1187-1227) - Added check in handleToggleFavorite
+    - `components/PhotoGrid.tsx` (lines 132-161) - Added disabled state to star button
+  - Impact: Prevents accidental removal of favorited photos that are being used in templates
+  - Commit: Current
+
 ## [2025-08-12] - Change Template Fix for Fill Templates Screen
 
 ### Fixed

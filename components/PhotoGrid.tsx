@@ -133,14 +133,26 @@ function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isU
           <button
             onClick={(e) => {
               e.stopPropagation();
+              // Don't allow unfavoriting if photo is used in template
+              if (isUsedInTemplate && isFavorited) {
+                console.log('🚫 Star button disabled - photo in template slot');
+                return;
+              }
               onToggleFavorite(photo.id);
             }}
+            disabled={isUsedInTemplate && isFavorited}
             className={`absolute top-1 right-1 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
               isFavorited 
                 ? 'bg-yellow-500 text-white shadow-lg' 
                 : 'bg-black bg-opacity-50 text-white hover:bg-opacity-70'
-            } ${isUsedInTemplate ? 'opacity-50' : ''}`}
-            title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+            } ${isUsedInTemplate && isFavorited ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title={
+              isUsedInTemplate && isFavorited 
+                ? 'Remove from template slot first' 
+                : isFavorited 
+                ? 'Remove from favorites' 
+                : 'Add to favorites'
+            }
           >
             <span className="text-sm">
               {isFavorited ? '⭐' : '☆'}

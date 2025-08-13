@@ -1185,6 +1185,37 @@ export default function PhotoSelectionScreen({
 
   // Favorites management
   const handleToggleFavorite = (photoId: string) => {
+    // Check if trying to unfavorite a photo that's in a template slot
+    const usedPhotoIds = getUsedPhotoIds();
+    const isPhotoInSlot = usedPhotoIds.has(photoId);
+    const isCurrentlyFavorited = favoritedPhotos.has(photoId);
+    
+    console.log('⭐ Toggle Favorite Debug:', {
+      photoId,
+      isCurrentlyFavorited,
+      isPhotoInSlot,
+      usedPhotoIds: Array.from(usedPhotoIds),
+      favoritedPhotos: Array.from(favoritedPhotos),
+      templateSlots: templateSlots.map(s => ({ id: s.id, photoId: s.photoId }))
+    });
+    
+    // If trying to unfavorite a photo that's in a slot, show warning
+    if (isCurrentlyFavorited && isPhotoInSlot) {
+      console.log('🚫 Blocking unfavorite - photo is in slot');
+      toast('Please remove from template slot first', {
+        id: 'unfavorite-locked',
+        duration: 3000,
+        icon: '⚠️',
+        style: {
+          background: '#FEF3C7',
+          color: '#92400E',
+        },
+      });
+      return; // Don't allow unfavoriting
+    }
+    
+    // Otherwise, toggle favorite normally
+    console.log('✅ Allowing favorite toggle');
     setFavoritedPhotos(prev => {
       const newFavorites = new Set(prev);
       if (newFavorites.has(photoId)) {
@@ -1365,6 +1396,27 @@ export default function PhotoSelectionScreen({
         newSlotCount: newSlots.length,
         preservedPhotos: newSlots.filter(s => s.photoId).length
       });
+      
+      // Add the new template to window cache so it can be found by TemplateVisual
+      const windowTemplates = (window as any).pngTemplates || [];
+      const convertedTemplate = {
+        ...newTemplate,
+        holes: newTemplate.holes_data,
+        driveFileId: newTemplate.drive_file_id
+      };
+      
+      // Check if template already exists in cache
+      const existsInCache = windowTemplates.some((t: any) => t.id === newTemplate.id);
+      if (!existsInCache) {
+        windowTemplates.push(convertedTemplate);
+        (window as any).pngTemplates = windowTemplates;
+        console.log('✅ Added swapped template to window cache:', {
+          templateId: newTemplate.id,
+          templateName: newTemplate.name,
+          templateType: newTemplate.template_type,
+          cacheSize: windowTemplates.length
+        });
+      }
       
       // Replace old slots with new slots
       const updatedSlots = templateSlots.filter(slot => slot.templateId !== targetGroup.templateId).concat(newSlots);
