@@ -917,15 +917,20 @@ export default function FolderSelectionScreen({
                                           description: pkg.description || `${pkg.template_count || 1} template${(pkg.template_count || 1) === 1 ? '' : 's'}`
                                         };
                                         
+                                        // DISABLED INLINE EXPANSION - Now navigates to PackageSelectionScreen
                                         // If this package is already expanded, collapse it
-                                        if (templateState.expandedPackageId === pkg.id.toString()) {
-                                          dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId: null });
-                                          setSelectedPackage(null);
-                                        } else {
-                                          // Expand this package and load templates
-                                          setSelectedPackage(packageData);
-                                          loadPackageTemplates(pkg.id.toString(), pkg.name);
-                                        }
+                                        // if (templateState.expandedPackageId === pkg.id.toString()) {
+                                        //   dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId: null });
+                                        //   setSelectedPackage(null);
+                                        // } else {
+                                        //   // Expand this package and load templates
+                                        //   setSelectedPackage(packageData);
+                                        //   loadPackageTemplates(pkg.id.toString(), pkg.name);
+                                        // }
+                                        
+                                        // NEW: Navigate to PackageSelectionScreen with selected package
+                                        setSelectedPackage(packageData);
+                                        handleContinue(); // This should navigate to 'package' screen
                                       }}
                                       className={`flex items-center p-4 rounded-lg cursor-pointer transition-all duration-200 border ${
                                         selectedPackage?.id === pkg.id
@@ -971,8 +976,8 @@ export default function FolderSelectionScreen({
                                       )}
                                     </div>
 
-                                    {/* Template Preview - Show directly below this package when expanded */}
-                                    <AnimatedTemplateReveal show={templateState.expandedPackageId === pkg.id.toString()}>
+                                    {/* DISABLED INLINE TEMPLATE PREVIEW - Now shown in PackageSelectionScreen */}
+                                    {/* <AnimatedTemplateReveal show={templateState.expandedPackageId === pkg.id.toString()}>
                                       {templateState.expandedPackageId === pkg.id.toString() && (
                                         <PackageTemplatePreview
                                           templates={getEffectiveTemplates(
@@ -997,7 +1002,7 @@ export default function FolderSelectionScreen({
                                           }
                                         />
                                       )}
-                                    </AnimatedTemplateReveal>
+                                    </AnimatedTemplateReveal> */}
                                   </div>
                                 ))}
                               </div>
@@ -1036,15 +1041,20 @@ export default function FolderSelectionScreen({
                                         description: pkg.description || `${pkg.template_count || 1} template${(pkg.template_count || 1) === 1 ? '' : 's'}`
                                       };
                                       
+                                      // DISABLED INLINE EXPANSION - Now navigates to PackageSelectionScreen
                                       // If this package is already expanded, collapse it
-                                      if (templateState.expandedPackageId === pkg.id.toString()) {
-                                        dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId: null });
-                                        setSelectedPackage(null);
-                                      } else {
-                                        // Expand this package and load templates
-                                        setSelectedPackage(packageData);
-                                        loadPackageTemplates(pkg.id.toString(), pkg.name);
-                                      }
+                                      // if (templateState.expandedPackageId === pkg.id.toString()) {
+                                      //   dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId: null });
+                                      //   setSelectedPackage(null);
+                                      // } else {
+                                      //   // Expand this package and load templates
+                                      //   setSelectedPackage(packageData);
+                                      //   loadPackageTemplates(pkg.id.toString(), pkg.name);
+                                      // }
+                                      
+                                      // NEW: Navigate to PackageSelectionScreen with selected package
+                                      setSelectedPackage(packageData);
+                                      handleContinue(); // This should navigate to 'package' screen
                                     }}
                                     className={`flex items-center p-4 rounded-lg cursor-pointer transition-all duration-200 border ${
                                       selectedPackage?.id === pkg.id
@@ -1090,8 +1100,8 @@ export default function FolderSelectionScreen({
                                     </div>
                                   </div>
 
-                                  {/* Template Preview - Show directly below this package when expanded */}
-                                  <AnimatedTemplateReveal show={templateState.expandedPackageId === pkg.id.toString()}>
+                                  {/* DISABLED INLINE TEMPLATE PREVIEW - Now shown in PackageSelectionScreen */}
+                                  {/* <AnimatedTemplateReveal show={templateState.expandedPackageId === pkg.id.toString()}>
                                     {templateState.expandedPackageId === pkg.id.toString() && (
                                       <PackageTemplatePreview
                                         templates={getEffectiveTemplates(
@@ -1116,7 +1126,7 @@ export default function FolderSelectionScreen({
                                         }
                                       />
                                     )}
-                                  </AnimatedTemplateReveal>
+                                  </AnimatedTemplateReveal> */}
                                 </div>
                               ))}
                             </div>

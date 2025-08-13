@@ -185,8 +185,25 @@ class ManualPackageServiceImpl implements IManualPackageService {
    */
   async updatePackage(id: string, updates: Partial<ManualPackage>): Promise<ManualPackage> {
     try {
-      console.log(`🔄 Updating package: ${id}`);
+      console.log(`🔄 Updating package: ${id}`, { id, idType: typeof id, updates });
       
+      // First check if the package exists
+      const { data: existingPackage, error: checkError } = await supabase
+        .from('manual_packages')
+        .select('id, name')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (checkError) {
+        throw new Error(`Failed to check if package exists: ${checkError.message}`);
+      }
+
+      if (!existingPackage) {
+        throw new Error(`Package with ID ${id} not found`);
+      }
+
+      console.log(`✅ Package exists: ${existingPackage.name}, proceeding with update`);
+
       const { data, error } = await supabase
         .from('manual_packages')
         .update({
@@ -194,16 +211,24 @@ class ManualPackageServiceImpl implements IManualPackageService {
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
-        .select()
-        .single();
+        .select();
 
       if (error) {
         throw new Error(`Failed to update package: ${error.message}`);
       }
 
+      if (!data || data.length === 0) {
+        throw new Error(`No rows were updated for package ID ${id}`);
+      }
+
+      if (data.length > 1) {
+        throw new Error(`Multiple rows were updated for package ID ${id} (this shouldn't happen)`);
+      }
+
+      const updatedPackage = data[0];
       this.clearCache();
-      console.log(`✅ Package updated: ${data.name}`);
-      return data;
+      console.log(`✅ Package updated: ${updatedPackage.name}`);
+      return updatedPackage;
     } catch (error) {
       console.error(`❌ Error updating package ${id}:`, error);
       throw error;

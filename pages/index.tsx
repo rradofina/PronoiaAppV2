@@ -189,6 +189,9 @@ export default function Home() {
   // Session Store  
   const { selectedPackage, clientName, setSelectedPackage, setClientName } = useSessionStore();
   
+  // Packages state
+  const [packages, setPackages] = useState<any[]>([]);
+  
   // Template Store
   const { 
     templateCounts, 
@@ -1347,6 +1350,24 @@ export default function Home() {
     // Load templates immediately - no dependencies needed
     loadTemplatesFromDatabase();
   }, []); // Empty dependency array - only run once on app startup
+  
+  // Load packages when navigating to package screen
+  useEffect(() => {
+    const loadPackages = async () => {
+      if (currentScreen === 'package') {
+        try {
+          const activePackages = await manualPackageService.getActivePackages();
+          setPackages(activePackages);
+          console.log('📦 Loaded packages for PackageSelectionScreen:', activePackages.length);
+        } catch (error) {
+          console.error('❌ Error loading packages:', error);
+          setPackages([]);
+        }
+      }
+    };
+    
+    loadPackages();
+  }, [currentScreen]);
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -1376,17 +1397,25 @@ export default function Home() {
             onChangeMainFolder={handleChangeMainFolder}
             selectedPackage={selectedPackage}
             setSelectedPackage={setSelectedPackage}
-            handleContinue={handlePackageContinue} // Skip package screen, go directly to template/photos
+            handleContinue={() => setCurrentScreen('package')} // Navigate to package screen when package selected
             onManageTemplates={() => setCurrentScreen('manual-template-manager')}
             onManagePackages={() => setCurrentScreen('manual-package-manager')}
           />
         );
       case 'package':
-        // Package selection is now handled within FolderSelectionScreen
-        // This should not be reached anymore, but if it is, redirect to photos
-        console.log('Package screen reached - this should not happen. Redirecting to photos.');
-        setCurrentScreen('photos');
-        return null;
+        // RE-ENABLED: Now shows dedicated PackageSelectionScreen
+        return (
+          <PackageSelectionScreen
+            clientName={clientName}
+            selectedClientFolder={selectedClientFolder}
+            photos={localPhotos}
+            packages={packages}
+            selectedPackage={selectedPackage}
+            setSelectedPackage={setSelectedPackage}
+            handleBack={handleBack}
+            handlePackageContinue={handlePackageContinue}
+          />
+        );
       case 'template-setup':
         return (
           <TemplateSetupScreen

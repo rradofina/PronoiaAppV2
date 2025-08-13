@@ -74,6 +74,9 @@ export default function PackageTemplatePreview({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<{index: number, name: string} | null>(null);
   
+  // Confirmation modal state for going back
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
+  
   // Use templates directly from props since parent manages state
   const currentTemplates = templates;
 
@@ -420,10 +423,10 @@ export default function PackageTemplatePreview({
           Continue with "{packageName}"
         </button>
         <button
-          onClick={onChangePackage}
+          onClick={() => setShowBackConfirm(true)}
           className="flex-1 sm:flex-none bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 border border-gray-300"
         >
-          Choose Different Package
+          Back
         </button>
       </div>
 
@@ -458,6 +461,21 @@ export default function PackageTemplatePreview({
         message={`Are you sure you want to remove "${templateToDelete?.name}"? This action cannot be undone.`}
         confirmText="Remove"
         cancelText="Cancel"
+        confirmButtonClass="bg-gray-600 hover:bg-gray-700"
+      />
+      
+      {/* Back Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showBackConfirm}
+        onClose={() => setShowBackConfirm(false)}
+        onConfirm={() => {
+          setShowBackConfirm(false);
+          onChangePackage();
+        }}
+        title="Go Back?"
+        message="Are you sure you want to go back? Any changes made here will be lost."
+        confirmText="Yes, Go Back"
+        cancelText="Stay Here"
         confirmButtonClass="bg-gray-600 hover:bg-gray-700"
       />
     </div>
