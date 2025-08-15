@@ -203,10 +203,10 @@ export default function PackageTemplatePreview({
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">
               Templates in "{packageName}"
             </h3>
-            <div className="text-sm text-gray-600">
+            <div className="text-xs sm:text-sm text-gray-600">
               {currentTemplates.length} template{currentTemplates.length > 1 ? 's' : ''} available
             </div>
           </div>
@@ -215,9 +215,9 @@ export default function PackageTemplatePreview({
           {onTemplateAdd && (
             <button
               onClick={handleAddPrints}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+              className="bg-green-600 text-white px-3 py-1.5 sm:px-4 sm:py-2 text-sm sm:text-base rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1 sm:gap-2 whitespace-nowrap"
             >
-              <span className="text-lg">+</span>
+              <span className="text-sm sm:text-lg">+</span>
               <span>Add Prints</span>
             </button>
           )}
@@ -425,16 +425,17 @@ export default function PackageTemplatePreview({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 border-t border-gray-200">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 pt-4 border-t border-gray-200">
         <button
           onClick={onContinue}
-          className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-sm hover:shadow-md"
+          className="flex-1 bg-blue-600 text-white px-3 py-1.5 sm:px-6 sm:py-3 text-sm sm:text-base rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-sm hover:shadow-md"
         >
-          Continue to Photo and Print Selection
+          <span className="hidden sm:inline">Continue to Photo and Print Selection</span>
+          <span className="sm:hidden">Continue to Selection</span>
         </button>
         <button
           onClick={() => setShowBackConfirm(true)}
-          className="flex-1 sm:flex-none bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 border border-gray-300"
+          className="flex-1 sm:flex-none bg-gray-100 text-gray-700 px-3 py-1.5 sm:px-6 sm:py-3 text-sm sm:text-base rounded-lg font-medium hover:bg-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 border border-gray-300"
         >
           Back
         </button>
