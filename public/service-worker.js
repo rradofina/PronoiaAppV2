@@ -1,4 +1,4 @@
-// Service Worker for Pronoia Photo Studio PWA
+// Service Worker for Pronoia Studios PH PWA
 const CACHE_NAME = 'pronoia-v1';
 const urlsToCache = [
   '/',

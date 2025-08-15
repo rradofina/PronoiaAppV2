@@ -9,6 +9,9 @@ interface AdminSettingsScreenProps {
   onSignOut: () => void;
   onChangeMainFolder: () => void;
   onBack: () => void;
+  onManageTemplates?: () => void;
+  onManagePackages?: () => void;
+  onAdminSettings?: () => void;
 }
 
 export default function AdminSettingsScreen({
@@ -17,6 +20,9 @@ export default function AdminSettingsScreen({
   onSignOut,
   onChangeMainFolder,
   onBack,
+  onManageTemplates,
+  onManagePackages,
+  onAdminSettings,
 }: AdminSettingsScreenProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -130,6 +136,9 @@ export default function AdminSettingsScreen({
         mainSessionsFolder={mainSessionsFolder}
         onSignOut={onSignOut}
         onChangeMainFolder={onChangeMainFolder}
+        onManageTemplates={onManageTemplates}
+        onManagePackages={onManagePackages}
+        onAdminSettings={onAdminSettings}
       />
       
       {/* DEV-DEBUG-OVERLAY */}

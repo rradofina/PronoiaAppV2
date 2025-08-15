@@ -1,4 +1,4 @@
-# Pronoia Photo Selection App
+# Pronoia Studios PH App
 
 <!-- Updated with latest features -->
 

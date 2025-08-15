@@ -18,7 +18,7 @@ export default function Document() {
         <meta name="apple-mobile-web-app-title" content="Pronoia" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="application-name" content="Pronoia Photo Studio" />
+        <meta name="application-name" content="Pronoia Studios PH" />
         
         {/* Apple Touch Icons */}
         <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />

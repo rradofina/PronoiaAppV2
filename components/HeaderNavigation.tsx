@@ -49,7 +49,7 @@ export default function HeaderNavigation({
       <div className="flex items-center justify-between max-w-7xl mx-auto">
         <div className="flex items-center space-x-4">
           <h1 className="text-xl font-bold text-gray-900">
-            Pronoia Photo Studio
+            Pronoia Studios PH
           </h1>
           {showMainFolder && mainSessionsFolder && (
             <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -71,9 +71,9 @@ export default function HeaderNavigation({
               {/* Profile Avatar Button */}
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center space-x-2 p-2 rounded-full hover:bg-gray-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
                   {getUserInitial(googleAuth.userEmail || '')}
                 </div>
                 <span className="text-sm text-gray-700 hidden sm:block">{googleAuth.userEmail}</span>
@@ -89,7 +89,7 @@ export default function HeaderNavigation({
 
               {/* Dropdown Menu */}
               {isDropdownOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                <div className="absolute right-0 top-full mt-2 min-w-full w-max bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                   {/* User Info Header */}
                   <div className="px-4 py-3 border-b border-gray-100">
                     <div className="flex items-center space-x-3">

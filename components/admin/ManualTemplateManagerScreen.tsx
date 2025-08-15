@@ -20,6 +20,9 @@ interface ManualTemplateManagerScreenProps {
   onSignOut: () => void;
   onChangeMainFolder: () => void;
   onBack: () => void;
+  onManageTemplates?: () => void;
+  onManagePackages?: () => void;
+  onAdminSettings?: () => void;
 }
 
 interface TemplateFormData {
@@ -53,7 +56,10 @@ export default function ManualTemplateManagerScreen({
   mainSessionsFolder,
   onSignOut,
   onChangeMainFolder,
-  onBack
+  onBack,
+  onManageTemplates,
+  onManagePackages,
+  onAdminSettings
 }: ManualTemplateManagerScreenProps) {
   const [templates, setTemplates] = useState<ManualTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -1085,6 +1091,9 @@ export default function ManualTemplateManagerScreen({
         onSignOut={onSignOut}
         onChangeMainFolder={onChangeMainFolder}
         showMainFolder={true}
+        onManageTemplates={onManageTemplates}
+        onManagePackages={onManagePackages}
+        onAdminSettings={onAdminSettings}
       />
       
       <div className="p-4">

@@ -14,7 +14,7 @@ const PrivacyPolicy: NextPage = () => {
             <section>
               <h2 className="text-xl font-semibold text-gray-900 mb-3">1. Information We Collect</h2>
               <p className="mb-3">
-                Pronoia Photo Studio ("we," "our," or "us") collects the following information when you use our photo selection application:
+                Pronoia Studios PH ("we," "our," or "us") collects the following information when you use our photo selection application:
               </p>
               <ul className="list-disc pl-6 space-y-2">
                 <li><strong>Google Account Information:</strong> When you sign in with Google, we access your email address and basic profile information.</li>
@@ -93,7 +93,7 @@ const PrivacyPolicy: NextPage = () => {
           <div className="mt-12 pt-8 border-t border-gray-200">
             <p className="text-center text-gray-600">
               <a href="/" className="text-blue-600 hover:text-blue-800">
-                ← Back to Pronoia Photo Studio
+                ← Back to Pronoia Studios PH
               </a>
             </p>
           </div>

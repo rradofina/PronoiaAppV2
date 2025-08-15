@@ -14,14 +14,14 @@ const TermsOfService: NextPage = () => {
             <section>
               <h2 className="text-xl font-semibold text-gray-900 mb-3">1. Acceptance of Terms</h2>
               <p>
-                By accessing and using Pronoia Photo Studio ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
+                By accessing and using Pronoia Studios PH ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
               </p>
             </section>
 
             <section>
               <h2 className="text-xl font-semibold text-gray-900 mb-3">2. Description of Service</h2>
               <p className="mb-3">
-                Pronoia Photo Studio is a web application that allows users to:
+                Pronoia Studios PH is a web application that allows users to:
               </p>
               <ul className="list-disc pl-6 space-y-2">
                 <li>Connect to their Google Drive account</li>
@@ -59,7 +59,7 @@ const TermsOfService: NextPage = () => {
             <section>
               <h2 className="text-xl font-semibold text-gray-900 mb-3">5. Intellectual Property</h2>
               <p>
-                You retain all rights to photos and content you upload or access through this service. The application code and design are proprietary to Pronoia Photo Studio. You may not copy, distribute, or create derivative works without permission.
+                You retain all rights to photos and content you upload or access through this service. The application code and design are proprietary to Pronoia Studios PH. You may not copy, distribute, or create derivative works without permission.
               </p>
             </section>
 
@@ -73,7 +73,7 @@ const TermsOfService: NextPage = () => {
             <section>
               <h2 className="text-xl font-semibold text-gray-900 mb-3">7. Limitation of Liability</h2>
               <p>
-                Pronoia Photo Studio shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your use of the service.
+                Pronoia Studios PH shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your use of the service.
               </p>
             </section>
 
@@ -116,7 +116,7 @@ const TermsOfService: NextPage = () => {
           <div className="mt-12 pt-8 border-t border-gray-200">
             <p className="text-center text-gray-600">
               <a href="/" className="text-blue-600 hover:text-blue-800">
-                ← Back to Pronoia Photo Studio
+                ← Back to Pronoia Studios PH
               </a>
             </p>
           </div>

@@ -1513,16 +1513,6 @@ export default function Home() {
             refreshTrigger={templateRefreshTrigger}
           />
         );
-      case 'manual-package-manager':
-        return (
-          <ManualPackageManagerScreen
-            googleAuth={googleAuth}
-            mainSessionsFolder={mainSessionsFolder}
-            onSignOut={handleSignOut}
-            onChangeMainFolder={handleChangeMainFolder}
-            onBack={() => setCurrentScreen('folder-selection')}
-          />
-        );
       case 'template-folder-selection':
         return (
           <TemplateFolderSelectionScreen
@@ -1545,6 +1535,9 @@ export default function Home() {
             onSignOut={handleSignOut}
             onChangeMainFolder={handleChangeMainFolder}
             onBack={() => setCurrentScreen('folder-selection')}
+            onManageTemplates={() => setCurrentScreen('manual-template-manager')}
+            onManagePackages={() => setCurrentScreen('manual-package-manager')}
+            onAdminSettings={() => setCurrentScreen('admin-settings')}
           />
         );
       case 'manual-package-manager':
@@ -1555,6 +1548,9 @@ export default function Home() {
             onSignOut={handleSignOut}
             onChangeMainFolder={handleChangeMainFolder}
             onBack={() => setCurrentScreen('manual-template-manager')}
+            onManageTemplates={() => setCurrentScreen('manual-template-manager')}
+            onManagePackages={() => setCurrentScreen('manual-package-manager')}
+            onAdminSettings={() => setCurrentScreen('admin-settings')}
           />
         );
       case 'admin-settings':
@@ -1565,6 +1561,9 @@ export default function Home() {
             onSignOut={handleSignOut}
             onChangeMainFolder={handleChangeMainFolder}
             onBack={() => setCurrentScreen('folder-selection')}
+            onManageTemplates={() => setCurrentScreen('manual-template-manager')}
+            onManagePackages={() => setCurrentScreen('manual-package-manager')}
+            onAdminSettings={() => setCurrentScreen('admin-settings')}
           />
         );
       default:
@@ -1623,7 +1622,7 @@ export default function Home() {
                       </p>
                       <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                         <p className="text-sm text-yellow-800 font-medium">
-                          Please contact Pronoia staff for assistance with existing prints.
+                          Please contact Pronoia Studios PH staff for assistance with existing prints.
                         </p>
                       </div>
                     </div>

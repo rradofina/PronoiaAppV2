@@ -21,6 +21,9 @@ interface ManualPackageManagerScreenProps {
   onSignOut: () => void;
   onChangeMainFolder: () => void;
   onBack: () => void;
+  onManageTemplates?: () => void;
+  onManagePackages?: () => void;
+  onAdminSettings?: () => void;
 }
 
 interface PrintPosition {
@@ -62,7 +65,10 @@ export default function ManualPackageManagerScreen({
   mainSessionsFolder,
   onSignOut,
   onChangeMainFolder,
-  onBack
+  onBack,
+  onManageTemplates,
+  onManagePackages,
+  onAdminSettings
 }: ManualPackageManagerScreenProps) {
   const [packages, setPackages] = useState<ManualPackage[]>([]);
   const [groups, setGroups] = useState<PackageGroup[]>([]);
@@ -625,6 +631,9 @@ export default function ManualPackageManagerScreen({
         onSignOut={onSignOut}
         onChangeMainFolder={onChangeMainFolder}
         showMainFolder={true}
+        onManageTemplates={onManageTemplates}
+        onManagePackages={onManagePackages}
+        onAdminSettings={onAdminSettings}
       />
       
       <div className="p-4">
