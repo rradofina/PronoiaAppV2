@@ -133,9 +133,9 @@ export default function AdminSettingsScreen({
       />
       
       {/* DEV-DEBUG-OVERLAY */}
-      <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
+      {/* <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
         AdminSettingsScreen.tsx
-      </div>
+      </div> */}
 
       <div className="max-w-6xl mx-auto p-6">
         {/* Header */}

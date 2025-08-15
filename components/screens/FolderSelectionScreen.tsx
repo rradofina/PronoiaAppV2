@@ -790,9 +790,9 @@ export default function FolderSelectionScreen({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
-      <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
+      {/* <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
         FolderSelectionScreen.tsx
-      </div>
+      </div> */}
       <HeaderNavigation
         googleAuth={googleAuth}
         mainSessionsFolder={mainSessionsFolder}

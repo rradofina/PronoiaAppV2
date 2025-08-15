@@ -1575,9 +1575,9 @@ export default function Home() {
   return (
     <div>
       {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
-      <div className="fixed bottom-2 right-2 z-50 bg-blue-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
+      {/* <div className="fixed bottom-2 right-2 z-50 bg-blue-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
         index.tsx ({currentScreen})
-      </div>
+      </div> */}
       
       {renderScreen()}
 

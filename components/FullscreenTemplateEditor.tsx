@@ -395,9 +395,9 @@ export default function FullscreenTemplateEditor({
       <div className="relative z-[101] flex flex-col h-full">
       
       {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
-      <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
+      {/* <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
         FullscreenTemplateEditor.tsx
-      </div>
+      </div> */}
 
       {/* Header - Top-Bottom Split Layout */}
       <div className="p-4 text-white">

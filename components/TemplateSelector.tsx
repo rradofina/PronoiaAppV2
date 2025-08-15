@@ -42,9 +42,9 @@ export default function TemplateSelector({
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-95 flex flex-col">
       {/* DEV-DEBUG-OVERLAY: Screen identifier - REMOVE BEFORE PRODUCTION */}
-      <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
+      {/* <div className="fixed bottom-2 left-2 z-50 bg-red-600 text-white px-2 py-1 text-xs font-mono rounded shadow-lg pointer-events-none">
         TemplateSelector.tsx
-      </div>
+      </div> */}
       {/* Header */}
       <div className="flex items-center justify-between p-4 text-white">
         <button
