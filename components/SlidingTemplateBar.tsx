@@ -48,7 +48,7 @@ export default function SlidingTemplateBar({
 
   return (
     <div 
-      className={`fixed inset-0 z-40 transition-all duration-500 ease-out ${
+      className={`fixed inset-0 z-40 transition-all duration-300 ${
         isVisible ? 'bg-transparent' : 'bg-transparent pointer-events-none'
       }`}
     >
@@ -65,7 +65,7 @@ export default function SlidingTemplateBar({
       
       {/* Sliding template bar */}
       <div 
-        className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl transition-transform duration-500 ease-out ${
+        className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl ${isVisible ? 'shadow-2xl' : ''} transition-transform duration-300 ease-in-out ${
           isVisible ? 'translate-y-0' : 'translate-y-full'
         }`}
         style={{ height: '60vh', minHeight: '450px', maxHeight: '700px' }}

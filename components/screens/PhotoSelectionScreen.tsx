@@ -762,7 +762,12 @@ export default function PhotoSelectionScreen({
 
   const handleSlotSelectFromSlidingBar = (slot: TemplateSlot) => {
     setInlineEditingSlot(slot);
-    setViewMode('inline-editing');
+    // First close the sliding bar by resetting view mode
+    setViewMode('normal');
+    // Then open inline editor after sliding bar animation completes
+    setTimeout(() => {
+      setViewMode('inline-editing');
+    }, 300);
   };
 
   // Template-first workflow  
