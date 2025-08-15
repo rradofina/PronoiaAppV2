@@ -1918,7 +1918,7 @@ export default function PhotoSelectionScreen({
               className={`flex-1 ${
                 templateSlots.every(slot => slot.photoId) 
                   ? 'bg-green-600 hover:bg-green-700' 
-                  : 'bg-orange-500 hover:bg-orange-600'
+                  : 'bg-gray-500 cursor-not-allowed'
               } text-white px-3 py-2 rounded-lg font-medium transition-all duration-200 shadow-md text-sm ${
                 viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
               }`}
