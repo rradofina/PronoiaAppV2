@@ -234,20 +234,8 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
         inlineEditingPhoto={inlineEditingPhoto}
         onInlineApply={onInlineApply}
         onInlineCancel={onInlineCancel}
-        isEditingMode={!!inlineEditingSlot}
         isActiveTemplate={isActiveTemplate}
-        slotShowingEditButton={slotShowingEditButton}
-        onEditButtonClick={onEditButtonClick}
-        onChangeButtonClick={onChangeButtonClick}
-        slotShowingRemoveConfirmation={slotShowingRemoveConfirmation}
-        onRemoveButtonClick={onRemoveButtonClick}
-        onConfirmRemove={onConfirmRemove}
-        onCancelRemove={onCancelRemove}
         onDropPhoto={onDropPhoto}
-        isDraggingPhoto={isDraggingPhoto}
-        previewSlotId={previewSlotId}
-        previewPhotoId={previewPhotoId}
-        onSetPreviewSlot={onSetPreviewSlot}
       />
     );
   }

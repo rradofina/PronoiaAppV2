@@ -406,10 +406,7 @@ export default function PackageTemplatePreview({
                       onSlotClick={() => {}} // No interaction in preview
                       photos={samplePhotos} // Re-enable sample photos
                       selectedSlot={null}
-                      isEditingMode={false}
                       isActiveTemplate={false} // Non-interactive preview
-                      debugHoles={false} // Show actual photos with auto-fit
-                      holePhotoAssignments={holePhotoAssignments} // Pass photo filename assignments
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">

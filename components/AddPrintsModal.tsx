@@ -264,10 +264,7 @@ export default function AddPrintsModal({
                                   onSlotClick={() => {}}
                                   photos={samplePhotos}
                                   selectedSlot={null}
-                                  isEditingMode={false}
                                   isActiveTemplate={false}
-                                  debugHoles={false}
-                                  holePhotoAssignments={holePhotoAssignments}
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">

@@ -280,10 +280,7 @@ export default function TemplateSelectionModal({
                                     onSlotClick={() => {}} // No interaction in modal
                                     photos={samplePhotos}
                                     selectedSlot={null}
-                                    isEditingMode={false}
                                     isActiveTemplate={false} // Non-interactive preview
-                                    debugHoles={false} // Show actual photos
-                                    holePhotoAssignments={holePhotoAssignments}
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
