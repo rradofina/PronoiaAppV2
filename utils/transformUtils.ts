@@ -8,7 +8,8 @@ export function createPhotoTransform(
   return {
     photoScale,
     photoCenterX,
-    photoCenterY
+    photoCenterY,
+    version: 'photo-centric'
   };
 }
 
