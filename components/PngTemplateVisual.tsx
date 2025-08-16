@@ -257,7 +257,7 @@ export default function PngTemplateVisual({
         
         // Handle drag enter - set preview
         const handleDragEnter = (e: React.DragEvent) => {
-          if (!slot || shouldBlockSlot || isPreviewMode || slot.photoId) return;
+          if (!slot || shouldBlockSlot || isPreviewMode) return;
           e.preventDefault();
           if (onSetPreviewSlot) {
             onSetPreviewSlot(slot.id);
@@ -280,14 +280,14 @@ export default function PngTemplateVisual({
         
         // Handle drag over
         const handleDragOver = (e: React.DragEvent) => {
-          if (!slot || shouldBlockSlot || isPreviewMode || slot.photoId) return;
+          if (!slot || shouldBlockSlot || isPreviewMode) return;
           e.preventDefault();
-          e.dataTransfer.dropEffect = 'copy';
+          e.dataTransfer.dropEffect = slot.photoId ? 'move' : 'copy';
         };
         
         // Handle drop
         const handleDrop = (e: React.DragEvent) => {
-          if (!slot || shouldBlockSlot || isPreviewMode || slot.photoId) return;
+          if (!slot || shouldBlockSlot || isPreviewMode) return;
           e.preventDefault();
           
           // Clear preview first
@@ -298,7 +298,11 @@ export default function PngTemplateVisual({
           const photoId = e.dataTransfer.getData('photoId');
           if (photoId && onDropPhoto) {
             onDropPhoto(slot, photoId);
-            console.log('🎯 Dropped photo on slot:', { slotId: slot.id, photoId });
+            console.log('🎯 Dropped photo on slot:', { 
+              slotId: slot.id, 
+              photoId,
+              isReplacement: !!slot.photoId 
+            });
           }
         };
         
@@ -314,6 +318,8 @@ export default function PngTemplateVisual({
                 ? 'pointer-events-none cursor-not-allowed'
                 : isPreviewMode
                 ? ''
+                : isDraggingPhoto && slot?.photoId && previewSlotId === slot?.id
+                ? 'border-2 border-orange-400 border-dashed animate-pulse'
                 : isDraggingPhoto && !slot?.photoId
                 ? 'border-2 border-green-400 border-dashed animate-pulse'
                 : slot?.photoId
@@ -416,20 +422,35 @@ export default function PngTemplateVisual({
               (() => {
                 const previewPhoto = photos.find(p => p.id === previewPhotoId);
                 const previewUrl = previewPhoto ? (previewPhoto.thumbnailUrl || previewPhoto.url) : null;
+                const isReplacement = !!slot.photoId;
                 return previewUrl ? (
                   <div className="w-full h-full overflow-hidden relative">
+                    {/* Show existing photo with overlay if replacing */}
+                    {isReplacement && photoUrl && (
+                      <div className="absolute inset-0 opacity-30">
+                        <PhotoRenderer
+                          photoUrl={photoUrl}
+                          photoAlt={`Current Photo`}
+                          transform={slot?.transform}
+                          interactive={false}
+                          previewMode={true}
+                          className="w-full h-full"
+                          fallbackUrls={slot && photos.find(p => p.id === slot.photoId) ? getHighResPhotoUrls(photos.find(p => p.id === slot.photoId)!) : []}
+                        />
+                      </div>
+                    )}
                     <PhotoRenderer
                       photoUrl={previewUrl}
                       photoAlt={`Preview`}
                       transform={createPhotoTransform(1.0, 0.5, 0.5)}
                       interactive={false}
                       previewMode={true}
-                      className="w-full h-full opacity-70"
+                      className={`w-full h-full ${isReplacement ? 'opacity-80' : 'opacity-70'}`}
                       fallbackUrls={previewPhoto ? getHighResPhotoUrls(previewPhoto) : []}
                     />
-                    <div className="absolute inset-0 border-4 border-green-400 border-dashed animate-pulse pointer-events-none" />
-                    <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-semibold pointer-events-none">
-                      Preview
+                    <div className={`absolute inset-0 border-4 ${isReplacement ? 'border-orange-400' : 'border-green-400'} border-dashed animate-pulse pointer-events-none`} />
+                    <div className={`absolute top-2 left-2 ${isReplacement ? 'bg-orange-600' : 'bg-green-600'} text-white px-2 py-1 rounded text-xs font-semibold pointer-events-none`}>
+                      {isReplacement ? 'Replace?' : 'Preview'}
                     </div>
                   </div>
                 ) : null;

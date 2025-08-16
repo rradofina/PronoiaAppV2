@@ -365,6 +365,10 @@ export default function PhotoSelectionScreen({
   const [previewSlotId, setPreviewSlotId] = useState<string | null>(null); // Track which slot is being previewed
   const [previewPhotoId, setPreviewPhotoId] = useState<string | null>(null); // Track which photo is being previewed
   
+  // Replacement confirmation state
+  const [pendingReplacement, setPendingReplacement] = useState<{slot: TemplateSlot, photoId: string} | null>(null);
+  const [showReplaceConfirmation, setShowReplaceConfirmation] = useState(false);
+  
   // Handle escape key to close photo selection mode
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -845,7 +849,15 @@ export default function PhotoSelectionScreen({
   
   // Handle photo drop on slot
   const handleDropPhoto = async (slot: TemplateSlot, photoId: string) => {
-    console.log('🎯 Photo dropped on slot:', { slotId: slot.id, photoId });
+    console.log('🎯 Photo dropped on slot:', { slotId: slot.id, photoId, hasExistingPhoto: !!slot.photoId });
+    
+    // Check if slot already has a photo
+    if (slot.photoId) {
+      // Store pending replacement and show confirmation
+      setPendingReplacement({ slot, photoId });
+      setShowReplaceConfirmation(true);
+      return;
+    }
     
     // Find the photo
     const photo = photos.find(p => p.id === photoId);
@@ -879,6 +891,51 @@ export default function PhotoSelectionScreen({
     console.log('✅ Photo dropped with smart alignment and inline editing started');
   };
 
+  // Handle confirmed replacement
+  const handleConfirmReplace = async () => {
+    if (!pendingReplacement) return;
+    
+    const { slot, photoId } = pendingReplacement;
+    console.log('✅ Replacing photo in slot:', { slotId: slot.id, newPhotoId: photoId });
+    
+    // Find the photo
+    const photo = photos.find(p => p.id === photoId);
+    if (!photo) {
+      console.error('❌ Photo not found:', photoId);
+      setShowReplaceConfirmation(false);
+      setPendingReplacement(null);
+      return;
+    }
+    
+    // Calculate smart transform for initial position
+    const smartTransform = await createSmartPhotoTransformFromSlot(photo, slot);
+    console.log('📠 Smart transform calculated for replacement photo:', smartTransform);
+    
+    // Update the slot with the new photo and smart transform
+    const updatedSlot: TemplateSlot = {
+      ...slot,
+      photoId: photo.id,
+      transform: smartTransform
+    };
+    
+    const updatedSlots = templateSlots.map(s => 
+      s.id === slot.id ? updatedSlot : s
+    );
+    
+    setTemplateSlots(updatedSlots);
+    
+    // Start inline editing for adjustment
+    setInlineEditingSlot(updatedSlot);
+    setInlineEditingPhoto(photo);
+    setViewMode('inline-editing');
+    
+    // Clear confirmation state
+    setShowReplaceConfirmation(false);
+    setPendingReplacement(null);
+    
+    console.log('✅ Photo replaced with smart alignment and inline editing started');
+  };
+  
   // Handle change button click for filled slots - opens favorites bar
   const handleChangeButtonClick = (slot: TemplateSlot) => {
     console.log('🔧 Change button clicked - opening favorites bar');
@@ -2301,6 +2358,21 @@ export default function PhotoSelectionScreen({
           </div>
         </Dialog>
       </Transition>
+
+      {/* Photo Replacement Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showReplaceConfirmation}
+        onClose={() => {
+          setShowReplaceConfirmation(false);
+          setPendingReplacement(null);
+        }}
+        onConfirm={handleConfirmReplace}
+        title="Replace Photo?"
+        message="This slot already has a photo. Do you want to replace it with the new one?"
+        confirmText="Replace"
+        cancelText="Cancel"
+        confirmButtonClass="bg-orange-600 hover:bg-orange-700"
+      />
 
     </div>
   );
