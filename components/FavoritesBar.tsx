@@ -255,6 +255,31 @@ export default function FavoritesBar({
             </div>
           </div>
         </div>
+        
+        {/* Unified drag preview - rendered as portal to avoid overflow clipping */}
+        {isDragging && draggedPhoto && dragPosition && ReactDOM.createPortal(
+          <div
+            className="fixed pointer-events-none z-[9999]"
+            style={{
+              left: dragPosition.x - 60,
+              top: dragPosition.y - 80,
+              width: '120px',
+              height: '160px'
+            }}
+          >
+            <div className="border-2 border-blue-500 rounded-lg overflow-hidden shadow-2xl opacity-90">
+              <img
+                src={draggedPhoto.thumbnailUrl || draggedPhoto.url}
+                alt={draggedPhoto.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap">
+              Dragging...
+            </div>
+          </div>,
+          document.body
+        )}
       </div>
     );
   } else {

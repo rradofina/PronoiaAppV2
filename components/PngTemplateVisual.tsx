@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { TemplateSlot, Photo, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform } from '../types';
 import { PngTemplate } from '../services/pngTemplateService';
 import PhotoRenderer from './PhotoRenderer';
@@ -87,6 +87,9 @@ export default function PngTemplateVisual({
   // Since TemplateVisual already filtered and passed only relevant slots, use them directly
   const thisTemplateSlots = templateSlots;
   
+  // Create refs for each slot for mobile drag and drop
+  const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
+  
   console.log('🔍 PngTemplateVisual slot mapping:', {
     pngTemplateId: pngTemplate.id,
     pngTemplateType: pngTemplate.templateType,
@@ -155,6 +158,53 @@ export default function PngTemplateVisual({
     slotsConnected: thisTemplateSlots.length,
     holesCount: pngTemplate.holes?.length
   });
+
+  // Setup custom drop event listeners for mobile drag and drop
+  useEffect(() => {
+    const handleCustomDrop = (index: number) => (e: CustomEvent) => {
+      const slot = thisTemplateSlots[index];
+      if (!slot || !onDropPhoto) return;
+      
+      // Check if slot should be blocked
+      const isInlineEditing = inlineEditingSlot?.id === slot.id;
+      const isOtherSlotDuringEditing = isEditingMode && !isInlineEditing;
+      const isInactiveTemplate = !isActiveTemplate;
+      const shouldBlockSlot = isOtherSlotDuringEditing || isInactiveTemplate;
+      const isPreviewMode = !isActiveTemplate && !isEditingMode;
+      
+      if (shouldBlockSlot || isPreviewMode) return;
+      
+      const photo = e.detail.photo;
+      if (photo) {
+        onDropPhoto(slot, photo.id);
+        console.log('📱 Mobile drop photo on slot:', { 
+          slotId: slot.id, 
+          photoId: photo.id,
+          isReplacement: !!slot.photoId 
+        });
+      }
+    };
+    
+    // Attach listeners to all slot refs
+    slotRefs.current.forEach((ref, index) => {
+      if (ref) {
+        const handler = handleCustomDrop(index) as EventListener;
+        ref.addEventListener('customdrop', handler);
+        // Store handler for cleanup
+        (ref as any)._customDropHandler = handler;
+      }
+    });
+    
+    // Cleanup
+    return () => {
+      slotRefs.current.forEach((ref) => {
+        if (ref && (ref as any)._customDropHandler) {
+          ref.removeEventListener('customdrop', (ref as any)._customDropHandler);
+          delete (ref as any)._customDropHandler;
+        }
+      });
+    };
+  }, [thisTemplateSlots, onDropPhoto, isEditingMode, isActiveTemplate, inlineEditingSlot]);
 
   return (
     <div 
@@ -309,6 +359,7 @@ export default function PngTemplateVisual({
         return (
           <div
             key={hole.id}
+            ref={(el) => { slotRefs.current[holeIndex] = el; }}
             className={`absolute transition-all duration-200 ${
               isInlineEditing 
                 ? 'z-50'
