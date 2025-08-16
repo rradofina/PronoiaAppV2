@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { TemplateSlot, Photo, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform } from '../types';
 import { PngTemplate } from '../services/pngTemplateService';
 import PhotoRenderer from './PhotoRenderer';
@@ -255,6 +255,34 @@ export default function PngTemplateVisual({
         const isPreviewMode = !isActiveTemplate && !isEditingMode;
         const shouldApplyDarkening = shouldBlockSlot && !isPreviewMode;
         
+        // Ref for touch drop handling
+        const slotRef = useRef<HTMLDivElement>(null);
+        
+        // Handle custom drop event (from pointer events)
+        useEffect(() => {
+          const handleCustomDrop = (e: CustomEvent) => {
+            if (!slot || shouldBlockSlot || isPreviewMode) return;
+            
+            const photo = e.detail.photo;
+            if (photo && onDropPhoto) {
+              onDropPhoto(slot, photo.id);
+              console.log('🎯 Custom drop photo on slot:', { 
+                slotId: slot.id, 
+                photoId: photo.id,
+                isReplacement: !!slot.photoId 
+              });
+            }
+          };
+          
+          const element = slotRef.current;
+          if (element) {
+            element.addEventListener('customdrop', handleCustomDrop as EventListener);
+            return () => {
+              element.removeEventListener('customdrop', handleCustomDrop as EventListener);
+            };
+          }
+        }, [slot, shouldBlockSlot, isPreviewMode, onDropPhoto]);
+        
         // Handle drag enter - set preview
         const handleDragEnter = (e: React.DragEvent) => {
           if (!slot || shouldBlockSlot || isPreviewMode) return;
@@ -296,6 +324,13 @@ export default function PngTemplateVisual({
           }
           
           const photoId = e.dataTransfer.getData('photoId');
+          console.log('📍 PngTemplateVisual handleDrop:', {
+            slotId: slot?.id,
+            currentPhotoId: slot?.photoId,
+            droppedPhotoId: photoId,
+            hasOnDropPhoto: !!onDropPhoto
+          });
+          
           if (photoId && onDropPhoto) {
             onDropPhoto(slot, photoId);
             console.log('🎯 Dropped photo on slot:', { 
@@ -308,6 +343,7 @@ export default function PngTemplateVisual({
         
         return (
           <div
+            ref={slotRef}
             key={hole.id}
             className={`absolute transition-all duration-200 ${
               isInlineEditing 

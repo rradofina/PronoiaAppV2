@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import ReactDOM from 'react-dom';
 import { Photo } from '../types';
 
 interface FavoritesBarProps {
@@ -30,18 +31,21 @@ export default function FavoritesBar({
   // Apply adaptive photo limiting
   const displayPhotos = maxPhotosToShow ? favoritedPhotos.slice(0, maxPhotosToShow) : favoritedPhotos;
   const containerRef = useRef<HTMLDivElement>(null);
-  const [draggingPhotoId, setDraggingPhotoId] = useState<string | null>(null);
   
-  // Handle drag start
+  // Unified drag state for both mouse and touch
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggingPhotoId, setDraggingPhotoId] = useState<string | null>(null);
+  const [draggedPhoto, setDraggedPhoto] = useState<Photo | null>(null);
+  const [dragPosition, setDragPosition] = useState<{x: number, y: number} | null>(null);
+  const dragStartPos = useRef<{x: number, y: number} | null>(null);
+  const dragThreshold = 10; // pixels to move before starting drag
+  
+  // HTML5 drag handlers for desktop
   const handleDragStart = (e: React.DragEvent, photo: Photo) => {
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData('photoId', photo.id);
     e.dataTransfer.setData('photoUrl', photo.thumbnailUrl || photo.url);
     e.dataTransfer.setData('photoName', photo.name);
-    
-    // Let browser handle the drag image naturally
-    // The browser will use the element being dragged as the ghost image
-    // We're already scaling up the source element by 10% which helps
     
     setDraggingPhotoId(photo.id);
     
@@ -49,7 +53,7 @@ export default function FavoritesBar({
       onDragStart(photo);
     }
     
-    console.log('🎯 Started dragging photo:', photo.name);
+    console.log('🖱️ Desktop drag started:', photo.name);
   };
   
   const handleDragEnd = () => {
@@ -57,7 +61,89 @@ export default function FavoritesBar({
     if (onDragEnd) {
       onDragEnd();
     }
-    console.log('🎯 Ended dragging');
+    console.log('🖱️ Desktop drag ended');
+  };
+  
+  // Pointer event handlers for mobile (and desktop fallback)
+  const handlePointerDown = (e: React.PointerEvent, photo: Photo) => {
+    // Capture pointer for consistent tracking
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    
+    // Store initial position
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    
+    // Store photo data for potential drag
+    setDraggedPhoto(photo);
+    
+    // Store in window for drop detection
+    (window as any).draggedPhoto = photo;
+    
+    console.log('👆 Pointer down on photo:', photo.name);
+  };
+  
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!dragStartPos.current || !draggedPhoto) return;
+    
+    const deltaX = Math.abs(e.clientX - dragStartPos.current.x);
+    const deltaY = Math.abs(e.clientY - dragStartPos.current.y);
+    
+    // Start drag if moved beyond threshold
+    if (!isDragging && (deltaX > dragThreshold || deltaY > dragThreshold)) {
+      e.preventDefault();
+      setIsDragging(true);
+      setDraggingPhotoId(draggedPhoto.id);
+      setDragPosition({ x: e.clientX, y: e.clientY }); // Set position immediately!
+      
+      if (onDragStart) {
+        onDragStart(draggedPhoto);
+      }
+      
+      console.log('🎯 Drag started for:', draggedPhoto.name);
+    }
+    
+    // Update position if dragging
+    if (isDragging) {
+      e.preventDefault();
+      setDragPosition({ x: e.clientX, y: e.clientY });
+      
+      // Store current position for drop detection
+      (window as any).currentDragPos = { x: e.clientX, y: e.clientY };
+    }
+  };
+  
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (isDragging && draggedPhoto) {
+      // Find element under pointer
+      const dragPos = (window as any).currentDragPos || { x: e.clientX, y: e.clientY };
+      const elementBelow = document.elementFromPoint(dragPos.x, dragPos.y);
+      
+      if (elementBelow) {
+        // Trigger custom drop event
+        const dropEvent = new CustomEvent('customdrop', {
+          detail: { photo: draggedPhoto },
+          bubbles: true
+        });
+        elementBelow.dispatchEvent(dropEvent);
+      }
+      
+      console.log('🎯 Drag ended');
+    } else if (draggedPhoto && !isDragging) {
+      // It was just a tap/click, not a drag
+      onPhotoClick(draggedPhoto);
+    }
+    
+    // Cleanup
+    setIsDragging(false);
+    setDraggingPhotoId(null);
+    setDraggedPhoto(null);
+    setDragPosition(null);
+    dragStartPos.current = null;
+    delete (window as any).draggedPhoto;
+    delete (window as any).currentDragPos;
+    
+    if (onDragEnd) {
+      onDragEnd();
+    }
   }
   
   if (displayPhotos.length === 0) {
@@ -106,7 +192,10 @@ export default function FavoritesBar({
                     draggable
                     onDragStart={(e) => handleDragStart(e, photo)}
                     onDragEnd={handleDragEnd}
-                    onClick={() => onPhotoClick(photo)}
+                    onPointerDown={(e) => handlePointerDown(e, photo)}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    style={{ touchAction: 'none' }}
                   >
                     <div className={`rounded-lg overflow-hidden border-2 transition-all duration-300 h-40 ${
                       isUsed
@@ -199,8 +288,10 @@ export default function FavoritesBar({
                   draggable
                   onDragStart={(e) => handleDragStart(e, photo)}
                   onDragEnd={handleDragEnd}
-                  onClick={() => onPhotoClick(photo)}
-                  style={{ aspectRatio: '3/4' }}
+                  onPointerDown={(e) => handlePointerDown(e, photo)}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  style={{ touchAction: 'none', aspectRatio: '3/4' }}
                 >
                   <div className={`w-full h-full rounded-lg overflow-hidden border-2 transition-all duration-300 ${
                     isUsed
@@ -255,6 +346,31 @@ export default function FavoritesBar({
             })}
           </div>
         </div>
+        
+        {/* Unified drag preview - rendered as portal to avoid overflow clipping */}
+        {isDragging && draggedPhoto && dragPosition && ReactDOM.createPortal(
+          <div
+            className="fixed pointer-events-none z-[9999]"
+            style={{
+              left: dragPosition.x - 60,
+              top: dragPosition.y - 80,
+              width: '120px',
+              height: '160px'
+            }}
+          >
+            <div className="border-2 border-blue-500 rounded-lg overflow-hidden shadow-2xl opacity-90">
+              <img
+                src={draggedPhoto.thumbnailUrl || draggedPhoto.url}
+                alt={draggedPhoto.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap">
+              Dragging...
+            </div>
+          </div>,
+          document.body
+        )}
       </div>
     );
   }

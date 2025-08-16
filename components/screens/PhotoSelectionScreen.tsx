@@ -849,12 +849,21 @@ export default function PhotoSelectionScreen({
   
   // Handle photo drop on slot
   const handleDropPhoto = async (slot: TemplateSlot, photoId: string) => {
-    console.log('🎯 Photo dropped on slot:', { slotId: slot.id, photoId, hasExistingPhoto: !!slot.photoId });
+    // Get fresh slot data in case of stale closure
+    const currentSlot = templateSlots.find(s => s.id === slot.id) || slot;
+    
+    console.log('🎯 Photo dropped on slot:', { 
+      slotId: currentSlot.id, 
+      photoId, 
+      hasExistingPhoto: !!currentSlot.photoId,
+      existingPhotoId: currentSlot.photoId 
+    });
     
     // Check if slot already has a photo
-    if (slot.photoId) {
+    if (currentSlot.photoId) {
+      console.log('🔄 Showing replacement confirmation for occupied slot');
       // Store pending replacement and show confirmation
-      setPendingReplacement({ slot, photoId });
+      setPendingReplacement({ slot: currentSlot, photoId });
       setShowReplaceConfirmation(true);
       return;
     }
