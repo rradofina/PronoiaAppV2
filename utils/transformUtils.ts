@@ -9,7 +9,7 @@ export function createPhotoTransform(
     photoScale,
     photoCenterX,
     photoCenterY,
-    version: 'photo-centric'
+    version: 'photo-centric' as const
   };
 }
 

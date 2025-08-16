@@ -847,7 +847,16 @@ export default function PhotoSelectionScreen({
       existingPhotoId: currentSlot.photoId 
     });
     
-    // Check if slot already has a photo
+    // Check if it's the same photo being dropped
+    if (currentSlot.photoId === photoId) {
+      console.log('⚠️ Same photo dropped - no action needed');
+      // Clear any preview states
+      setPreviewSlotId(null);
+      setPreviewPhotoId(null);
+      return;
+    }
+    
+    // Check if slot already has a different photo
     if (currentSlot.photoId) {
       console.log('🔄 Showing replacement confirmation for occupied slot');
       // Store pending replacement and show confirmation
