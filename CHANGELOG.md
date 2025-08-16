@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-16] - Replace Tap-to-Add with Drag-and-Drop Photo Placement
+
+### Changed
+- **Photo Placement Workflow**: Complete refactor from tap-to-add to drag-and-drop
+  - Removed expanding/collapsing favorites bar functionality
+  - Favorites bar now always visible with fixed 200px height
+  - Increased photo thumbnail sizes in favorites bar (120px min width, 3:4 aspect ratio)
+  - Changed empty slot interaction from "Tap to Add" to drag-and-drop only
+  - Files Modified:
+    - `components/FavoritesBar.tsx` - Removed expansion logic, added drag handlers, increased photo sizes
+    - `components/PngTemplateVisual.tsx` - Added drop zones, changed placeholder text to "Drag photo here"
+    - `components/screens/PhotoSelectionScreen.tsx` - Added drag/drop state management and handlers
+  - Impact: More intuitive photo placement workflow based on user feedback
+  - Branch: PlaceholderIssueBranch
+  - Commit: Current
+
+### Added
+- **Drag and Drop Support**:
+  - Photos in favorites bar are now draggable with visual "Drag me" indicator on hover
+  - Empty template slots show green dashed border when dragging a photo
+  - Drop zones accept photos and immediately enter inline editing mode
+  - Star indicators remain visible on draggable photos
+  - Files Modified:
+    - `components/FavoritesBar.tsx` - Added onDragStart, onDragEnd, handleDragStart, handleDragEnd
+    - `components/PngTemplateVisual.tsx` - Added onDropPhoto, isDraggingPhoto props, handleDragOver, handleDrop
+  - Impact: Modern drag-and-drop interface replacing click-based workflow
+
+### Removed
+- **Tap to Add Workflow**:
+  - Removed isExpanded state and expansion animations from FavoritesBar
+  - Removed viewport-aware expansion calculations
+  - Removed isSelectingPhoto trigger for empty slot clicks
+  - Removed adaptivePhotoSize and dynamicHeight props
+  - Files Modified:
+    - `components/FavoritesBar.tsx` - Removed expansion-related code and props
+    - `components/screens/PhotoSelectionScreen.tsx` - Removed photo selection mode for empty slots
+  - Impact: Simplified codebase with single interaction pattern
+
 ## [2025-08-13] - Fix Additional Prints from Package Selection
 
 ### Fixed

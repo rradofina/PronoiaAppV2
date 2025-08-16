@@ -34,6 +34,9 @@ interface PngTemplateVisualProps {
   onRemoveButtonClick?: (slot: TemplateSlot) => void;
   onConfirmRemove?: (slot: TemplateSlot) => void;
   onCancelRemove?: () => void;
+  // Drag and drop handlers
+  onDropPhoto?: (slot: TemplateSlot, photoId: string) => void;
+  isDraggingPhoto?: boolean;
 }
 
 
@@ -57,7 +60,9 @@ export default function PngTemplateVisual({
   slotShowingRemoveConfirmation = null,
   onRemoveButtonClick,
   onConfirmRemove,
-  onCancelRemove
+  onCancelRemove,
+  onDropPhoto,
+  isDraggingPhoto = false
 }: PngTemplateVisualProps) {
   
   const getPhotoUrl = (photoId?: string | null) => {
@@ -242,19 +247,42 @@ export default function PngTemplateVisual({
         const isPreviewMode = !isActiveTemplate && !isEditingMode;
         const shouldApplyDarkening = shouldBlockSlot && !isPreviewMode;
         
+        // Handle drag over
+        const handleDragOver = (e: React.DragEvent) => {
+          if (!slot || shouldBlockSlot || isPreviewMode || slot.photoId) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+        };
+        
+        // Handle drop
+        const handleDrop = (e: React.DragEvent) => {
+          if (!slot || shouldBlockSlot || isPreviewMode || slot.photoId) return;
+          e.preventDefault();
+          
+          const photoId = e.dataTransfer.getData('photoId');
+          if (photoId && onDropPhoto) {
+            onDropPhoto(slot, photoId);
+            console.log('🎯 Dropped photo on slot:', { slotId: slot.id, photoId });
+          }
+        };
+        
         return (
           <div
             key={hole.id}
             className={`absolute transition-all duration-200 ${
               isInlineEditing 
-                ? 'z-50' // Clean editing experience - no border highlights during editing
+                ? 'z-50'
                 : isSelected 
-                ? 'border-4 border-blue-500 border-opacity-90 z-40 cursor-pointer' // Above overlay (z-30) - removed shadow for instant deselection
+                ? 'border-4 border-blue-500 border-opacity-90 z-40'
                 : shouldApplyDarkening
-                ? 'pointer-events-none cursor-not-allowed' // Block interaction during editing (but keep photos fully visible)
+                ? 'pointer-events-none cursor-not-allowed'
                 : isPreviewMode
-                ? '' // No effects for preview mode - clean display
-                : 'hover:border-2 hover:border-blue-300 hover:border-opacity-60 cursor-pointer'
+                ? ''
+                : isDraggingPhoto && !slot?.photoId
+                ? 'border-2 border-green-400 border-dashed animate-pulse'
+                : slot?.photoId
+                ? 'hover:border-2 hover:border-blue-300 hover:border-opacity-60 cursor-pointer'
+                : ''
             }`}
             style={{
               left: `${(hole.x / pngTemplate.dimensions.width) * 100}%`,
@@ -262,7 +290,9 @@ export default function PngTemplateVisual({
               width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
               height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
             }}
-            onClick={() => slot && !shouldBlockSlot && !isPreviewMode && onSlotClick(slot)}
+            onClick={() => slot && !shouldBlockSlot && !isPreviewMode && slot.photoId && onSlotClick(slot)}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
             title={
               !slot
                 ? "Template hole - no slot assigned"
@@ -274,7 +304,7 @@ export default function PngTemplateVisual({
                 ? "Editing in progress - complete current edit first" 
                 : slot.photoId 
                 ? "Click to edit this photo" 
-                : "Click to select slot"
+                : "Drag and drop a photo here"
             }
           >
             {debugHoles ? (
@@ -342,42 +372,44 @@ export default function PngTemplateVisual({
                 )}
               </>
             ) : (
-              // Empty slot - show placeholder with enhanced highlighting when selected
-              <div className={`w-full h-full flex items-center justify-center relative overflow-hidden border-2 border-solid ${
+              // Empty slot - show placeholder for drag and drop
+              <div className={`w-full h-full flex items-center justify-center relative overflow-hidden border-2 ${
                 isInlineEditing 
-                  ? 'bg-yellow-50 border-yellow-400 animate-pulse shadow-lg shadow-yellow-400/30' // Enhanced highlighting for inline editing
-                  : isSelected 
-                  ? 'bg-blue-50 border-blue-400' 
+                  ? 'bg-yellow-50 border-yellow-400 animate-pulse shadow-lg shadow-yellow-400/30'
+                  : isDraggingPhoto && !shouldBlockSlot
+                  ? 'bg-green-50 border-green-400 border-dashed'
                   : isPreviewMode
-                  ? 'bg-gray-100 border-gray-300' // Neutral inactive placeholder
+                  ? 'bg-gray-100 border-gray-300'
                   : shouldApplyDarkening
-                  ? 'bg-gray-500 border-gray-600' // Darker background during editing for consistency
-                  : 'bg-gray-200 border-gray-400'
+                  ? 'bg-gray-500 border-gray-600'
+                  : 'bg-gray-200 border-gray-400 border-dashed'
               }`}>
                 
                 {/* Additional darkening overlay for empty slots during editing */}
                 {shouldApplyDarkening && (
                   <div className="absolute inset-0 bg-black bg-opacity-40 transition-opacity duration-200 pointer-events-none" />
                 )}
-                {/* Visible placeholder with debug info */}
-                <div className={`text-center ${
+                {/* Visible placeholder with drag and drop instruction */}
+                <div className={`text-center pointer-events-none ${
                   isInlineEditing 
                     ? 'text-yellow-600 font-bold' 
-                    : isSelected 
-                    ? 'text-blue-600 font-semibold' 
+                    : isDraggingPhoto && !shouldBlockSlot
+                    ? 'text-green-600 font-semibold'
                     : isPreviewMode
-                    ? 'text-gray-500 font-medium' // Neutral inactive text
+                    ? 'text-gray-500 font-medium'
                     : shouldApplyDarkening
-                    ? 'text-gray-400' // Grayed out during editing
+                    ? 'text-gray-400'
                     : 'text-gray-500'
                 }`}>
-                  <div className="text-sm mb-1">
-                    {shouldBlockSlot ? '·' : '+'}
+                  <div className="text-lg mb-1">
+                    {isDraggingPhoto && !shouldBlockSlot ? '📥' : shouldBlockSlot ? '·' : '🗃️'}
                   </div>
                   <div className="text-xs font-medium">
                     {isInlineEditing 
                       ? 'Select Photo Below' 
-                      : 'Tap to Add'
+                      : isDraggingPhoto && !shouldBlockSlot
+                      ? 'Drop here'
+                      : 'Drag photo here'
                     }
                   </div>
                 </div>

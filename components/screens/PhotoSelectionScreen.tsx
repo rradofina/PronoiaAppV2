@@ -28,7 +28,7 @@ import { setupViewportHandler, getViewportInfo } from '../../utils/viewportUtils
 
 
 // Simplified TemplateVisual component
-const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard, isActiveTemplate = true, slotShowingEditButton, onEditButtonClick, onChangeButtonClick, slotShowingRemoveConfirmation, onRemoveButtonClick, onConfirmRemove, onCancelRemove }: any) => {
+const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard, isActiveTemplate = true, slotShowingEditButton, onEditButtonClick, onChangeButtonClick, slotShowingRemoveConfirmation, onRemoveButtonClick, onConfirmRemove, onCancelRemove, onDropPhoto, isDraggingPhoto }: any) => {
   // Get templates from both window cache AND database to ensure consistency with swap modal
   const windowTemplates = (window as any).pngTemplates || [];
   const [databaseTemplates, setDatabaseTemplates] = useState<any[]>([]);
@@ -243,6 +243,8 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
         onRemoveButtonClick={onRemoveButtonClick}
         onConfirmRemove={onConfirmRemove}
         onCancelRemove={onCancelRemove}
+        onDropPhoto={onDropPhoto}
+        isDraggingPhoto={isDraggingPhoto}
       />
     );
   }
@@ -356,6 +358,7 @@ export default function PhotoSelectionScreen({
   const [selectedTemplateForViewer, setSelectedTemplateForViewer] = useState<string | null>(null);
   const [selectedSlotForEditor, setSelectedSlotForEditor] = useState<TemplateSlot | null>(null);
   const [isSelectingPhoto, setIsSelectingPhoto] = useState(false); // Track when user is selecting photo for empty slot
+  const [isDraggingPhoto, setIsDraggingPhoto] = useState(false); // Track when dragging a photo
   
   // Handle escape key to close photo selection mode
   useEffect(() => {
@@ -831,10 +834,44 @@ export default function PhotoSelectionScreen({
       }
     }
 
-    // Empty slot behavior: select and trigger photo selection mode
-    console.log('🔧 Empty slot clicked - entering photo selection mode');
-    setSelectedSlot(slot);
-    setIsSelectingPhoto(true); // Trigger expanded favorites bar
+    // Empty slot behavior - no longer select for photo selection mode (drag and drop only)
+    console.log('🔧 Empty slot clicked - drag and drop photos here');
+  };
+  
+  // Handle photo drop on slot
+  const handleDropPhoto = async (slot: TemplateSlot, photoId: string) => {
+    console.log('🎯 Photo dropped on slot:', { slotId: slot.id, photoId });
+    
+    // Find the photo
+    const photo = photos.find(p => p.id === photoId);
+    if (!photo) {
+      console.error('❌ Photo not found:', photoId);
+      return;
+    }
+    
+    // Calculate smart transform for initial position
+    const smartTransform = await createSmartPhotoTransformFromSlot(photo, slot);
+    console.log('📠 Smart transform calculated for dropped photo:', smartTransform);
+    
+    // Update the slot with the photo and smart transform
+    const updatedSlot: TemplateSlot = {
+      ...slot,
+      photoId: photo.id,
+      transform: smartTransform
+    };
+    
+    const updatedSlots = templateSlots.map(s => 
+      s.id === slot.id ? updatedSlot : s
+    );
+    
+    setTemplateSlots(updatedSlots);
+    
+    // Start inline editing for adjustment
+    setInlineEditingSlot(updatedSlot);
+    setInlineEditingPhoto(photo);
+    setViewMode('inline-editing');
+    
+    console.log('✅ Photo dropped with smart alignment and inline editing started');
   };
 
   // Handle change button click for filled slots - opens favorites bar
@@ -1888,6 +1925,8 @@ export default function PhotoSelectionScreen({
                         onRemoveButtonClick={handleRemoveButtonClick}
                         onConfirmRemove={handleConfirmRemove}
                         onCancelRemove={handleCancelRemove}
+                        onDropPhoto={handleDropPhoto}
+                        isDraggingPhoto={isDraggingPhoto}
                       />
                     )}
                     layout="coverflow"
@@ -1901,7 +1940,7 @@ export default function PhotoSelectionScreen({
         </div>
 
         {/* UNIFIED NAVIGATION BAR - Mode toggle and Finalize buttons (all screen sizes) */}
-        <div className="fixed bottom-[150px] left-0 right-0 z-40 bg-white border-t shadow-lg">
+        <div className="fixed bottom-[200px] left-0 right-0 z-40 bg-white border-t shadow-lg">
           <div className="flex p-3 gap-3">
             <button
               onClick={handleModeToggle}
@@ -1931,7 +1970,7 @@ export default function PhotoSelectionScreen({
         {/* UNIFIED FAVORITES BAR - All screen sizes */}
         <div className={viewMode === 'inline-editing' ? 'opacity-50 pointer-events-none' : ''}>
           {/* Spacer to maintain layout when favorites bar and nav bar are fixed */}
-          <div style={{ height: '210px' }} /> {/* Increased from 150px to account for nav bar (60px) */}
+          <div style={{ height: '260px' }} /> {/* Account for FavoritesBar (200px) + NavBar (60px) */}
           
           {selectionMode === 'photo' ? (
             // Photo Selection Mode: Show Favorites Bar - FIXED HEIGHT
@@ -1943,7 +1982,8 @@ export default function PhotoSelectionScreen({
               layout="horizontal"
               showRemoveButtons={true}
               usedPhotoIds={getUsedPhotoIds()}
-              isExpanded={false} // No expansion needed - fixed height
+              onDragStart={() => setIsDraggingPhoto(true)}
+              onDragEnd={() => setIsDraggingPhoto(false)}
             />
           ) : (
             // Print Filling Mode: Show Favorites Bar - EXPANDED when selecting
@@ -1955,8 +1995,8 @@ export default function PhotoSelectionScreen({
               layout="horizontal"
               showRemoveButtons={false}
               usedPhotoIds={getUsedPhotoIds()}
-              isExpanded={isSelectingPhoto} // Expand when selecting photo for slot
-              adaptivePhotoSize={isSelectingPhoto ? "large" : "medium"} // Larger photos when expanded
+              onDragStart={() => setIsDraggingPhoto(true)}
+              onDragEnd={() => setIsDraggingPhoto(false)}
             />
           )}
         </div>
