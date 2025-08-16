@@ -6,6 +6,7 @@ import { packageGroupService } from '../../services/packageGroupService';
 import { googleDriveService } from '../../services/googleDriveService';
 import AnimatedTemplateReveal from '../animations/AnimatedTemplateReveal';
 import PackageTemplatePreview from '../PackageTemplatePreview';
+import { ChevronRight, ChevronLeft, Folder } from 'lucide-react';
 
 // Template state management types with session storage
 interface TemplateState {
@@ -296,7 +297,15 @@ const transformGoogleDriveImageUrl = (photo: any, size: string = 's100'): string
 };
 
 // Simple folder card component with thumbnail
-function FolderCard({ folder, onSelect }: { folder: DriveFolder; onSelect: () => void }) {
+function FolderCard({ 
+  folder, 
+  isSelected,
+  onClick 
+}: { 
+  folder: DriveFolder; 
+  isSelected: boolean;
+  onClick: () => void;
+}) {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -332,14 +341,18 @@ function FolderCard({ folder, onSelect }: { folder: DriveFolder; onSelect: () =>
   }, [folder.id]);
 
   return (
-    <div
-      onClick={onSelect}
-      className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all duration-200 w-full"
+    <div 
+      onClick={onClick}
+      className={`rounded-lg p-3 sm:p-4 cursor-pointer transition-all duration-200 w-full border-2 ${
+        isSelected 
+          ? 'bg-blue-50 border-blue-500 shadow-md' 
+          : 'bg-gray-50 border-transparent hover:bg-gray-100 hover:border-gray-300'
+      }`}
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center">
+        <div className="flex items-center flex-1">
           {/* Thumbnail or fallback icon */}
-          <div className="w-10 h-10 mr-4 rounded-full overflow-hidden flex-shrink-0">
+          <div className="w-8 sm:w-10 h-8 sm:h-10 mr-3 sm:mr-4 rounded-full overflow-hidden flex-shrink-0">
             {isLoading ? (
               <div className="w-full h-full bg-gray-300 animate-pulse rounded-full" />
             ) : thumbnailUrl ? (
@@ -356,9 +369,11 @@ function FolderCard({ folder, onSelect }: { folder: DriveFolder; onSelect: () =>
             )}
           </div>
           
-          <div>
-            <p className="font-semibold text-gray-800 text-lg">{folder.name}</p>
-            <p className="text-sm text-gray-500">
+          <div className="flex-1">
+            <p className={`font-semibold text-base sm:text-lg ${isSelected ? 'text-blue-900' : 'text-gray-800'}`}>
+              {folder.name}
+            </p>
+            <p className="text-xs sm:text-sm text-gray-500">
               {new Date(folder.createdTime).toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'short',
@@ -370,12 +385,12 @@ function FolderCard({ folder, onSelect }: { folder: DriveFolder; onSelect: () =>
           </div>
         </div>
         
-        <div className="flex items-center space-x-4">
-          {/* Photo Preview Strip */}
+        <div className="flex items-center space-x-3">
+          {/* Photo Preview Strip - Hidden on mobile for space */}
           {previewImages.length > 0 && (
-            <div className="flex space-x-2">
+            <div className="hidden sm:flex space-x-2">
               {previewImages.map((imageUrl, index) => (
-                <div key={index} className="w-12 h-12 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
+                <div key={index} className="w-10 h-10 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
                   <img
                     src={imageUrl}
                     alt={`Photo ${index + 1} from ${folder.name}`}
@@ -389,12 +404,14 @@ function FolderCard({ folder, onSelect }: { folder: DriveFolder; onSelect: () =>
             </div>
           )}
           
-          {/* Arrow indicator */}
-          <div className="text-blue-500 opacity-60 hover:opacity-100 transition-opacity flex-shrink-0">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </div>
+          {/* Selection indicator */}
+          {isSelected && (
+            <div className="text-blue-600">
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              </svg>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -424,12 +441,109 @@ export default function FolderSelectionScreen({
   const [isLoadingPackages, setIsLoadingPackages] = useState(false);
   const [packageError, setPackageError] = useState<string | null>(null);
   
+  // Navigation state for folder browsing
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [folderPath, setFolderPath] = useState<{ id: string; name: string }[]>([]);
+  const [currentFolders, setCurrentFolders] = useState<DriveFolder[]>(clientFolders);
+  const [isLoadingFolders, setIsLoadingFolders] = useState(false);
+  const [selectedNavigationFolder, setSelectedNavigationFolder] = useState<DriveFolder | null>(null);
+  
   // Template state managed by reducer (replaces scattered useState)
   const [templateState, dispatchTemplate] = useReducer(templateReducer, initialTemplateState);
   
   // Individual template selection state
   const [selectedTemplates, setSelectedTemplates] = useState<ManualTemplate[]>([]);
   const [availablePhotos, setAvailablePhotos] = useState<Photo[]>([]);
+
+  // Load folders from a specific parent folder
+  const loadFolders = async (parentId: string | null = null) => {
+    setIsLoadingFolders(true);
+    try {
+      // If parentId is null, we're at the root (selectedMainFolder)
+      if (parentId === null) {
+        // Load folders from the main folder
+        const mainFolderId = selectedMainFolder?.id;
+        if (!mainFolderId) {
+          setCurrentFolders(clientFolders);
+          return;
+        }
+        
+        const response = await window.gapi.client.drive.files.list({
+          q: `'${mainFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+          fields: 'files(id, name, createdTime)',
+          orderBy: 'name'
+        });
+        setCurrentFolders(response.result.files || []);
+      } else {
+        // Load subfolders from the specified parent
+        const response = await window.gapi.client.drive.files.list({
+          q: `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+          fields: 'files(id, name, createdTime)',
+          orderBy: 'name'
+        });
+        setCurrentFolders(response.result.files || []);
+      }
+    } catch (error) {
+      console.error('Failed to load folders:', error);
+      setCurrentFolders([]);
+    } finally {
+      setIsLoadingFolders(false);
+    }
+  };
+
+  // Navigate into a folder (browse its contents)
+  const handleFolderNavigate = async (folder: DriveFolder) => {
+    console.log('📂 Navigating into folder:', folder.name);
+    
+    // Add to path
+    setFolderPath([...folderPath, { id: folder.id, name: folder.name }]);
+    setCurrentFolderId(folder.id);
+    setSelectedNavigationFolder(null); // Clear selection when navigating
+    
+    // Load subfolders
+    await loadFolders(folder.id);
+  };
+
+  // Navigate via breadcrumb
+  const handleBreadcrumbClick = async (index: number) => {
+    console.log('🔙 Navigating to breadcrumb index:', index);
+    
+    setSelectedNavigationFolder(null); // Clear selection when navigating
+    
+    if (index === -1) {
+      // Root/main folder clicked
+      setFolderPath([]);
+      setCurrentFolderId(null);
+      await loadFolders(null);
+    } else {
+      // Navigate to specific folder in path
+      const newPath = folderPath.slice(0, index + 1);
+      setFolderPath(newPath);
+      const targetFolder = newPath[newPath.length - 1];
+      setCurrentFolderId(targetFolder.id);
+      await loadFolders(targetFolder.id);
+    }
+  };
+
+  // Go back one level
+  const handleBackClick = async () => {
+    if (folderPath.length > 0) {
+      const newPath = folderPath.slice(0, -1);
+      setFolderPath(newPath);
+      setSelectedNavigationFolder(null); // Clear selection when going back
+      
+      if (newPath.length === 0) {
+        // Back to root
+        setCurrentFolderId(null);
+        await loadFolders(null);
+      } else {
+        // Back to parent folder
+        const parentFolder = newPath[newPath.length - 1];
+        setCurrentFolderId(parentFolder.id);
+        await loadFolders(parentFolder.id);
+      }
+    }
+  };
 
   // Database-first template replacement (eliminates race conditions)
   const handleTemplateReplace = useCallback((packageId: string, packageName: string, templateIndex: number, newTemplate: ManualTemplate) => {
@@ -748,7 +862,15 @@ export default function FolderSelectionScreen({
     }
   }, [showPackageSelection]);
 
+  // Initialize folders on mount
+  useEffect(() => {
+    if (!showPackageSelection && clientFolders.length > 0) {
+      setCurrentFolders(clientFolders);
+    }
+  }, [clientFolders, showPackageSelection]);
+
   const handleFolderSelect = (folder: DriveFolder) => {
+    console.log('✅ Selecting folder as client folder:', folder.name);
     setSelectedFolder(folder);
     handleClientFolderSelect(folder); // Still call the original handler for data loading
     loadAvailablePhotos(folder); // Load photos for sample generation
@@ -761,6 +883,11 @@ export default function FolderSelectionScreen({
     setSelectedPackage(null);
     dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId: null });
     dispatchTemplate({ type: 'CLEAR_ALL_TEMPLATES' });
+    // Reset navigation state
+    setCurrentFolderId(null);
+    setFolderPath([]);
+    setSelectedNavigationFolder(null);
+    loadFolders(null); // Reload root folders
   };
 
   const handlePackageContinue = () => {
@@ -804,42 +931,142 @@ export default function FolderSelectionScreen({
         onAdminSettings={onAdminSettings}
       />
       
-      <div className="p-4">
+      <div className="p-2 sm:p-4">
         <div className="max-w-4xl mx-auto">
           
           {/* Step 1: Folder Selection */}
           {!showPackageSelection && (
             <>
-              <div className="text-center mb-8">
-                <h1 className="text-4xl font-bold text-gray-800 mb-2">
+              <div className="text-center mb-4 sm:mb-8">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-2">
                   Select Client Folder
                 </h1>
-                <p className="text-gray-600 text-lg">
+                <p className="text-gray-600 text-sm sm:text-base md:text-lg">
                   Choose the client's photo session folder
                 </p>
-                <div className="mt-2 text-sm text-blue-600">
+                <div className="mt-2 text-xs sm:text-sm text-blue-600">
                   Main folder: {selectedMainFolder?.name}
                 </div>
-                
               </div>
 
-              <div className="bg-white rounded-lg p-6 shadow-sm">
-                <div className="space-y-3 max-h-[70vh] overflow-y-auto">
-                  {clientFolders
-                    .sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime())
-                    .map((folder) => (
-                    <FolderCard 
-                      key={folder.id}
-                      folder={folder}
-                      onSelect={() => handleFolderSelect(folder)}
-                    />
-                  ))}
-                </div>
-
-                {clientFolders.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    No client folders found in this directory
+              <div className="bg-white rounded-lg p-3 sm:p-6 shadow-sm">
+                {/* Breadcrumb Navigation */}
+                {(folderPath.length > 0 || currentFolderId !== null) && (
+                  <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-b border-gray-200">
+                    <div className="flex items-center flex-wrap gap-1 text-xs sm:text-sm">
+                      {/* Root/Main Folder */}
+                      <button
+                        onClick={() => handleBreadcrumbClick(-1)}
+                        className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-1 sm:px-2 py-0.5 sm:py-1 rounded transition-colors flex items-center"
+                      >
+                        <Folder className="w-3 sm:w-4 h-3 sm:h-4 mr-0.5 sm:mr-1" />
+                        <span className="truncate max-w-[100px] sm:max-w-none">{selectedMainFolder?.name || 'Root'}</span>
+                      </button>
+                      
+                      {/* Path folders */}
+                      {folderPath.map((folder, index) => (
+                        <div key={folder.id} className="flex items-center">
+                          <ChevronRight className="w-3 sm:w-4 h-3 sm:h-4 text-gray-400 mx-0.5 sm:mx-1" />
+                          <button
+                            onClick={() => handleBreadcrumbClick(index)}
+                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-1 sm:px-2 py-0.5 sm:py-1 rounded transition-colors"
+                          >
+                            <span className="truncate max-w-[80px] sm:max-w-none">{folder.name}</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Back Button */}
+                    {folderPath.length > 0 && (
+                      <button
+                        onClick={handleBackClick}
+                        className="mt-2 sm:mt-3 flex items-center text-gray-600 hover:text-gray-800 text-xs sm:text-sm"
+                      >
+                        <ChevronLeft className="w-3 sm:w-4 h-3 sm:h-4 mr-0.5 sm:mr-1" />
+                        <span className="truncate">Back to {folderPath.length > 1 ? folderPath[folderPath.length - 1].name : selectedMainFolder?.name}</span>
+                      </button>
+                    )}
                   </div>
+                )}
+
+                {/* Loading state */}
+                {isLoadingFolders ? (
+                  <div className="text-center py-8">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <p className="mt-2 text-gray-600">Loading folders...</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Folder List */}
+                    <div className="space-y-2 sm:space-y-3 max-h-[50vh] overflow-y-auto mb-3 sm:mb-4">
+                      {currentFolders
+                        .sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime())
+                        .map((folder) => (
+                        <FolderCard 
+                          key={folder.id}
+                          folder={folder}
+                          isSelected={selectedNavigationFolder?.id === folder.id}
+                          onClick={() => setSelectedNavigationFolder(folder)}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Action Buttons - Only show when a folder is selected */}
+                    {selectedNavigationFolder && (
+                      <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200">
+                        <div className="flex items-center justify-between mb-2 sm:mb-3">
+                          <div className="text-xs sm:text-sm text-gray-600">
+                            Selected: <span className="font-semibold text-gray-800 truncate">{selectedNavigationFolder.name}</span>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2 sm:space-x-3">
+                          <button
+                            onClick={() => {
+                              handleFolderNavigate(selectedNavigationFolder);
+                              setSelectedNavigationFolder(null);
+                            }}
+                            className="flex-1 px-3 sm:px-4 py-2 sm:py-3 bg-white border border-gray-300 sm:border-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center space-x-1 sm:space-x-2 text-sm sm:text-base font-medium text-gray-700"
+                          >
+                            <svg className="w-4 sm:w-5 h-4 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                            <span className="hidden sm:inline">Open Folder</span>
+                            <span className="sm:hidden">Open</span>
+                          </button>
+                          
+                          <button
+                            onClick={() => {
+                              handleFolderSelect(selectedNavigationFolder);
+                              setSelectedNavigationFolder(null);
+                            }}
+                            className="flex-1 px-3 sm:px-4 py-2 sm:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1 sm:space-x-2 text-sm sm:text-base font-medium"
+                          >
+                            <svg className="w-4 sm:w-5 h-4 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span className="hidden sm:inline">Select as Client Folder</span>
+                            <span className="sm:hidden">Select</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {currentFolders.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <Folder className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p>No folders found in this directory</p>
+                        {folderPath.length > 0 && (
+                          <button
+                            onClick={handleBackClick}
+                            className="mt-4 text-blue-600 hover:text-blue-800 text-sm underline"
+                          >
+                            Go back
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </>
