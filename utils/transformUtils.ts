@@ -1,0 +1,25 @@
+import { PhotoTransform } from '../types';
+
+export function createPhotoTransform(
+  photoScale: number = 1.0,
+  photoCenterX: number = 0.5,
+  photoCenterY: number = 0.5
+): PhotoTransform {
+  return {
+    photoScale,
+    photoCenterX,
+    photoCenterY
+  };
+}
+
+export function createContainerTransform(
+  scale: number = 1.0,
+  x: number = 0,
+  y: number = 0
+) {
+  return {
+    scale,
+    x,
+    y
+  };
+}

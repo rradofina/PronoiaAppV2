@@ -28,7 +28,7 @@ import { setupViewportHandler, getViewportInfo } from '../../utils/viewportUtils
 
 
 // Simplified TemplateVisual component
-const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard, isActiveTemplate = true, slotShowingEditButton, onEditButtonClick, onChangeButtonClick, slotShowingRemoveConfirmation, onRemoveButtonClick, onConfirmRemove, onCancelRemove, onDropPhoto, isDraggingPhoto }: any) => {
+const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard, isActiveTemplate = true, slotShowingEditButton, onEditButtonClick, onChangeButtonClick, slotShowingRemoveConfirmation, onRemoveButtonClick, onConfirmRemove, onCancelRemove, onDropPhoto, isDraggingPhoto, previewSlotId, previewPhotoId, onSetPreviewSlot }: any) => {
   // Get templates from both window cache AND database to ensure consistency with swap modal
   const windowTemplates = (window as any).pngTemplates || [];
   const [databaseTemplates, setDatabaseTemplates] = useState<any[]>([]);
@@ -245,6 +245,9 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
         onCancelRemove={onCancelRemove}
         onDropPhoto={onDropPhoto}
         isDraggingPhoto={isDraggingPhoto}
+        previewSlotId={previewSlotId}
+        previewPhotoId={previewPhotoId}
+        onSetPreviewSlot={onSetPreviewSlot}
       />
     );
   }
@@ -359,6 +362,8 @@ export default function PhotoSelectionScreen({
   const [selectedSlotForEditor, setSelectedSlotForEditor] = useState<TemplateSlot | null>(null);
   const [isSelectingPhoto, setIsSelectingPhoto] = useState(false); // Track when user is selecting photo for empty slot
   const [isDraggingPhoto, setIsDraggingPhoto] = useState(false); // Track when dragging a photo
+  const [previewSlotId, setPreviewSlotId] = useState<string | null>(null); // Track which slot is being previewed
+  const [previewPhotoId, setPreviewPhotoId] = useState<string | null>(null); // Track which photo is being previewed
   
   // Handle escape key to close photo selection mode
   useEffect(() => {
@@ -1927,6 +1932,9 @@ export default function PhotoSelectionScreen({
                         onCancelRemove={handleCancelRemove}
                         onDropPhoto={handleDropPhoto}
                         isDraggingPhoto={isDraggingPhoto}
+                        previewSlotId={previewSlotId}
+                        previewPhotoId={previewPhotoId}
+                        onSetPreviewSlot={setPreviewSlotId}
                       />
                     )}
                     layout="coverflow"
@@ -1982,8 +1990,15 @@ export default function PhotoSelectionScreen({
               layout="horizontal"
               showRemoveButtons={true}
               usedPhotoIds={getUsedPhotoIds()}
-              onDragStart={() => setIsDraggingPhoto(true)}
-              onDragEnd={() => setIsDraggingPhoto(false)}
+              onDragStart={(photo) => {
+                setIsDraggingPhoto(true);
+                setPreviewPhotoId(photo.id);
+              }}
+              onDragEnd={() => {
+                setIsDraggingPhoto(false);
+                setPreviewSlotId(null);
+                setPreviewPhotoId(null);
+              }}
             />
           ) : (
             // Print Filling Mode: Show Favorites Bar - EXPANDED when selecting
@@ -1995,8 +2010,15 @@ export default function PhotoSelectionScreen({
               layout="horizontal"
               showRemoveButtons={false}
               usedPhotoIds={getUsedPhotoIds()}
-              onDragStart={() => setIsDraggingPhoto(true)}
-              onDragEnd={() => setIsDraggingPhoto(false)}
+              onDragStart={(photo) => {
+                setIsDraggingPhoto(true);
+                setPreviewPhotoId(photo.id);
+              }}
+              onDragEnd={() => {
+                setIsDraggingPhoto(false);
+                setPreviewSlotId(null);
+                setPreviewPhotoId(null);
+              }}
             />
           )}
         </div>

@@ -39,27 +39,9 @@ export default function FavoritesBar({
     e.dataTransfer.setData('photoUrl', photo.thumbnailUrl || photo.url);
     e.dataTransfer.setData('photoName', photo.name);
     
-    // Use the img element directly as drag image with offset for larger appearance
-    const img = e.currentTarget.querySelector('img') as HTMLImageElement;
-    if (img) {
-      // Clone the image element for drag preview
-      const dragImg = img.cloneNode(true) as HTMLImageElement;
-      dragImg.style.width = `${img.width * 1.5}px`;
-      dragImg.style.height = `${img.height * 1.5}px`;
-      dragImg.style.position = 'absolute';
-      dragImg.style.top = '-9999px';
-      dragImg.style.left = '-9999px';
-      dragImg.style.pointerEvents = 'none';
-      document.body.appendChild(dragImg);
-      
-      // Use the larger clone as drag image
-      e.dataTransfer.setDragImage(dragImg, dragImg.width / 2, dragImg.height / 2);
-      
-      // Remove clone after a brief delay
-      setTimeout(() => {
-        document.body.removeChild(dragImg);
-      }, 0);
-    }
+    // Let browser handle the drag image naturally
+    // The browser will use the element being dragged as the ghost image
+    // We're already scaling up the source element by 10% which helps
     
     setDraggingPhotoId(photo.id);
     

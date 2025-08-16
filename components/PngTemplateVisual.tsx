@@ -5,6 +5,7 @@ import PhotoRenderer from './PhotoRenderer';
 import InlinePhotoEditor from './InlinePhotoEditor';
 import { getHighResPhotoUrls } from '../utils/photoUrlUtils';
 import { getPrintSizeDimensions } from '../utils/printSizeDimensions';
+import { createPhotoTransform } from '../utils/transformUtils';
 
 interface PngTemplateVisualProps {
   pngTemplate: PngTemplate;
@@ -37,6 +38,10 @@ interface PngTemplateVisualProps {
   // Drag and drop handlers
   onDropPhoto?: (slot: TemplateSlot, photoId: string) => void;
   isDraggingPhoto?: boolean;
+  // Preview state
+  previewSlotId?: string | null;
+  previewPhotoId?: string | null;
+  onSetPreviewSlot?: (slotId: string | null) => void;
 }
 
 
@@ -62,7 +67,10 @@ export default function PngTemplateVisual({
   onConfirmRemove,
   onCancelRemove,
   onDropPhoto,
-  isDraggingPhoto = false
+  isDraggingPhoto = false,
+  previewSlotId,
+  previewPhotoId,
+  onSetPreviewSlot
 }: PngTemplateVisualProps) {
   
   const getPhotoUrl = (photoId?: string | null) => {
@@ -247,6 +255,29 @@ export default function PngTemplateVisual({
         const isPreviewMode = !isActiveTemplate && !isEditingMode;
         const shouldApplyDarkening = shouldBlockSlot && !isPreviewMode;
         
+        // Handle drag enter - set preview
+        const handleDragEnter = (e: React.DragEvent) => {
+          if (!slot || shouldBlockSlot || isPreviewMode || slot.photoId) return;
+          e.preventDefault();
+          if (onSetPreviewSlot) {
+            onSetPreviewSlot(slot.id);
+          }
+        };
+        
+        // Handle drag leave - clear preview
+        const handleDragLeave = (e: React.DragEvent) => {
+          if (!slot || shouldBlockSlot || isPreviewMode) return;
+          // Only clear if leaving the actual slot, not child elements
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX;
+          const y = e.clientY;
+          if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+            if (onSetPreviewSlot) {
+              onSetPreviewSlot(null);
+            }
+          }
+        };
+        
         // Handle drag over
         const handleDragOver = (e: React.DragEvent) => {
           if (!slot || shouldBlockSlot || isPreviewMode || slot.photoId) return;
@@ -258,6 +289,11 @@ export default function PngTemplateVisual({
         const handleDrop = (e: React.DragEvent) => {
           if (!slot || shouldBlockSlot || isPreviewMode || slot.photoId) return;
           e.preventDefault();
+          
+          // Clear preview first
+          if (onSetPreviewSlot) {
+            onSetPreviewSlot(null);
+          }
           
           const photoId = e.dataTransfer.getData('photoId');
           if (photoId && onDropPhoto) {
@@ -291,6 +327,8 @@ export default function PngTemplateVisual({
               height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
             }}
             onClick={() => slot && !shouldBlockSlot && !isPreviewMode && slot.photoId && onSlotClick(slot)}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             title={
@@ -354,7 +392,9 @@ export default function PngTemplateVisual({
                   holeSize: { width: hole.width, height: hole.height },
                   holePosition: { x: hole.x, y: hole.y }
                 })}
-                <div className="w-full h-full overflow-hidden">
+                <div className={`w-full h-full overflow-hidden transition-opacity duration-200 ${
+                  isDraggingPhoto ? 'opacity-30' : ''
+                }`}>
                   <PhotoRenderer
                     photoUrl={photoUrl}
                     photoAlt={`Photo ${holeIndex + 1}`}
@@ -371,11 +411,36 @@ export default function PngTemplateVisual({
                   <div className="absolute inset-0 bg-black bg-opacity-60 transition-opacity duration-200 pointer-events-none" />
                 )}
               </>
+            ) : slot && previewSlotId === slot.id && previewPhotoId ? (
+              // Preview mode - show preview photo while dragging
+              (() => {
+                const previewPhoto = photos.find(p => p.id === previewPhotoId);
+                const previewUrl = previewPhoto ? (previewPhoto.thumbnailUrl || previewPhoto.url) : null;
+                return previewUrl ? (
+                  <div className="w-full h-full overflow-hidden relative">
+                    <PhotoRenderer
+                      photoUrl={previewUrl}
+                      photoAlt={`Preview`}
+                      transform={createPhotoTransform(1.0, 0.5, 0.5)}
+                      interactive={false}
+                      previewMode={true}
+                      className="w-full h-full opacity-70"
+                      fallbackUrls={previewPhoto ? getHighResPhotoUrls(previewPhoto) : []}
+                    />
+                    <div className="absolute inset-0 border-4 border-green-400 border-dashed animate-pulse pointer-events-none" />
+                    <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-semibold pointer-events-none">
+                      Preview
+                    </div>
+                  </div>
+                ) : null;
+              })()
             ) : (
               // Empty slot - show placeholder for drag and drop
               <div className={`w-full h-full flex items-center justify-center relative overflow-hidden border-2 ${
                 isInlineEditing 
                   ? 'bg-yellow-50 border-yellow-400 animate-pulse shadow-lg shadow-yellow-400/30'
+                  : isDraggingPhoto && !shouldBlockSlot && previewSlotId === slot?.id
+                  ? 'bg-green-50 border-green-400 border-dashed animate-pulse'
                   : isDraggingPhoto && !shouldBlockSlot
                   ? 'bg-green-50 border-green-400 border-dashed'
                   : isPreviewMode
