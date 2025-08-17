@@ -453,8 +453,10 @@ export default function PngTemplateVisual({
                     className="w-full h-full"
                     fallbackUrls={slot && photos.find(p => p.id === slot.photoId) ? getHighResPhotoUrls(photos.find(p => p.id === slot.photoId)!) : []}
                     finalizationRef={{
-                      current: finalizationRefs.current[holeIndex],
-                      set current(value) {
+                      get current() {
+                        return finalizationRefs.current[holeIndex];
+                      },
+                      set current(value: (() => Promise<PhotoTransform>) | null) {
                         finalizationRefs.current[holeIndex] = value;
                       }
                     }}
