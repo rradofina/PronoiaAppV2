@@ -90,6 +90,9 @@ export default function PngTemplateVisual({
   // Create refs for each slot for mobile drag and drop
   const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
   
+  // Create finalization refs for auto-snap functionality
+  const finalizationRefs = useRef<((() => Promise<PhotoTransform>) | null)[]>([]);
+  
   console.log('🔍 PngTemplateVisual slot mapping:', {
     pngTemplateId: pngTemplate.id,
     pngTemplateType: pngTemplate.templateType,
@@ -165,14 +168,9 @@ export default function PngTemplateVisual({
       const slot = thisTemplateSlots[index];
       if (!slot || !onDropPhoto) return;
       
-      // Check if slot should be blocked
-      const isInlineEditing = inlineEditingSlot?.id === slot.id;
-      const isOtherSlotDuringEditing = isEditingMode && !isInlineEditing;
+      // Only block if not active template
       const isInactiveTemplate = !isActiveTemplate;
-      const shouldBlockSlot = isOtherSlotDuringEditing || isInactiveTemplate;
-      const isPreviewMode = !isActiveTemplate && !isEditingMode;
-      
-      if (shouldBlockSlot || isPreviewMode) return;
+      if (isInactiveTemplate) return;
       
       const photo = e.detail.photo;
       if (photo) {
@@ -230,10 +228,6 @@ export default function PngTemplateVisual({
         }}
       />
       
-      {/* Template background darkening overlay during editing */}
-      {isEditingMode && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 pointer-events-none transition-opacity duration-200" />
-      )}
       
       {/* Photo Holes Overlay */}
       {pngTemplate.holes.map((hole, holeIndex) => {
@@ -296,18 +290,13 @@ export default function PngTemplateVisual({
           }
         }
         
-        // Check if this slot should be blocked during editing mode or inactive template
-        const isOtherSlotDuringEditing = isEditingMode && !isInlineEditing;
+        // Simple check - only block if not active template
         const isInactiveTemplate = !isActiveTemplate;
-        const shouldBlockSlot = isOtherSlotDuringEditing || isInactiveTemplate;
-        
-        // For preview mode (non-interactive), never apply darkening effects
-        const isPreviewMode = !isActiveTemplate && !isEditingMode;
-        const shouldApplyDarkening = shouldBlockSlot && !isPreviewMode;
+        const isPreviewMode = !isActiveTemplate;
         
         // Handle drag enter - set preview
         const handleDragEnter = (e: React.DragEvent) => {
-          if (!slot || shouldBlockSlot || isPreviewMode) return;
+          if (!slot || isInactiveTemplate) return;
           e.preventDefault();
           if (onSetPreviewSlot) {
             onSetPreviewSlot(slot.id);
@@ -316,7 +305,7 @@ export default function PngTemplateVisual({
         
         // Handle drag leave - clear preview
         const handleDragLeave = (e: React.DragEvent) => {
-          if (!slot || shouldBlockSlot || isPreviewMode) return;
+          if (!slot || isPreviewMode) return;
           // Only clear if leaving the actual slot, not child elements
           const rect = e.currentTarget.getBoundingClientRect();
           const x = e.clientX;
@@ -330,14 +319,14 @@ export default function PngTemplateVisual({
         
         // Handle drag over
         const handleDragOver = (e: React.DragEvent) => {
-          if (!slot || shouldBlockSlot || isPreviewMode) return;
+          if (!slot || isPreviewMode) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = slot.photoId ? 'move' : 'copy';
         };
         
         // Handle drop
         const handleDrop = (e: React.DragEvent) => {
-          if (!slot || shouldBlockSlot || isPreviewMode) return;
+          if (!slot || isPreviewMode) return;
           e.preventDefault();
           
           // Clear preview first
@@ -360,23 +349,15 @@ export default function PngTemplateVisual({
           <div
             key={hole.id}
             ref={(el) => { slotRefs.current[holeIndex] = el; }}
-            className={`absolute transition-all duration-200 ${
-              isInlineEditing 
-                ? 'z-50'
-                : isSelected 
-                ? 'border-4 border-blue-500 border-opacity-90 z-40'
-                : shouldApplyDarkening
-                ? 'pointer-events-none cursor-not-allowed'
-                : isPreviewMode
+            className={`absolute ${
+              isPreviewMode
                 ? ''
                 : isDraggingPhoto && slot?.photoId === previewPhotoId && previewSlotId === slot?.id
                 ? 'border-2 border-gray-400 border-dashed'
                 : isDraggingPhoto && slot?.photoId && previewSlotId === slot?.id
-                ? 'border-2 border-orange-400 border-dashed animate-pulse'
+                ? 'border-2 border-orange-400 border-dashed'
                 : isDraggingPhoto && !slot?.photoId
-                ? 'border-2 border-green-400 border-dashed animate-pulse'
-                : slot?.photoId
-                ? 'hover:border-2 hover:border-blue-300 hover:border-opacity-60 cursor-pointer'
+                ? 'border-2 border-green-400 border-dashed'
                 : ''
             }`}
             style={{
@@ -385,7 +366,6 @@ export default function PngTemplateVisual({
               width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
               height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`,
             }}
-            onClick={() => slot && !shouldBlockSlot && !isPreviewMode && slot.photoId && onSlotClick(slot)}
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
             onDragOver={handleDragOver}
@@ -397,8 +377,6 @@ export default function PngTemplateVisual({
                 ? "Template preview - no interaction available"
                 : isInactiveTemplate
                 ? "Navigate to this template first to edit placeholders"
-                : shouldBlockSlot 
-                ? "Editing in progress - complete current edit first" 
                 : slot.photoId 
                 ? "Click to edit this photo" 
                 : "Drag and drop a photo here"
@@ -422,6 +400,7 @@ export default function PngTemplateVisual({
                   )}
                 </div>
               </div>
+            /* Commented out - using direct manipulation instead
             ) : hasInlinePhoto && onInlineApply && onInlineCancel ? (
               // Inline editing mode - show InlinePhotoEditor
               <>
@@ -442,6 +421,7 @@ export default function PngTemplateVisual({
                   />
                 </div>
               </>
+            */
             ) : photoUrl ? (
               // Normal mode - show photo with high-resolution fallbacks
               <>
@@ -451,24 +431,45 @@ export default function PngTemplateVisual({
                   holeSize: { width: hole.width, height: hole.height },
                   holePosition: { x: hole.x, y: hole.y }
                 })}
-                <div className={`w-full h-full overflow-hidden transition-opacity duration-200 ${
-                  isDraggingPhoto ? 'opacity-30' : ''
-                }`}>
+                <div className="w-full h-full overflow-hidden">
                   <PhotoRenderer
                     photoUrl={photoUrl}
                     photoAlt={`Photo ${holeIndex + 1}`}
                     transform={slot?.transform}
-                    interactive={false}
+                    interactive={!!photoUrl && !isPreviewMode}
+                    onTransformChange={(newTransform) => {
+                      // Don't update during drag - PhotoRenderer handles it internally
+                      // This prevents re-renders and flashing during interaction
+                      // Transform will be saved on interaction end with auto-snap applied
+                    }}
+                    onInteractionEnd={(finalTransform) => {
+                      // Save finalized transform with auto-snap applied
+                      if (slot && onInlineApply && finalTransform) {
+                        console.log('🔧 Saving finalized transform with auto-snap');
+                        onInlineApply(slot.id, slot.photoId!, finalTransform);
+                      }
+                    }}
                     previewMode={isPreviewMode}
                     className="w-full h-full"
                     fallbackUrls={slot && photos.find(p => p.id === slot.photoId) ? getHighResPhotoUrls(photos.find(p => p.id === slot.photoId)!) : []}
+                    finalizationRef={{
+                      current: finalizationRefs.current[holeIndex],
+                      set current(value) {
+                        finalizationRefs.current[holeIndex] = value;
+                      }
+                    }}
+                    onSmartReset={async () => {
+                      // Smart reset for optimal photo placement
+                      const photo = photos.find(p => p.id === slot?.photoId);
+                      if (photo && slot) {
+                        const { createSmartPhotoTransformFromSlot } = await import('../types');
+                        return createSmartPhotoTransformFromSlot(photo, slot);
+                      }
+                      return createPhotoTransform(1, 0.5, 0.5);
+                    }}
                   />
                 </div>
                 
-                {/* Darkening overlay for non-selected slots during editing */}
-                {shouldApplyDarkening && (
-                  <div className="absolute inset-0 bg-black bg-opacity-60 transition-opacity duration-200 pointer-events-none" />
-                )}
               </>
             ) : slot && previewSlotId === slot.id && previewPhotoId ? (
               // Preview mode - show preview photo while dragging
@@ -503,9 +504,9 @@ export default function PngTemplateVisual({
                       <div className="absolute inset-0 border-4 border-gray-400 border-dashed pointer-events-none" />
                     ) : (
                       <>
-                        {/* Show existing photo with overlay if replacing */}
+                        {/* Show existing photo if replacing */}
                         {isReplacement && photoUrl && (
-                          <div className="absolute inset-0 opacity-30">
+                          <div className="absolute inset-0">
                             <PhotoRenderer
                               photoUrl={photoUrl}
                               photoAlt={`Current Photo`}
@@ -523,10 +524,10 @@ export default function PngTemplateVisual({
                           transform={createPhotoTransform(1.0, 0.5, 0.5)}
                           interactive={false}
                           previewMode={true}
-                          className={`w-full h-full ${isReplacement ? 'opacity-80' : 'opacity-70'}`}
+                          className="w-full h-full"
                           fallbackUrls={previewPhoto ? getHighResPhotoUrls(previewPhoto) : []}
                         />
-                        <div className={`absolute inset-0 border-4 ${isReplacement ? 'border-orange-400' : 'border-green-400'} border-dashed animate-pulse pointer-events-none`} />
+                        <div className={`absolute inset-0 border-4 ${isReplacement ? 'border-orange-400' : 'border-green-400'} border-dashed pointer-events-none`} />
                         <div className={`absolute top-2 left-2 ${isReplacement ? 'bg-orange-600' : 'bg-green-600'} text-white px-2 py-1 rounded text-xs font-semibold pointer-events-none`}>
                           {isReplacement ? 'Replace?' : 'Preview'}
                         </div>
@@ -539,41 +540,33 @@ export default function PngTemplateVisual({
               // Empty slot - show placeholder for drag and drop
               <div className={`w-full h-full flex items-center justify-center relative overflow-hidden border-2 ${
                 isInlineEditing 
-                  ? 'bg-yellow-50 border-yellow-400 animate-pulse shadow-lg shadow-yellow-400/30'
-                  : isDraggingPhoto && !shouldBlockSlot && previewSlotId === slot?.id
-                  ? 'bg-green-50 border-green-400 border-dashed animate-pulse'
-                  : isDraggingPhoto && !shouldBlockSlot
+                  ? 'bg-yellow-50 border-yellow-400'
+                  : isDraggingPhoto && previewSlotId === slot?.id
+                  ? 'bg-green-50 border-green-400 border-dashed'
+                  : isDraggingPhoto
                   ? 'bg-green-50 border-green-400 border-dashed'
                   : isPreviewMode
                   ? 'bg-gray-100 border-gray-300'
-                  : shouldApplyDarkening
-                  ? 'bg-gray-500 border-gray-600'
                   : 'bg-gray-200 border-gray-400 border-dashed'
               }`}>
                 
-                {/* Additional darkening overlay for empty slots during editing */}
-                {shouldApplyDarkening && (
-                  <div className="absolute inset-0 bg-black bg-opacity-40 transition-opacity duration-200 pointer-events-none" />
-                )}
                 {/* Visible placeholder with drag and drop instruction */}
                 <div className={`text-center pointer-events-none ${
                   isInlineEditing 
                     ? 'text-yellow-600 font-bold' 
-                    : isDraggingPhoto && !shouldBlockSlot
+                    : isDraggingPhoto
                     ? 'text-green-600 font-semibold'
                     : isPreviewMode
                     ? 'text-gray-500 font-medium'
-                    : shouldApplyDarkening
-                    ? 'text-gray-400'
                     : 'text-gray-500'
                 }`}>
                   <div className="text-lg mb-1">
-                    {isDraggingPhoto && !shouldBlockSlot ? '📥' : shouldBlockSlot ? '·' : '🗃️'}
+                    {isDraggingPhoto ? '📥' : '🗃️'}
                   </div>
                   <div className="text-xs font-medium">
                     {isInlineEditing 
                       ? 'Select Photo Below' 
-                      : isDraggingPhoto && !shouldBlockSlot
+                      : isDraggingPhoto
                       ? 'Drop here'
                       : 'Drag photo here'
                     }
@@ -582,43 +575,7 @@ export default function PngTemplateVisual({
               </div>
             )}
             
-            {/* Edit, Change and Remove buttons positioned INSIDE placeholder (top-right) */}
-            {slot && slot.photoId && slotShowingEditButton?.id === slot.id && onEditButtonClick && onRemoveButtonClick && (
-              <div className="absolute top-2 right-2 flex gap-1 z-70">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEditButtonClick(slot);
-                  }}
-                  className="px-2 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 shadow-lg transition-all duration-200"
-                  title="Crop and zoom photo"
-                >
-                  Crop & Zoom
-                </button>
-                {onChangeButtonClick && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onChangeButtonClick(slot);
-                    }}
-                    className="px-2 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 shadow-lg transition-all duration-200"
-                    title="Change photo"
-                  >
-                    Change Photo
-                  </button>
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveButtonClick(slot);
-                  }}
-                  className="px-2 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700 shadow-lg transition-all duration-200"
-                  title="Remove photo"
-                >
-                  Remove Photo
-                </button>
-              </div>
-            )}
+            {/* All buttons removed - using pure direct manipulation */}
 
             {/* Remove confirmation dialog - keep overlay for this since it's temporary */}
             {slot && slot.photoId && slotShowingRemoveConfirmation?.id === slot.id && onConfirmRemove && onCancelRemove && (
@@ -633,7 +590,7 @@ export default function PngTemplateVisual({
                       e.stopPropagation();
                       onConfirmRemove(slot);
                     }}
-                    className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 shadow-lg transition-all duration-200"
+                    className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 shadow-lg"
                   >
                     Yes, Remove
                   </button>
@@ -642,7 +599,7 @@ export default function PngTemplateVisual({
                       e.stopPropagation();
                       onCancelRemove();
                     }}
-                    className="bg-gray-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700 shadow-lg transition-all duration-200"
+                    className="bg-gray-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700 shadow-lg"
                   >
                     Cancel
                   </button>

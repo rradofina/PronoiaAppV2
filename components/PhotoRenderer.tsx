@@ -12,6 +12,7 @@ interface PhotoRendererProps {
   // Interaction mode
   interactive?: boolean;
   onTransformChange?: (transform: PhotoTransform) => void;
+  onInteractionEnd?: (transform: PhotoTransform) => void;
   
   // Container styling
   className?: string;
@@ -109,6 +110,7 @@ export default function PhotoRenderer({
   transform,
   interactive = false,
   onTransformChange,
+  onInteractionEnd,
   className = '',
   style = {},
   debug = false,
@@ -170,17 +172,8 @@ export default function PhotoRenderer({
     }
   }, [onInteractionChange]);
   
-  const handleInteractionEnd = useCallback(() => {
-    // Clear any existing timeout
-    if (interactionTimeoutRef.current) {
-      clearTimeout(interactionTimeoutRef.current);
-      interactionTimeoutRef.current = null;
-    }
-    
-    // Show UI immediately
-    setIsInteracting(false);
-    onInteractionChange?.(false);
-  }, [onInteractionChange]);
+  // Placeholder for handleInteractionEnd - will be defined after finalizePositioning
+  let handleInteractionEnd: () => void;
   
   // Check if user has recently interacted with photo (within last 3 seconds)
   const hasRecentUserInteraction = useCallback(() => {
@@ -1018,6 +1011,37 @@ export default function PhotoRenderer({
     });
   }, [currentTransform, detectGaps, calculateGapBasedMovement, onTransformChange, debug, hasRecentUserInteraction, createPhotoTransform]);
 
+  // Now define handleInteractionEnd after finalizePositioning is available
+  handleInteractionEnd = useCallback(async () => {
+    // Clear any existing timeout
+    if (interactionTimeoutRef.current) {
+      clearTimeout(interactionTimeoutRef.current);
+      interactionTimeoutRef.current = null;
+    }
+    
+    // Show UI immediately
+    setIsInteracting(false);
+    onInteractionChange?.(false);
+    
+    // Add delay before auto-snap to ensure user is done interacting
+    // This prevents jarring movements while user is still adjusting
+    setTimeout(async () => {
+      if (onInteractionEnd) {
+        console.log('🎯 Starting auto-snap finalization after 300ms delay...');
+        try {
+          // Call finalization to detect gaps and apply auto-snap
+          const finalizedTransform = await finalizePositioning();
+          console.log('✅ Auto-snap finalization complete:', finalizedTransform);
+          onInteractionEnd(finalizedTransform);
+        } catch (error) {
+          console.error('❌ Auto-snap finalization failed:', error);
+          // Fallback to current transform if finalization fails
+          onInteractionEnd(currentTransform);
+        }
+      }
+    }, 300); // 300ms delay before auto-snap calculation
+  }, [onInteractionChange, onInteractionEnd, currentTransform, finalizePositioning]);
+
   // Analyze image for clipping (overexposed/underexposed areas)
   const analyzeClipping = () => {
     if (!showClippingIndicators || !imageRef.current || !canvasRef.current) {
@@ -1095,18 +1119,43 @@ export default function PhotoRenderer({
     }
   };
 
-  // Update internal transform when prop changes
+  // Initialize and sync transform based on mode
+  // For non-interactive: always sync with prop
+  // For interactive: only initialize when photo changes, ignore during interaction
+  const [lastPhotoUrlForTransform, setLastPhotoUrlForTransform] = useState<string>('');
+  
   useEffect(() => {
-    if (transform && isPhotoTransform(transform)) {
-      console.log('📐 PhotoRenderer - Updating transform from prop:', {
-        photoScale: transform.photoScale,
-        photoCenterX: transform.photoCenterX,
-        photoCenterY: transform.photoCenterY,
-        timestamp: Date.now()
-      });
+    if (!interactive && transform && isPhotoTransform(transform)) {
+      // Non-interactive mode: always sync with prop for correct display
+      if (debug) {
+        console.log('📐 PhotoRenderer NON-INTERACTIVE - Syncing transform from prop:', {
+          photoScale: transform.photoScale,
+          photoCenterX: transform.photoCenterX,
+          photoCenterY: transform.photoCenterY
+        });
+      }
       setCurrentTransform(transform);
+    } else if (interactive && photoUrl !== lastPhotoUrlForTransform) {
+      // Interactive mode: only sync when photo changes, not during dragging
+      // This prevents feedback loops from parent updates
+      if (transform && isPhotoTransform(transform)) {
+        console.log('📐 PhotoRenderer INTERACTIVE - New photo, initializing transform:', {
+          photoScale: transform.photoScale,
+          photoCenterX: transform.photoCenterX,
+          photoCenterY: transform.photoCenterY,
+          photoUrl: photoUrl.substring(0, 50) + '...',
+          timestamp: Date.now()
+        });
+        setCurrentTransform(transform);
+      } else {
+        // No transform provided, use default
+        console.log('📐 PhotoRenderer INTERACTIVE - New photo, using default transform');
+        setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
+      }
+      setLastPhotoUrlForTransform(photoUrl);
     }
-  }, [transform]);
+    // Don't update if it's the same photo in interactive mode - prevents feedback loops
+  }, [interactive, transform, photoUrl, lastPhotoUrlForTransform, debug, createPhotoTransform]);
   
   // Helper function to determine if two URLs represent the same photo
   const isSamePhoto = useCallback((url1: string, url2: string): boolean => {
@@ -1149,13 +1198,13 @@ export default function PhotoRenderer({
 
   // Track the current photo URL to detect actual photo changes
   const [lastPhotoUrl, setLastPhotoUrl] = useState<string>('');
-  const [hasInitialized, setHasInitialized] = useState(false);
+  const [hasPhotoInitialized, setHasPhotoInitialized] = useState(false);
   
   useEffect(() => {
     // On first mount, initialize without resetting states
-    if (!hasInitialized && photoUrl) {
+    if (!hasPhotoInitialized && photoUrl) {
       setLastPhotoUrl(photoUrl);
-      setHasInitialized(true);
+      setHasPhotoInitialized(true);
       console.log('📸 PhotoRenderer - Initial photo set:', photoUrl.substring(0, 50) + '...');
       return;
     }
@@ -1182,7 +1231,7 @@ export default function PhotoRenderer({
       // Update the URL reference but keep loading state
       setLastPhotoUrl(photoUrl);
     }
-  }, [photoUrl, hasInitialized, lastPhotoUrl, isSamePhoto, imageLoaded]);
+  }, [photoUrl, hasPhotoInitialized, lastPhotoUrl, isSamePhoto, imageLoaded]);
   
   // Analyze clipping when image loads and clipping indicators are enabled
   useEffect(() => {
@@ -1313,43 +1362,54 @@ export default function PhotoRenderer({
 
   // Calculate CSS style for the photo
   const photoStyle: React.CSSProperties = (() => {
-    // Always check for transform first, regardless of interactive mode
-    if (transform && isPhotoTransform(transform)) {
-      console.log(`📸 PhotoRenderer applying saved transform for ${photoAlt}:`, {
-        transform,
-        interactive,
-        previewMode,
-        style: 'Using convertPhotoToCSS with transform'
-      });
-      return convertPhotoToCSS(transform, previewMode);
-    } else if (transform && isContainerTransform(transform)) {
-      console.log(`📸 PhotoRenderer applying legacy transform for ${photoAlt}`);
-      return convertLegacyToCSS(transform);
-    } else if (!interactive) {
-      // Only use simple cover if no transform exists
-      console.log(`📸 PhotoRenderer NON-INTERACTIVE mode without transform for ${photoAlt}:`, {
-        photoUrl: photoUrl.substring(0, 60) + '...',
-        style: 'object-fit: cover, center center (no transform)'
-      });
-      return {
-        width: '100%',
-        height: '100%',
-        objectFit: 'cover' as const,
-        objectPosition: 'center center'
-      };
-    } else {
-      // Interactive mode with no provided transform - use current state
-      return {
-        ...convertPhotoToCSS(currentTransform, previewMode),
-        // Add smooth spring animation when auto-fitting or snapping to close gaps
-        // Using a slightly bouncy easing for a satisfying "snap into place" feel
-        transition: isSnapping 
-          ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' 
-          : isDragging || isTouching 
-            ? 'none'  // No transition during manual interaction
-            : 'transform 0.15s ease-out'  // Subtle transition for other state changes
-      };
+    // For non-interactive mode, use prop transform directly for stable display
+    if (!interactive) {
+      if (transform && isPhotoTransform(transform)) {
+        if (debug) {
+          console.log(`📸 PhotoRenderer NON-INTERACTIVE with transform for ${photoAlt}:`, transform);
+        }
+        return convertPhotoToCSS(transform, previewMode);
+      } else if (transform && isContainerTransform(transform)) {
+        if (debug) {
+          console.log(`📸 PhotoRenderer NON-INTERACTIVE with legacy transform for ${photoAlt}`);
+        }
+        return convertLegacyToCSS(transform);
+      } else {
+        // Default for non-interactive without transform
+        if (debug) {
+          console.log(`📸 PhotoRenderer NON-INTERACTIVE without transform for ${photoAlt}`);
+        }
+        return {
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover' as const,
+          objectPosition: 'center center'
+        };
+      }
     }
+    
+    // For interactive mode, use currentTransform for smooth dragging
+    const baseStyle = convertPhotoToCSS(currentTransform, previewMode);
+    
+    if (debug) {
+      console.log(`📸 PhotoRenderer INTERACTIVE applying currentTransform for ${photoAlt}:`, {
+        currentTransform,
+        isSnapping,
+        isDragging,
+        isTouching,
+        previewMode
+      });
+    }
+    
+    // Add animation only when snapping, not during user interaction
+    return {
+      ...baseStyle,
+      transition: isSnapping 
+        ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' // Spring animation for auto-snap
+        : isDragging || isTouching 
+          ? 'none' // No transition during manual dragging for smooth movement
+          : 'none' // No transition for normal updates to prevent lag
+    };
   })();
 
   // Touch helper functions for pinch-to-zoom
@@ -1413,7 +1473,8 @@ export default function PhotoRenderer({
       );
       
       setCurrentTransform(newTransform);
-      onTransformChange?.(newTransform);
+      // Don't update parent during drag - causes re-renders and flashing
+      // onTransformChange?.(newTransform);
       setLastTouchDistance(distance);
     } else if (e.touches.length === 1 && isDragging && lastPointer && containerRef.current) {
       // Single finger - handle drag
@@ -1437,7 +1498,8 @@ export default function PhotoRenderer({
       );
       
       setCurrentTransform(newTransform);
-      onTransformChange?.(newTransform);
+      // Don't update parent during drag - causes re-renders and flashing
+      // onTransformChange?.(newTransform);
       setLastPointer({ x: touch.clientX, y: touch.clientY });
     }
   };
@@ -1453,6 +1515,10 @@ export default function PhotoRenderer({
       // All fingers lifted - just clean up state, no auto-corrections
       setIsTouching(false);
       setIsDragging(false);
+      
+      // Track user interaction and call end handler
+      trackUserInteraction('touch-end');
+      handleInteractionEnd();
       setLastPointer(null);
       setLastTouchDistance(0);
       handleInteractionEnd();
@@ -1472,6 +1538,7 @@ export default function PhotoRenderer({
     if (!interactive) return;
     
     e.preventDefault();
+    e.stopPropagation(); // Prevent event from bubbling to parent slot
     setIsDragging(true);
     setLastPointer({ x: e.clientX, y: e.clientY });
     handleInteractionStart();
@@ -1507,7 +1574,8 @@ export default function PhotoRenderer({
     );
     
     setCurrentTransform(newTransform);
-    onTransformChange?.(newTransform);
+    // Don't update parent during drag - causes re-renders and flashing
+    // onTransformChange?.(newTransform);
     setLastPointer({ x: e.clientX, y: e.clientY });
   };
 
@@ -1546,7 +1614,8 @@ export default function PhotoRenderer({
     );
     
     setCurrentTransform(newTransform);
-    onTransformChange?.(newTransform);
+    // Don't update parent during zoom - causes re-renders and flashing
+    // onTransformChange?.(newTransform);
     
     // Track user interaction
     trackUserInteraction('zoom');

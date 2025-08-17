@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { TemplateSlot as Slot, Photo, ContainerTransform } from '../types';
+import { TemplateSlot as Slot, Photo, ContainerTransform, PhotoTransform } from '../types';
 import PhotoRenderer from './PhotoRenderer';
 import InlinePhotoEditor from './InlinePhotoEditor';
 import { isPhotoTransform, isContainerTransform } from '../types';
@@ -208,9 +208,22 @@ export default function TemplateSlot({
             photoUrl={photoUrl}
             photoAlt={actualPhoto.name}
             transform={slot.transform}
+            interactive={!!photoUrl && !isInlineEditing && !shouldBlockSlot && !isPreviewMode}
+            onTransformChange={(newTransform) => {
+              // Auto-save transform changes
+              if (onInlineApply) {
+                console.log('🔧 Auto-saving transform change from TemplateSlot');
+                const containerTransform: ContainerTransform = {
+                  scale: newTransform.photoScale,
+                  x: (0.5 - newTransform.photoCenterX) * 100,
+                  y: (0.5 - newTransform.photoCenterY) * 100
+                };
+                onInlineApply(slot, containerTransform);
+              }
+            }}
           />
           
-          {/* Inline Editor - show when editing this slot */}
+          {/* Inline Editor - Commented out, using direct manipulation instead
           {hasInlinePhoto && onInlineApply && onInlineCancel && (
             <div className="absolute inset-0 z-30">
               <InlinePhotoEditor
@@ -233,6 +246,7 @@ export default function TemplateSlot({
               />
             </div>
           )}
+          */}
         </>
       )}
       

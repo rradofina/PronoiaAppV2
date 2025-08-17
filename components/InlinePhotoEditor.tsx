@@ -297,7 +297,7 @@ export default function InlinePhotoEditor({
         onSmartReset={handleSmartReset} // Smart reset for intelligent photo repositioning
       />
       
-      {/* Editing Controls Overlay - Hidden during interaction */}
+      {/* Editing Controls Overlay - Commented out for direct manipulation
       <div className={`absolute top-2 right-2 flex space-x-2 z-50 transition-opacity duration-75 ${
         isUserInteracting ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}>
@@ -316,13 +316,15 @@ export default function InlinePhotoEditor({
           ✕
         </button>
       </div>
+      */}
       
-      {/* Instructions - Hidden during interaction */}
+      {/* Instructions - Commented out for direct manipulation
       <div className={`absolute bottom-2 left-2 right-2 bg-black bg-opacity-70 text-white px-3 py-2 rounded-md text-xs text-center z-50 transition-opacity duration-75 ${
         isUserInteracting ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}>
         Pinch to zoom • Drag to position
       </div>
+      */}
     </div>
   );
 }

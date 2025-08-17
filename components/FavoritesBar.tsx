@@ -168,19 +168,18 @@ export default function FavoritesBar({
         ref={containerRef}
         className="fixed bottom-0 left-0 right-0 z-50 border-t overflow-hidden bg-white shadow-lg"
         style={{
-          height: '200px',
-          overflowY: 'auto'
+          height: '200px'
         }}
       >
         <div className="h-full flex flex-col">
           {/* Header section with title */}
-          <div className="flex-shrink-0 px-3 py-2 text-sm font-medium text-gray-700 border-b border-gray-200">
+          <div className="flex-shrink-0 px-3 py-1.5 text-sm font-medium text-gray-700 border-b border-gray-200">
             Favorites ({favoritedPhotos.length}) - Drag photos to template slots
           </div>
           
           {/* Photos section - takes remaining space */}
           <div className="flex-1 overflow-x-auto flex items-center">
-            <div className="flex px-3 space-x-4 py-3" style={{ touchAction: 'pan-x' }}>
+            <div className="flex px-3 space-x-4 py-2" style={{ touchAction: 'pan-x' }}>
               {displayPhotos.map((photo) => {
                 const isUsed = usedPhotoIds.has(photo.id);
                 return (

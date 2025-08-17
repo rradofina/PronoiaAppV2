@@ -54,7 +54,7 @@ export default function TemplateGrid({
     // Calculate optimal template width based on available space
     // Leave margins for navigation arrows and padding
     const horizontalMargin = 120; // Space for side arrows and padding
-    const verticalMargin = 100;   // Space for buttons and padding
+    const verticalMargin = 80;   // Space for buttons and padding (reduced for more template space)
     
     const maxWidth = availableWidth - horizontalMargin;
     const maxHeight = availableHeight - verticalMargin;

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-17] - Direct Photo Manipulation in Template Slots
+
+### Changed
+- **Photo Editing Workflow**: Immediate direct manipulation for zooming and positioning
+  - Removed "Crop & Zoom" button - photos are now immediately interactive when selected
+  - Single click/touch on filled slot enables direct manipulation (drag to position, pinch/scroll to zoom)
+  - Auto-save transform changes when interaction ends (no need to click checkmark)
+  - Files Modified:
+    - `components/PngTemplateVisual.tsx` - Removed Crop & Zoom button, enabled interactive PhotoRenderer
+    - `components/TemplateSlot.tsx` - Added interactive mode and auto-save for PhotoRenderer
+    - `components/screens/PhotoSelectionScreen.tsx` - Updated slot click handling for direct manipulation
+  - Impact: Faster, more intuitive photo editing with fewer clicks/taps
+  - Commit: Current
+
+### Improved
+- **User Interaction Flow**:
+  - Previous: Click slot → Click "Crop & Zoom" → Adjust → Click ✓ (4 interactions)
+  - New: Click/touch slot → Immediately drag/pinch to adjust (1 interaction to start)
+  - Kept "Change Photo" and "Remove Photo" buttons for safety with confirmation
+  - Toggle behavior: Click same slot again to deselect and hide buttons
+  - Impact: Reduced friction in photo editing workflow, especially for tablet users
+
 ## [2025-08-16] - Replace Tap-to-Add with Drag-and-Drop Photo Placement
 
 ### Changed

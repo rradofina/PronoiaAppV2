@@ -28,7 +28,7 @@ import { setupViewportHandler, getViewportInfo } from '../../utils/viewportUtils
 
 
 // Simplified TemplateVisual component
-const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard, isActiveTemplate = true, slotShowingEditButton, onEditButtonClick, onChangeButtonClick, slotShowingRemoveConfirmation, onRemoveButtonClick, onConfirmRemove, onCancelRemove, onDropPhoto, isDraggingPhoto, previewSlotId, previewPhotoId, onSetPreviewSlot }: any) => {
+const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard, isActiveTemplate = true, slotShowingRemoveConfirmation, onConfirmRemove, onCancelRemove, onDropPhoto, isDraggingPhoto, previewSlotId, previewPhotoId, onSetPreviewSlot }: any) => {
   // Get templates from both window cache AND database to ensure consistency with swap modal
   const windowTemplates = (window as any).pngTemplates || [];
   const [databaseTemplates, setDatabaseTemplates] = useState<any[]>([]);
@@ -376,10 +376,7 @@ export default function PhotoSelectionScreen({
   const [inlineEditingSlot, setInlineEditingSlot] = useState<TemplateSlot | null>(null);
   const [inlineEditingPhoto, setInlineEditingPhoto] = useState<Photo | null>(null);
   
-  // Edit button state for filled slots (intermediate step before editing)
-  const [slotShowingEditButton, setSlotShowingEditButton] = useState<TemplateSlot | null>(null);
-  
-  // Remove confirmation state
+  // Remove confirmation state - kept for replacement confirmation
   const [slotShowingRemoveConfirmation, setSlotShowingRemoveConfirmation] = useState<TemplateSlot | null>(null);
   
   // Back navigation confirmation
@@ -776,63 +773,10 @@ export default function PhotoSelectionScreen({
     setViewMode('template-first');
   };
 
+  // Slot clicks no longer needed - using pure direct manipulation
   const handleSlotSelectFromTemplate = (slot: TemplateSlot) => {
-    console.log('🔧 SLOT CLICK DEBUG:', {
-      slotId: slot.id,
-      hasPhoto: !!slot.photoId,
-      photoId: slot.photoId,
-      selectionMode,
-      currentViewMode: viewMode,
-      currentInlineEditingSlot: inlineEditingSlot?.id
-    });
-
-    // Prevent slot selection if already in inline editing mode
-    if (viewMode === 'inline-editing') {
-      console.log('⚠️ Already in inline editing mode, ignoring slot click');
-      return;
-    }
-
-    // NEW UX: Filled slots show edit button first (no immediate editing)
-    if (slot.photoId) {
-      console.log('🔧 Filled slot clicked - checking for toggle behavior');
-      
-      // TOGGLE BEHAVIOR: If this slot is already selected with edit button showing, deselect completely
-      if (selectedSlot?.id === slot.id && slotShowingEditButton?.id === slot.id) {
-        console.log('🔧 Same slot clicked - toggling deselection for clean viewing');
-        setSelectedSlot(null);
-        setSlotShowingEditButton(null);
-        console.log('✅ Slot completely deselected - clean viewing mode');
-        return;
-      }
-      
-      // Find the existing photo in the photos array
-      const existingPhoto = photos.find(photo => photo.id === slot.photoId);
-      
-      if (existingPhoto) {
-        console.log('🔧 Found existing photo, showing edit button:', {
-          photo: existingPhoto.name,
-          slotId: slot.id
-        });
-        
-        // Show edit button instead of immediately entering edit mode
-        setSelectedSlot(slot);
-        setSlotShowingEditButton(slot);
-        // Don't set inline editing states yet - wait for edit button click
-        
-        console.log('✅ Edit button shown for filled slot:', {
-          selectedSlot: slot.id,
-          slotShowingEditButton: slot.id,
-          photo: existingPhoto.name
-        });
-        
-        return; // Exit early - filled slots show edit button first
-      } else {
-        console.warn('🔧 Photo not found in photos array:', slot.photoId);
-      }
-    }
-
-    // Empty slot behavior - no longer select for photo selection mode (drag and drop only)
-    console.log('🔧 Empty slot clicked - drag and drop photos here');
+    // This function is kept for compatibility but does nothing
+    // Photos are directly manipulable without any slot selection
   };
   
   // Handle photo drop on slot
@@ -943,50 +887,7 @@ export default function PhotoSelectionScreen({
   };
   
   // Handle change button click for filled slots - opens favorites bar
-  const handleChangeButtonClick = (slot: TemplateSlot) => {
-    console.log('🔧 Change button clicked - opening favorites bar');
-    
-    // Set the slot as selected and trigger photo selection mode
-    setSelectedSlot(slot);
-    setIsSelectingPhoto(true);
-    setSlotShowingEditButton(null); // Hide the edit buttons
-    
-    console.log('✅ Favorites bar expanded for photo change');
-  };
-  
-  // Handle edit button click for filled slots - starts inline editing
-  const handleEditButtonClick = (slot: TemplateSlot) => {
-    console.log('🔧 Edit button clicked - starting inline editing for position/zoom');
-    
-    // Find the existing photo in the photos array
-    const existingPhoto = photos.find(photo => photo.id === slot.photoId);
-    
-    if (existingPhoto) {
-      console.log('🔧 Starting inline editing:', {
-        photo: existingPhoto.name,
-        slotId: slot.id
-      });
-      
-      // Clear edit button state and enter inline editing mode
-      setSlotShowingEditButton(null);
-      setInlineEditingSlot(slot);
-      setInlineEditingPhoto(existingPhoto);
-      setViewMode('inline-editing');
-      
-      console.log('✅ Inline editing started for position/zoom adjustment');
-    } else {
-      console.error('❌ Photo not found when clicking edit button:', slot.photoId);
-    }
-  };
-
-  // Handle remove button click for filled slots
-  const handleRemoveButtonClick = (slot: TemplateSlot) => {
-    console.log('🔧 Remove button clicked - showing confirmation');
-    
-    // Hide edit buttons and show remove confirmation
-    setSlotShowingEditButton(null);
-    setSlotShowingRemoveConfirmation(slot);
-  };
+  // Button handlers removed - using pure direct manipulation
 
   // Handle confirmed photo removal
   const handleConfirmRemove = async (slot: TemplateSlot) => {
@@ -1029,9 +930,6 @@ export default function PhotoSelectionScreen({
     
     // Clear confirmation and show edit buttons again
     setSlotShowingRemoveConfirmation(null);
-    if (slot) {
-      setSlotShowingEditButton(slot);
-    }
   };
 
   const handlePhotoSelectForSlot = (photo: Photo) => {
@@ -1044,13 +942,6 @@ export default function PhotoSelectionScreen({
   const handleBackgroundClick = (event: React.MouseEvent) => {
     // Only deselect if clicking directly on the background (not on child elements)
     if (event.target !== event.currentTarget) {
-      return;
-    }
-
-    // Clear edit button state if shown
-    if (slotShowingEditButton) {
-      console.log('🔧 Background clicked - clearing edit button');
-      setSlotShowingEditButton(null);
       return;
     }
 
@@ -1250,7 +1141,6 @@ export default function PhotoSelectionScreen({
     setSelectedSlotForEditor(null);
     setInlineEditingSlot(null);
     setInlineEditingPhoto(null);
-    setSlotShowingEditButton(null);
     setSlotShowingRemoveConfirmation(null);
   };
 
@@ -1265,7 +1155,6 @@ export default function PhotoSelectionScreen({
     setSelectedPhotoForTemplate(null);
     setSelectedTemplateForViewer(null);
     setSelectedSlotForEditor(null);
-    setSlotShowingEditButton(null);
     setSlotShowingRemoveConfirmation(null);
   };
 
@@ -1986,11 +1875,7 @@ export default function PhotoSelectionScreen({
                         onInlineApply={handleInlineApply}
                         onInlineCancel={handleInlineCancel}
                         skipStateGuard={isApplyingPhoto}
-                        slotShowingEditButton={slotShowingEditButton}
-                        onEditButtonClick={handleEditButtonClick}
-                        onChangeButtonClick={handleChangeButtonClick}
                         slotShowingRemoveConfirmation={slotShowingRemoveConfirmation}
-                        onRemoveButtonClick={handleRemoveButtonClick}
                         onConfirmRemove={handleConfirmRemove}
                         onCancelRemove={handleCancelRemove}
                         onDropPhoto={handleDropPhoto}
