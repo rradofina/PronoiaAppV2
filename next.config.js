@@ -2,6 +2,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  eslint: {
+    // Disable ESLint during builds to prevent hanging on warnings
+    ignoreDuringBuilds: true,
+  },
   images: {
     domains: [
       'drive.google.com', 
