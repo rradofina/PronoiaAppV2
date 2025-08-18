@@ -698,11 +698,8 @@ export default function PhotoSelectionScreen({
           });
           setTemplateSlots(updatedSlots);
           
-          // Now start inline editing so user can adjust if needed
+          // Direct manipulation - photos are immediately interactive
           setIsSelectingPhoto(false); // Close expanded favorites bar
-          setInlineEditingSlot(selectedSlot);
-          setInlineEditingPhoto(photo);
-          setViewMode('inline-editing');
           
           console.log('✅ Photo applied with smart transform - inline editor opened for adjustment');
         })
@@ -724,18 +721,13 @@ export default function PhotoSelectionScreen({
           setTemplateSlots(updatedSlots);
           
           setIsSelectingPhoto(false);
-          setInlineEditingSlot(selectedSlot);
-          setInlineEditingPhoto(photo);
-          setViewMode('inline-editing');
+          // Photos are now immediately interactive via PhotoRenderer
         });
       
       console.log('✅ Starting inline editing with auto-fit Process 1 (smart scale)');
     } else if (selectionMode === 'print' && selectedSlot) {
-      // In print mode with selected slot but favorites not expanded - start inline editing
-      console.log('🔧 Starting inline editing from photo click');
-      setInlineEditingSlot(selectedSlot);
-      setInlineEditingPhoto(photo);
-      setViewMode('inline-editing');
+      // Direct manipulation - photo is immediately interactive
+      console.log('🔧 Photo applied for direct manipulation');
     } else if (selectionMode === 'photo') {
       // In photo mode - show photo viewer for starring/unstarring
       console.log('🔧 Opening photo viewer in photo mode');
@@ -747,10 +739,8 @@ export default function PhotoSelectionScreen({
   const handleAddToTemplate = (photo: Photo) => {
     setSelectedPhotoForTemplate(photo);
     if (selectedSlot) {
-      // If we have a selected slot, start inline editing
-      setInlineEditingSlot(selectedSlot);
-      setInlineEditingPhoto(photo);
-      setViewMode('inline-editing');
+      // Photos are immediately interactive via PhotoRenderer
+      console.log('🔧 Photo ready for direct manipulation');
     } else {
       // Fallback to sliding templates if no slot selected
       setViewMode('sliding-templates');
@@ -758,13 +748,8 @@ export default function PhotoSelectionScreen({
   };
 
   const handleSlotSelectFromSlidingBar = (slot: TemplateSlot) => {
-    setInlineEditingSlot(slot);
-    // First close the sliding bar by resetting view mode
+    // Direct manipulation - close sliding bar and photos become immediately interactive
     setViewMode('normal');
-    // Then open inline editor after sliding bar animation completes
-    setTimeout(() => {
-      setViewMode('inline-editing');
-    }, 300);
   };
 
   // Template-first workflow  
@@ -833,12 +818,10 @@ export default function PhotoSelectionScreen({
     
     setTemplateSlots(updatedSlots);
     
-    // Start inline editing for adjustment
-    setInlineEditingSlot(updatedSlot);
-    setInlineEditingPhoto(photo);
-    setViewMode('inline-editing');
+    // Direct manipulation - no mode switching needed
+    // Photo is now immediately interactive via PhotoRenderer
     
-    console.log('✅ Photo dropped with smart alignment and inline editing started');
+    console.log('✅ Photo dropped with smart alignment - ready for continuous interaction');
   };
 
   // Handle confirmed replacement
@@ -874,10 +857,7 @@ export default function PhotoSelectionScreen({
     
     setTemplateSlots(updatedSlots);
     
-    // Start inline editing for adjustment
-    setInlineEditingSlot(updatedSlot);
-    setInlineEditingPhoto(photo);
-    setViewMode('inline-editing');
+    // Direct manipulation - photo is immediately interactive via PhotoRenderer
     
     // Clear confirmation state
     setShowReplaceConfirmation(false);
@@ -1234,11 +1214,8 @@ export default function PhotoSelectionScreen({
       // Clear timeout since operation succeeded
       clearTimeout(timeoutId);
       
-      // Reset states immediately to prevent loading flashes
-      console.log('🔧 Resetting inline editing states immediately after apply');
-      setViewMode('normal');
-      setInlineEditingSlot(null);
-      setInlineEditingPhoto(null);
+      // Keep continuous interaction - no state resets during auto-snap
+      console.log('🔧 Auto-snap applied - maintaining interactive state');
       // Don't reset selectedSlot - let handleApplyPhotoToSlot handle selection logic
       
     } catch (error) {
@@ -1828,7 +1805,7 @@ export default function PhotoSelectionScreen({
 
           {/* MAIN CONTENT AREA - CALCULATED FIXED HEIGHT */}
           <div 
-            className={`layout-main-content relative z-40 transition-all duration-300 ${
+            className={`layout-main-content relative z-40 ${
               viewMode === 'inline-editing' && selectionMode === 'print' 
                 ? 'editing-mode' // Custom class to help with styling
                 : ''
@@ -1837,8 +1814,7 @@ export default function PhotoSelectionScreen({
               touchAction: 'manipulation',
               // Add padding when favorites bar is expanded to prevent template cutoff
               paddingBottom: isSelectingPhoto ? 'calc(40vh - 150px)' : '0px',
-              // Smooth transition for padding changes
-              transition: 'padding-bottom 300ms cubic-bezier(0.4, 0, 0.2, 1)'
+              // No transitions - pure direct manipulation interface
             }}
           >
             {selectionMode === 'photo' ? (
@@ -1924,7 +1900,7 @@ export default function PhotoSelectionScreen({
         </div>
 
         {/* UNIFIED FAVORITES BAR - All screen sizes */}
-        <div className={viewMode === 'inline-editing' ? 'opacity-50 pointer-events-none' : ''}>
+        <div className="">
           {/* Spacer to maintain layout when favorites bar and nav bar are fixed */}
           <div style={{ height: '260px' }} /> {/* Account for FavoritesBar (200px) + NavBar (60px) */}
           

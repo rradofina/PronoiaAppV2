@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-18] - Continuous Photo Interaction Workflow
+
+### Fixed
+- **Continuous Photo Dragging**: Enable immediate interaction with multiple photos without mode switching
+  - Root Cause: Auto-activation of inline-editing mode after photo drop prevented continuous interaction
+  - Solution: Removed automatic mode switching and state resets that blocked immediate photo dragging
+  - Files Modified:
+    - `components/screens/PhotoSelectionScreen.tsx` - Removed lines 837-839 (auto inline-editing activation), lines 1238-1242 (state resets during auto-snap), line 1927 (photo grid disabling)
+  - Impact: Users can now drag photo → drop → immediately drag another photo without barriers
+  - User Request: "when i drag a photo to a slot, i cant immediately drag another photo to another slot?"
+
+### Fixed
+- **Template Navigation After Photo Placement**: Enable immediate template swiping after placing photos
+  - Root Cause: Multiple functions triggered `inline-editing` mode which applied `pointer-events-none` to TemplateGrid, blocking swipe gestures
+  - Solution: Removed ALL automatic `setViewMode('inline-editing')` calls (6 instances) for pure direct manipulation
+  - Files Modified:
+    - `components/screens/PhotoSelectionScreen.tsx` - Removed inline-editing activation from `handlePhotoClick`, `handleSelectPhotoForTemplate`, `handleSlotSelectFromSlidingBar`, `handleConfirmReplace`
+  - Impact: Users can now place photo → immediately swipe to next template without navigation barriers
+  - User Request: "when i put a photo i cant immedately swipe to the next template"
+
+### Removed
+- **Mode Switching Barriers**: Eliminated automatic state changes that interfered with direct manipulation
+  - Removed automatic `setViewMode('inline-editing')` after photo drops
+  - Removed state resets (`setInlineEditingSlot(null)`, `setInlineEditingPhoto(null)`) during auto-snap
+  - Removed photo grid disabling (`opacity-50 pointer-events-none`) during editing mode
+  - Files: `components/screens/PhotoSelectionScreen.tsx`
+
+### Removed
+- **Visual Transitions**: Eliminated CSS transitions causing unwanted flashing during interaction
+  - Removed `transition-all duration-300` className from main content container
+  - Removed `transition: 'padding-bottom 300ms cubic-bezier(0.4, 0, 0.2, 1)'` style
+  - Files: `components/screens/PhotoSelectionScreen.tsx` lines 1826, 1836
+  - Impact: Pure direct manipulation interface with only intended auto-snap spring animation
+
 ## [2025-08-17] - Direct Photo Manipulation in Template Slots
 
 ### Changed
