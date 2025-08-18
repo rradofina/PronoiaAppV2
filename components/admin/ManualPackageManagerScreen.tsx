@@ -94,6 +94,18 @@ export default function ManualPackageManagerScreen({
     transformedUrl: string | null;
   }>({ isValidating: false, isValid: null, error: null, transformedUrl: null });
 
+  // Selection state for UI improvements
+  const [selectedPackages, setSelectedPackages] = useState<string[]>([]);
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deleteItems, setDeleteItems] = useState<{
+    packages: ManualPackage[];
+    groups: PackageGroup[];
+  }>({ packages: [], groups: [] });
+  
+  // Sort mode state for mobile-friendly scrolling
+  const [sortMode, setSortMode] = useState(false);
+
   // Utility function to transform Google Drive URLs
   const transformGoogleDriveUrl = (url: string): string => {
     if (!url) return url;
@@ -106,6 +118,113 @@ export default function ManualPackageManagerScreen({
     }
     
     return url;
+  };
+
+  // Get thumbnail URL for package
+  const getPackageThumbnailUrl = (pkg: ManualPackage): string | null => {
+    if (!pkg.thumbnail_url) return null;
+    return transformGoogleDriveUrl(pkg.thumbnail_url);
+  };
+
+  // Package Icon Component (same pattern as FolderSelectionScreen.tsx)
+  const PackageIcon = ({ pkg, size = "w-16 h-16" }: { 
+    pkg: ManualPackage; 
+    size?: string; 
+  }) => {
+    const thumbnailUrl = getPackageThumbnailUrl(pkg);
+    const [imageError, setImageError] = useState(false);
+
+    if (thumbnailUrl && !imageError) {
+      return (
+        <div className={`${size} rounded border border-gray-200 overflow-hidden flex-shrink-0`}>
+          <img
+            src={thumbnailUrl}
+            alt={`${pkg.name} thumbnail`}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        </div>
+      );
+    }
+
+    // Fallback package icon
+    return (
+      <div className={`${size} bg-gray-100 rounded border border-gray-200 flex items-center justify-center flex-shrink-0`}>
+        <div className="text-gray-400 text-xl">📦</div>
+      </div>
+    );
+  };
+
+  // Selection helper functions - single selection only
+  const togglePackageSelection = (packageId: string) => {
+    // Single select - replace current selection
+    setSelectedPackages(prev => 
+      prev.includes(packageId) && prev.length === 1
+        ? [] // Deselect if clicking already selected item
+        : [packageId]
+    );
+    setSelectedGroups([]); // Clear group selection
+  };
+
+  const toggleGroupSelection = (groupId: string) => {
+    // Single select - replace current selection
+    setSelectedGroups(prev => 
+      prev.includes(groupId) && prev.length === 1
+        ? [] // Deselect if clicking already selected item
+        : [groupId]
+    );
+    setSelectedPackages([]); // Clear package selection
+  };
+
+  const clearAllSelections = () => {
+    setSelectedPackages([]);
+    setSelectedGroups([]);
+  };
+
+  const isPackageSelected = (packageId: string) => selectedPackages.includes(packageId);
+  const isGroupSelected = (groupId: string) => selectedGroups.includes(groupId);
+  
+  const hasSelection = () => selectedPackages.length > 0 || selectedGroups.length > 0;
+
+  // Delete confirmation functions
+  const openDeleteConfirmation = () => {
+    const packageItems = selectedPackages
+      .map(id => packages.find(p => p.id === id))
+      .filter(Boolean) as ManualPackage[];
+    
+    const groupItems = selectedGroups
+      .map(id => groups.find(g => g.id === id))
+      .filter(Boolean) as PackageGroup[];
+
+    setDeleteItems({ packages: packageItems, groups: groupItems });
+    setShowDeleteConfirmation(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      // Delete packages
+      for (const pkg of deleteItems.packages) {
+        await handleDelete(pkg);
+      }
+      
+      // Delete groups
+      for (const group of deleteItems.groups) {
+        await handleDeleteGroup(group);
+      }
+      
+      // Clear selections and close modal
+      clearAllSelections();
+      setShowDeleteConfirmation(false);
+      setDeleteItems({ packages: [], groups: [] });
+    } catch (error) {
+      console.error('❌ Error during bulk deletion:', error);
+      // Keep modal open on error so user can retry
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirmation(false);
+    setDeleteItems({ packages: [], groups: [] });
   };
 
   // Validate thumbnail URL
@@ -180,6 +299,66 @@ export default function ManualPackageManagerScreen({
       loadTemplates();
     }
   }, [showCreateForm, editingPackage]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle keyboard shortcuts when not in forms
+      if (showCreateForm || showCreateGroupForm) return;
+      
+      // Delete key - trigger delete action
+      if (event.key === 'Delete' && hasSelection()) {
+        event.preventDefault();
+        openDeleteConfirmation();
+      }
+      
+      // Escape key - close modal or clear selections
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (showDeleteConfirmation) {
+          handleCancelDelete();
+        } else if (hasSelection()) {
+          clearAllSelections();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [hasSelection, selectedPackages, selectedGroups, packages, groups, showCreateForm, showCreateGroupForm, showDeleteConfirmation]);
+
+  // Click outside to clear selections
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      // Only clear selections if clicking outside the main content area
+      // and not clicking on action buttons or form elements
+      const target = event.target as Element;
+      
+      // Don't clear selections if:
+      // - Clicking on action bar
+      // - Clicking on form modals
+      // - Clicking on buttons
+      // - Clicking on package/group items (they handle their own selection)
+      if (
+        target.closest('[data-floating-action-bar]') ||
+        target.closest('[data-package-item]') ||
+        target.closest('[data-group-item]') ||
+        target.closest('button') ||
+        target.closest('[role="dialog"]') ||
+        target.closest('.bg-black.bg-opacity-50') // Modal backdrop
+      ) {
+        return;
+      }
+      
+      // Clear selections if clicking in empty areas
+      if (hasSelection()) {
+        clearAllSelections();
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [hasSelection]);
 
   const loadPackages = async () => {
     setIsLoading(true);
@@ -398,7 +577,7 @@ export default function ManualPackageManagerScreen({
 
       const packageData: CreateManualPackageRequest = {
         name: formData.name.trim(),
-        description: formData.description.trim() || undefined,
+        description: formData.description.trim() || undefined, // Use undefined for optional field
         thumbnail_url: formData.thumbnail_url.trim() || undefined,
         print_size: determinedPrintSize, // Dynamic print size based on selected templates
         template_count: formData.number_of_prints,
@@ -540,13 +719,13 @@ export default function ManualPackageManagerScreen({
       if (editingGroup) {
         await packageGroupService.updateGroup(editingGroup.id, {
           name: groupFormData.name.trim(),
-          description: groupFormData.description.trim() || undefined
+          description: groupFormData.description.trim() || undefined // Use undefined for optional field
         });
         console.log('✅ Group updated successfully');
       } else {
         await packageGroupService.createGroup({
           name: groupFormData.name.trim(),
-          description: groupFormData.description.trim() || undefined
+          description: groupFormData.description.trim() || undefined // Use undefined for optional field
         });
         console.log('✅ Group created successfully');
       }
@@ -658,7 +837,60 @@ export default function ManualPackageManagerScreen({
               </p>
             </div>
             
-            <div className="flex space-x-3">
+            <div className="flex items-center space-x-3">
+              {/* Action buttons - always visible but disabled when no selection */}
+              <button
+                onClick={() => {
+                  if (selectedPackages.length === 1) {
+                    const pkg = packages.find(p => p.id === selectedPackages[0]);
+                    if (pkg) handleEdit(pkg);
+                  } else if (selectedGroups.length === 1) {
+                    const group = groups.find(g => g.id === selectedGroups[0]);
+                    if (group) handleEditGroup(group);
+                  }
+                }}
+                disabled={!hasSelection()}
+                className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                  hasSelection()
+                    ? 'bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                }`}
+                title={hasSelection() ? 'Edit selected item' : 'Select an item to edit'}
+              >
+                ✏️ Edit
+              </button>
+              
+              <button
+                onClick={openDeleteConfirmation}
+                disabled={!hasSelection()}
+                className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                  hasSelection()
+                    ? 'bg-red-100 text-red-800 hover:bg-red-200 cursor-pointer'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                }`}
+                title={hasSelection() ? 'Delete selected item' : 'Select an item to delete'}
+              >
+                🗑️ Delete
+              </button>
+
+              {/* Divider */}
+              {hasSelection() && <div className="h-6 w-px bg-gray-300"></div>}
+              
+              {/* Sort Mode Toggle */}
+              <button
+                onClick={() => setSortMode(!sortMode)}
+                className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center space-x-2 ${
+                  sortMode
+                    ? 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title={sortMode ? 'Disable sort mode for easier scrolling' : 'Enable sort mode to drag and reorder items'}
+              >
+                <span>🔄</span>
+                <span>{sortMode ? 'Sort: ON' : 'Sort: OFF'}</span>
+              </button>
+              
+              {/* Create buttons */}
               <button
                 onClick={handleCreateGroup}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
@@ -706,33 +938,50 @@ export default function ManualPackageManagerScreen({
               {packages.length > 0 ? (
                 <div className="max-w-4xl mx-auto space-y-6">
                   <div className="mb-4 text-sm text-gray-600 text-center">
-                    💡 Drag groups to reorder them, or drag packages to reorder within groups
+                    {sortMode ? (
+                      <>💡 Drag groups to reorder them, or drag packages to reorder within groups</>
+                    ) : (
+                      <>📱 Sort mode is OFF for easier scrolling on mobile. Click "Sort: OFF" to enable reordering.</>
+                    )}
                   </div>
 
                   {/* Display Groups */}
                   <Reorder.Group
                     axis="y"
                     values={groups}
-                    onReorder={handleReorderGroups}
+                    onReorder={sortMode ? handleReorderGroups : () => {}}
                     className="space-y-6"
                   >
                     {groups.map((group) => (
                       <Reorder.Item
                         key={group.id}
                         value={group}
-                        className="cursor-move"
-                        whileDrag={{ 
+                        className={sortMode ? "cursor-move" : "cursor-default"}
+                        drag={sortMode}
+                        whileDrag={sortMode ? { 
                           scale: 1.02, 
                           boxShadow: "0 8px 25px rgba(0,0,0,0.15)",
                           zIndex: 50 
-                        }}
+                        } : false}
                       >
                         <div className="bg-white rounded-lg border-2 border-gray-200">
                           {/* Group Header */}
-                          <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+                          <div 
+                            className={`flex items-center justify-between p-4 border-b border-gray-200 rounded-t-lg cursor-pointer transition-all duration-200 hover:bg-gray-100 ${
+                              isGroupSelected(group.id) 
+                                ? 'bg-blue-100 border-blue-300' 
+                                : 'bg-gray-50'
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleGroupSelection(group.id);
+                            }}
+                            data-group-item
+                          >
                             <div className="flex items-center space-x-3 flex-1">
-                              {/* Drag Handle for Group */}
-                              <div className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
+                              {/* Drag Handle for Group - only show when sort mode is on */}
+                              {sortMode && (
+                                <div className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                                   <circle cx="4" cy="4" r="1"/>
                                   <circle cx="4" cy="8" r="1"/>
@@ -744,7 +993,8 @@ export default function ManualPackageManagerScreen({
                                   <circle cx="12" cy="8" r="1"/>
                                   <circle cx="12" cy="12" r="1"/>
                                 </svg>
-                              </div>
+                                </div>
+                              )}
                               <div>
                                 <h3 className="text-lg font-semibold text-gray-800">{group.name}</h3>
                                 {group.description && (
@@ -755,23 +1005,6 @@ export default function ManualPackageManagerScreen({
                                 </div>
                               </div>
                             </div>
-                            
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => handleEditGroup(group)}
-                                className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
-                                title="Edit Group"
-                              >
-                                ✏️ Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteGroup(group)}
-                                className="px-3 py-1 text-xs bg-red-100 text-red-800 rounded hover:bg-red-200 transition-colors"
-                                title="Delete Group"
-                              >
-                                🗑️ Delete
-                              </button>
-                            </div>
                           </div>
 
                       {/* Packages in Group */}
@@ -780,7 +1013,7 @@ export default function ManualPackageManagerScreen({
                           <Reorder.Group
                             axis="y"
                             values={groupedPackages[group.id]}
-                            onReorder={(newOrder) => {
+                            onReorder={sortMode ? (newOrder) => {
                               // Update packages within this group
                               const updatedGrouped = { ...groupedPackages };
                               updatedGrouped[group.id] = newOrder;
@@ -790,30 +1023,41 @@ export default function ManualPackageManagerScreen({
                               newOrder.forEach(async (pkg, index) => {
                                 await manualPackageService.updatePackage(pkg.id, { sort_order: index + 1 });
                               });
-                            }}
+                            } : () => {}}
                             className="space-y-3"
                           >
                             {groupedPackages[group.id].map((pkg) => (
                               <Reorder.Item
                                 key={pkg.id}
                                 value={pkg}
-                                className={`bg-gray-50 rounded-lg p-3 border transition-all duration-200 cursor-move hover:shadow-md ${
-                                  pkg.is_active
-                                    ? pkg.is_default
-                                      ? 'border-green-400 bg-green-50'
-                                      : 'border-green-200'
-                                    : 'border-gray-300 opacity-60'
+                                className={`rounded-lg p-3 border transition-all duration-200 cursor-pointer hover:shadow-md ${
+                                  isPackageSelected(pkg.id)
+                                    ? 'bg-blue-50 border-blue-300'
+                                    : pkg.is_active
+                                      ? pkg.is_default
+                                        ? 'border-green-400 bg-green-50'
+                                        : 'border-green-200 bg-gray-50'
+                                      : 'border-gray-300 bg-gray-50 opacity-60'
                                 }`}
-                                whileDrag={{ 
+                                drag={sortMode}
+                                whileDrag={sortMode ? { 
                                   scale: 1.02, 
                                   boxShadow: "0 5px 15px rgba(0,0,0,0.1)",
                                   zIndex: 50 
-                                }}
+                                } : false}
                               >
-                                <div className="flex items-start justify-between">
+                                <div 
+                                  className="flex items-start justify-between"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    togglePackageSelection(pkg.id);
+                                  }}
+                                  data-package-item
+                                >
                                   <div className="flex items-start space-x-3 flex-1">
-                                    {/* Drag Handle */}
-                                    <div className="mt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
+                                    {/* Drag Handle - only show when sort mode is on */}
+                                    {sortMode && (
+                                      <div className="mt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
                                       <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
                                         <circle cx="4" cy="4" r="1"/>
                                         <circle cx="4" cy="8" r="1"/>
@@ -825,7 +1069,11 @@ export default function ManualPackageManagerScreen({
                                         <circle cx="12" cy="8" r="1"/>
                                         <circle cx="12" cy="12" r="1"/>
                                       </svg>
-                                    </div>
+                                      </div>
+                                    )}
+
+                                    {/* Package thumbnail */}
+                                    <PackageIcon pkg={pkg} />
                                     
                                     <div className="flex-1">
                                       <div className="flex items-center space-x-2 mb-1">
@@ -880,18 +1128,6 @@ export default function ManualPackageManagerScreen({
                                         ⭐
                                       </button>
                                     )}
-                                    <button
-                                      onClick={() => handleEdit(pkg)}
-                                      className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      onClick={() => handleDelete(pkg)}
-                                      className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded hover:bg-red-200 transition-colors"
-                                    >
-                                      Delete
-                                    </button>
                                   </div>
                                 </div>
                               </Reorder.Item>
@@ -927,36 +1163,47 @@ export default function ManualPackageManagerScreen({
                         <Reorder.Group
                           axis="y"
                           values={ungroupedPackages}
-                          onReorder={(newOrder) => {
+                          onReorder={sortMode ? (newOrder) => {
                             setUngroupedPackages(newOrder);
                             // Update sort order in database
                             newOrder.forEach(async (pkg, index) => {
                               await manualPackageService.updatePackage(pkg.id, { sort_order: index + 1 });
                             });
-                          }}
+                          } : () => {}}
                           className="space-y-3"
                         >
                           {ungroupedPackages.map((pkg) => (
                             <Reorder.Item
                               key={pkg.id}
                               value={pkg}
-                              className={`bg-gray-50 rounded-lg p-3 border transition-all duration-200 cursor-move hover:shadow-md ${
-                                pkg.is_active
-                                  ? pkg.is_default
-                                    ? 'border-green-400 bg-green-50'
-                                    : 'border-green-200'
-                                  : 'border-gray-300 opacity-60'
+                              className={`rounded-lg p-3 border transition-all duration-200 cursor-pointer hover:shadow-md ${
+                                isPackageSelected(pkg.id)
+                                  ? 'bg-blue-50 border-blue-300'
+                                  : pkg.is_active
+                                    ? pkg.is_default
+                                      ? 'border-green-400 bg-green-50'
+                                      : 'border-green-200 bg-gray-50'
+                                    : 'border-gray-300 bg-gray-50 opacity-60'
                               }`}
-                              whileDrag={{ 
+                              drag={sortMode}
+                              whileDrag={sortMode ? { 
                                 scale: 1.02, 
                                 boxShadow: "0 5px 15px rgba(0,0,0,0.1)",
                                 zIndex: 50 
-                              }}
+                              } : false}
                             >
-                              <div className="flex items-start justify-between">
+                              <div 
+                                className="flex items-start justify-between"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  togglePackageSelection(pkg.id);
+                                }}
+                                data-package-item
+                              >
                                 <div className="flex items-start space-x-3 flex-1">
-                                  {/* Drag Handle */}
-                                  <div className="mt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
+                                  {/* Drag Handle - only show when sort mode is on */}
+                                  {sortMode && (
+                                    <div className="mt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
                                     <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
                                       <circle cx="4" cy="4" r="1"/>
                                       <circle cx="4" cy="8" r="1"/>
@@ -968,7 +1215,11 @@ export default function ManualPackageManagerScreen({
                                       <circle cx="12" cy="8" r="1"/>
                                       <circle cx="12" cy="12" r="1"/>
                                     </svg>
-                                  </div>
+                                    </div>
+                                  )}
+
+                                  {/* Package thumbnail */}
+                                  <PackageIcon pkg={pkg} />
                                   
                                   <div className="flex-1">
                                     <div className="flex items-center space-x-2 mb-1">
@@ -1036,18 +1287,6 @@ export default function ManualPackageManagerScreen({
                                       ⭐
                                     </button>
                                   )}
-                                  <button
-                                    onClick={() => handleEdit(pkg)}
-                                    className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDelete(pkg)}
-                                    className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded hover:bg-red-200 transition-colors"
-                                  >
-                                    Delete
-                                  </button>
                                 </div>
                               </div>
                             </Reorder.Item>
@@ -1611,6 +1850,85 @@ export default function ManualPackageManagerScreen({
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">Confirm Deletion</h2>
+                <button
+                  onClick={handleCancelDelete}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-gray-700 mb-4">
+                  Are you sure you want to delete the following item? This action cannot be undone.
+                </p>
+
+                {/* List items to be deleted */}
+                <div className="bg-gray-50 rounded-lg p-4 max-h-40 overflow-y-auto">
+                  {deleteItems.groups.length > 0 && (
+                    <div className="mb-3">
+                      <div className="text-sm font-medium text-gray-700 mb-2">Groups:</div>
+                      {deleteItems.groups.map(group => (
+                        <div key={group.id} className="flex items-center space-x-2 text-sm text-gray-600 mb-1">
+                          <span className="text-green-600">📁</span>
+                          <span>{group.name}</span>
+                          {group.description && (
+                            <span className="text-gray-400">- {group.description}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {deleteItems.packages.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-700 mb-2">Packages:</div>
+                      {deleteItems.packages.map(pkg => (
+                        <div key={pkg.id} className="flex items-center space-x-2 text-sm text-gray-600 mb-1">
+                          <span className="text-blue-600">📦</span>
+                          <span>{pkg.name}</span>
+                          {pkg.description && (
+                            <span className="text-gray-400">- {pkg.description}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {deleteItems.groups.length > 0 && (
+                  <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                    <strong>Note:</strong> Deleting groups will move their packages to "Ungrouped".
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end space-x-3">
+                <button
+                  onClick={handleCancelDelete}
+                  className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Delete Item
+                </button>
               </div>
             </div>
           </div>

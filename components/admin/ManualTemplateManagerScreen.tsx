@@ -87,6 +87,16 @@ export default function ManualTemplateManagerScreen({
   const [lastTouchDistance, setLastTouchDistance] = useState(0);
   // Removed viewMode - using single row layout like packages
 
+  // Selection state for UI improvements
+  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deleteItems, setDeleteItems] = useState<{
+    templates: ManualTemplate[];
+  }>({ templates: [] });
+  
+  // Sort mode state for mobile-friendly scrolling
+  const [sortMode, setSortMode] = useState(false);
+
   // Load templates on mount
   useEffect(() => {
     loadTemplates();
@@ -134,6 +144,112 @@ export default function ManualTemplateManagerScreen({
     loadDynamicOptions();
   }, [formData.template_type, formData.print_size]);
 
+  // Selection helper functions - single selection only
+  const toggleTemplateSelection = (templateId: string) => {
+    // Single select - replace current selection
+    setSelectedTemplates(prev => 
+      prev.includes(templateId) && prev.length === 1
+        ? [] // Deselect if clicking already selected item
+        : [templateId]
+    );
+  };
+
+  const clearAllSelections = () => {
+    setSelectedTemplates([]);
+  };
+
+  const isTemplateSelected = (templateId: string) => selectedTemplates.includes(templateId);
+  
+  const hasSelection = () => selectedTemplates.length > 0;
+
+  // Delete confirmation functions
+  const openDeleteConfirmation = () => {
+    const templateItems = selectedTemplates
+      .map(id => templates.find(t => t.id === id))
+      .filter(Boolean) as ManualTemplate[];
+
+    setDeleteItems({ templates: templateItems });
+    setShowDeleteConfirmation(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      // Delete templates
+      for (const template of deleteItems.templates) {
+        await handleDelete(template);
+      }
+      
+      // Clear selections and close modal
+      clearAllSelections();
+      setShowDeleteConfirmation(false);
+      setDeleteItems({ templates: [] });
+    } catch (error) {
+      console.error('❌ Error during template deletion:', error);
+      // Keep modal open on error so user can retry
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirmation(false);
+    setDeleteItems({ templates: [] });
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle keyboard shortcuts when not in forms
+      if (showCreateForm) return;
+      
+      // Delete key - trigger delete action
+      if (event.key === 'Delete' && hasSelection()) {
+        event.preventDefault();
+        openDeleteConfirmation();
+      }
+      
+      // Escape key - close modal or clear selections
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (showDeleteConfirmation) {
+          handleCancelDelete();
+        } else if (hasSelection()) {
+          clearAllSelections();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [hasSelection, selectedTemplates, templates, showCreateForm, showDeleteConfirmation]);
+
+  // Click outside to clear selections
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      // Only clear selections if clicking outside the main content area
+      // and not clicking on action buttons or form elements
+      const target = event.target as Element;
+      
+      // Don't clear selections if:
+      // - Clicking on form modals
+      // - Clicking on buttons
+      // - Clicking on template items (they handle their own selection)
+      if (
+        target.closest('[data-template-item]') ||
+        target.closest('button') ||
+        target.closest('[role="dialog"]') ||
+        target.closest('.bg-black.bg-opacity-50') // Modal backdrop
+      ) {
+        return;
+      }
+      
+      // Clear selections if clicking in empty areas
+      if (hasSelection()) {
+        clearAllSelections();
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [hasSelection]);
 
   const loadTemplates = async () => {
     setIsLoading(true);
@@ -369,10 +485,6 @@ export default function ManualTemplateManagerScreen({
   };
 
   const handleDelete = async (template: ManualTemplate) => {
-    if (!confirm(`Are you sure you want to delete "${template.name}"? This cannot be undone.`)) {
-      return;
-    }
-
     try {
       await manualTemplateService.deleteTemplate(template.id);
       console.log('✅ Template deleted successfully');
@@ -547,33 +659,44 @@ export default function ManualTemplateManagerScreen({
     <Reorder.Item
       key={template.id}
       value={template}
-      className={`bg-gray-50 rounded-lg p-3 border transition-all duration-200 cursor-move hover:shadow-md ${
+      data-template-item
+      onClick={() => toggleTemplateSelection(template.id)}
+      className={`bg-gray-50 rounded-lg p-3 border transition-all duration-200 cursor-pointer hover:shadow-md ${
         template.is_active
           ? 'border-green-200'
           : 'border-gray-300 opacity-60'
+      } ${
+        isTemplateSelected(template.id)
+          ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-200'
+          : ''
+      } ${
+        sortMode ? 'cursor-move' : 'cursor-pointer'
       }`}
-      whileDrag={{ 
+      drag={sortMode}
+      whileDrag={sortMode ? { 
         scale: 1.02, 
         boxShadow: "0 5px 15px rgba(0,0,0,0.1)",
         zIndex: 50 
-      }}
+      } : false}
     >
       <div className="flex items-start justify-between">
         <div className="flex items-start space-x-3 flex-1">
-          {/* Drag Handle */}
-          <div className="mt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-              <circle cx="4" cy="4" r="1"/>
-              <circle cx="4" cy="8" r="1"/>
-              <circle cx="4" cy="12" r="1"/>
-              <circle cx="8" cy="4" r="1"/>
-              <circle cx="8" cy="8" r="1"/>
-              <circle cx="8" cy="12" r="1"/>
-              <circle cx="12" cy="4" r="1"/>
-              <circle cx="12" cy="8" r="1"/>
-              <circle cx="12" cy="12" r="1"/>
-            </svg>
-          </div>
+          {/* Drag Handle - only show when sort mode is on */}
+          {sortMode && (
+            <div className="mt-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="4" cy="4" r="1"/>
+                <circle cx="4" cy="8" r="1"/>
+                <circle cx="4" cy="12" r="1"/>
+                <circle cx="8" cy="4" r="1"/>
+                <circle cx="8" cy="8" r="1"/>
+                <circle cx="8" cy="12" r="1"/>
+                <circle cx="12" cy="4" r="1"/>
+                <circle cx="12" cy="8" r="1"/>
+                <circle cx="12" cy="12" r="1"/>
+              </svg>
+            </div>
+          )}
           
           <div className="flex-1">
             <div className="flex items-center space-x-2 mb-1">
@@ -602,7 +725,7 @@ export default function ManualTemplateManagerScreen({
           </div>
         </div>
         
-        <div className="flex items-center space-x-1 ml-3">
+        <div className="flex items-center ml-3">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -616,24 +739,6 @@ export default function ManualTemplateManagerScreen({
             title={template.is_active ? 'Deactivate' : 'Activate'}
           >
             {template.is_active ? '✓' : '○'}
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEdit(template);
-            }}
-            className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
-          >
-            Edit
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete(template);
-            }}
-            className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded hover:bg-red-200 transition-colors"
-          >
-            Delete
           </button>
         </div>
       </div>
@@ -1118,15 +1223,65 @@ export default function ManualTemplateManagerScreen({
               </p>
             </div>
             
-            <button
-              onClick={handleCreateNew}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Create Template</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              {/* Action buttons - always visible but disabled when no selection */}
+              <button
+                onClick={() => {
+                  const template = templates.find(t => t.id === selectedTemplates[0]);
+                  if (template) handleEdit(template);
+                }}
+                disabled={!hasSelection()}
+                className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                  hasSelection()
+                    ? 'bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                }`}
+                title={hasSelection() ? 'Edit selected template' : 'Select a template to edit'}
+              >
+                ✏️ Edit
+              </button>
+              
+              <button
+                onClick={openDeleteConfirmation}
+                disabled={!hasSelection()}
+                className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                  hasSelection()
+                    ? 'bg-red-100 text-red-800 hover:bg-red-200 cursor-pointer'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                }`}
+                title={hasSelection() ? 'Delete selected template' : 'Select a template to delete'}
+              >
+                🗑️ Delete
+              </button>
+
+              {/* Divider */}
+              {hasSelection() && <div className="h-6 w-px bg-gray-300"></div>}
+              
+              {/* Sort Mode Toggle */}
+              <button
+                onClick={() => setSortMode(!sortMode)}
+                className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center space-x-2 ${
+                  sortMode
+                    ? 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title={sortMode ? 'Disable sort mode for easier scrolling' : 'Enable sort mode to drag and reorder templates'}
+              >
+                <span>🔄</span>
+                <span>{sortMode ? 'Sort: ON' : 'Sort: OFF'}</span>
+              </button>
+              
+              {/* Create button */}
+              <button
+                onClick={handleCreateNew}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Create Template</span>
+              </button>
+            </div>
           </div>
 
           {/* Error Display */}
@@ -1140,6 +1295,7 @@ export default function ManualTemplateManagerScreen({
               </div>
             </div>
           )}
+
 
           {/* Loading State */}
           {isLoading && (
@@ -1160,13 +1316,24 @@ export default function ManualTemplateManagerScreen({
             <>
               {templates.length > 0 ? (
                 <>
+                  <div className="mb-4 text-sm text-gray-600 text-center">
+                    {sortMode ? (
+                      <>💡 Drag templates to reorder them - this affects package template order</>
+                    ) : (
+                      <>📱 Sort mode is OFF for easier scrolling on mobile. Click "Sort: OFF" to enable reordering.</>
+                    )}
+                  </div>
+
                   <div className="bg-white rounded-lg border">
                     <div className="p-4 border-b bg-gray-50">
                       <div className="flex items-center justify-between">
                         <div>
                           <h3 className="text-lg font-semibold text-gray-800">Manual Templates</h3>
                           <p className="text-sm text-gray-600 mt-1">
-                            ↕️ Drag templates to reorder them - this affects package template order
+                            {sortMode 
+                              ? '↕️ Drag templates to reorder them - this affects package template order'
+                              : 'Click templates to select, then use Edit/Delete buttons above'
+                            }
                           </p>
                         </div>
                         <div className="text-sm text-gray-500">
@@ -1179,7 +1346,7 @@ export default function ManualTemplateManagerScreen({
                       <Reorder.Group
                         axis="y"
                         values={templates.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))}
-                        onReorder={handleReorderTemplates}
+                        onReorder={sortMode ? handleReorderTemplates : () => {}}
                         className="space-y-3"
                       >
                         {templates
@@ -1212,6 +1379,66 @@ export default function ManualTemplateManagerScreen({
 
       {/* Create/Edit Form Modal */}
       {showCreateForm && renderForm()}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div 
+            role="dialog"
+            className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl"
+          >
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="flex-shrink-0">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Delete Templates</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-sm text-gray-700 mb-3">
+                Are you sure you want to delete the following template{deleteItems.templates.length === 1 ? '' : 's'}?
+              </p>
+              
+              <div className="max-h-40 overflow-y-auto">
+                {deleteItems.templates.length > 0 && (
+                  <div>
+                    <div className="text-sm font-medium text-gray-700 mb-2">Templates:</div>
+                    {deleteItems.templates.map(template => (
+                      <div key={template.id} className="flex items-center space-x-2 text-sm text-gray-600 mb-1">
+                        <span className="text-blue-600">📝</span>
+                        <span>{template.name}</span>
+                        <span className="text-gray-400">({template.template_type}, {template.holes_data.length} holes)</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleCancelDelete}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
