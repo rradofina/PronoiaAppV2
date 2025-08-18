@@ -84,12 +84,13 @@ class PhotoCacheService {
     const photoId = photo.googleDriveId || photo.id;
     const cached = this.cache.get(photoId);
     
+    // Always return cached blob if available to maintain URL consistency
     if (cached && Date.now() < cached.expiresAt) {
       cached.lastAccessed = Date.now();
       return cached.blobUrl; // Return cached blob if available
     }
     
-    // Return high-res URL immediately while blob loads in background
+    // Return consistent high-res URL for all photos - no special first-photo handling
     const { getBestPhotoUrl } = require('../utils/photoUrlUtils');
     return getBestPhotoUrl(photo);
   }

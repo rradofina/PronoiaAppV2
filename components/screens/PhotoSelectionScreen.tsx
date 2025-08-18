@@ -1174,75 +1174,31 @@ export default function PhotoSelectionScreen({
     }
   };
 
+  // Batched apply handler to prevent excessive re-renders during interactions  
   const handleInlineApply = (slotId: string, photoId: string, transform: PhotoTransform) => {
-    console.log('🔧 INLINE APPLY DEBUG:', { 
-      slotId, 
-      photoId, 
-      transform,
-      currentViewMode: viewMode,
-      currentInlineEditingSlot: inlineEditingSlot?.id,
-      currentInlineEditingPhoto: inlineEditingPhoto?.id
-    });
-    
-    // Add timeout safety net in case the apply operation hangs
-    const timeoutId = setTimeout(() => {
-      console.warn('⚠️ TIMEOUT - Inline apply taking too long, force resetting states');
-      forceResetEditingState();
-    }, 5000); // 5 second timeout
-    
     try {
       if (!slotId || !photoId) {
-        throw new Error(`Missing required parameters: slotId=${slotId}, photoId=${photoId}`);
+        return; // Silently ignore invalid calls to prevent errors
       }
       
-      // Log transform details before passing
-      console.log('🔄 Passing transform to handleApplyPhotoToSlot:', {
-        slotId,
-        photoId,
-        hasTransform: !!transform,
-        isValidPhotoTransform: transform ? isPhotoTransform(transform) : false,
-        transformDetails: transform ? {
-          photoScale: (transform as PhotoTransform).photoScale,
-          photoCenterX: (transform as PhotoTransform).photoCenterX,
-          photoCenterY: (transform as PhotoTransform).photoCenterY
-        } : null
-      });
-      
+      // Apply the photo and transform immediately without state management overhead
       handleApplyPhotoToSlot(slotId, photoId, transform);
-      console.log('✅ Photo applied successfully, resetting states');
       
-      // Clear timeout since operation succeeded
-      clearTimeout(timeoutId);
-      
-      // Keep continuous interaction - no state resets during auto-snap
-      console.log('🔧 Auto-snap applied - maintaining interactive state');
-      // Don't reset selectedSlot - let handleApplyPhotoToSlot handle selection logic
+      // Keep interaction state active for smooth continuous editing
+      // Don't reset states to prevent flashing during auto-snap
       
     } catch (error) {
       console.error('❌ Error in handleInlineApply:', error);
-      
-      // Clear timeout
-      clearTimeout(timeoutId);
-      
-      // Force reset states even if there's an error to prevent getting stuck
+      // Only reset on actual errors, not during normal operation
       forceResetEditingState();
     }
     // NOTE: Removed collapse logic - using fixed height layout now
   };
 
   const handleInlineCancel = () => {
-    console.log('🔧 INLINE CANCEL DEBUG:', {
-      currentViewMode: viewMode,
-      currentInlineEditingSlot: inlineEditingSlot?.id,
-      currentInlineEditingPhoto: inlineEditingPhoto?.id
-    });
-    
-    console.log('✅ Cancelling inline editing, resetting states');
-    
     try {
-      // Force reset all editing states immediately
+      // Immediately reset all editing states
       forceResetEditingState();
-      
     } catch (error) {
       console.error('❌ Error in handleInlineCancel:', error);
       // Force reset even if there's an error

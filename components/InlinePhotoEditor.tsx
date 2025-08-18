@@ -56,10 +56,9 @@ export default function InlinePhotoEditor({
       hasOnCancel: !!onCancel
     });
     
-    // Only update keys when photo actually changes to avoid unnecessary remounts
-    // Remove timestamp to prevent remount on every transform change
-    setPhotoKey(`inline-${slot?.id}-${photo?.id}`);
-    setComponentKey(`component-${slot?.id}-${photo?.id}`);
+    // Create stable keys based on slot and photo content only when they actually change
+    setPhotoKey(`inline-${slot?.id}-${photo?.id || 'no-photo'}`);
+    setComponentKey(`component-${slot?.id}-${photo?.id || 'no-photo'}`);
     
     // If the slot already has a transform and we're re-editing the same photo, use it
     if (slot?.transform && isPhotoTransform(slot.transform) && slot.photoId === photo?.id) {

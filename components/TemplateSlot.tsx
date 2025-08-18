@@ -22,7 +22,7 @@ interface TemplateSlotProps {
   photos: Photo[];
 }
 
-export default function TemplateSlot({
+function TemplateSlot({
   hole,
   holeIndex,
   slot,
@@ -259,3 +259,81 @@ export default function TemplateSlot({
     </div>
   );
 }
+
+// Custom comparison function for React.memo to prevent unnecessary re-renders
+const arePropsEqual = (prevProps: TemplateSlotProps, nextProps: TemplateSlotProps): boolean => {
+  // Compare essential props that should trigger re-renders
+  const essentialPropsChanged = 
+    prevProps.holeIndex !== nextProps.holeIndex ||
+    prevProps.isEditingMode !== nextProps.isEditingMode ||
+    prevProps.isActiveTemplate !== nextProps.isActiveTemplate ||
+    prevProps.hole.id !== nextProps.hole.id ||
+    prevProps.hole.x !== nextProps.hole.x ||
+    prevProps.hole.y !== nextProps.hole.y ||
+    prevProps.hole.width !== nextProps.hole.width ||
+    prevProps.hole.height !== nextProps.hole.height;
+  
+  if (essentialPropsChanged) {
+    return false; // Essential props changed, re-render needed
+  }
+  
+  // Compare slot props
+  const prevSlot = prevProps.slot;
+  const nextSlot = nextProps.slot;
+  
+  if (prevSlot?.id !== nextSlot?.id || 
+      prevSlot?.photoId !== nextSlot?.photoId ||
+      prevSlot?.templateId !== nextSlot?.templateId) {
+    return false; // Slot identity or photo changed, re-render needed
+  }
+  
+  // Compare selected slot
+  const prevSelectedId = prevProps.selectedSlot?.id;
+  const nextSelectedId = nextProps.selectedSlot?.id;
+  
+  if (prevSelectedId !== nextSelectedId) {
+    return false; // Selection changed, re-render needed
+  }
+  
+  // Compare inline editing state
+  const prevEditingId = prevProps.inlineEditingSlot?.id;
+  const nextEditingId = nextProps.inlineEditingSlot?.id;
+  
+  if (prevEditingId !== nextEditingId) {
+    return false; // Editing state changed, re-render needed
+  }
+  
+  // Compare inline editing photo
+  const prevEditingPhotoId = prevProps.inlineEditingPhoto?.id;
+  const nextEditingPhotoId = nextProps.inlineEditingPhoto?.id;
+  
+  if (prevEditingPhotoId !== nextEditingPhotoId) {
+    return false; // Editing photo changed, re-render needed
+  }
+  
+  // Compare PNG template dimensions (affects positioning)
+  const prevDimensions = prevProps.pngTemplate?.dimensions;
+  const nextDimensions = nextProps.pngTemplate?.dimensions;
+  
+  if (prevDimensions?.width !== nextDimensions?.width ||
+      prevDimensions?.height !== nextDimensions?.height) {
+    return false; // Template dimensions changed, re-render needed
+  }
+  
+  // Photos array comparison - only check if relevant photo exists and has same URL
+  const relevantPhotoId = nextSlot?.photoId;
+  if (relevantPhotoId) {
+    const prevPhoto = prevProps.photos.find(p => p.id === relevantPhotoId);
+    const nextPhoto = nextProps.photos.find(p => p.id === relevantPhotoId);
+    
+    if (prevPhoto?.url !== nextPhoto?.url) {
+      return false; // Relevant photo URL changed, re-render needed
+    }
+  }
+  
+  // All other props are functions or non-critical, skip deep comparison
+  return true; // Props are equivalent, skip re-render
+};
+
+// Export memoized component to prevent unnecessary re-renders
+export default React.memo(TemplateSlot, arePropsEqual);

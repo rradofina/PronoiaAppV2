@@ -318,7 +318,7 @@ export default function TemplateGrid({
         
         return (
           <div 
-            key={templateId} 
+            key={`template-container-${templateId}`} 
             className={`${itemClasses} ${shouldBlock ? 'pointer-events-none brightness-75' : ''} ${isAnimating ? 'animate-template-pop' : ''}`}
             style={{
               ...itemStyle,
@@ -401,7 +401,7 @@ export default function TemplateGrid({
           
           <div className="w-full overflow-hidden border border-gray-200" style={visualHeight}>
             <TemplateVisual
-              key={`template-visual-${templateId}-${slots[0]?.templateType || templateId.split('_')[0]}`}
+              key={`template-visual-${templateId}`}
               template={{ id: slots[0]?.templateType || templateId.split('_')[0], name: templateName, slots: slots.length }}
               slots={slots}
               onSlotClick={onSlotClick}

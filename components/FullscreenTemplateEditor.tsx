@@ -116,8 +116,8 @@ export default function FullscreenTemplateEditor({
     // Cleanup previous photo URL to prevent memory leaks
     cleanupPhotoUrl();
     
-    // Force re-render with new key to clear any cached images
-    setPhotoKey(`slot-${selectedSlot?.id}-${Date.now()}`);
+    // Create stable key based on slot and photo content
+    setPhotoKey(`slot-${selectedSlot?.id}-${selectedSlot?.photoId || 'empty'}`);
     
     // If the slot already has a transform, use it; otherwise use smart scaling
     if (selectedSlot?.transform && isPhotoTransform(selectedSlot.transform)) {
@@ -284,8 +284,8 @@ export default function FullscreenTemplateEditor({
       setSelectedPhotoUrl(null);
     }
     
-    // Update photo key for forcing re-render
-    setPhotoKey(`photo-${selectedPhoto?.id}-${Date.now()}`);
+    // Update photo key based on photo content only when photo actually changes
+    setPhotoKey(`photo-${selectedPhoto?.id || 'none'}-${selectedSlot?.id || 'no-slot'}`);
   }, [selectedPhoto?.id, isVisible]);
 
   // Debug photos array and templateSlots

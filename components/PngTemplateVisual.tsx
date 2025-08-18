@@ -93,23 +93,6 @@ export default function PngTemplateVisual({
   // Create finalization refs for auto-snap functionality
   const finalizationRefs = useRef<((() => Promise<PhotoTransform>) | null)[]>([]);
   
-  console.log('🔍 PngTemplateVisual slot mapping:', {
-    pngTemplateId: pngTemplate.id,
-    pngTemplateType: pngTemplate.templateType,
-    pngTemplateName: pngTemplate.name,
-    slotsReceived: templateSlots.length,
-    slotsToRender: thisTemplateSlots.length,
-    holesAvailable: pngTemplate.holes?.length || 0,
-    slotIds: thisTemplateSlots.map(s => s.id),
-    slotTemplateTypes: [...new Set(templateSlots.map(s => s.templateType))],
-    firstSlotData: templateSlots[0] ? {
-      id: templateSlots[0].id,
-      templateId: templateSlots[0].templateId,
-      templateType: templateSlots[0].templateType,
-      slotIndex: templateSlots[0].slotIndex,
-      hasPhoto: !!templateSlots[0].photoId
-    } : null
-  });
 
   // Get the PNG URL from the correct property
   const driveFileId = (pngTemplate as any).drive_file_id || pngTemplate.driveFileId;
@@ -131,36 +114,6 @@ export default function PngTemplateVisual({
     ? '📐 PNG fits to HEIGHT, padded on SIDES (left/right)'
     : '📐 PNG fits to WIDTH, padded on TOP/BOTTOM';
   
-  console.log('🖼️ PngTemplateVisual ASPECT RATIO DEBUG:', {
-    templateName: pngTemplate.name,
-    templateType: pngTemplate.templateType,
-    
-    // Dimensions
-    storedDimensions: pngTemplate.dimensions,
-    correctDimensions: expectedDimensions,
-    
-    // Aspect Ratios
-    storedAspectRatio: actualAspectRatio.toFixed(3),
-    correctAspectRatio: expectedAspectRatio.toFixed(3),
-    aspectRatioMatch,
-    
-    // Container Behavior
-    containerWiderThanPNG,
-    objectContainBehavior,
-    
-    // Diagnosis
-    diagnosis: !aspectRatioMatch ? 
-      `🚨 PROBLEM: Container aspect ratio ${actualAspectRatio.toFixed(3)} ≠ PNG aspect ratio. ${objectContainBehavior}` :
-      '✅ Container and PNG aspect ratios match perfectly',
-    
-    // Fix needed
-    fixNeeded: !aspectRatioMatch ? 
-      `Change stored dimensions from ${pngTemplate.dimensions.width}×${pngTemplate.dimensions.height} to ${expectedDimensions.width}×${expectedDimensions.height}` :
-      'No fix needed',
-    
-    slotsConnected: thisTemplateSlots.length,
-    holesCount: pngTemplate.holes?.length
-  });
 
   // Setup custom drop event listeners for mobile drag and drop
   useEffect(() => {
@@ -175,11 +128,6 @@ export default function PngTemplateVisual({
       const photo = e.detail.photo;
       if (photo) {
         onDropPhoto(slot, photo.id);
-        console.log('📱 Mobile drop photo on slot:', { 
-          slotId: slot.id, 
-          photoId: photo.id,
-          isReplacement: !!slot.photoId 
-        });
       }
     };
     
@@ -218,7 +166,7 @@ export default function PngTemplateVisual({
         src={pngUrl}
         alt={pngTemplate.name}
         className={`absolute inset-0 w-full h-full ${isActiveTemplate ? 'object-contain' : 'object-cover'}`}
-        onLoad={() => console.log('✅ PNG loaded successfully:', pngTemplate.name, pngUrl)}
+        onLoad={() => {}}
         onError={(e) => {
           console.error('❌ PNG failed to load:', pngTemplate.name, pngUrl);
           console.error('❌ Image error details:', e);
@@ -233,21 +181,6 @@ export default function PngTemplateVisual({
       {pngTemplate.holes.map((hole, holeIndex) => {
         const slot = thisTemplateSlots[holeIndex];
         
-        // Debug hole information using template dimensions
-        console.log(`🕳️ HOLE DEBUG ${holeIndex + 1}/${pngTemplate.holes.length}:`, {
-          holeId: hole.id,
-          position: { x: hole.x, y: hole.y },
-          size: { width: hole.width, height: hole.height },
-          templateDimensions: pngTemplate.dimensions,
-          percentages: {
-            left: `${(hole.x / pngTemplate.dimensions.width) * 100}%`,
-            top: `${(hole.y / pngTemplate.dimensions.height) * 100}%`,
-            width: `${(hole.width / pngTemplate.dimensions.width) * 100}%`,
-            height: `${(hole.height / pngTemplate.dimensions.height) * 100}%`
-          },
-          hasSlot: !!slot,
-          slotId: slot?.id
-        });
         
         // Always show holes, even without slots (for debugging/preview)
         const photoUrl = slot ? getPhotoUrl(slot.photoId) : null;
@@ -255,40 +188,7 @@ export default function PngTemplateVisual({
         const isInlineEditing = slot && inlineEditingSlot?.id === slot.id;
         const hasInlinePhoto = isInlineEditing && inlineEditingPhoto;
         
-        // DEBUG: Log ALL slots to identify multiple editor issue
-        if (slot) {
-          console.log(`🔧 SLOT ${holeIndex + 1} (${slot.id}) EDITING CHECK:`, {
-            slotId: slot.id,
-            isSelected,
-            isInlineEditing,
-            hasInlinePhoto,
-            inlineEditingSlotId: inlineEditingSlot?.id,
-            inlineEditingPhotoName: inlineEditingPhoto?.name,
-            hasOnInlineApply: !!onInlineApply,
-            hasOnInlineCancel: !!onInlineCancel,
-            willShowInlineEditor: hasInlinePhoto && onInlineApply && onInlineCancel,
-            photoUrl: photoUrl ? photoUrl.substring(0, 50) + '...' : 'none'
-          });
-        }
         
-        // Debug transform values
-        if (slot?.transform) {
-          if (isPhotoTransform(slot.transform)) {
-            console.log(`🔧 Slot ${holeIndex} photo-centric transform:`, {
-              photoScale: slot.transform.photoScale,
-              photoCenterX: slot.transform.photoCenterX,
-              photoCenterY: slot.transform.photoCenterY,
-              photoUrl: photoUrl?.substring(0, 50) + '...'
-            });
-          } else if (isContainerTransform(slot.transform)) {
-            console.log(`🔧 Slot ${holeIndex} container transform:`, {
-              scale: slot.transform.scale,
-              x: slot.transform.x,
-              y: slot.transform.y,
-              photoUrl: photoUrl?.substring(0, 50) + '...'
-            });
-          }
-        }
         
         // Simple check - only block if not active template
         const isInactiveTemplate = !isActiveTemplate;
@@ -337,11 +237,6 @@ export default function PngTemplateVisual({
           const photoId = e.dataTransfer.getData('photoId');
           if (photoId && onDropPhoto) {
             onDropPhoto(slot, photoId);
-            console.log('🎯 Dropped photo on slot:', { 
-              slotId: slot.id, 
-              photoId,
-              isReplacement: !!slot.photoId 
-            });
           }
         };
         
@@ -404,12 +299,6 @@ export default function PngTemplateVisual({
             ) : hasInlinePhoto && onInlineApply && onInlineCancel ? (
               // Inline editing mode - show InlinePhotoEditor
               <>
-                {console.log('🔧 PngTemplateVisual - Rendering InlinePhotoEditor:', {
-                  slotId: slot.id,
-                  photoName: inlineEditingPhoto.name,
-                  hasOnInlineApply: !!onInlineApply,
-                  hasOnInlineCancel: !!onInlineCancel
-                })}
                 <div className="w-full h-full overflow-hidden">
                   <InlinePhotoEditor
                     slot={slot}
@@ -425,12 +314,6 @@ export default function PngTemplateVisual({
             ) : photoUrl ? (
               // Normal mode - show photo with high-resolution fallbacks
               <>
-                {console.log(`📸 RENDERING PHOTO in hole ${holeIndex + 1}:`, {
-                  photoUrl: photoUrl.substring(0, 60) + '...',
-                  slotId: slot?.id,
-                  holeSize: { width: hole.width, height: hole.height },
-                  holePosition: { x: hole.x, y: hole.y }
-                })}
                 <div className="w-full h-full overflow-hidden">
                   <PhotoRenderer
                     photoUrl={photoUrl}
@@ -438,14 +321,16 @@ export default function PngTemplateVisual({
                     transform={slot?.transform}
                     interactive={!!photoUrl && !isPreviewMode}
                     onTransformChange={(newTransform) => {
-                      // Don't update during drag - PhotoRenderer handles it internally
-                      // This prevents re-renders and flashing during interaction
-                      // Transform will be saved on interaction end with auto-snap applied
+                      // Update slot transform immediately during interaction for smooth feedback
+                      // This provides real-time visual updates without triggering parent re-renders
+                      if (slot && slot.photoId) {
+                        // Update only the local slot state, not the parent template state
+                        slot.transform = newTransform;
+                      }
                     }}
                     onInteractionEnd={(finalTransform) => {
                       // Save finalized transform with auto-snap applied
                       if (slot && onInlineApply && finalTransform) {
-                        console.log('🔧 Saving finalized transform with auto-snap');
                         onInlineApply(slot.id, slot.photoId!, finalTransform);
                       }
                     }}

@@ -4,6 +4,24 @@ import { getHighResPhotoUrls } from '../utils/photoUrlUtils';
 import DebugPortal from './DebugPortal';
 import { usePhotoDebug } from '../hooks/usePhotoDebug';
 
+// Debounce utility for transform updates
+const useDebounce = <T extends any[]>(
+  callback: (...args: T) => void,
+  delay: number
+): (...args: T) => void => {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  return useCallback((...args: T) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    timeoutRef.current = setTimeout(() => {
+      callback(...args);
+    }, delay);
+  }, [callback, delay]);
+};
+
 interface PhotoRendererProps {
   photoUrl: string;
   photoAlt?: string;
@@ -104,7 +122,7 @@ function convertPhotoToCSS(photoTransform: PhotoTransform, previewMode: boolean 
   };
 }
 
-export default function PhotoRenderer({
+function PhotoRenderer({
   photoUrl,
   photoAlt = 'Photo',
   transform,
@@ -132,7 +150,7 @@ export default function PhotoRenderer({
   // URL fallback management
   const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(true); // Default to true for instant display
   const [currentTransform, setCurrentTransform] = useState<PhotoTransform>(
     transform && isPhotoTransform(transform) 
       ? transform 
@@ -146,6 +164,13 @@ export default function PhotoRenderer({
   const [isInteracting, setIsInteracting] = useState(false);
   const interactionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Debounced transform change to prevent excessive parent updates during dragging
+  const debouncedTransformChange = useDebounce((transform: PhotoTransform) => {
+    if (onTransformChange) {
+      onTransformChange(transform);
+    }
+  }, 100); // 100ms debounce for smooth dragging
+  
   // User interaction tracking to prevent auto-snap on recently manipulated photos
   const [lastUserInteraction, setLastUserInteraction] = useState<number>(0);
   const [interactionType, setInteractionType] = useState<string>('none');
@@ -155,10 +180,7 @@ export default function PhotoRenderer({
     const now = Date.now();
     setLastUserInteraction(now);
     setInteractionType(type);
-    if (debug) {
-      console.log(`👆 User interaction tracked: ${type} at ${now}`);
-    }
-  }, [debug]);
+  }, []);
   
   // Track interaction state for UI hiding
   const handleInteractionStart = useCallback(() => {
@@ -181,12 +203,8 @@ export default function PhotoRenderer({
     const RECENT_INTERACTION_THRESHOLD = 3000; // 3 seconds
     const isRecent = timeSinceInteraction < RECENT_INTERACTION_THRESHOLD;
     
-    if (debug && isRecent) {
-      console.log(`⏱️ Recent user interaction detected: ${interactionType} ${timeSinceInteraction}ms ago`);
-    }
-    
     return isRecent;
-  }, [lastUserInteraction, interactionType, debug]);
+  }, [lastUserInteraction]);
   
   // Removed timeout reference - no more auto-corrections
   
@@ -303,37 +321,6 @@ export default function PhotoRenderer({
     const actualGapTop = photoTop > 0 ? photoTop : 0; // Empty space on top side (photo doesn't reach top edge)
     const actualGapBottom = photoBottom < containerHeight ? (containerHeight - photoBottom) : 0; // Empty space on bottom side (photo doesn't reach bottom edge)
 
-    if (debug) {
-      console.log('🧮 Mathematical Gap Calculation:', {
-        naturalPhoto: { width: photoNaturalWidth, height: photoNaturalHeight },
-        container: { width: containerWidth, height: containerHeight },
-        scaling: {
-          containScale: containScale.toFixed(3),
-          transformScale: currentTransform.photoScale.toFixed(3),
-          finalScale: finalScale.toFixed(3)
-        },
-        positioning: {
-          photoCenterX: currentTransform.photoCenterX.toFixed(3),
-          photoCenterY: currentTransform.photoCenterY.toFixed(3),
-          translateX: translateX.toFixed(1),
-          translateY: translateY.toFixed(1)
-        },
-        photoSize: { width: renderedWidth.toFixed(1), height: renderedHeight.toFixed(1) },
-        photoEdges: { 
-          left: photoLeft.toFixed(1), 
-          right: photoRight.toFixed(1), 
-          top: photoTop.toFixed(1), 
-          bottom: photoBottom.toFixed(1) 
-        },
-        gaps: { 
-          left: actualGapLeft.toFixed(1), 
-          right: actualGapRight.toFixed(1), 
-          top: actualGapTop.toFixed(1), 
-          bottom: actualGapBottom.toFixed(1) 
-        },
-        note: 'Mathematical calculation - accounts for smart scaling system'
-      });
-    }
     
     return {
       gaps: { 
@@ -354,10 +341,8 @@ export default function PhotoRenderer({
     gaps: { left: number; right: number; top: number; bottom: number };
     significantGaps: { left: boolean; right: boolean; top: boolean; bottom: boolean };
   } => {
-    console.log('🔧 detectGaps - Starting gap detection...');
     
     if (!imageRef.current || !containerRef.current) {
-      console.log('🔧 detectGaps - No refs available');
       return { 
         hasGaps: false, 
         gapCount: 0,
@@ -1023,23 +1008,21 @@ export default function PhotoRenderer({
     setIsInteracting(false);
     onInteractionChange?.(false);
     
-    // Add delay before auto-snap to ensure user is done interacting
-    // This prevents jarring movements while user is still adjusting
-    setTimeout(async () => {
-      if (onInteractionEnd) {
-        console.log('🎯 Starting auto-snap finalization after 300ms delay...');
-        try {
-          // Call finalization to detect gaps and apply auto-snap
-          const finalizedTransform = await finalizePositioning();
-          console.log('✅ Auto-snap finalization complete:', finalizedTransform);
+    // Immediate auto-snap without delay to prevent flashing
+    if (onInteractionEnd) {
+      try {
+        // Call finalization immediately to detect gaps and apply auto-snap
+        finalizePositioning().then(finalizedTransform => {
           onInteractionEnd(finalizedTransform);
-        } catch (error) {
+        }).catch(error => {
           console.error('❌ Auto-snap finalization failed:', error);
-          // Fallback to current transform if finalization fails
           onInteractionEnd(currentTransform);
-        }
+        });
+      } catch (error) {
+        console.error('❌ Auto-snap finalization failed:', error);
+        onInteractionEnd(currentTransform);
       }
-    }, 300); // 300ms delay before auto-snap calculation
+    }
   }, [onInteractionChange, onInteractionEnd, currentTransform, finalizePositioning]);
 
   // Analyze image for clipping (overexposed/underexposed areas)
@@ -1164,13 +1147,19 @@ export default function PhotoRenderer({
     // Handle URL upgrades: immediate URL (googleusercontent.com/fife) → blob URL
     // Extract Google Drive file ID from both URLs
     const extractFileId = (url: string): string | null => {
+      // Blob URLs can't be compared by file ID, handle separately
+      if (url.startsWith('blob:')) {
+        return null; // Blob URLs are compared by reference, not content
+      }
+      
       // Try various Google Drive URL patterns
       const patterns = [
         /\/d\/([a-zA-Z0-9-_]+)/,           // /d/FILE_ID
         /id=([a-zA-Z0-9-_]+)/,            // id=FILE_ID
         /file\/d\/([a-zA-Z0-9-_]+)/,      // file/d/FILE_ID
         /uc\?id=([a-zA-Z0-9-_]+)/,        // uc?id=FILE_ID
-        /\/fife\/.*\/([a-zA-Z0-9-_]+)/    // fife/.../FILE_ID
+        /\/fife\/.*\/([a-zA-Z0-9-_]+)/,    // fife/.../FILE_ID (immediate URLs)
+        /=([a-zA-Z0-9-_]{20,})/           // Generic long ID pattern
       ];
       
       for (const pattern of patterns) {
@@ -1183,55 +1172,57 @@ export default function PhotoRenderer({
     const fileId1 = extractFileId(url1);
     const fileId2 = extractFileId(url2);
     
+    // Special case: if one is blob and other is not, they could be the same photo
+    // but we can't verify without additional context, so assume different for safety
+    const url1IsBlob = url1.startsWith('blob:');
+    const url2IsBlob = url2.startsWith('blob:');
+    
+    if (url1IsBlob || url2IsBlob) {
+      // For blob URLs, we can't extract file IDs, so we assume they're different
+      // unless they're the exact same blob URL
+      return false;
+    }
+    
     // If both URLs have the same Google Drive file ID, they're the same photo
     if (fileId1 && fileId2 && fileId1 === fileId2) {
-      console.log('📸 PhotoRenderer - URL upgrade detected (same file ID):', {
-        fileId: fileId1,
-        fromType: url1.includes('blob:') ? 'blob' : 'immediate',
-        toType: url2.includes('blob:') ? 'blob' : 'immediate'
-      });
+      if (debug) {
+        console.log('📸 PhotoRenderer - URL upgrade detected (same file ID):', {
+          fileId: fileId1,
+          fromType: url1.includes('fife') ? 'immediate' : 'direct',
+          toType: url2.includes('fife') ? 'immediate' : 'direct',
+          url1Preview: url1.substring(0, 50) + '...',
+          url2Preview: url2.substring(0, 50) + '...'
+        });
+      }
       return true;
     }
     
     return false;  
-  }, []);
+  }, [debug]);
 
   // Track the current photo URL to detect actual photo changes
   const [lastPhotoUrl, setLastPhotoUrl] = useState<string>('');
   const [hasPhotoInitialized, setHasPhotoInitialized] = useState(false);
   
   useEffect(() => {
-    // On first mount, initialize without resetting states
-    if (!hasPhotoInitialized && photoUrl) {
-      setLastPhotoUrl(photoUrl);
-      setHasPhotoInitialized(true);
-      console.log('📸 PhotoRenderer - Initial photo set:', photoUrl.substring(0, 50) + '...');
-      return;
-    }
-    
-    // Only reset loading state if URL represents a truly different photo
+    // Unified photo loading logic - treat all photos the same way
     if (photoUrl && !isSamePhoto(photoUrl, lastPhotoUrl)) {
-      console.log('📸 PhotoRenderer - Different photo detected, resetting loading state:', {
-        from: lastPhotoUrl.substring(0, 50) + '...',
-        to: photoUrl.substring(0, 50) + '...',
-        samePhoto: false
-      });
+      // Different photo detected - prepare for seamless transition
       setCurrentUrlIndex(0);
       setImageError(false);
-      setImageLoaded(false);
+      // NEVER reset imageLoaded - let the new image load smoothly over the existing one
       setClippingData({ overexposed: null, underexposed: null });
       setLastPhotoUrl(photoUrl);
+      
+      // Mark as initialized after any successful photo load
+      if (!hasPhotoInitialized) {
+        setHasPhotoInitialized(true);
+      }
     } else if (photoUrl && isSamePhoto(photoUrl, lastPhotoUrl)) {
-      console.log('📸 PhotoRenderer - Same photo (URL upgrade), keeping loading state:', {
-        from: lastPhotoUrl.substring(0, 50) + '...',
-        to: photoUrl.substring(0, 50) + '...',
-        samePhoto: true,
-        imageLoaded
-      });
-      // Update the URL reference but keep loading state
+      // URL upgrade for same photo - preserve all state
       setLastPhotoUrl(photoUrl);
     }
-  }, [photoUrl, hasPhotoInitialized, lastPhotoUrl, isSamePhoto, imageLoaded]);
+  }, [photoUrl, hasPhotoInitialized, lastPhotoUrl, isSamePhoto]);
   
   // Analyze clipping when image loads and clipping indicators are enabled
   useEffect(() => {
@@ -1337,25 +1328,32 @@ export default function PhotoRenderer({
       console.log(`🔄 PhotoRenderer - Trying fallback URL ${currentUrlIndex + 2}/${allUrls.length}`);
       setCurrentUrlIndex(prev => prev + 1);
       setImageError(false);
-      setImageLoaded(false);
+      // Keep imageLoaded=true to prevent flashing during URL fallback
     } else {
       console.error('💥 PhotoRenderer - All URLs failed');
       setImageError(true);
+      // Only set imageLoaded=false on final failure
       setImageLoaded(false);
     }
   };
   
   // Handle successful image load
   const handleImageLoad = () => {
+    const currentUrl = getCurrentUrl();
+    const isUpgrade = lastPhotoUrl && isSamePhoto(currentUrl, lastPhotoUrl);
+    
     if (debug) {
       console.log(`✅ PhotoRenderer - Image loaded successfully (${currentUrlIndex + 1}/${getAllUrls().length}):`, {
-        url: getCurrentUrl(),
+        url: currentUrl,
+        isUpgrade,
         naturalSize: imageRef.current ? {
           width: imageRef.current.naturalWidth,
           height: imageRef.current.naturalHeight
         } : 'unknown'
       });
     }
+    
+    // Always set loaded to true, even for URL upgrades
     setImageLoaded(true);
     setImageError(false);
   };
@@ -1401,14 +1399,10 @@ export default function PhotoRenderer({
       });
     }
     
-    // Add animation only when snapping, not during user interaction
+    // No transitions - instant photo display and movement
     return {
       ...baseStyle,
-      transition: isSnapping 
-        ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' // Spring animation for auto-snap
-        : isDragging || isTouching 
-          ? 'none' // No transition during manual dragging for smooth movement
-          : 'none' // No transition for normal updates to prevent lag
+      transition: 'none' // No transitions for instant response
     };
   })();
 
@@ -1473,8 +1467,8 @@ export default function PhotoRenderer({
       );
       
       setCurrentTransform(newTransform);
-      // Don't update parent during drag - causes re-renders and flashing
-      // onTransformChange?.(newTransform);
+      // Use debounced transform change to prevent excessive parent updates during pinch
+      debouncedTransformChange(newTransform);
       setLastTouchDistance(distance);
     } else if (e.touches.length === 1 && isDragging && lastPointer && containerRef.current) {
       // Single finger - handle drag
@@ -1498,8 +1492,8 @@ export default function PhotoRenderer({
       );
       
       setCurrentTransform(newTransform);
-      // Don't update parent during drag - causes re-renders and flashing
-      // onTransformChange?.(newTransform);
+      // Use debounced transform change to prevent excessive parent updates during touch drag
+      debouncedTransformChange(newTransform);
       setLastPointer({ x: touch.clientX, y: touch.clientY });
     }
   };
@@ -1574,8 +1568,8 @@ export default function PhotoRenderer({
     );
     
     setCurrentTransform(newTransform);
-    // Don't update parent during drag - causes re-renders and flashing
-    // onTransformChange?.(newTransform);
+    // Use debounced transform change to prevent excessive parent updates during pointer drag
+    debouncedTransformChange(newTransform);
     setLastPointer({ x: e.clientX, y: e.clientY });
   };
 
@@ -1614,8 +1608,8 @@ export default function PhotoRenderer({
     );
     
     setCurrentTransform(newTransform);
-    // Don't update parent during zoom - causes re-renders and flashing
-    // onTransformChange?.(newTransform);
+    // Use debounced transform change to prevent excessive parent updates during wheel zoom
+    debouncedTransformChange(newTransform);
     
     // Track user interaction
     trackUserInteraction('zoom');
@@ -1671,14 +1665,12 @@ export default function PhotoRenderer({
         className="absolute inset-0"
         style={{
           ...photoStyle,
-          // Ensure transition is applied when snapping
-          transition: isSnapping 
-            ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' 
-            : photoStyle.transition || 'none',
+          // No transitions for instant response
+          transition: 'none',
           // Improve image quality
           imageRendering: 'auto',
           backfaceVisibility: 'hidden',
-          // Show/hide based on load state
+          // Instant display - no fade effects or transitions
           display: imageLoaded && !imageError ? 'block' : 'none'
         }}
         draggable={false}
@@ -1686,8 +1678,8 @@ export default function PhotoRenderer({
         onError={handleImageError}
       />
       
-      {/* Loading/Error state */}
-      {(!imageLoaded || imageError) && (
+      {/* Loading/Error state - only show on actual errors, not loading */}
+      {imageError && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
           <div className="text-center text-gray-500">
             <div className="text-2xl mb-2">
@@ -1703,7 +1695,7 @@ export default function PhotoRenderer({
                   onClick={() => {
                     setCurrentUrlIndex(0);
                     setImageError(false);
-                    setImageLoaded(false);
+                    // Keep imageLoaded=true for instant retry
                   }}
                   className="mt-1 px-2 py-1 bg-blue-500 text-white rounded text-xs"
                 >
@@ -1730,6 +1722,36 @@ export default function PhotoRenderer({
     </div>
   );
 }
+
+// Relaxed comparison function for React.memo - allow essential updates through
+const arePropsEqual = (prevProps: PhotoRendererProps, nextProps: PhotoRendererProps): boolean => {
+  // Allow ALL photoUrl changes through immediately - no blocking
+  if (prevProps.photoUrl !== nextProps.photoUrl) {
+    return false; // Always re-render for URL changes
+  }
+  
+  // Allow interactive mode changes through
+  if (prevProps.interactive !== nextProps.interactive ||
+      prevProps.previewMode !== nextProps.previewMode) {
+    return false; // Re-render for mode changes
+  }
+  
+  // Allow transform updates to pass through - essential for real-time feedback
+  if (prevProps.transform !== nextProps.transform) {
+    return false; // Re-render for any transform change
+  }
+  
+  // Only block re-renders for truly non-essential prop changes
+  const nonEssentialChanged = 
+    prevProps.showClippingIndicators !== nextProps.showClippingIndicators ||
+    prevProps.debug !== nextProps.debug;
+  
+  // Allow non-essential changes through as well to prevent issues
+  return false; // For now, allow all re-renders to prevent blocking issues
+};
+
+// Export memoized component to prevent unnecessary re-renders
+export default React.memo(PhotoRenderer, arePropsEqual);
 
 // Export utility functions for use in other components
 export { convertPhotoToCSS, convertLegacyToCSS };
