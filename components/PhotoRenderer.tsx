@@ -1532,7 +1532,10 @@ function PhotoRenderer({
     if (!interactive) return;
     
     e.preventDefault();
-    e.stopPropagation(); // Prevent event from bubbling to parent slot
+    // PHASE 2 FIX: Allow drag events to bubble to parent slots for drag-and-drop preview
+    // Only prevent default and stop propagation for photo manipulation, not for drag events
+    console.log('🔥 PHASE 2 FIX: PhotoRenderer handlePointerDown - allowing drag events to bubble');
+    // e.stopPropagation(); // REMOVED - this was blocking drag events from reaching slot containers
     setIsDragging(true);
     setLastPointer({ x: e.clientX, y: e.clientY });
     handleInteractionStart();

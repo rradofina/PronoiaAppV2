@@ -38,7 +38,8 @@ export default function FavoritesBar({
   const [draggedPhoto, setDraggedPhoto] = useState<Photo | null>(null);
   const [dragPosition, setDragPosition] = useState<{x: number, y: number} | null>(null);
   const dragStartPos = useRef<{x: number, y: number} | null>(null);
-  const dragThreshold = 10; // pixels to move before starting drag
+  const dragThreshold = 25; // pixels to move before starting drag (increased for better scroll support)
+  const verticalBias = 0.6; // require 60% vertical movement to trigger drag
   
   // HTML5 drag handlers for desktop
   const handleDragStart = (e: React.DragEvent, photo: Photo) => {
@@ -66,8 +67,8 @@ export default function FavoritesBar({
   
   // Pointer event handlers for mobile (and desktop fallback)
   const handlePointerDown = (e: React.PointerEvent, photo: Photo) => {
-    // Capture pointer for consistent tracking
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    // Don't capture pointer immediately - let scroll work first
+    // Only capture after we confirm this is a drag gesture
     
     // Store initial position
     dragStartPos.current = { x: e.clientX, y: e.clientY };
@@ -86,19 +87,28 @@ export default function FavoritesBar({
     
     const deltaX = Math.abs(e.clientX - dragStartPos.current.x);
     const deltaY = Math.abs(e.clientY - dragStartPos.current.y);
+    const totalDelta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     
-    // Start drag if moved beyond threshold
-    if (!isDragging && (deltaX > dragThreshold || deltaY > dragThreshold)) {
+    // Only start drag if:
+    // 1. Movement is beyond threshold AND
+    // 2. Movement is primarily vertical (verticalBias) OR significant total movement
+    const isVerticalGesture = deltaY > deltaX * verticalBias;
+    const isSignificantMovement = totalDelta > dragThreshold;
+    
+    if (!isDragging && isSignificantMovement && isVerticalGesture) {
+      // NOW capture the pointer since we confirmed this is a drag
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      
       e.preventDefault();
       setIsDragging(true);
       setDraggingPhotoId(draggedPhoto.id);
-      setDragPosition({ x: e.clientX, y: e.clientY }); // Set position immediately!
+      setDragPosition({ x: e.clientX, y: e.clientY });
       
       if (onDragStart) {
         onDragStart(draggedPhoto);
       }
       
-      console.log('🎯 Drag started for:', draggedPhoto.name);
+      console.log('🎯 Drag started for:', draggedPhoto.name, { deltaX, deltaY, isVerticalGesture });
     }
     
     // Update position if dragging
@@ -194,7 +204,7 @@ export default function FavoritesBar({
                     onPointerDown={(e) => handlePointerDown(e, photo)}
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
-                    style={{ touchAction: 'none' }}
+                    style={{ touchAction: 'pan-x' }} // Allow horizontal scrolling
                   >
                     <div className={`rounded-lg overflow-hidden border-2 transition-all duration-300 h-40 ${
                       isUsed
@@ -315,7 +325,7 @@ export default function FavoritesBar({
                   onPointerDown={(e) => handlePointerDown(e, photo)}
                   onPointerMove={handlePointerMove}
                   onPointerUp={handlePointerUp}
-                  style={{ touchAction: 'none', aspectRatio: '3/4' }}
+                  style={{ touchAction: 'pan-x', aspectRatio: '3/4' }} // Allow horizontal scrolling
                 >
                   <div className={`w-full h-full rounded-lg overflow-hidden border-2 transition-all duration-300 ${
                     isUsed

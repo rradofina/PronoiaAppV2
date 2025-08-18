@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Used Photos Disappearing in Mode Switch**: Used photos now remain visible in favorites bar when switching between modes
+  - Root Cause: Photo mode favorites bar showed `getUnusedFavorites()` which filtered out photos already used in templates
+  - Solution: Changed photo mode to show ALL favorited photos consistently like print mode
+  - Files Modified: `components/screens/PhotoSelectionScreen.tsx` - line 1866 changed from `getUnusedFavorites()` to `photos.filter(photo => favoritedPhotos.has(photo.id))`
+  - Impact: Consistent favorites bar experience across both "Select Photos" and "Fill Templates" modes
+  - Protection: Existing logic prevents unfavoriting photos currently in template slots
+
 ## [2025-08-18] - Continuous Photo Interaction Workflow
 
 ### Fixed

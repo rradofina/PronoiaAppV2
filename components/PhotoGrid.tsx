@@ -8,9 +8,11 @@ interface PhotoCardProps {
   isFavorited?: boolean;
   onToggleFavorite?: (photoId: string) => void;
   isUsedInTemplate?: boolean;
+  onDragStart?: (photo: Photo) => void;
 }
 
-function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isUsedInTemplate = false, isEditingMode = false }: PhotoCardProps & { isEditingMode?: boolean }) {
+function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isUsedInTemplate = false,
+isEditingMode = false, onDragStart }: PhotoCardProps & { isEditingMode?: boolean }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -82,6 +84,16 @@ function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isU
 
   const handleImageError = () => {
     console.error(`❌ PhotoGrid image failed: ${photo.name} with URL ${currentUrlIndex + 1}/${fallbackUrls.length}:`, getCurrentUrl());
+    console.error('🔥 PHASE 4 DEBUG: Photo details:', {
+      photoId: photo.id,
+      photoName: photo.name,
+      originalUrl: photo.url,
+      thumbnailUrl: photo.thumbnailUrl,
+      googleDriveId: photo.googleDriveId,
+      currentUrlIndex,
+      allFallbackUrls: fallbackUrls,
+      currentFailedUrl: getCurrentUrl()
+    });
     
     // Try next fallback URL
     if (currentUrlIndex < fallbackUrls.length - 1) {
@@ -90,6 +102,11 @@ function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isU
       setImageError(false); // Reset error state to try next URL
     } else {
       console.error(`❌ All fallback URLs failed for ${photo.name}`);
+      console.error('🔥 PHASE 4 DEBUG: All URL attempts:', fallbackUrls.map((url, index) => ({
+        index,
+        url,
+        attempted: index <= currentUrlIndex
+      })));
       setImageError(true);
     }
   };
@@ -99,11 +116,28 @@ function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isU
     photoCacheService.preloadPhoto(photo);
   };
 
+  const handleDragStart = (e: React.DragEvent) => {
+    console.log('🎯 PhotoCard: handleDragStart called for photo:', photo.name);
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('photoId', photo.id);
+    e.dataTransfer.setData('photoUrl', photo.thumbnailUrl || photo.url);
+    e.dataTransfer.setData('photoName', photo.name);
+
+    if (onDragStart) {
+      console.log('🎯 PhotoCard: Calling parent onDragStart callback');
+      onDragStart(photo);
+    } else {
+      console.log('⚠️ PhotoCard: No onDragStart callback provided');
+    }
+  };
+
   return (
     <div
       ref={cardRef}
       onClick={onSelect}
       onMouseEnter={handleMouseEnter}
+      draggable={true}
+      onDragStart={handleDragStart}
       className="relative overflow-hidden cursor-pointer hover:opacity-90 transition-opacity duration-200"
     >
       <div className="w-full relative aspect-[2/3] xl:aspect-auto">
@@ -114,13 +148,14 @@ function PhotoCard({ photo, onSelect, isFavorited = false, onToggleFavorite, isU
             className="w-full h-full object-cover"
             style={{
               imageRendering: 'auto',
-              backfaceVisibility: 'hidden'
+              backfaceVisibility: 'hidden',
+              touchAction: 'manipulation' // CHANGED: 'none' blocks touch events, use 'manipulation'
             }}
             onLoad={handleImageLoad}
             onError={handleImageError}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-100">
+          <div className="w-full h-full flex items-center justify-center bg-gray-100" style={{ touchAction: 'manipulation' }}>
             <div className="text-center text-gray-500">
               <div className="text-2xl mb-1">📷</div>
               <div className="text-xs">Failed to load</div>
@@ -183,6 +218,8 @@ interface PhotoGridProps {
   onToggleFavorite?: (photoId: string) => void;
   usedPhotoIds?: Set<string>;
   isEditingMode?: boolean;
+  // Drag and drop support
+  onDragStart?: (photo: Photo) => void;
 }
 
 export default function PhotoGrid({
@@ -195,8 +232,15 @@ export default function PhotoGrid({
   favoritedPhotos = new Set(),
   onToggleFavorite,
   usedPhotoIds = new Set(),
-  isEditingMode = false
+  isEditingMode = false,
+  onDragStart  // ADD THIS LINE
 }: PhotoGridProps) {
+  
+  const handlePhotoDragStart = (photo: Photo) => {
+    if (onDragStart) {
+      onDragStart(photo);
+    }
+  };
   
   return (
     <div 
@@ -228,6 +272,7 @@ export default function PhotoGrid({
             onToggleFavorite={onToggleFavorite}
             isUsedInTemplate={usedPhotoIds.has(photo.id)}
             isEditingMode={isEditingMode}
+            onDragStart={handlePhotoDragStart}
           />
         ))}
       </div>
