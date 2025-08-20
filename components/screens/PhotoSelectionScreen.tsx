@@ -1863,7 +1863,7 @@ export default function PhotoSelectionScreen({
           {selectionMode === 'photo' ? (
             // Photo Selection Mode: Show Favorites Bar - FIXED HEIGHT
             <FavoritesBar
-              favoritedPhotos={getUnusedFavorites()}
+              favoritedPhotos={photos.filter(photo => favoritedPhotos.has(photo.id))}
               onPhotoClick={handlePhotoClick}
               onRemoveFavorite={handleToggleFavorite}
               isActiveInteractionArea={false}

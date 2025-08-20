@@ -87,12 +87,28 @@ class PhotoCacheService {
     // Always return cached blob if available to maintain URL consistency
     if (cached && Date.now() < cached.expiresAt) {
       cached.lastAccessed = Date.now();
+      if (this.debug) {
+        console.log(`🔥 PHASE 4 CACHE: Returning cached blob for ${photo.name}:`, cached.blobUrl);
+      }
       return cached.blobUrl; // Return cached blob if available
     }
     
     // Return consistent high-res URL for all photos - no special first-photo handling
     const { getBestPhotoUrl } = require('../utils/photoUrlUtils');
-    return getBestPhotoUrl(photo);
+    const bestUrl = getBestPhotoUrl(photo);
+
+    if (this.debug) {
+      console.log(`🔥 PHASE 4 CACHE: No cache for ${photo.name}, returning best URL:`, {
+        photoId,
+        photoName: photo.name,
+        bestUrl,
+        originalUrl: photo.url,
+        thumbnailUrl: photo.thumbnailUrl,
+        googleDriveId: photo.googleDriveId
+      });
+    }
+
+    return bestUrl;
   }
 
   /**
