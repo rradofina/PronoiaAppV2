@@ -398,17 +398,97 @@ class TemplateSyncService {
   }
 
   /**
+   * Flush all pending syncs - process immediately without waiting for debounce
+   */
+  private flushPendingSync(templateSlots: TemplateSlot[], photos: Photo[]): void {
+    console.log('🚀 Flushing pending syncs before finalization');
+    const pendingCount = this.syncQueue.size;
+    
+    if (pendingCount > 0) {
+      console.log(`⚡ Processing ${pendingCount} pending sync(s) immediately`);
+      
+      // Process each pending sync immediately
+      for (const [templateId, timer] of this.syncQueue.entries()) {
+        // Clear the debounce timer
+        clearTimeout(timer);
+        
+        // Add to upload queue with high priority
+        console.log(`  📤 Flushing template: ${templateId}`);
+        const templateSpecificSlots = templateSlots.filter(s => s.templateId === templateId);
+        
+        if (this.isTemplateComplete(templateSpecificSlots, templateId)) {
+          this.addToUploadQueue(templateId, templateSlots, photos, 'high');
+        }
+      }
+      
+      // Clear the sync queue
+      this.syncQueue.clear();
+    } else {
+      console.log('✅ No pending syncs to flush');
+    }
+  }
+
+  /**
+   * Wait for all uploads to complete
+   */
+  private async waitForUploads(): Promise<void> {
+    console.log('⏳ Waiting for upload queue to complete...');
+    console.log(`  📦 Queue size: ${this.uploadQueue.length}`);
+    console.log(`  🔄 Processing: ${this.isProcessing}`);
+    
+    // Start processing if there are items and not already processing
+    if (this.uploadQueue.length > 0 && !this.isProcessing) {
+      this.processUploadQueue(); // Start processing (don't await)
+    }
+    
+    // Wait for all processing to complete
+    let checkCount = 0;
+    while (this.isProcessing || this.uploadQueue.length > 0) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      checkCount++;
+      
+      // Log progress every second
+      if (checkCount % 10 === 0) {
+        console.log(`  ⏱️ Still waiting... Queue: ${this.uploadQueue.length}, Processing: ${this.isProcessing}`);
+      }
+      
+      // Safety check - if stuck for too long, try to restart processing
+      if (checkCount > 300 && this.uploadQueue.length > 0 && !this.isProcessing) {
+        console.log('  ⚠️ Processing seems stuck, restarting...');
+        this.processUploadQueue();
+      }
+    }
+    
+    console.log('✅ All uploads completed');
+  }
+
+  /**
    * Finalize session - rename draft folder to prints
    */
-  async finalizeSession(): Promise<void> {
+  async finalizeSession(templateSlots: TemplateSlot[], photos: Photo[]): Promise<void> {
     if (!this.draftFolderId) {
       throw new Error('No draft folder to finalize');
     }
     
     try {
-      console.log('🏁 Finalizing session - renaming draft folder to prints');
+      console.log('🏁 Finalizing session - processing pending syncs first');
       
-      // First, check if prints folder already exists and delete it
+      // Step 1: Flush all pending syncs (process immediately without waiting for debounce)
+      console.log('🔍 Current sync status:', {
+        pendingSyncs: this.syncQueue.size,
+        uploadQueueSize: this.uploadQueue.length,
+        isProcessing: this.isProcessing
+      });
+      
+      this.flushPendingSync(templateSlots, photos);
+      
+      // Step 2: Wait for all uploads to complete
+      console.log('⏳ Waiting for all uploads to complete...');
+      await this.waitForUploads();
+      
+      console.log('✅ All templates synced, proceeding with folder rename');
+      
+      // Step 3: Check if prints folder already exists and delete it
       const folders = await googleDriveService.listFolders(this.clientFolderId!);
       const existingPrintsFolder = folders.find(f => f.name === 'prints');
       
@@ -417,11 +497,11 @@ class TemplateSyncService {
         await googleDriveService.deleteFolder(existingPrintsFolder.id);
       }
       
-      // Rename draft folder to prints
+      // Step 4: Rename draft folder to prints
       await googleDriveService.renameFolder(this.draftFolderId, 'prints');
       console.log('✅ Successfully renamed prints_draft to prints');
       
-      // Clear all states
+      // Step 5: Clear all states
       this.syncStates.clear();
       this.syncQueue.clear();
       this.uploadQueue = [];

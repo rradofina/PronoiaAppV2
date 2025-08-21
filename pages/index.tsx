@@ -809,7 +809,8 @@ export default function Home() {
       setUploadProgress({ current: 0, total: 1, templateName: 'Finalizing templates...' });
       
       // Finalize the sync session - this renames prints_draft to prints
-      await templateSyncService.finalizeSession();
+      // Pass templateSlots and photos to ensure pending syncs are processed
+      await templateSyncService.finalizeSession(templateSlots, photos);
       
       console.log('✅ Templates finalized successfully');
 
