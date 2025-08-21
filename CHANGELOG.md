@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **UI Lag During Background Sync**: Fixed drag-and-drop becoming unresponsive during template uploads
+  - Root Cause: Heavy rasterization operations blocking the main thread
+  - Solution: Added yield points and interaction detection
+  - Implementation:
+    - Added `yieldToUI()` with requestAnimationFrame between syncs
+    - Implemented `setUserInteracting()` to pause sync during drag operations
+    - Connected to drag events in FavoritesBar and PhotoRenderer
+    - Reduced JPEG quality to 0.85 for faster draft processing
+  - Files Modified: `services/templateSyncService.ts`, `components/screens/PhotoSelectionScreen.tsx`, `components/PngTemplateVisual.tsx`
+  - Commit: `4469fa3`
+  - Impact: Smooth drag-and-drop even while templates sync in background
+
 - **All Templates Not Syncing**: Fixed issue where only one template synced instead of all completed templates
   - Root Cause: Sync logic only checked the specific template that was just modified
   - Solution: Added `syncAllCompletedTemplates()` helper that iterates through ALL templates
