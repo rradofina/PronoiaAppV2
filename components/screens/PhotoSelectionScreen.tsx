@@ -457,10 +457,12 @@ export default function PhotoSelectionScreen({
 
   // Sync all completed templates on mount and when slots/photos change
   useEffect(() => {
-    // Only sync if we have both slots and photos
-    if (templateSlots.length > 0 && photos.length > 0) {
+    // Only sync if we have both slots and photos AND service is initialized
+    if (templateSlots.length > 0 && photos.length > 0 && templateSyncService.getIsInitialized()) {
       console.log('🚀 Initial sync check for all completed templates');
       syncAllCompletedTemplates(templateSlots);
+    } else if (templateSlots.length > 0 && photos.length > 0) {
+      console.log('⏸️ Skipping initial sync - sync service not initialized');
     }
   }, []); // Only run once on mount
 
@@ -670,6 +672,12 @@ export default function PhotoSelectionScreen({
   // Photo-first workflow
   // Helper function to sync ALL completed templates
   const syncAllCompletedTemplates = (slots: TemplateSlot[]) => {
+    // Guard: Only sync if service is initialized
+    if (!templateSyncService.getIsInitialized()) {
+      console.log('⚠️ Sync service not initialized, skipping template sync');
+      return;
+    }
+    
     // Get all unique template IDs
     const templateIds = new Set(slots.map(s => s.templateId));
     console.log('🔍 Checking ALL templates for completion:', {

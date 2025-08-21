@@ -42,12 +42,14 @@ class TemplateSyncService {
   private isUserInteracting: boolean = false; // Track if user is actively interacting
   private YIELD_DELAY = 100; // ms to yield between syncs for UI responsiveness
   private existingFiles: Map<string, string> = new Map(); // Map template ID to Drive file ID
+  private isInitialized: boolean = false; // Track initialization state
 
   /**
    * Initialize sync service for a client session
    */
   async initialize(clientFolderId: string): Promise<void> {
     console.log('🔄 Initializing template sync service for client:', clientFolderId);
+    this.isInitialized = false; // Reset initialization state
     this.clientFolderId = clientFolderId;
     this.syncStates.clear();
     this.syncQueue.clear();
@@ -56,11 +58,14 @@ class TemplateSyncService {
     try {
       // Create or get prints folder
       await this.ensurePrintsFolder();
+      this.isInitialized = true; // Mark as initialized only after successful setup
       console.log('✅ Sync service initialized successfully');
       console.log('  Prints folder ID:', this.printsFolderId);
     } catch (error) {
       console.error('❌ Failed to initialize sync service:', error);
-      throw error;
+      this.isInitialized = false;
+      // Don't throw - allow app to continue without sync
+      console.warn('⚠️ Sync service will be disabled for this session');
     }
   }
 
@@ -131,6 +136,12 @@ class TemplateSyncService {
     photos: Photo[],
     immediate: boolean = false
   ): void {
+    // Guard: Don't sync if service not initialized
+    if (!this.isInitialized) {
+      console.log('⚠️ Sync service not initialized, skipping sync for:', templateId);
+      return;
+    }
+
     // Check if template is complete
     if (!this.isTemplateComplete(templateSlots, templateId)) {
       console.log('⏸️ Template incomplete, skipping sync:', templateId);
@@ -381,6 +392,12 @@ class TemplateSyncService {
    * Delete template from Google Drive immediately
    */
   async deleteFromDrive(templateId: string): Promise<void> {
+    // Guard: Don't try to delete if not initialized
+    if (!this.isInitialized) {
+      console.log('⚠️ Sync service not initialized, skipping delete for:', templateId);
+      return;
+    }
+
     const syncState = this.syncStates.get(templateId);
     const existingFileId = syncState?.driveFileId || this.existingFiles.get(templateId);
     
@@ -446,9 +463,21 @@ class TemplateSyncService {
   }
 
   /**
+   * Check if service is initialized and ready
+   */
+  getIsInitialized(): boolean {
+    return this.isInitialized;
+  }
+
+  /**
    * Set user interaction state - call this when user starts/stops dragging
    */
   setUserInteracting(isInteracting: boolean): void {
+    // Guard: Only set if initialized
+    if (!this.isInitialized) {
+      return;
+    }
+    
     this.isUserInteracting = isInteracting;
     if (isInteracting) {
       console.log('🔄 User interaction started - background sync will pause');
@@ -530,6 +559,12 @@ class TemplateSyncService {
    * Finalize session - process pending syncs and clean up
    */
   async finalizeSession(templateSlots: TemplateSlot[], photos: Photo[]): Promise<void> {
+    // Guard: Don't finalize if not initialized
+    if (!this.isInitialized) {
+      console.log('⚠️ Sync service not initialized, skipping finalization');
+      return;
+    }
+
     try {
       console.log('🏁 Finalizing session - processing pending syncs');
       
