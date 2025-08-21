@@ -49,8 +49,15 @@ class TemplateSyncService {
     this.syncQueue.clear();
     this.uploadQueue = [];
     
-    // Create or get prints_draft folder
-    await this.ensureDraftFolder();
+    try {
+      // Create or get prints_draft folder
+      await this.ensureDraftFolder();
+      console.log('✅ Sync service initialized successfully');
+      console.log('  Draft folder ID:', this.draftFolderId);
+    } catch (error) {
+      console.error('❌ Failed to initialize sync service:', error);
+      throw error;
+    }
   }
 
   /**
@@ -63,7 +70,9 @@ class TemplateSyncService {
 
     try {
       // Check if prints_draft folder exists
+      console.log('📂 Checking for existing prints_draft folder in:', this.clientFolderId);
       const folders = await googleDriveService.listFolders(this.clientFolderId);
+      console.log('  Found folders:', folders.map(f => f.name));
       const draftFolder = folders.find(f => f.name === 'prints_draft');
       
       if (draftFolder) {
@@ -133,7 +142,10 @@ class TemplateSyncService {
     } else {
       // Debounce for 3 seconds
       console.log('⏱️ Queueing template sync (3s debounce):', templateId);
+      console.log('  Template slots count:', templateSlots.filter(s => s.templateId === templateId).length);
+      console.log('  Photos available:', photos.length);
       const timer = setTimeout(() => {
+        console.log('⏰ Debounce complete, adding to upload queue:', templateId);
         this.addToUploadQueue(templateId, templateSlots, photos, 'normal');
         this.syncQueue.delete(templateId);
       }, this.DEBOUNCE_TIME);
@@ -224,6 +236,8 @@ class TemplateSyncService {
     }
     
     console.log('🔄 Syncing template:', templateId);
+    console.log('  Slots for this template:', templateSlots.length);
+    console.log('  Photos available:', photos.length);
     this.updateSyncState(templateId, 'syncing');
     
     try {
@@ -258,6 +272,7 @@ class TemplateSyncService {
       const dpi = printDimensions.dpi || 300;
       
       // Rasterize the template
+      console.log('🎨 Starting rasterization for template:', manualTemplate.name);
       const rasterized = await templateRasterizationService.rasterizeTemplate(
         manualTemplate,
         templateSlots,
@@ -269,6 +284,12 @@ class TemplateSyncService {
           dpi: dpi
         }
       );
+      
+      // Validate blob
+      if (!rasterized.blob) {
+        throw new Error('Rasterization failed - no blob returned');
+      }
+      console.log('✅ Rasterized blob size:', rasterized.blob.size, 'bytes');
       
       // Generate filename
       const fileName = `${firstSlot.templateName.replace(/[^a-zA-Z0-9]/g, '_')}_${templateId.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
@@ -295,14 +316,18 @@ class TemplateSyncService {
         );
         
         // Store the file ID
+        console.log('📁 File uploaded with ID:', fileId);
         this.updateSyncState(templateId, 'synced', undefined, fileId);
       }
       
       console.log('✅ Successfully synced:', templateId);
-      this.updateSyncState(templateId, 'synced');
+      // REMOVED DUPLICATE STATE UPDATE - This was overwriting the fileId!
       
     } catch (error) {
       console.error('❌ Sync failed for template:', templateId, error);
+      console.error('  Error details:', error instanceof Error ? error.message : error);
+      // Update state to show error
+      this.updateSyncState(templateId, 'error', error instanceof Error ? error.message : 'Unknown error');
       throw error;
     }
   }

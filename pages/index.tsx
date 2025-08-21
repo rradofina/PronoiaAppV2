@@ -1072,8 +1072,18 @@ export default function Home() {
       const templateSpecificSlots = updatedSlots.filter((s: TemplateSlot) => s.templateId === templateId);
       const isTemplateComplete = templateSpecificSlots.every((s: TemplateSlot) => s.photoId);
       
+      console.log('🔍 Template completion check:', {
+        templateId,
+        slotsCount: templateSpecificSlots.length,
+        filledSlots: templateSpecificSlots.filter((s: TemplateSlot) => s.photoId).length,
+        isComplete: isTemplateComplete,
+        photosAvailable: localPhotos.length
+      });
+      
       if (isTemplateComplete) {
         console.log('✅ Template completed, queueing sync:', templateId);
+        console.log('  Photos being passed:', localPhotos.length);
+        console.log('  First photo sample:', localPhotos[0]?.name);
         templateSyncService.queueTemplateSync(templateId, updatedSlots, localPhotos);
       }
       
