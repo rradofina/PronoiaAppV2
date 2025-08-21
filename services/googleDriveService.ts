@@ -994,27 +994,6 @@ class GoogleDriveService {
     }
   }
 
-  /**
-   * List files in a folder
-   */
-  async listFiles(folderId: string): Promise<GoogleDriveFile[]> {
-    try {
-      if (!this.isSignedIn()) {
-        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
-      }
-
-      const response = await window.gapi.client.drive.files.list({
-        q: `'${folderId}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
-        fields: 'files(id,name,mimeType,size,thumbnailLink,webContentLink,webViewLink,createdTime,modifiedTime)',
-        pageSize: 1000,
-      });
-
-      return response.result.files || [];
-    } catch (error) {
-      console.error('Failed to list files:', error);
-      throw new Error('Failed to list files from Google Drive');
-    }
-  }
 }
 
 // Export singleton instance

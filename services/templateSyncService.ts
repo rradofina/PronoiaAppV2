@@ -71,7 +71,7 @@ class TemplateSyncService {
         console.log('✅ Found existing prints_draft folder:', this.draftFolderId);
         
         // Clean up any existing files (fresh start)
-        const files = await googleDriveService.listFiles(this.draftFolderId);
+        const files = await googleDriveService.listFiles(this.draftFolderId, {});
         for (const file of files) {
           await googleDriveService.deleteFile(file.id);
         }
