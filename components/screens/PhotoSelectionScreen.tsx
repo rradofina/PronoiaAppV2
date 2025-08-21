@@ -13,6 +13,7 @@ import PhotoSelectionMode from '../PhotoSelectionMode';
 import SlidingTemplateBar from '../SlidingTemplateBar';
 import { manualTemplateService } from '../../services/manualTemplateService';
 import { templateRasterizationService } from '../../services/templateRasterizationService';
+import { templateSyncService } from '../../services/templateSyncService';
 import { printSizeService } from '../../services/printSizeService';
 import UploadOptionsModal from '../UploadOptionsModal';
 import { photoCacheService } from '../../services/photoCacheService';
@@ -498,6 +499,19 @@ export default function PhotoSelectionScreen({
       s.id === slotId ? { ...s, transform } : s
     );
     setTemplateSlots(updatedSlots);
+    
+    // Find the template ID for this slot and check if template is complete
+    const slot = templateSlots.find(s => s.id === slotId);
+    if (slot) {
+      const templateId = slot.templateId;
+      const templateSpecificSlots = updatedSlots.filter(s => s.templateId === templateId);
+      const isTemplateComplete = templateSpecificSlots.every(s => s.photoId);
+      
+      if (isTemplateComplete) {
+        console.log('📐 Template transform updated, queueing sync:', templateId);
+        templateSyncService.queueTemplateSync(templateId, updatedSlots, photos);
+      }
+    }
   };
 
 
@@ -576,6 +590,11 @@ export default function PhotoSelectionScreen({
     
     // Original delete logic moved here
     const templateIdToDelete = templateToDelete;
+    
+    // Delete from Google Drive sync immediately
+    console.log('🗑️ Deleting template from Drive sync:', templateIdToDelete);
+    templateSyncService.deleteFromDrive(templateIdToDelete);
+    
       // Get current template groups before deletion
       const currentGroups = Object.values(
         templateSlots.reduce((acc, slot) => {
@@ -889,6 +908,16 @@ export default function PhotoSelectionScreen({
       // Update template slots using the provided setter
       console.log('🔧 Photo removed from slot, updating template slots');
       setTemplateSlots(updatedTemplateSlots);
+      
+      // Check if template is now incomplete and delete from Drive if it was synced
+      const templateId = slot.templateId;
+      const templateSpecificSlots = updatedTemplateSlots.filter(s => s.templateId === templateId);
+      const isTemplateComplete = templateSpecificSlots.every(s => s.photoId);
+      
+      if (!isTemplateComplete) {
+        console.log('❌ Template now incomplete, removing from Drive sync:', templateId);
+        templateSyncService.deleteFromDrive(templateId);
+      }
       
       // Clear all related states
       setSlotShowingRemoveConfirmation(null);

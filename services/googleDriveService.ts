@@ -881,6 +881,140 @@ class GoogleDriveService {
       throw new Error('Failed to get file URL from Google Drive');
     }
   }
+
+  /**
+   * Update an existing file in Google Drive
+   */
+  async updateFile(
+    fileId: string,
+    file: Blob,
+    fileName: string,
+    mimeType: string = 'image/jpeg'
+  ): Promise<void> {
+    try {
+      if (!this.isSignedIn() || !this.accessToken) {
+        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
+      }
+
+      const metadata = {
+        name: fileName,
+        mimeType,
+      };
+
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', file);
+
+      const response = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
+        {
+          method: 'PATCH',
+          headers: new Headers({
+            'Authorization': `Bearer ${this.accessToken}`
+          }),
+          body: form,
+        }
+      );
+
+      if (!response.ok) {
+        const errorBody = await response.json();
+        console.error('Failed to update file:', errorBody);
+        throw new Error(`Update failed: ${errorBody.error?.message || 'Unknown error'}`);
+      }
+
+      console.log(`Successfully updated file: ${fileName}`);
+    } catch (error) {
+      console.error('Failed to update file:', error);
+      throw new Error(ERROR_MESSAGES.EXPORT_FAILED);
+    }
+  }
+
+  /**
+   * Delete a file from Google Drive
+   */
+  async deleteFile(fileId: string): Promise<void> {
+    try {
+      if (!this.isSignedIn()) {
+        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
+      }
+
+      await window.gapi.client.drive.files.delete({
+        fileId: fileId,
+      });
+
+      console.log(`Successfully deleted file: ${fileId}`);
+    } catch (error) {
+      console.error('Failed to delete file:', error);
+      throw new Error('Failed to delete file from Google Drive');
+    }
+  }
+
+  /**
+   * Delete a folder from Google Drive
+   */
+  async deleteFolder(folderId: string): Promise<void> {
+    try {
+      if (!this.isSignedIn()) {
+        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
+      }
+
+      // Delete the folder (this will also delete all contents)
+      await window.gapi.client.drive.files.delete({
+        fileId: folderId,
+      });
+
+      console.log(`Successfully deleted folder: ${folderId}`);
+    } catch (error) {
+      console.error('Failed to delete folder:', error);
+      throw new Error('Failed to delete folder from Google Drive');
+    }
+  }
+
+  /**
+   * Rename a folder in Google Drive
+   */
+  async renameFolder(folderId: string, newName: string): Promise<void> {
+    try {
+      if (!this.isSignedIn()) {
+        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
+      }
+
+      await window.gapi.client.drive.files.update({
+        fileId: folderId,
+        resource: {
+          name: newName,
+        },
+        fields: 'id,name',
+      });
+
+      console.log(`Successfully renamed folder to: ${newName}`);
+    } catch (error) {
+      console.error('Failed to rename folder:', error);
+      throw new Error('Failed to rename folder in Google Drive');
+    }
+  }
+
+  /**
+   * List files in a folder
+   */
+  async listFiles(folderId: string): Promise<GoogleDriveFile[]> {
+    try {
+      if (!this.isSignedIn()) {
+        throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
+      }
+
+      const response = await window.gapi.client.drive.files.list({
+        q: `'${folderId}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
+        fields: 'files(id,name,mimeType,size,thumbnailLink,webContentLink,webViewLink,createdTime,modifiedTime)',
+        pageSize: 1000,
+      });
+
+      return response.result.files || [];
+    } catch (error) {
+      console.error('Failed to list files:', error);
+      throw new Error('Failed to list files from Google Drive');
+    }
+  }
 }
 
 // Export singleton instance

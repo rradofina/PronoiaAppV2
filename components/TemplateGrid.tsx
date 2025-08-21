@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TemplateSlot, Photo } from '../types';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
+import { templateSyncService } from '../services/templateSyncService';
+import SyncStatusIndicator from './SyncStatusIndicator';
 
 interface TemplateGridProps {
   templateSlots: TemplateSlot[];
@@ -333,6 +335,14 @@ export default function TemplateGrid({
             }`}>
               {templateName}
             </h3>
+            
+            {/* Sync status indicator */}
+            {slots.every(s => s.photoId) && (
+              <SyncStatusIndicator 
+                status={templateSyncService.getSyncStatus(templateId)} 
+                className="mr-2"
+              />
+            )}
             
             {showActions && (
               <div className="flex items-center space-x-1 sm:space-x-2 ml-2">

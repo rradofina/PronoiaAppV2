@@ -24,6 +24,7 @@ import { manualPackageService } from '../services/manualPackageService';
 import { templateCacheService } from '../services/templateCacheService';
 import { printSizeService } from '../services/printSizeService';
 import { templateRasterizationService } from '../services/templateRasterizationService';
+import { templateSyncService } from '../services/templateSyncService';
 import { getPrintSizeDimensions } from '../utils/printSizeDimensions';
 
 declare global {
@@ -232,7 +233,6 @@ export default function Home() {
   const [templateRefreshTrigger, setTemplateRefreshTrigger] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [printsFolderId, setPrintsFolderId] = useState<string | null>(null);
-  const [showExistingPrintsDialog, setShowExistingPrintsDialog] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; templateName: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadType, setUploadType] = useState<'templates' | 'photos' | null>(null);
@@ -642,6 +642,16 @@ export default function Home() {
     console.log('📂 handleClientFolderSelect called with folder:', folder.name);
     setSelectedClientFolder(folder);
     setClientName(folder.name);
+    
+    // Initialize template sync service for this client
+    try {
+      await templateSyncService.initialize(folder.id);
+      console.log('✅ Template sync service initialized for client:', folder.name);
+    } catch (error) {
+      console.error('Failed to initialize template sync service:', error);
+      // Continue anyway - sync is optional
+    }
+    
     try {
       console.log(`📥 Loading photos from folder: ${folder.name} (${folder.id})`);
       
@@ -746,11 +756,9 @@ export default function Home() {
     // Check if folder has content
     const folderContents = await googleDriveService.getFolderContents(folderId);
     
+    // We now always overwrite - no warning needed
     if (folderContents.files && folderContents.files.length > 0) {
-      // Folder has existing prints
-      console.log('⚠️ Prints folder already has content');
-      setShowExistingPrintsDialog(true);
-      return null; // Return null to indicate folder has content
+      console.log('ℹ️ Prints folder has existing content - will be overwritten');
     }
     
     setPrintsFolderId(folderId);
@@ -775,20 +783,18 @@ export default function Home() {
     // Check if folder has content
     const folderContents = await googleDriveService.getFolderContents(folderId);
     
+    // We now always overwrite - no warning needed
     if (folderContents.files && folderContents.files.length > 0) {
-      // Folder has existing photos
-      console.log('⚠️ Photos folder already has content');
-      setShowExistingPrintsDialog(true);
-      return null; // Return null to indicate folder has content
+      console.log('ℹ️ Photos folder has existing content - will be overwritten');
     }
     
     console.log(`✅ Photos folder ready: ${folderId}`);
     return folderId;
   };
 
-  // Handle template upload (previous handlePhotoContinue logic)
+  // Handle template finalization - rename draft folder to prints
   const handleTemplateUpload = async () => {
-    console.log('📸 Uploading print templates...');
+    console.log('🏁 Finalizing templates...');
     
     if (!selectedClientFolder) {
       showWarning('No client folder selected', 'Please go back and select a folder.');
@@ -799,127 +805,23 @@ export default function Home() {
     setIsUploading(true);
 
     try {
-      const folderId = await ensurePrintsFolder();
+      // Show progress for finalization
+      setUploadProgress({ current: 0, total: 1, templateName: 'Finalizing templates...' });
       
-      // Check if folder setup failed due to existing content
-      if (!folderId) {
-        console.log('❌ Cannot upload - folder has existing content');
-        setIsUploading(false);
-        return;
-      }
+      // Finalize the sync session - this renames prints_draft to prints
+      await templateSyncService.finalizeSession();
       
-      // Group templates by templateName for generation
-      const templateGroups = new Map<string, TemplateSlot[]>();
-      templateSlots.forEach(slot => {
-        if (!slot.templateName) return;
-        if (!templateGroups.has(slot.templateName)) {
-          templateGroups.set(slot.templateName, []);
-        }
-        templateGroups.get(slot.templateName)!.push(slot);
-      });
-
-      console.log(`📋 Preparing to upload ${templateGroups.size} templates`);
-      setUploadProgress({ current: 0, total: templateGroups.size, templateName: 'Preparing...' });
-
-      // Get available print sizes for template lookup
-      const availablePrintSizes = await printSizeService.getAvailablePrintSizes();
-
-      let uploadedCount = 0;
-      const errors: string[] = [];
-
-      // Process each template group
-      for (const [templateName, slots] of templateGroups.entries()) {
-        try {
-          console.log(`🎨 Generating template: ${templateName}`);
-          setUploadProgress({ 
-            current: uploadedCount, 
-            total: templateGroups.size, 
-            templateName: `Uploading: ${templateName}` 
-          });
-
-          // Find the manual template for this template group
-          const firstSlot = slots[0];
-          if (!firstSlot) continue;
-
-          // Get all templates to find the matching manual template
-          const allTemplates = await manualTemplateService.getAllTemplates();
-          
-          // First try to find template by exact ID (for templates added via Package Manager)
-          let manualTemplate = allTemplates.find(t => 
-            t.id.toString() === firstSlot.templateType
-          );
-
-          // If not found by ID, try to find by type and print size (for standard templates)
-          if (!manualTemplate) {
-            manualTemplate = allTemplates.find(t => 
-              t.template_type === firstSlot.templateType && 
-              t.print_size === (firstSlot.printSize || (availablePrintSizes.length > 0 ? availablePrintSizes[0].name : ''))
-            );
-          }
-
-          if (!manualTemplate) {
-            console.error(`Manual template not found for: ${firstSlot.templateType} (type/id) with print size: ${firstSlot.printSize}`);
-            errors.push(`Template not found: ${templateName}`);
-            continue;
-          }
-
-          console.log('📝 Found manual template:', manualTemplate.name);
-
-          // Get the correct DPI for the template's print size
-          const printDimensions = getPrintSizeDimensions(manualTemplate.print_size);
-          const dpi = printDimensions.dpi || 300; // Default to 300 DPI if not specified
-
-          console.log('🖨️ Using DPI for', manualTemplate.print_size, ':', dpi);
-
-          // Generate the template with correct DPI
-          const rasterized = await templateRasterizationService.rasterizeTemplate(
-            manualTemplate,
-            slots,
-            localPhotos,
-            {
-              format: 'jpeg',
-              quality: 0.95,
-              includeBackground: true,
-              dpi: dpi // Pass the correct DPI for the print size
-            }
-          );
-
-          console.log(`📤 Uploading template: ${templateName}`);
-
-          // Upload to Google Drive
-          const fileName = `${templateName.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
-          await googleDriveService.uploadFile(
-            rasterized.blob,
-            fileName,
-            folderId,
-            'image/jpeg'
-          );
-
-          uploadedCount++;
-          console.log(`✅ Uploaded: ${fileName}`);
-
-        } catch (error) {
-          console.error(`❌ Failed to process template ${templateName}:`, error);
-          errors.push(`Failed: ${templateName}`);
-        }
-      }
+      console.log('✅ Templates finalized successfully');
 
       setUploadProgress(null);
       setUploadType(null);
       setIsUploading(false);
-
-      // Show completion message
-      if (errors.length > 0) {
-        showWarning(
-          'Templates uploaded with some errors',
-          `✅ Successful: ${uploadedCount}/${templateGroups.size}\n❌ Failed: ${errors.join(', ')}\n\nCheck the prints folder in Google Drive.`
-        );
-      } else {
-        showSuccess(
-          'All templates uploaded successfully!',
-          `${uploadedCount} templates have been saved to the prints folder in Google Drive.`
-        );
-      }
+      
+      // Show success message
+      showSuccess(
+        'Templates finalized!',
+        'All completed templates have been saved to the prints folder in Google Drive.'
+      );
       
     } catch (error: any) {
       console.error('❌ Failed to upload templates:', error);
@@ -1158,13 +1060,23 @@ export default function Home() {
 
   const handlePhotoSelect = (photo: Photo) => {
     if (selectedSlot) {
-      setTemplateSlots(
-        templateSlots.map((slot: TemplateSlot) =>
-          slot === selectedSlot
-            ? { ...slot, photoId: photo.id }
-            : slot
-        )
+      const updatedSlots = templateSlots.map((slot: TemplateSlot) =>
+        slot === selectedSlot
+          ? { ...slot, photoId: photo.id }
+          : slot
       );
+      setTemplateSlots(updatedSlots);
+      
+      // Check if this completes a template and trigger sync
+      const templateId = selectedSlot.templateId;
+      const templateSpecificSlots = updatedSlots.filter((s: TemplateSlot) => s.templateId === templateId);
+      const isTemplateComplete = templateSpecificSlots.every((s: TemplateSlot) => s.photoId);
+      
+      if (isTemplateComplete) {
+        console.log('✅ Template completed, queueing sync:', templateId);
+        templateSyncService.queueTemplateSync(templateId, updatedSlots, localPhotos);
+      }
+      
       const currentSlotIndex = templateSlots.findIndex((s: TemplateSlot) => s === selectedSlot);
       const nextEmptySlot = templateSlots.slice(currentSlotIndex + 1).find((s: TemplateSlot) => !s.photoId);
       setSelectedSlot(nextEmptySlot || null);
@@ -1579,70 +1491,6 @@ export default function Home() {
       </div> */}
       
       {renderScreen()}
-
-      {/* Existing Prints Dialog */}
-      <Transition appear show={showExistingPrintsDialog} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={() => setShowExistingPrintsDialog(false)}>
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-black bg-opacity-50" />
-          </Transition.Child>
-
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4 text-center">
-              <Transition.Child
-                as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 scale-95"
-                enterTo="opacity-100 scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 scale-100"
-                leaveTo="opacity-0 scale-95"
-              >
-                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-                  <Dialog.Title
-                    as="h3"
-                    className="text-lg font-medium leading-6 text-gray-900 text-center"
-                  >
-                    Prints Already Created
-                  </Dialog.Title>
-                  
-                  <div className="mt-4">
-                    <div className="text-center">
-                      <div className="text-5xl mb-4">📁</div>
-                      <p className="text-sm text-gray-600 mb-4">
-                        A prints folder already exists with files inside for this client.
-                      </p>
-                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <p className="text-sm text-yellow-800 font-medium">
-                          Please contact Pronoia Studios PH staff for assistance with existing prints.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6">
-                    <button
-                      type="button"
-                      className="w-full inline-flex justify-center rounded-lg border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                      onClick={() => setShowExistingPrintsDialog(false)}
-                    >
-                      Understood
-                    </button>
-                  </div>
-                </Dialog.Panel>
-              </Transition.Child>
-            </div>
-          </div>
-        </Dialog>
-      </Transition>
 
       {/* Upload Progress Modal */}
       <Transition appear show={isUploading} as={Fragment}>

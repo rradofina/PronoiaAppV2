@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Real-Time Template Sync to Google Drive**: Templates automatically upload to Drive as they're completed
+  - New Service: `services/templateSyncService.ts` - Manages background sync with debouncing and queue
+  - Auto-sync triggers:
+    - When last slot of template is filled (3s debounce)
+    - When photo transform is adjusted (3s debounce) 
+    - When template is deleted (immediate)
+    - When photo is removed making template incomplete (immediate)
+  - Visual indicators: Shows sync status (Pending/Saving.../Saved/Error) on completed templates
+  - Finalize is now instant: Just renames `prints_draft/` to `prints/` folder
+  - Files Modified:
+    - Created `services/templateSyncService.ts` - Complete sync management system
+    - Created `components/SyncStatusIndicator.tsx` - Visual sync status component
+    - Modified `pages/index.tsx` - Initialize sync service, trigger on photo selection
+    - Modified `components/screens/PhotoSelectionScreen.tsx` - Sync triggers for add/delete/transform
+    - Modified `components/TemplateGrid.tsx` - Display sync status indicators
+    - Modified `services/googleDriveService.ts` - Added updateFile, deleteFile, renameFolder methods
+  - Impact: Zero wait time at finalization, templates ready in Drive as user works
+
+### Changed
+- **Simplified Finalize Flow**: Replaced upload progress with instant folder rename
+  - Old: Generate and upload each template on finalize (slow)
+  - New: Templates already uploaded, just rename folder (instant)
+  - Files Modified: `pages/index.tsx` - handleTemplateUpload now just calls finalizeSession
+
+### Removed
+- **"Prints Already Created" Warning**: Always overwrites existing prints folder
+  - Removed blocking dialog that prevented overwriting
+  - Files Modified: `pages/index.tsx` - Removed showExistingPrintsDialog and related UI
+  - Impact: Smoother workflow without interruptions
+
 ### Fixed
 - **Used Photos Disappearing in Mode Switch**: Used photos now remain visible in favorites bar when switching between modes
   - Root Cause: Photo mode favorites bar showed `getUnusedFavorites()` which filtered out photos already used in templates
