@@ -1,7 +1,8 @@
 /**
  * Template Sync Service
  * Manages real-time synchronization of completed templates to Google Drive
- * Handles background uploads, deletions, and folder management
+ * Handles background uploads, updates, deletions, and smart file management
+ * Syncs directly to 'prints' folder without intermediate drafts
  */
 
 import { TemplateSlot, Photo, ManualTemplate } from '../types';
@@ -34,12 +35,13 @@ class TemplateSyncService {
   private syncQueue: Map<string, NodeJS.Timeout> = new Map();
   private uploadQueue: SyncQueueItem[] = [];
   private isProcessing: boolean = false;
-  private draftFolderId: string | null = null;
+  private printsFolderId: string | null = null; // Changed from draftFolderId
   private clientFolderId: string | null = null;
   private DEBOUNCE_TIME = 3000; // 3 seconds
   private MAX_RETRIES = 3;
   private isUserInteracting: boolean = false; // Track if user is actively interacting
   private YIELD_DELAY = 100; // ms to yield between syncs for UI responsiveness
+  private existingFiles: Map<string, string> = new Map(); // Map template ID to Drive file ID
 
   /**
    * Initialize sync service for a client session
@@ -52,10 +54,10 @@ class TemplateSyncService {
     this.uploadQueue = [];
     
     try {
-      // Create or get prints_draft folder
-      await this.ensureDraftFolder();
+      // Create or get prints folder
+      await this.ensurePrintsFolder();
       console.log('✅ Sync service initialized successfully');
-      console.log('  Draft folder ID:', this.draftFolderId);
+      console.log('  Prints folder ID:', this.printsFolderId);
     } catch (error) {
       console.error('❌ Failed to initialize sync service:', error);
       throw error;
@@ -63,42 +65,50 @@ class TemplateSyncService {
   }
 
   /**
-   * Ensure prints_draft folder exists
+   * Ensure prints folder exists and load existing files
    */
-  private async ensureDraftFolder(): Promise<string> {
+  private async ensurePrintsFolder(): Promise<string> {
     if (!this.clientFolderId) {
       throw new Error('Client folder ID not set');
     }
 
     try {
-      // Check if prints_draft folder exists
-      console.log('📂 Checking for existing prints_draft folder in:', this.clientFolderId);
+      // Check if prints folder exists
+      console.log('📂 Checking for existing prints folder in:', this.clientFolderId);
       const folders = await googleDriveService.listFolders(this.clientFolderId);
       console.log('  Found folders:', folders.map(f => f.name));
-      const draftFolder = folders.find(f => f.name === 'prints_draft');
+      const printsFolder = folders.find(f => f.name === 'prints');
       
-      if (draftFolder) {
-        this.draftFolderId = draftFolder.id;
-        console.log('✅ Found existing prints_draft folder:', this.draftFolderId);
+      if (printsFolder) {
+        this.printsFolderId = printsFolder.id;
+        console.log('✅ Found existing prints folder:', this.printsFolderId);
         
-        // Clean up any existing files (fresh start)
-        const files = await googleDriveService.listFiles(this.draftFolderId, {});
+        // Load existing files to track what's already uploaded
+        const files = await googleDriveService.listFiles(this.printsFolderId, {});
+        this.existingFiles.clear();
+        
         for (const file of files) {
-          await googleDriveService.deleteFile(file.id);
+          // Extract template ID from filename (format: TemplateName_TemplateID.jpg)
+          const match = file.name.match(/_([^_]+)\.jpg$/);
+          if (match) {
+            const templateId = match[1];
+            this.existingFiles.set(templateId, file.id);
+            console.log(`  📄 Found existing template: ${templateId} -> ${file.id}`);
+          }
         }
-        console.log('🧹 Cleaned up', files.length, 'existing files in prints_draft');
+        console.log(`📊 Loaded ${this.existingFiles.size} existing templates`);
       } else {
-        // Create new prints_draft folder
-        this.draftFolderId = await googleDriveService.createOutputFolder(
+        // Create new prints folder
+        this.printsFolderId = await googleDriveService.createOutputFolder(
           this.clientFolderId,
-          'prints_draft'
+          'prints'
         );
-        console.log('📁 Created new prints_draft folder:', this.draftFolderId);
+        console.log('📁 Created new prints folder:', this.printsFolderId);
       }
       
-      return this.draftFolderId;
+      return this.printsFolderId;
     } catch (error) {
-      console.error('❌ Failed to ensure draft folder:', error);
+      console.error('❌ Failed to ensure prints folder:', error);
       throw error;
     }
   }
@@ -261,8 +271,8 @@ class TemplateSyncService {
   private async syncTemplate(item: SyncQueueItem): Promise<void> {
     const { templateId, templateSlots, photos } = item;
     
-    if (!this.draftFolderId) {
-      await this.ensureDraftFolder();
+    if (!this.printsFolderId) {
+      await this.ensurePrintsFolder();
     }
     
     console.log('🔄 Syncing template:', templateId);
@@ -324,30 +334,35 @@ class TemplateSyncService {
       // Generate filename
       const fileName = `${firstSlot.templateName.replace(/[^a-zA-Z0-9]/g, '_')}_${templateId.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
       
-      // Check if file already exists
-      const existingState = this.syncStates.get(templateId);
-      if (existingState?.driveFileId) {
+      // Check if file already exists (either in sync state or from previous session)
+      const existingFileId = this.syncStates.get(templateId)?.driveFileId || this.existingFiles.get(templateId);
+      
+      if (existingFileId) {
         // Update existing file
         console.log('📝 Updating existing file:', fileName);
         await googleDriveService.updateFile(
-          existingState.driveFileId,
+          existingFileId,
           rasterized.blob,
           fileName,
           'image/jpeg'
         );
+        // Update sync state with existing file ID
+        this.updateSyncState(templateId, 'synced', undefined, existingFileId);
       } else {
         // Upload new file
         console.log('📤 Uploading new file:', fileName);
         const fileId = await googleDriveService.uploadFile(
           rasterized.blob,
           fileName,
-          this.draftFolderId!,
+          this.printsFolderId!,
           'image/jpeg'
         );
         
         // Store the file ID
         console.log('📁 File uploaded with ID:', fileId);
         this.updateSyncState(templateId, 'synced', undefined, fileId);
+        // Also track in existing files for future updates
+        this.existingFiles.set(templateId, fileId);
       }
       
       console.log('✅ Successfully synced:', templateId);
@@ -367,6 +382,7 @@ class TemplateSyncService {
    */
   async deleteFromDrive(templateId: string): Promise<void> {
     const syncState = this.syncStates.get(templateId);
+    const existingFileId = syncState?.driveFileId || this.existingFiles.get(templateId);
     
     // Clear any pending sync
     const pendingTimer = this.syncQueue.get(templateId);
@@ -378,12 +394,14 @@ class TemplateSyncService {
     // Remove from upload queue
     this.uploadQueue = this.uploadQueue.filter(item => item.templateId !== templateId);
     
-    // Delete from Drive if it was synced
-    if (syncState?.driveFileId) {
+    // Delete from Drive if it exists
+    if (existingFileId) {
       try {
         console.log('🗑️ Deleting template from Drive:', templateId);
-        await googleDriveService.deleteFile(syncState.driveFileId);
+        await googleDriveService.deleteFile(existingFileId);
         console.log('✅ Deleted from Drive:', templateId);
+        // Remove from existing files map
+        this.existingFiles.delete(templateId);
       } catch (error) {
         console.error('❌ Failed to delete from Drive:', templateId, error);
       }
@@ -509,15 +527,11 @@ class TemplateSyncService {
   }
 
   /**
-   * Finalize session - rename draft folder to prints
+   * Finalize session - process pending syncs and clean up
    */
   async finalizeSession(templateSlots: TemplateSlot[], photos: Photo[]): Promise<void> {
-    if (!this.draftFolderId) {
-      throw new Error('No draft folder to finalize');
-    }
-    
     try {
-      console.log('🏁 Finalizing session - processing pending syncs first');
+      console.log('🏁 Finalizing session - processing pending syncs');
       
       // Step 1: Flush all pending syncs (process immediately without waiting for debounce)
       console.log('🔍 Current sync status:', {
@@ -532,30 +546,50 @@ class TemplateSyncService {
       console.log('⏳ Waiting for all uploads to complete...');
       await this.waitForUploads();
       
-      console.log('✅ All templates synced, proceeding with folder rename');
+      console.log('✅ All templates synced successfully');
       
-      // Step 3: Check if prints folder already exists and delete it
-      const folders = await googleDriveService.listFolders(this.clientFolderId!);
-      const existingPrintsFolder = folders.find(f => f.name === 'prints');
+      // Step 3: Clean up templates that are no longer in the session
+      await this.cleanupRemovedTemplates(templateSlots);
       
-      if (existingPrintsFolder) {
-        console.log('🗑️ Removing existing prints folder');
-        await googleDriveService.deleteFolder(existingPrintsFolder.id);
-      }
-      
-      // Step 4: Rename draft folder to prints
-      await googleDriveService.renameFolder(this.draftFolderId, 'prints');
-      console.log('✅ Successfully renamed prints_draft to prints');
-      
-      // Step 5: Clear all states
+      // Step 4: Clear session states (but keep existing files map for next session)
       this.syncStates.clear();
       this.syncQueue.clear();
       this.uploadQueue = [];
-      this.draftFolderId = null;
+      
+      console.log('🎯 Session finalized - prints folder is ready');
       
     } catch (error) {
       console.error('❌ Failed to finalize session:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Clean up templates that were removed from the session
+   */
+  private async cleanupRemovedTemplates(currentTemplateSlots: TemplateSlot[]): Promise<void> {
+    // Get all current template IDs
+    const currentTemplateIds = new Set(
+      currentTemplateSlots
+        .map(slot => slot.templateId)
+        .filter(id => id) // Filter out any undefined/null values
+    );
+    
+    // Find templates that exist in Drive but not in current session
+    const templatesToDelete: string[] = [];
+    for (const [templateId, fileId] of this.existingFiles.entries()) {
+      if (!currentTemplateIds.has(templateId)) {
+        templatesToDelete.push(templateId);
+      }
+    }
+    
+    if (templatesToDelete.length > 0) {
+      console.log(`🧹 Cleaning up ${templatesToDelete.length} removed templates`);
+      for (const templateId of templatesToDelete) {
+        await this.deleteFromDrive(templateId);
+      }
+    } else {
+      console.log('✅ No templates to clean up');
     }
   }
 
@@ -572,6 +606,9 @@ class TemplateSyncService {
     // Clear queues
     this.uploadQueue = [];
     this.isProcessing = false;
+    
+    // Keep printsFolderId and existingFiles for next session
+    // This allows us to reuse the same folder and track existing files
     
     console.log('🧹 Template sync service cleaned up');
   }

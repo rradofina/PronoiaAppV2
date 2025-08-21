@@ -792,7 +792,7 @@ export default function Home() {
     return folderId;
   };
 
-  // Handle template finalization - rename draft folder to prints
+  // Handle template finalization - process pending syncs and clean up
   const handleTemplateUpload = async () => {
     console.log('🏁 Finalizing templates...');
     
@@ -808,8 +808,8 @@ export default function Home() {
       // Show progress for finalization
       setUploadProgress({ current: 0, total: 1, templateName: 'Finalizing templates...' });
       
-      // Finalize the sync session - this renames prints_draft to prints
-      // Pass templateSlots and photos to ensure pending syncs are processed
+      // Finalize the sync session - process pending syncs and clean up removed templates
+      // Pass templateSlots and photos to ensure all changes are captured
       await templateSyncService.finalizeSession(templateSlots, photos);
       
       console.log('✅ Templates finalized successfully');
