@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **All Templates Not Syncing**: Fixed issue where only one template synced instead of all completed templates
+  - Root Cause: Sync logic only checked the specific template that was just modified
+  - Solution: Added `syncAllCompletedTemplates()` helper that iterates through ALL templates
+  - Implementation:
+    - Checks every unique template ID for completion status
+    - Queues sync for each completed template found
+    - Runs on component mount to catch pre-existing completed templates
+    - Comprehensive logging shows total templates vs completed count
+  - Files Modified: `components/screens/PhotoSelectionScreen.tsx`
+  - Commit: `f2be5d1`
+  - Impact: All completed templates now properly sync to drafts folder
+
 ### Added
 - **Real-Time Template Sync to Google Drive**: Templates automatically upload to Drive as they're completed
   - New Service: `services/templateSyncService.ts` - Manages background sync with debouncing and queue
