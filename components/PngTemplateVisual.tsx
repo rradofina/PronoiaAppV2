@@ -6,6 +6,7 @@ import InlinePhotoEditor from './InlinePhotoEditor';
 import { getHighResPhotoUrls } from '../utils/photoUrlUtils';
 import { getPrintSizeDimensions } from '../utils/printSizeDimensions';
 import { createPhotoTransform } from '../utils/transformUtils';
+import { templateSyncService } from '../services/templateSyncService';
 
 interface PngTemplateVisualProps {
   pngTemplate: PngTemplate;
@@ -328,7 +329,14 @@ export default function PngTemplateVisual({
                         slot.transform = newTransform;
                       }
                     }}
+                    onInteractionStart={() => {
+                      // Pause background sync during photo manipulation
+                      templateSyncService.setUserInteracting(true);
+                    }}
                     onInteractionEnd={(finalTransform) => {
+                      // Resume background sync after manipulation
+                      templateSyncService.setUserInteracting(false);
+                      
                       // Save finalized transform with auto-snap applied
                       if (slot && onInlineApply && finalTransform) {
                         onInlineApply(slot.id, slot.photoId!, finalTransform);

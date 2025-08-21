@@ -1952,10 +1952,14 @@ export default function PhotoSelectionScreen({
               onDragStart={(photo) => {
                 setIsDraggingPhoto(true);
                 setPreviewPhotoId(photo.id);
+                // Pause background sync during drag
+                templateSyncService.setUserInteracting(true);
               }}
               onDragEnd={() => {
                 setIsDraggingPhoto(false);
                 setPreviewSlotId(null);
+                // Resume background sync after drag
+                templateSyncService.setUserInteracting(false);
                 setPreviewPhotoId(null);
               }}
             />
@@ -1972,10 +1976,14 @@ export default function PhotoSelectionScreen({
               onDragStart={(photo) => {
                 setIsDraggingPhoto(true);
                 setPreviewPhotoId(photo.id);
+                // Pause background sync during drag
+                templateSyncService.setUserInteracting(true);
               }}
               onDragEnd={() => {
                 setIsDraggingPhoto(false);
                 setPreviewSlotId(null);
+                // Resume background sync after drag
+                templateSyncService.setUserInteracting(false);
                 setPreviewPhotoId(null);
               }}
             />

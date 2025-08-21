@@ -38,6 +38,8 @@ class TemplateSyncService {
   private clientFolderId: string | null = null;
   private DEBOUNCE_TIME = 3000; // 3 seconds
   private MAX_RETRIES = 3;
+  private isUserInteracting: boolean = false; // Track if user is actively interacting
+  private YIELD_DELAY = 100; // ms to yield between syncs for UI responsiveness
 
   /**
    * Initialize sync service for a client session
@@ -206,8 +208,20 @@ class TemplateSyncService {
       const item = this.uploadQueue.shift();
       if (!item) break;
       
+      // If user is interacting, pause processing
+      if (this.isUserInteracting) {
+        console.log('⏸️ Pausing sync - user is interacting');
+        this.uploadQueue.unshift(item); // Put item back at front
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait longer
+        continue;
+      }
+      
       try {
         await this.syncTemplate(item);
+        
+        // Yield to UI after each sync to prevent blocking
+        await this.yieldToUI();
+        
       } catch (error) {
         console.error('❌ Failed to sync template:', item.templateId, error);
         
@@ -223,6 +237,22 @@ class TemplateSyncService {
     }
     
     this.isProcessing = false;
+  }
+
+  /**
+   * Yield control back to the browser for UI updates
+   */
+  private async yieldToUI(): Promise<void> {
+    // Use requestAnimationFrame to ensure UI has a chance to update
+    await new Promise(resolve => {
+      if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+        window.requestAnimationFrame(() => {
+          setTimeout(resolve, this.YIELD_DELAY);
+        });
+      } else {
+        setTimeout(resolve, this.YIELD_DELAY);
+      }
+    });
   }
 
   /**
@@ -271,7 +301,7 @@ class TemplateSyncService {
       const printDimensions = getPrintSizeDimensions(manualTemplate.print_size);
       const dpi = printDimensions.dpi || 300;
       
-      // Rasterize the template
+      // Rasterize the template - use lower quality for drafts to speed up processing
       console.log('🎨 Starting rasterization for template:', manualTemplate.name);
       const rasterized = await templateRasterizationService.rasterizeTemplate(
         manualTemplate,
@@ -279,7 +309,7 @@ class TemplateSyncService {
         photos,
         {
           format: 'jpeg',
-          quality: 0.95,
+          quality: 0.85, // Reduced from 0.95 for faster processing
           includeBackground: true,
           dpi: dpi
         }
@@ -395,6 +425,22 @@ class TemplateSyncService {
    */
   getAllSyncStates(): Map<string, TemplateSyncState> {
     return this.syncStates;
+  }
+
+  /**
+   * Set user interaction state - call this when user starts/stops dragging
+   */
+  setUserInteracting(isInteracting: boolean): void {
+    this.isUserInteracting = isInteracting;
+    if (isInteracting) {
+      console.log('🔄 User interaction started - background sync will pause');
+    } else {
+      console.log('▶️ User interaction ended - background sync will resume');
+      // Resume processing if there are pending items
+      if (this.uploadQueue.length > 0 && !this.isProcessing) {
+        this.processUploadQueue();
+      }
+    }
   }
 
   /**
