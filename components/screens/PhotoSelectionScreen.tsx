@@ -876,6 +876,16 @@ export default function PhotoSelectionScreen({
     
     setTemplateSlots(updatedSlots);
     
+    // Check if template is complete and trigger sync
+    const templateId = slot.templateId;
+    const templateSpecificSlots = updatedSlots.filter(s => s.templateId === templateId);
+    const isTemplateComplete = templateSpecificSlots.every(s => s.photoId);
+    
+    if (isTemplateComplete) {
+      console.log('✅ Template completed via photo replace, queueing sync:', templateId);
+      templateSyncService.queueTemplateSync(templateId, updatedSlots, photos);
+    }
+    
     // Direct manipulation - photo is immediately interactive via PhotoRenderer
     
     // Clear confirmation state
@@ -1084,6 +1094,18 @@ export default function PhotoSelectionScreen({
     // Force component to re-render by also updating a dummy counter
     console.log('🔧 FORCING COMPONENT RE-RENDER - Calling setTemplateSlots');
     setTemplateSlots(updatedSlots);
+    
+    // Check if template is complete and trigger sync
+    const templateId = updatedSlot?.templateId;
+    if (templateId) {
+      const templateSpecificSlots = updatedSlots.filter(s => s.templateId === templateId);
+      const isTemplateComplete = templateSpecificSlots.every(s => s.photoId);
+      
+      if (isTemplateComplete) {
+        console.log('✅ Template completed via apply button, queueing sync:', templateId);
+        templateSyncService.queueTemplateSync(templateId, updatedSlots, photos);
+      }
+    }
     
     // Force immediate re-render check
     const immediateCheck = () => {
