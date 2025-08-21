@@ -455,6 +455,15 @@ export default function PhotoSelectionScreen({
     }
   }, [photos]); // Removed favoritedPhotos dependency to avoid re-preloading on favorite changes
 
+  // Sync all completed templates on mount and when slots/photos change
+  useEffect(() => {
+    // Only sync if we have both slots and photos
+    if (templateSlots.length > 0 && photos.length > 0) {
+      console.log('🚀 Initial sync check for all completed templates');
+      syncAllCompletedTemplates(templateSlots);
+    }
+  }, []); // Only run once on mount
+
   // Load available templates
   useEffect(() => {
     const loadTemplates = async () => {
@@ -500,18 +509,8 @@ export default function PhotoSelectionScreen({
     );
     setTemplateSlots(updatedSlots);
     
-    // Find the template ID for this slot and check if template is complete
-    const slot = templateSlots.find(s => s.id === slotId);
-    if (slot) {
-      const templateId = slot.templateId;
-      const templateSpecificSlots = updatedSlots.filter(s => s.templateId === templateId);
-      const isTemplateComplete = templateSpecificSlots.every(s => s.photoId);
-      
-      if (isTemplateComplete) {
-        console.log('📐 Template transform updated, queueing sync:', templateId);
-        templateSyncService.queueTemplateSync(templateId, updatedSlots, photos);
-      }
-    }
+    // Sync ALL completed templates (transforms may affect multiple templates)
+    syncAllCompletedTemplates(updatedSlots);
   };
 
 
@@ -669,6 +668,42 @@ export default function PhotoSelectionScreen({
   // New workflow handlers
   
   // Photo-first workflow
+  // Helper function to sync ALL completed templates
+  const syncAllCompletedTemplates = (slots: TemplateSlot[]) => {
+    // Get all unique template IDs
+    const templateIds = new Set(slots.map(s => s.templateId));
+    console.log('🔍 Checking ALL templates for completion:', {
+      totalTemplates: templateIds.size,
+      templateIds: Array.from(templateIds)
+    });
+    
+    let completedCount = 0;
+    let syncedTemplates: string[] = [];
+    
+    // Check each template for completion
+    templateIds.forEach(templateId => {
+      const templateSpecificSlots = slots.filter(s => s.templateId === templateId);
+      const isComplete = templateSpecificSlots.length > 0 && 
+                        templateSpecificSlots.every(s => s.photoId);
+      
+      if (isComplete) {
+        completedCount++;
+        syncedTemplates.push(templateId);
+        console.log(`✅ Template ${templateId} is complete (${templateSpecificSlots.length} slots filled)`);
+        templateSyncService.queueTemplateSync(templateId, slots, photos);
+      } else {
+        const filledSlots = templateSpecificSlots.filter(s => s.photoId).length;
+        console.log(`⏸️ Template ${templateId} is incomplete (${filledSlots}/${templateSpecificSlots.length} slots filled)`);
+      }
+    });
+    
+    console.log('📊 Sync summary:', {
+      totalTemplates: templateIds.size,
+      completedTemplates: completedCount,
+      syncedTemplateIds: syncedTemplates
+    });
+  };
+
   const handlePhotoClick = (photo: Photo) => {
     console.log('🔧 PHOTO CLICK DEBUG:', {
       photoId: photo.id,
@@ -717,6 +752,9 @@ export default function PhotoSelectionScreen({
           });
           setTemplateSlots(updatedSlots);
           
+          // Sync ALL completed templates
+          syncAllCompletedTemplates(updatedSlots);
+          
           // Direct manipulation - photos are immediately interactive
           setIsSelectingPhoto(false); // Close expanded favorites bar
           
@@ -738,6 +776,9 @@ export default function PhotoSelectionScreen({
             return s;
           });
           setTemplateSlots(updatedSlots);
+          
+          // Sync ALL completed templates
+          syncAllCompletedTemplates(updatedSlots);
           
           setIsSelectingPhoto(false);
           // Photos are now immediately interactive via PhotoRenderer
@@ -837,6 +878,9 @@ export default function PhotoSelectionScreen({
     
     setTemplateSlots(updatedSlots);
     
+    // Sync ALL completed templates
+    syncAllCompletedTemplates(updatedSlots);
+    
     // Direct manipulation - no mode switching needed
     // Photo is now immediately interactive via PhotoRenderer
     
@@ -876,15 +920,8 @@ export default function PhotoSelectionScreen({
     
     setTemplateSlots(updatedSlots);
     
-    // Check if template is complete and trigger sync
-    const templateId = slot.templateId;
-    const templateSpecificSlots = updatedSlots.filter(s => s.templateId === templateId);
-    const isTemplateComplete = templateSpecificSlots.every(s => s.photoId);
-    
-    if (isTemplateComplete) {
-      console.log('✅ Template completed via photo replace, queueing sync:', templateId);
-      templateSyncService.queueTemplateSync(templateId, updatedSlots, photos);
-    }
+    // Sync ALL completed templates
+    syncAllCompletedTemplates(updatedSlots);
     
     // Direct manipulation - photo is immediately interactive via PhotoRenderer
     
@@ -1095,17 +1132,8 @@ export default function PhotoSelectionScreen({
     console.log('🔧 FORCING COMPONENT RE-RENDER - Calling setTemplateSlots');
     setTemplateSlots(updatedSlots);
     
-    // Check if template is complete and trigger sync
-    const templateId = updatedSlot?.templateId;
-    if (templateId) {
-      const templateSpecificSlots = updatedSlots.filter(s => s.templateId === templateId);
-      const isTemplateComplete = templateSpecificSlots.every(s => s.photoId);
-      
-      if (isTemplateComplete) {
-        console.log('✅ Template completed via apply button, queueing sync:', templateId);
-        templateSyncService.queueTemplateSync(templateId, updatedSlots, photos);
-      }
-    }
+    // Sync ALL completed templates
+    syncAllCompletedTemplates(updatedSlots);
     
     // Force immediate re-render check
     const immediateCheck = () => {
