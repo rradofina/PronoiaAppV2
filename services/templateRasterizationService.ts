@@ -73,28 +73,40 @@ class TemplateRasterizationService {
     };
 
     try {
-      // Use the correct dimensions for the print size with proper DPI
-      const expectedDimensions = getPrintSizeDimensions(template.print_size);
-      let canvasWidth = expectedDimensions.width;
-      let canvasHeight = expectedDimensions.height;
+      // Get dimensions - prefer PNG's actual dimensions over standard print sizes
+      let canvasWidth: number;
+      let canvasHeight: number;
+      
+      if (template.drive_file_id) {
+        // Use PNG's actual dimensions for pixel-perfect export
+        const pngDimensions = await this.getPngNaturalDimensions(template.drive_file_id);
+        if (pngDimensions) {
+          canvasWidth = pngDimensions.width;
+          canvasHeight = pngDimensions.height;
+          console.log('📐 Using PNG natural dimensions:', pngDimensions);
+        } else {
+          // Fallback to standard print dimensions if PNG dimensions can't be determined
+          const expectedDimensions = getPrintSizeDimensions(template.print_size);
+          canvasWidth = expectedDimensions.width;
+          canvasHeight = expectedDimensions.height;
+          console.log('⚠️ Using fallback print dimensions:', expectedDimensions);
+        }
+      } else {
+        // No PNG, use standard print dimensions
+        const expectedDimensions = getPrintSizeDimensions(template.print_size);
+        canvasWidth = expectedDimensions.width;
+        canvasHeight = expectedDimensions.height;
+        console.log('📐 Using standard print dimensions (no PNG):', expectedDimensions);
+      }
       
       // Log dimension information for debugging
-      console.log('📐 Template dimensions:', {
+      console.log('📐 Final canvas dimensions:', {
+        width: canvasWidth,
+        height: canvasHeight,
         printSize: template.print_size,
-        expectedDimensions: expectedDimensions,
         storedDimensions: template.dimensions,
         dpi: settings.dpi
       });
-      
-      // If PNG has different dimensions, we'll scale it to match expected dimensions
-      if (template.drive_file_id) {
-        const pngDimensions = await this.getPngNaturalDimensions(template.drive_file_id);
-        if (pngDimensions) {
-          console.log('🖼️ PNG natural dimensions:', pngDimensions);
-          // We keep the expected dimensions to ensure proper DPI
-          // The PNG will be scaled to fit during drawTemplateBackground
-        }
-      }
       
       this.initializeCanvas(canvasWidth, canvasHeight);
       if (!this.canvas || !this.ctx) {
@@ -173,24 +185,20 @@ class TemplateRasterizationService {
       console.log('🔗 Loading PNG template from:', pngUrl);
       const img = await this.loadImage(pngUrl);
       
-      // Scale the PNG to fit the expected canvas dimensions (for proper DPI)
-      const scaleX = this.canvas.width / img.width;
-      const scaleY = this.canvas.height / img.height;
-      
-      // Store the scale for coordinate transformation
-      this.templateScale = Math.min(scaleX, scaleY);
+      // Since canvas is now sized to match PNG, we draw at 1:1 scale
+      // This ensures pixel-perfect template export
+      this.templateScale = 1;
       this.templateOffsetX = 0;
       this.templateOffsetY = 0;
       
-      console.log('🎨 Scaling PNG to match print size dimensions:', {
+      console.log('🎨 Drawing PNG at natural size (1:1 scale):', {
         pngSize: { width: img.width, height: img.height },
         canvasSize: { width: this.canvas.width, height: this.canvas.height },
-        scaleFactors: { x: scaleX.toFixed(3), y: scaleY.toFixed(3) },
-        finalScale: this.templateScale.toFixed(3)
+        scale: this.templateScale
       });
       
-      // Draw the PNG scaled to fill the canvas (maintaining expected dimensions)
-      this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+      // Draw the PNG at its natural size (1:1 pixel mapping)
+      this.ctx.drawImage(img, 0, 0);
     } catch (error) {
       console.warn('⚠️ Failed to load template background, continuing without it:', error);
     }
