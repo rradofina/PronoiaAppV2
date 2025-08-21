@@ -32,6 +32,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Commit: `f2be5d1`
   - Impact: All completed templates now properly sync to drafts folder
 
+- **Template Export Dimensions Mismatch**: Exported templates now use PNG's actual dimensions
+  - Root Cause: Canvas was forced to standard print sizes (1200x1800, etc.) regardless of PNG dimensions
+  - Solution: Use PNG's natural dimensions for pixel-perfect export
+  - Implementation:
+    - Canvas sized to match PNG template exactly
+    - PNG drawn at 1:1 scale without stretching
+    - Fallback to standard dimensions only when PNG unavailable
+  - Files Modified: `services/templateRasterizationService.ts`
+  - Commit: `9189269`
+  - Impact: Exported templates now match exact pixel dimensions of uploaded PNG templates
+
 ### Added
 - **Real-Time Template Sync to Google Drive**: Templates automatically upload to Drive as they're completed
   - New Service: `services/templateSyncService.ts` - Manages background sync with debouncing and queue
