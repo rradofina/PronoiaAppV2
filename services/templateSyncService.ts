@@ -41,6 +41,8 @@ class TemplateSyncService {
   private MAX_RETRIES = 3;
   private isUserInteracting: boolean = false; // Track if user is actively interacting
   private YIELD_DELAY = 100; // ms to yield between syncs for UI responsiveness
+  private PARALLEL_BATCH_SIZE = 2; // Process 2 templates at once for balanced performance
+  private activeOperations = 0; // Track active parallel operations
   private existingFiles: Map<string, string> = new Map(); // Map template ID to Drive file ID
   private isInitialized: boolean = false; // Track initialization state
 
@@ -216,7 +218,7 @@ class TemplateSyncService {
   }
 
   /**
-   * Process upload queue
+   * Process upload queue with parallel batch processing
    */
   private async processUploadQueue(): Promise<void> {
     if (this.isProcessing || this.uploadQueue.length === 0) {
@@ -224,39 +226,87 @@ class TemplateSyncService {
     }
     
     this.isProcessing = true;
+    console.log(`🚀 Starting parallel sync processing with batch size ${this.PARALLEL_BATCH_SIZE}`);
     
     while (this.uploadQueue.length > 0) {
-      const item = this.uploadQueue.shift();
-      if (!item) break;
-      
-      // If user is interacting, pause processing
+      // If user is interacting, pause all processing
       if (this.isUserInteracting) {
         console.log('⏸️ Pausing sync - user is interacting');
-        this.uploadQueue.unshift(item); // Put item back at front
-        await new Promise(resolve => setTimeout(resolve, 500)); // Wait longer
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for interaction to complete
         continue;
       }
       
+      // Take a batch of templates to process in parallel
+      const batchSize = Math.min(this.PARALLEL_BATCH_SIZE, this.uploadQueue.length);
+      const batch = this.uploadQueue.splice(0, batchSize);
+      
+      console.log(`📦 Processing batch of ${batch.length} templates in parallel`);
+      this.activeOperations = batch.length;
+      
       try {
-        await this.syncTemplate(item);
+        // Process batch in parallel using Promise.allSettled to handle individual failures
+        const results = await Promise.allSettled(
+          batch.map(async (item) => {
+            // Check user interaction before starting each template
+            if (this.isUserInteracting) {
+              throw new Error('User interaction detected, deferring sync');
+            }
+            return this.syncTemplate(item);
+          })
+        );
         
-        // Yield to UI after each sync to prevent blocking
-        await this.yieldToUI();
+        // Handle results and retry failed items
+        results.forEach((result, index) => {
+          const item = batch[index];
+          
+          if (result.status === 'rejected') {
+            const error = result.reason;
+            console.error('❌ Failed to sync template:', item.templateId, error);
+            
+            // Check if it was due to user interaction
+            if (error?.message?.includes('User interaction detected')) {
+              // Put back at front of queue for immediate retry
+              this.uploadQueue.unshift(item);
+            } else {
+              // Normal retry logic for other failures
+              if (item.retryCount < this.MAX_RETRIES) {
+                item.retryCount++;
+                console.log('🔄 Retrying sync:', item.templateId, 'Attempt:', item.retryCount);
+                this.uploadQueue.push(item); // Add back to end of queue
+              } else {
+                this.updateSyncState(item.templateId, 'error', `Failed after ${this.MAX_RETRIES} retries`);
+              }
+            }
+          } else {
+            console.log('✅ Successfully synced in batch:', item.templateId);
+          }
+        });
         
       } catch (error) {
-        console.error('❌ Failed to sync template:', item.templateId, error);
-        
-        // Retry logic
-        if (item.retryCount < this.MAX_RETRIES) {
-          item.retryCount++;
-          console.log('🔄 Retrying sync:', item.templateId, 'Attempt:', item.retryCount);
-          this.uploadQueue.push(item); // Add back to end of queue
-        } else {
-          this.updateSyncState(item.templateId, 'error', `Failed after ${this.MAX_RETRIES} retries`);
-        }
+        // This shouldn't happen with allSettled, but handle just in case
+        console.error('❌ Batch processing error:', error);
+        // Put all items back for retry
+        batch.forEach(item => {
+          if (item.retryCount < this.MAX_RETRIES) {
+            item.retryCount++;
+            this.uploadQueue.push(item);
+          }
+        });
+      }
+      
+      this.activeOperations = 0;
+      
+      // Yield to UI after each batch to prevent blocking
+      await this.yieldToUI();
+      
+      // Additional pause if user started interacting during batch
+      if (this.isUserInteracting) {
+        console.log('⏸️ User interaction detected after batch, pausing...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
     
+    console.log('✅ Parallel sync processing complete');
     this.isProcessing = false;
   }
 
@@ -322,6 +372,11 @@ class TemplateSyncService {
       const printDimensions = getPrintSizeDimensions(manualTemplate.print_size);
       const dpi = printDimensions.dpi || 300;
       
+      // Check user interaction before heavy rasterization
+      if (this.isUserInteracting) {
+        throw new Error('User interaction detected, deferring sync');
+      }
+      
       // Rasterize the template - use lower quality for drafts to speed up processing
       console.log('🎨 Starting rasterization for template:', manualTemplate.name);
       const rasterized = await templateRasterizationService.rasterizeTemplate(
@@ -336,6 +391,11 @@ class TemplateSyncService {
         }
       );
       
+      // Check user interaction after rasterization
+      if (this.isUserInteracting) {
+        throw new Error('User interaction detected, deferring sync');
+      }
+      
       // Validate blob
       if (!rasterized.blob) {
         throw new Error('Rasterization failed - no blob returned');
@@ -349,16 +409,37 @@ class TemplateSyncService {
       const existingFileId = this.syncStates.get(templateId)?.driveFileId || this.existingFiles.get(templateId);
       
       if (existingFileId) {
-        // Update existing file
+        // Try to update existing file
         console.log('📝 Updating existing file:', fileName);
-        await googleDriveService.updateFile(
-          existingFileId,
-          rasterized.blob,
-          fileName,
-          'image/jpeg'
-        );
-        // Update sync state with existing file ID
-        this.updateSyncState(templateId, 'synced', undefined, existingFileId);
+        try {
+          await googleDriveService.updateFile(
+            existingFileId,
+            rasterized.blob,
+            fileName,
+            'image/jpeg'
+          );
+          // Update sync state with existing file ID
+          this.updateSyncState(templateId, 'synced', undefined, existingFileId);
+        } catch (updateError: any) {
+          // Check if file was deleted from Drive
+          if (updateError.message && updateError.message.includes('File not found')) {
+            console.log('⚠️ File not found in Drive, uploading as new file:', fileName);
+            // File was deleted, upload as new
+            const fileId = await googleDriveService.uploadFile(
+              rasterized.blob,
+              fileName,
+              this.printsFolderId!,
+              'image/jpeg'
+            );
+            console.log('📁 New file uploaded with ID:', fileId);
+            this.updateSyncState(templateId, 'synced', undefined, fileId);
+            // Update tracking with new file ID
+            this.existingFiles.set(templateId, fileId);
+          } else {
+            // Re-throw other errors
+            throw updateError;
+          }
+        }
       } else {
         // Upload new file
         console.log('📤 Uploading new file:', fileName);

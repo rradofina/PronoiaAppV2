@@ -157,8 +157,8 @@ function PhotoRenderer({
       : createPhotoTransform(1, 0.5, 0.5) // Default: fit scale, centered
   );
   
-  // Auto-snap state for smooth zoom corrections
-  const [isSnapping, setIsSnapping] = useState(false);
+  // Auto-snap state removed - no longer needed after fixing flashing issue
+  // Previously used for animation, but caused flashing due to multiple renders
   
   // Interaction state tracking for UI hiding
   const [isInteracting, setIsInteracting] = useState(false);
@@ -956,33 +956,22 @@ function PhotoRenderer({
         
         if (transformsAreDifferent) {
           console.log('⚙️ EXECUTING TRANSFORM CHANGE...');
-          console.log('🎬 Starting smooth animation to close gaps');
+          console.log('🎬 Applying auto-snap movement immediately');
           
-          // First, enable the animation transition
-          setIsSnapping(true);
+          // Apply transform immediately without animation states to prevent flashing
+          setCurrentTransform(finalizedTransform);
           
-          // Use requestAnimationFrame to ensure the transition is applied before the transform changes
-          // This forces React to render with isSnapping=true first, then apply the new transform
-          requestAnimationFrame(() => {
-            console.log('🎯 Applying new transform with animation');
-            setCurrentTransform(finalizedTransform);
-            
-            if (onTransformChange) {
-              console.log('📡 Calling onTransformChange callback...');
-              onTransformChange(finalizedTransform);
-              console.log('✅ Callback executed');
-            } else {
-              console.log('⚠️ No onTransformChange callback provided');
-            }
-          });
+          if (onTransformChange) {
+            console.log('📡 Calling onTransformChange callback...');
+            onTransformChange(finalizedTransform);
+            console.log('✅ Callback executed');
+          } else {
+            console.log('⚠️ No onTransformChange callback provided');
+          }
           
-          // Wait for animation to complete before resolving
-          setTimeout(() => {
-            setIsSnapping(false);
-            console.log('✅ FINALIZATION COMPLETE - Animation finished');
-            if (debug) console.log('✅ Gap-based finalization complete');
-            resolve(finalizedTransform);
-          }, 450); // Slightly longer than animation duration to ensure completion
+          console.log('✅ FINALIZATION COMPLETE - Transform applied');
+          if (debug) console.log('✅ Gap-based finalization complete');
+          resolve(finalizedTransform);
         } else {
           console.log('ℹ️ NO CHANGE: Transforms are identical, resolving with current');
           resolve(currentTransform);
@@ -1392,7 +1381,6 @@ function PhotoRenderer({
     if (debug) {
       console.log(`📸 PhotoRenderer INTERACTIVE applying currentTransform for ${photoAlt}:`, {
         currentTransform,
-        isSnapping,
         isDragging,
         isTouching,
         previewMode
@@ -1637,7 +1625,7 @@ function PhotoRenderer({
     interactive,
     isDragging,
     isTouching,
-    isSnapping,
+    isSnapping: false, // Always false now - animation removed to fix flashing
     calculateMathematicalGaps,
     calculateGapBasedMovement,
     hasRecentUserInteraction,

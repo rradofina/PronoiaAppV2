@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Auto-Snap Flashing Issue**: Eliminated visual flashing during auto-snap photo positioning
+  - Root Cause: Multiple sequential state updates with requestAnimationFrame causing 3 separate renders
+  - Solution: Removed requestAnimationFrame and isSnapping state, apply transform immediately
+  - Implementation:
+    - Direct transform application without intermediate animation states
+    - Single render cycle instead of multiple sequential renders
+    - Removed unused isSnapping state that was causing extra re-renders
+  - Files Modified: `components/PhotoRenderer.tsx`
+  - Impact: Auto-snap now happens instantly without visible flashing or flickering
+
+- **Template Sync File Not Found Error**: Fixed crash when syncing templates that were deleted from Google Drive
+  - Root Cause: Sync service stored file IDs from previous sessions but files were deleted from Drive
+  - Solution: Gracefully handle 404 errors by re-uploading as new files
+  - Implementation:
+    - Wrap updateFile call in try-catch block
+    - Detect "File not found" error message
+    - Fall back to uploading as new file when original is missing
+    - Update tracking with new file ID
+  - Files Modified: `services/templateSyncService.ts`
+  - Impact: Sync no longer crashes when encountering deleted files, automatically re-uploads them
+
 ### Changed
 - **Photo Upload Performance**: Implemented parallel batch processing for photo finalization
   - Previously: Sequential processing (one photo at a time) - slow for many photos
