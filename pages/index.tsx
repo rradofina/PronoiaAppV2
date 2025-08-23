@@ -871,30 +871,59 @@ export default function Home() {
 
       let uploadedCount = 0;
       const errors: string[] = [];
+      const PARALLEL_BATCH_SIZE = 5; // Process 5 photos simultaneously
 
-      // Copy each favorited photo to the prints folder
-      for (const photo of favoritedPhotos) {
-        try {
-          console.log(`📤 Copying photo: ${photo.name}`);
-          setUploadProgress({ 
-            current: uploadedCount, 
-            total: favoritedPhotos.length, 
-            templateName: `Uploading: ${photo.name}` 
-          });
+      // Process photos in parallel batches
+      for (let i = 0; i < favoritedPhotos.length; i += PARALLEL_BATCH_SIZE) {
+        const batch = favoritedPhotos.slice(i, i + PARALLEL_BATCH_SIZE);
+        console.log(`📦 Processing batch ${Math.floor(i/PARALLEL_BATCH_SIZE) + 1}/${Math.ceil(favoritedPhotos.length/PARALLEL_BATCH_SIZE)} (${batch.length} photos)`);
+        
+        // Update progress with batch info
+        setUploadProgress({ 
+          current: uploadedCount, 
+          total: favoritedPhotos.length, 
+          templateName: `Uploading batch: ${batch.map(p => p.name.split('.')[0]).join(', ')}` 
+        });
 
-          // Copy the file to the prints folder
-          await googleDriveService.copyFile(
-            photo.googleDriveId || photo.id,
-            folderId
-          );
+        // Process batch in parallel
+        const batchResults = await Promise.allSettled(
+          batch.map(async (photo) => {
+            console.log(`📤 Copying photo: ${photo.name}`);
+            
+            try {
+              // Copy the file to the prints folder
+              await googleDriveService.copyFile(
+                photo.googleDriveId || photo.id,
+                folderId
+              );
+              
+              console.log(`✅ Uploaded: ${photo.name}`);
+              return { success: true, photo };
+            } catch (error) {
+              console.error(`❌ Failed to copy photo ${photo.name}:`, error);
+              return { success: false, photo, error };
+            }
+          })
+        );
 
-          uploadedCount++;
-          console.log(`✅ Uploaded: ${photo.name}`);
-
-        } catch (error) {
-          console.error(`❌ Failed to copy photo ${photo.name}:`, error);
-          errors.push(photo.name);
+        // Process batch results
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled' && result.value.success) {
+            uploadedCount++;
+          } else if (result.status === 'fulfilled' && !result.value.success) {
+            errors.push(result.value.photo.name);
+          } else if (result.status === 'rejected') {
+            // Handle unexpected rejection
+            console.error('❌ Unexpected error in batch processing:', result.reason);
+          }
         }
+
+        // Update progress after each batch
+        setUploadProgress({ 
+          current: uploadedCount, 
+          total: favoritedPhotos.length, 
+          templateName: `Uploaded ${uploadedCount}/${favoritedPhotos.length} photos` 
+        });
       }
 
       setUploadProgress(null);
