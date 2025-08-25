@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Template Layering Order**: Fixed templates appearing UNDER photos instead of ON TOP
+  - Root Cause: Incorrect rendering order - photos rendered/drawn after templates
+  - Solution: Reversed order to render photos first, then template overlay on top
+  - Implementation:
+    - PngTemplateVisual: Moved PNG `<img>` to render AFTER photo holes
+    - Added `z-10` and `pointer-events-none` classes to PNG overlay
+    - templateRasterizationService: Draw photos first, then PNG template on top
+  - Files Modified: `components/PngTemplateVisual.tsx`, `services/templateRasterizationService.ts`
+  - Impact: Templates now properly frame photos with decorative overlays visible
+  - Note: This fix was documented previously but never actually implemented until now
+
+### Fixed
 - **Auto-Snap Flashing Issue**: Eliminated visual flashing during auto-snap photo positioning
   - Root Cause: Multiple sequential state updates with requestAnimationFrame causing 3 separate renders
   - Solution: Removed requestAnimationFrame and isSnapping state, apply transform immediately

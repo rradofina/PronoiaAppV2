@@ -162,23 +162,7 @@ export default function PngTemplateVisual({
         maxHeight: '100%'
       }}
     >
-      {/* Background PNG Template */}
-      <img 
-        src={pngUrl}
-        alt={pngTemplate.name}
-        className={`absolute inset-0 w-full h-full ${isActiveTemplate ? 'object-contain' : 'object-cover'}`}
-        onLoad={() => {}}
-        onError={(e) => {
-          console.error('❌ PNG failed to load:', pngTemplate.name, pngUrl);
-          console.error('❌ Image error details:', e);
-        }}
-        style={{
-          backgroundColor: !isActiveTemplate ? 'transparent' : undefined
-        }}
-      />
-      
-      
-      {/* Photo Holes Overlay */}
+      {/* Photo Holes - Render FIRST so they appear BEHIND the template */}
       {pngTemplate.holes.map((hole, holeIndex) => {
         const slot = thisTemplateSlots[holeIndex];
         
@@ -504,6 +488,21 @@ export default function PngTemplateVisual({
           </div>
         );
       })}
+      
+      {/* PNG Template Overlay - Render LAST so it appears ON TOP of photos */}
+      <img 
+        src={pngUrl}
+        alt={pngTemplate.name}
+        className={`absolute inset-0 w-full h-full z-10 pointer-events-none ${isActiveTemplate ? 'object-contain' : 'object-cover'}`}
+        onLoad={() => {}}
+        onError={(e) => {
+          console.error('❌ PNG failed to load:', pngTemplate.name, pngUrl);
+          console.error('❌ Image error details:', e);
+        }}
+        style={{
+          backgroundColor: !isActiveTemplate ? 'transparent' : undefined
+        }}
+      />
     </div>
   );
 }

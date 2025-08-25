@@ -118,11 +118,13 @@ class TemplateRasterizationService {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       }
 
+      // Draw photos FIRST so they appear BEHIND the template
+      await this.drawPhotosInSlots(templateSlots, photos, template);
+
+      // Draw template LAST so it appears ON TOP of photos
       if (template.drive_file_id) {
         await this.drawTemplateBackground(template);
       }
-
-      await this.drawPhotosInSlots(templateSlots, photos, template);
 
       const blob = await this.canvasToBlob(settings.format, settings.quality);
       const fileName = this.generateFileName(template, settings);
