@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Auto-Snap Not Working**: Fixed auto-snap feature that stopped working after user interaction
+  - Root Cause: Missing `onInteractionEnd` prop in InlinePhotoEditor's PhotoRenderer
+  - Solution: Added `onInteractionEnd` callback to enable automatic gap detection and positioning
+  - Implementation: PhotoRenderer now properly triggers auto-snap after drag/zoom ends
+  - Files Modified: `components/InlinePhotoEditor.tsx` (lines 297-300)
+  - Impact: Auto-snap now works automatically when users release photos after dragging
+
+### Fixed
 - **Vercel Deployment Caching Issues**: Fixed stale content being served on tablets and browsers after new deployments
   - Root Cause: Aggressive service worker caching with static cache name and cache-first strategy for HTML/JS
   - Solution: Implemented comprehensive caching strategy overhaul

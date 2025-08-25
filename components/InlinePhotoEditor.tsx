@@ -294,6 +294,10 @@ export default function InlinePhotoEditor({
         finalizationRef={finalizationRef} // Pass ref for finalization method access
         onInteractionChange={handleInteractionChange} // Track interaction state
         onSmartReset={handleSmartReset} // Smart reset for intelligent photo repositioning
+        onInteractionEnd={(finalTransform) => {
+          // Update transform after auto-snap completes
+          setCurrentTransform(finalTransform);
+        }}
       />
       
       {/* Editing Controls Overlay - Commented out for direct manipulation
