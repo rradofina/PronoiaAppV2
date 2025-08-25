@@ -221,6 +221,18 @@ function TemplateSlot({
                 onInlineApply(slot, containerTransform);
               }
             }}
+            onInteractionEnd={(finalTransform) => {
+              // Save final transform after auto-snap
+              if (onInlineApply) {
+                console.log('🎯 Auto-snap complete in TemplateSlot');
+                const containerTransform: ContainerTransform = {
+                  scale: finalTransform.photoScale,
+                  x: (0.5 - finalTransform.photoCenterX) * 100,
+                  y: (0.5 - finalTransform.photoCenterY) * 100
+                };
+                onInlineApply(slot, containerTransform);
+              }
+            }}
           />
           
           {/* Inline Editor - Commented out, using direct manipulation instead
