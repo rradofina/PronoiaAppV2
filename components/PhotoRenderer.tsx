@@ -1500,7 +1500,6 @@ function PhotoRenderer({
       
       // Track user interaction and call end handler
       trackUserInteraction('touch-end');
-      handleInteractionEnd();
       setLastPointer(null);
       setLastTouchDistance(0);
       handleInteractionEnd();
