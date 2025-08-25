@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Template Change Button Not Working**: Fixed issue where clicking "Change Template" in package selection screen had no effect
+  - Root Cause: Missing `onTemplateReplace` callback prop in PackageSelectionScreen component
+  - Solution: Added `onTemplateReplace` handler that updates the templates array at the specified index
+  - Files Modified: `components/screens/PackageSelectionScreen.tsx` (lines 126-132)
+  - Impact: Users can now successfully change templates within their selected package
+
 - **Template Layering Order**: Fixed templates appearing UNDER photos instead of ON TOP
   - Root Cause: Incorrect rendering order - photos rendered/drawn after templates
   - Solution: Reversed order to render photos first, then template overlay on top

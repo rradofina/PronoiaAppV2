@@ -123,6 +123,13 @@ export default function PackageSelectionScreen({
               onChangePackage={handleBack}
               availablePhotos={photos}
               loading={isLoadingTemplates}
+              onTemplateReplace={(packageId, templateIndex, newTemplate) => {
+                // Replace the template at the specified index
+                const updatedTemplates = [...templates];
+                updatedTemplates[templateIndex] = newTemplate;
+                setTemplates(updatedTemplates);
+                console.log('✅ Template replaced at index:', templateIndex, 'with:', newTemplate.name);
+              }}
               onTemplateAdd={(template) => {
                 // Add the new template to the list
                 const newTemplates = [...templates, template];
