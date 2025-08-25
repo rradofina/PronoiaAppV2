@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Vercel Deployment Caching Issues**: Fixed stale content being served on tablets and browsers after new deployments
+  - Root Cause: Aggressive service worker caching with static cache name and cache-first strategy for HTML/JS
+  - Solution: Implemented comprehensive caching strategy overhaul
+  - Implementation:
+    - Service Worker: Dynamic cache versioning with timestamp, network-first for HTML/JS
+    - Next.js: Added cache-control headers to prevent HTML caching
+    - Vercel: Created vercel.json with proper edge caching configuration
+    - Auto-reload: Service worker now auto-reloads page when new version detected
+  - Files Modified: 
+    - `public/service-worker.js` - Dynamic cache versioning and network-first strategy
+    - `next.config.js` - Cache-control headers for different resource types
+    - `vercel.json` (new) - Vercel-specific cache configuration
+    - `components/ServiceWorkerRegistration.tsx` - Auto-reload on update
+  - Impact: New deployments are immediately visible on all devices, no more stale content
+  - Note: Authentication persistence preserved via localStorage (unaffected by cache changes)
+
+### Fixed
 - **Template Change Button Not Working**: Fixed issue where clicking "Change Template" in package selection screen had no effect
   - Root Cause: Missing `onTemplateReplace` callback prop in PackageSelectionScreen component
   - Solution: Added `onTemplateReplace` handler that updates the templates array at the specified index

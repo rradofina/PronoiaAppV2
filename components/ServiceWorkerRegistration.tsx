@@ -23,8 +23,14 @@ export default function ServiceWorkerRegistration() {
               if (newWorker) {
                 newWorker.addEventListener('statechange', () => {
                   if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    // New service worker available, prompt for update
-                    logger.info('SERVICE_WORKER', 'New content available; please refresh.');
+                    // New service worker available
+                    logger.info('SERVICE_WORKER', 'New version detected, reloading page...');
+                    
+                    // Auto-reload page to get fresh content
+                    // Small delay to ensure service worker is ready
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 1000);
                   }
                 });
               }
