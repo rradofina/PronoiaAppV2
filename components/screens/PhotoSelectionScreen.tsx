@@ -1792,6 +1792,8 @@ export default function PhotoSelectionScreen({
           <div className="bg-white border-b p-2 sm:p-3 flex items-center justify-between layout-header">
             <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
               <h2 className="text-sm sm:text-base font-medium text-gray-800">
+                <span className="text-blue-600">{clientName}</span>
+                <span className="mx-1 text-gray-400">•</span>
                 {selectionMode === 'photo' ? 'Select Your Favorite Photos' : 'Fill Your Print Templates'}
               </h2>
               <div className="text-xs sm:text-sm text-gray-600">
