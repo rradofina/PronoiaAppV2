@@ -820,6 +820,11 @@ function PhotoRenderer({
     return new Promise(async (resolve) => {
       const performFinalization = async () => {
         console.log('🚀 FINALIZATION STARTED - Checkmark clicked');
+        console.log('[MOBILE DEBUG] finalizePositioning', {
+          isMobile: /iPhone|iPad|Android/i.test(navigator.userAgent),
+          viewport: window.innerWidth,
+          currentTransform: currentTransformRef.current
+        });
         console.log('✅ PROCEEDING: Auto-snap executes regardless of recent interaction');
         
         // Detect gaps using accurate measurement
@@ -987,7 +992,18 @@ function PhotoRenderer({
 
   // Define handleInteractionEnd and assign to ref
   useEffect(() => {
+    console.log('[MOBILE DEBUG] Setting handleInteractionEndRef.current:', {
+      hasOnInteractionEnd: !!onInteractionEnd,
+      isMobile: /iPhone|iPad|Android/i.test(navigator.userAgent),
+      viewport: window.innerWidth
+    });
+    
     handleInteractionEndRef.current = async () => {
+      console.log('[MOBILE DEBUG] handleInteractionEnd called!', {
+        hasOnInteractionEnd: !!onInteractionEnd,
+        currentTransform: currentTransform
+      });
+      
       // Clear any existing timeout
       if (interactionTimeoutRef.current) {
         clearTimeout(interactionTimeoutRef.current);
@@ -1000,9 +1016,11 @@ function PhotoRenderer({
       
       // Immediate auto-snap without delay to prevent flashing
       if (onInteractionEnd) {
+        console.log('[MOBILE DEBUG] Calling finalizePositioning for auto-snap');
         try {
           // Call finalization immediately to detect gaps and apply auto-snap
           finalizePositioning().then(finalizedTransform => {
+            console.log('[MOBILE DEBUG] Auto-snap finalized:', finalizedTransform);
             onInteractionEnd(finalizedTransform);
           }).catch(error => {
             console.error('❌ Auto-snap finalization failed:', error);
@@ -1012,6 +1030,8 @@ function PhotoRenderer({
           console.error('❌ Auto-snap finalization failed:', error);
           onInteractionEnd(currentTransform);
         }
+      } else {
+        console.warn('[MOBILE DEBUG] No onInteractionEnd callback provided!');
       }
     };
   }, [onInteractionChange, onInteractionEnd, currentTransform, finalizePositioning, setIsInteracting]);
@@ -1411,6 +1431,12 @@ function PhotoRenderer({
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!interactive) return;
     
+    console.log('[MOBILE DEBUG] Touch start event', {
+      touches: e.touches.length,
+      hasInteractionEndRef: !!handleInteractionEndRef.current,
+      viewport: window.innerWidth
+    });
+    
     // Prevent browser zoom/scroll for all interactive touches
     e.preventDefault();
     e.stopPropagation();
@@ -1504,8 +1530,20 @@ function PhotoRenderer({
       trackUserInteraction('touch-end');
       setLastPointer(null);
       setLastTouchDistance(0);
+      
+      // Debug logging for mobile auto-snap
+      console.log('[MOBILE DEBUG] Touch end - checking handleInteractionEndRef:', {
+        hasRef: !!handleInteractionEndRef.current,
+        isMobile: /iPhone|iPad|Android/i.test(navigator.userAgent),
+        viewport: window.innerWidth,
+        transform: currentTransformRef.current
+      });
+      
       if (handleInteractionEndRef.current) {
+        console.log('[MOBILE DEBUG] Calling handleInteractionEndRef.current()');
         handleInteractionEndRef.current();
+      } else {
+        console.error('[MOBILE DEBUG] handleInteractionEndRef.current is null!');
       }
       
       // No auto-corrections - user has complete control over positioning

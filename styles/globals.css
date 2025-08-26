@@ -21,13 +21,23 @@ input, textarea {
   user-select: text;
 }
 
-/* Prevent image dragging */
+/* Prevent image dragging except for draggable elements */
 img {
   -webkit-user-drag: none;
   -khtml-user-drag: none;
   -moz-user-drag: none;
   -o-user-drag: none;
   user-drag: none;
+}
+
+/* Allow dragging for elements explicitly marked as draggable */
+[draggable="true"] {
+  -webkit-user-drag: element !important;
+  -khtml-user-drag: element !important;
+  -moz-user-drag: element !important;
+  -o-user-drag: element !important;
+  user-drag: element !important;
+  cursor: move;
 }
 
 /* Animation classes for photo selection mode */
