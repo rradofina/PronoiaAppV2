@@ -157,6 +157,9 @@ function PhotoRenderer({
       : createPhotoTransform(1, 0.5, 0.5) // Default: fit scale, centered
   );
   
+  // Ref to always have the latest transform value (fixes mobile auto-snap stale closure issue)
+  const currentTransformRef = useRef<PhotoTransform>(currentTransform);
+  
   // Auto-snap state removed - no longer needed after fixing flashing issue
   // Previously used for animation, but caused flashing due to multiple renders
   
@@ -642,8 +645,8 @@ function PhotoRenderer({
     if (!imageRef.current || !containerRef.current) {
       return {
         action: 'none',
-        newCenterX: currentTransform.photoCenterX,
-        newCenterY: currentTransform.photoCenterY,
+        newCenterX: currentTransformRef.current.photoCenterX,
+        newCenterY: currentTransformRef.current.photoCenterY,
         movements: { horizontal: 'no change', vertical: 'no change' }
       };
     }
@@ -665,8 +668,8 @@ function PhotoRenderer({
     if (gapCount === 0) {
       return {
         action: 'none',
-        newCenterX: currentTransform.photoCenterX,
-        newCenterY: currentTransform.photoCenterY,
+        newCenterX: currentTransformRef.current.photoCenterX,
+        newCenterY: currentTransformRef.current.photoCenterY,
         movements: { horizontal: 'no change', vertical: 'no change' }
       };
     }
@@ -703,8 +706,8 @@ function PhotoRenderer({
           gap: gaps.left,
           containerWidth: containerRect.width,
           movement: horizontalMovement,
-          currentPhotoCenterX: currentTransform.photoCenterX,
-          newPhotoCenterX: currentTransform.photoCenterX + horizontalMovement,
+          currentPhotoCenterX: currentTransformRef.current.photoCenterX,
+          newPhotoCenterX: currentTransformRef.current.photoCenterX + horizontalMovement,
           expectedTranslateChange: `${-(horizontalMovement * 100).toFixed(1)}%`
         });
       }
@@ -720,8 +723,8 @@ function PhotoRenderer({
           gap: gaps.right,
           containerWidth: containerRect.width,
           movement: horizontalMovement,
-          currentPhotoCenterX: currentTransform.photoCenterX,
-          newPhotoCenterX: currentTransform.photoCenterX + horizontalMovement,
+          currentPhotoCenterX: currentTransformRef.current.photoCenterX,
+          newPhotoCenterX: currentTransformRef.current.photoCenterX + horizontalMovement,
           expectedTranslateChange: `${-(horizontalMovement * 100).toFixed(1)}%`
         });
       }
@@ -750,8 +753,8 @@ function PhotoRenderer({
     };
     
     // Apply movements to current position (no artificial bounds - allow true edge positioning)
-    const newCenterX = currentTransform.photoCenterX + horizontalMovement;
-    const newCenterY = currentTransform.photoCenterY + verticalMovement;
+    const newCenterX = currentTransformRef.current.photoCenterX + horizontalMovement;
+    const newCenterY = currentTransformRef.current.photoCenterY + verticalMovement;
     
     // Post-snap validation: Check if the new position would result in 3+ gaps
     console.log('🔮 POST-SNAP VALIDATION: Checking if movement would create more gaps...');
@@ -837,7 +840,7 @@ function PhotoRenderer({
           if (debug) {
             console.log('✅ No significant gaps detected - no adjustment needed');
           }
-          resolve(currentTransform);
+          resolve(currentTransformRef.current);
           return;
         }
         
@@ -864,7 +867,7 @@ function PhotoRenderer({
           if (debug) {
             console.log('✅ No action needed - current position is acceptable');
           }
-          resolve(currentTransform);
+          resolve(currentTransformRef.current);
           return;
         }
         
@@ -974,7 +977,7 @@ function PhotoRenderer({
           resolve(finalizedTransform);
         } else {
           console.log('ℹ️ NO CHANGE: Transforms are identical, resolving with current');
-          resolve(currentTransform);
+          resolve(currentTransformRef.current);
         }
       };
 
@@ -983,7 +986,7 @@ function PhotoRenderer({
         requestAnimationFrame(performFinalization);
       });
     });
-  }, [currentTransform, detectGaps, calculateGapBasedMovement, onTransformChange, debug, hasRecentUserInteraction]);
+  }, [detectGaps, calculateGapBasedMovement, onTransformChange, debug, hasRecentUserInteraction]);
 
   // Define handleInteractionEnd as a stable callback
   const handleInteractionEnd = useCallback(async () => {
@@ -1005,10 +1008,10 @@ function PhotoRenderer({
         onInteractionEnd(finalizedTransform);
       } catch (error) {
         console.error('❌ Auto-snap finalization failed:', error);
-        onInteractionEnd(currentTransform);
+        onInteractionEnd(currentTransformRef.current);
       }
     }
-  }, [onInteractionChange, onInteractionEnd, currentTransform, finalizePositioning, setIsInteracting]);
+  }, [onInteractionChange, onInteractionEnd, finalizePositioning, setIsInteracting]);
 
   // Analyze image for clipping (overexposed/underexposed areas)
   const analyzeClipping = () => {
@@ -1124,6 +1127,11 @@ function PhotoRenderer({
     }
     // Don't update if it's the same photo in interactive mode - prevents feedback loops
   }, [interactive, transform, photoUrl, lastPhotoUrlForTransform, debug]);
+  
+  // Keep ref synchronized with state for use in callbacks (fixes mobile auto-snap)
+  useEffect(() => {
+    currentTransformRef.current = currentTransform;
+  }, [currentTransform]);
   
   // Helper function to determine if two URLs represent the same photo
   const isSamePhoto = useCallback((url1: string, url2: string): boolean => {
