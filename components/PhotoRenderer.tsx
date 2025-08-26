@@ -983,7 +983,7 @@ function PhotoRenderer({
         requestAnimationFrame(performFinalization);
       });
     });
-  }, [currentTransform, detectGaps, calculateGapBasedMovement, onTransformChange, debug, hasRecentUserInteraction, createPhotoTransform]);
+  }, [currentTransform, detectGaps, calculateGapBasedMovement, onTransformChange, debug, hasRecentUserInteraction]);
 
   // Define handleInteractionEnd as a stable callback
   const handleInteractionEnd = useCallback(async () => {
@@ -1123,7 +1123,7 @@ function PhotoRenderer({
       setLastPhotoUrlForTransform(photoUrl);
     }
     // Don't update if it's the same photo in interactive mode - prevents feedback loops
-  }, [interactive, transform, photoUrl, lastPhotoUrlForTransform, debug, createPhotoTransform]);
+  }, [interactive, transform, photoUrl, lastPhotoUrlForTransform, debug]);
   
   // Helper function to determine if two URLs represent the same photo
   const isSamePhoto = useCallback((url1: string, url2: string): boolean => {
