@@ -194,8 +194,8 @@ function PhotoRenderer({
     }
   }, [onInteractionChange]);
   
-  // Placeholder for handleInteractionEnd - will be defined after finalizePositioning
-  let handleInteractionEnd: () => void;
+  // Use ref for handleInteractionEnd to avoid closure issues with touch events
+  const handleInteractionEndRef = useRef<(() => void) | null>(null);
   
   // Check if user has recently interacted with photo (within last 3 seconds)
   const hasRecentUserInteraction = useCallback(() => {
@@ -985,34 +985,36 @@ function PhotoRenderer({
     });
   }, [currentTransform, detectGaps, calculateGapBasedMovement, onTransformChange, debug, hasRecentUserInteraction, createPhotoTransform]);
 
-  // Now define handleInteractionEnd after finalizePositioning is available
-  handleInteractionEnd = useCallback(async () => {
-    // Clear any existing timeout
-    if (interactionTimeoutRef.current) {
-      clearTimeout(interactionTimeoutRef.current);
-      interactionTimeoutRef.current = null;
-    }
-    
-    // Show UI immediately
-    setIsInteracting(false);
-    onInteractionChange?.(false);
-    
-    // Immediate auto-snap without delay to prevent flashing
-    if (onInteractionEnd) {
-      try {
-        // Call finalization immediately to detect gaps and apply auto-snap
-        finalizePositioning().then(finalizedTransform => {
-          onInteractionEnd(finalizedTransform);
-        }).catch(error => {
+  // Define handleInteractionEnd and assign to ref
+  useEffect(() => {
+    handleInteractionEndRef.current = async () => {
+      // Clear any existing timeout
+      if (interactionTimeoutRef.current) {
+        clearTimeout(interactionTimeoutRef.current);
+        interactionTimeoutRef.current = null;
+      }
+      
+      // Show UI immediately
+      setIsInteracting(false);
+      onInteractionChange?.(false);
+      
+      // Immediate auto-snap without delay to prevent flashing
+      if (onInteractionEnd) {
+        try {
+          // Call finalization immediately to detect gaps and apply auto-snap
+          finalizePositioning().then(finalizedTransform => {
+            onInteractionEnd(finalizedTransform);
+          }).catch(error => {
+            console.error('❌ Auto-snap finalization failed:', error);
+            onInteractionEnd(currentTransform);
+          });
+        } catch (error) {
           console.error('❌ Auto-snap finalization failed:', error);
           onInteractionEnd(currentTransform);
-        });
-      } catch (error) {
-        console.error('❌ Auto-snap finalization failed:', error);
-        onInteractionEnd(currentTransform);
+        }
       }
-    }
-  }, [onInteractionChange, onInteractionEnd, currentTransform, finalizePositioning]);
+    };
+  }, [onInteractionChange, onInteractionEnd, currentTransform, finalizePositioning, setIsInteracting]);
 
   // Analyze image for clipping (overexposed/underexposed areas)
   const analyzeClipping = () => {
@@ -1502,7 +1504,9 @@ function PhotoRenderer({
       trackUserInteraction('touch-end');
       setLastPointer(null);
       setLastTouchDistance(0);
-      handleInteractionEnd();
+      if (handleInteractionEndRef.current) {
+        handleInteractionEndRef.current();
+      }
       
       // No auto-corrections - user has complete control over positioning
     } else if (e.touches.length === 1) {
@@ -1572,7 +1576,9 @@ function PhotoRenderer({
     
     // Track user interaction
     trackUserInteraction('drag-end');
-    handleInteractionEnd();
+    if (handleInteractionEndRef.current) {
+      handleInteractionEndRef.current();
+    }
     
     // No auto-corrections - user has complete control over positioning
   };
