@@ -23,8 +23,9 @@ export default function App({ Component, pageProps }: AppProps) {
     // Selectively disable drag start - allow for draggable elements
     const handleDragStart = (e: DragEvent) => {
       const target = e.target as HTMLElement;
-      // Allow dragging if element has draggable="true" attribute
-      if (target.draggable === true) {
+      // Allow dragging if element has draggable attribute or is in favorites bar
+      // Check for draggable attribute or if it's a photo in the favorites bar
+      if (target.draggable || target.closest('[draggable]') || target.closest('.favorites-bar')) {
         return true;
       }
       // Prevent default dragging for other elements (non-draggable images, links, etc.)
