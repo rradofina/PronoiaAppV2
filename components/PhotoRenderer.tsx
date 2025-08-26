@@ -823,7 +823,7 @@ function PhotoRenderer({
         console.log('[MOBILE DEBUG] finalizePositioning', {
           isMobile: /iPhone|iPad|Android/i.test(navigator.userAgent),
           viewport: window.innerWidth,
-          currentTransform: currentTransformRef.current
+          currentTransform: currentTransform
         });
         console.log('✅ PROCEEDING: Auto-snap executes regardless of recent interaction');
         
@@ -1536,7 +1536,7 @@ function PhotoRenderer({
         hasRef: !!handleInteractionEndRef.current,
         isMobile: /iPhone|iPad|Android/i.test(navigator.userAgent),
         viewport: window.innerWidth,
-        transform: currentTransformRef.current
+        transform: currentTransform
       });
       
       if (handleInteractionEndRef.current) {
