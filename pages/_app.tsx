@@ -6,10 +6,44 @@ import { Toaster } from 'react-hot-toast';
 import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration';
 import { useViewportHeight } from '../hooks/useViewportHeight';
 import { AlertProvider } from '../contexts/AlertContext';
+import { useEffect } from 'react';
 
 export default function App({ Component, pageProps }: AppProps) {
   // Track viewport height for mobile browser compatibility
   useViewportHeight();
+  
+  // Disable unwanted browser interactions globally
+  useEffect(() => {
+    // Disable right-click context menu
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      return false;
+    };
+    
+    // Disable drag start for images and links
+    const handleDragStart = (e: DragEvent) => {
+      e.preventDefault();
+      return false;
+    };
+    
+    // Disable text selection on mobile long press
+    const handleTouchStart = (e: TouchEvent) => {
+      // Only prevent if it's a long press (handled by browser)
+      if (e.touches.length > 1) return; // Allow multi-touch
+    };
+    
+    // Add event listeners
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('dragstart', handleDragStart);
+    document.addEventListener('touchstart', handleTouchStart, { passive: false });
+    
+    // Cleanup on unmount
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('dragstart', handleDragStart);
+      document.removeEventListener('touchstart', handleTouchStart);
+    };
+  }, []);
   
   return (
     <>
