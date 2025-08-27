@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-27] - Autosnap Aspect Ratio Fix & Deployment Detection
+
+### Fixed
+- **Autosnap for Opposite Gaps**: Fixed autosnap not handling aspect ratio mismatches correctly
+  - Root Cause: When photo had gaps on opposite sides (left+right or top+bottom), autosnap would only move the photo instead of scaling it
+  - Solution: Detect opposite gaps and trigger smart reset with proper scaling instead of movement
+  - Implementation:
+    - Added detection for opposite horizontal gaps (left AND right)
+    - Added detection for opposite vertical gaps (top AND bottom)
+    - Opposite gaps now trigger reset-to-default action (same as 3+ gaps)
+    - Adjacent gaps (corners) continue to work with movement-only logic
+  - Files Modified: `components/PhotoRenderer.tsx` - Updated `calculateGapBasedMovement` function
+  - Impact: Photos now correctly fill slots regardless of aspect ratio differences
+  - Commit: Latest
+
 ## [2025-08-27] - Deployment Detection & Cache Management Fix
 
 ### Added

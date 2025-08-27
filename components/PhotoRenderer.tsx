@@ -515,8 +515,13 @@ function PhotoRenderer({
           significantGaps: { left: hasLeftGap, right: hasRightGap, top: hasTopGap, bottom: hasBottomGap },
           gapCount,
           threshold: GAP_THRESHOLD,
+          hasOppositeGaps: {
+            horizontal: hasLeftGap && hasRightGap,
+            vertical: hasTopGap && hasBottomGap
+          },
           action: gapCount >= 3 ? 'Reset to default' : 
-                 gapCount === 2 ? 'Move by both gap amounts' :
+                 (hasLeftGap && hasRightGap) || (hasTopGap && hasBottomGap) ? 'Reset to default (opposite gaps)' :
+                 gapCount === 2 ? 'Move by both gap amounts (adjacent)' :
                  gapCount === 1 ? 'Move by single gap amount' : 'No action needed'
         }
       });
@@ -633,7 +638,8 @@ function PhotoRenderer({
         gaps: { left: gapLeft, right: gapRight, top: gapTop, bottom: gapBottom },
         thresholdGaps: { left: hasLeftGap, right: hasRightGap, top: hasTopGap, bottom: hasBottomGap },
         gapCount,
-        threshold: POST_SNAP_THRESHOLD
+        threshold: POST_SNAP_THRESHOLD,
+        wouldTriggerReset: gapCount >= 3 || (hasLeftGap && hasRightGap) || (hasTopGap && hasBottomGap)
       });
     }
     
@@ -667,8 +673,23 @@ function PhotoRenderer({
     const containerRect = containerRef.current.getBoundingClientRect();
     const { gapCount, gaps, significantGaps } = gapData;
     
-    // User specification: 3+ sides with gaps → Reset to default
-    if (gapCount >= 3) {
+    // Check for opposite gaps that need scaling (not just movement)
+    const hasOppositeHorizontalGaps = significantGaps.left && significantGaps.right;
+    const hasOppositeVerticalGaps = significantGaps.top && significantGaps.bottom;
+    
+    // User specification: 3+ sides with gaps OR opposite gaps → Reset to default
+    // Opposite gaps (left+right or top+bottom) indicate photo is too small and needs scaling
+    if (gapCount >= 3 || hasOppositeHorizontalGaps || hasOppositeVerticalGaps) {
+      if (debug) {
+        console.log('🎯 Reset triggered:', {
+          gapCount,
+          hasOppositeHorizontalGaps,
+          hasOppositeVerticalGaps,
+          reason: gapCount >= 3 ? '3+ gaps' : 
+                  hasOppositeHorizontalGaps ? 'Opposite horizontal gaps (need width scaling)' :
+                  'Opposite vertical gaps (need height scaling)'
+        });
+      }
       return {
         action: 'reset-to-default',
         newCenterX: 0.5,
@@ -677,7 +698,8 @@ function PhotoRenderer({
       };
     }
     
-    // User specification: 1-2 sides with gaps → Move by exact gap amounts
+    // User specification: 1-2 ADJACENT sides with gaps → Move by exact gap amounts
+    // (Opposite gaps are handled above with reset-to-default)
     if (gapCount === 0) {
       return {
         action: 'none',
@@ -688,6 +710,7 @@ function PhotoRenderer({
     }
     
     // Calculate movement based on gaps (convert pixels to photoCenterX/Y units)
+    // Note: At this point we only have 1-2 ADJACENT gaps (corner cases)
     let horizontalMovement = 0;
     let verticalMovement = 0;
     let horizontalDescription = '';
@@ -705,9 +728,9 @@ function PhotoRenderer({
     // To move photo UP: translateY decreases, so photoCenterY must INCREASE
     // To move photo DOWN: translateY increases, so photoCenterY must DECREASE
     
-    // Horizontal movement - check BOTH left and right (for 2-gap cases)
-    // Note: We shouldn't have both left AND right gaps (that would be 4 gaps total)
-    // But we need separate if statements to handle 2-gap cases like left+top
+    // Horizontal movement - check for gaps
+    // Note: If we had BOTH left AND right gaps, we already returned 'reset-to-default' above
+    // So here we only handle single horizontal gaps or adjacent gaps (e.g., left+top)
     if (significantGaps.left) {
       // Gap on left → photo is too far right → needs to move LEFT
       // To move left: increase photoCenterX
@@ -743,8 +766,8 @@ function PhotoRenderer({
       }
     }
     
-    // Vertical movement - check BOTH top and bottom (for 2-gap cases)
-    // Note: We shouldn't have both top AND bottom gaps (that would be 4 gaps total)
+    // Vertical movement - check for gaps
+    // Note: If we had BOTH top AND bottom gaps, we already returned 'reset-to-default' above
     // But we need separate if statements to handle 2-gap cases like left+top
     if (significantGaps.top) {
       // Gap on top → photo is too low → needs to move UP
