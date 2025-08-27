@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-27] - Deployment Detection & Cache Management Fix
+
+### Added
+- **Build-Time Version Generation System**: Created automated version tracking for deployments
+  - File: `scripts/generate-version.js` - Generates version info at build time using Vercel env vars
+  - File: `public/version.json` - Stores deployment metadata (ID, timestamp, git commit, branch)
+  - Impact: Enables accurate detection of new deployments vs runtime changes
+  - Commit: Latest
+
+- **Version API Endpoint**: New endpoint for checking current deployment version
+  - File: `pages/api/version.ts` - Returns current deployment info with no-cache headers
+  - Impact: Allows client-side version checking without caching issues
+  - Commit: Latest
+
+- **Enhanced Service Worker Registration**: Improved update detection with user notifications
+  - File: `components/ServiceWorkerRegistration.tsx` - Added version checking and update toast
+  - Features: Periodic version checks, user-friendly update notifications, auto-reload option
+  - Impact: Users get notified of new versions with choice to update immediately or later
+  - Commit: Latest
+
+### Fixed
+- **Service Worker Fake Versioning**: Fixed runtime timestamp generation issue
+  - Root Cause: `new Date().toISOString()` generated new timestamp on every page load
+  - Solution: Replace with build-time injection of actual deployment version
+  - Files Modified: `public/service-worker.js`
+  - Impact: Service worker now correctly detects actual deployments
+  - Commit: Latest
+
+- **Cache Header Conflicts**: Resolved conflicting cache configurations
+  - Root Cause: `next.config.js` and `vercel.json` had contradictory cache headers
+  - Solution: Removed cache headers from `next.config.js`, consolidated in `vercel.json`
+  - Files Modified: `next.config.js`, `vercel.json`
+  - Impact: Consistent cache behavior, proper invalidation on deployment
+  - Commit: Latest
+
+### Changed
+- **Build Process**: Updated to include automatic version generation
+  - File: `package.json` - Added `prebuild` script to run version generation
+  - Commands: Added `generate-version` script for manual version generation
+  - Impact: Every build now generates accurate deployment version info
+  - Commit: Latest
+
+- **Cache Strategy**: Improved cache headers for better deployment detection
+  - File: `vercel.json` - Updated with proper no-cache headers for dynamic content
+  - Strategy: No-cache for HTML/API, immutable for static assets, never cache service worker
+  - Impact: Users always get fresh HTML on deployment while static assets remain cached
+  - Commit: Latest
+
+### Technical Details
+- Service worker now uses `DEPLOYMENT_ID` instead of runtime timestamp
+- Version checks run every 60 seconds to detect new deployments
+- Service worker updates check every 30 seconds for faster detection
+- Added proper cache cleanup for old service worker versions
+- Version endpoint protected with aggressive no-cache headers
+
 ### Fixed
 - **Mobile Auto-Snap Race Condition (CRITICAL)**: Fixed auto-snap failing on mobile for 1-2 gap scenarios
   - Root Cause: Race condition between child local state updates and parent prop updates in same React render frame

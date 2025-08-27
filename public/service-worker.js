@@ -1,7 +1,8 @@
 // Service Worker for Pronoia Studios PH PWA
-// Dynamic cache versioning - updates with each deployment
-const BUILD_TIMESTAMP = new Date().toISOString();
-const CACHE_NAME = `pronoia-v-${BUILD_TIMESTAMP}`;
+// Version info is injected at build time by generate-version.js
+const BUILD_TIMESTAMP = '2025-08-27T12:17:23.925Z';
+const DEPLOYMENT_ID = '1756297043925';
+const CACHE_NAME = `pronoia-v-${DEPLOYMENT_ID}`;
 const urlsToCache = [
   '/manifest.json',
   '/icons/icon-192x192.png',
@@ -11,13 +12,17 @@ const urlsToCache = [
 
 // Install event - cache essential files
 self.addEventListener('install', (event) => {
+  console.log('New service worker installing with version:', DEPLOYMENT_ID);
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Opened cache');
+        console.log('Opened cache:', CACHE_NAME);
         return cache.addAll(urlsToCache);
       })
-      .then(() => self.skipWaiting())
+      .then(() => {
+        // Skip waiting to activate new service worker immediately
+        return self.skipWaiting();
+      })
   );
 });
 
@@ -27,13 +32,17 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+          // Delete all caches that don't match current version
+          if (cacheName.startsWith('pronoia-v-') && cacheName !== CACHE_NAME) {
             console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => {
+      // Take control of all clients immediately
+      return self.clients.claim();
+    })
   );
 });
 
