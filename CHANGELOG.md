@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Mobile Auto-Snap Race Condition (CRITICAL)**: Fixed auto-snap failing on mobile for 1-2 gap scenarios
+  - Root Cause: Race condition between child local state updates and parent prop updates in same React render frame
+  - Technical Issue: Touch events would calculate correct transform, but parent's stale prop would overwrite it immediately
+  - Solution: Implemented queueMicrotask() to defer callback execution to next microtask, preventing same-frame overwrites
+  - Implementation:
+    - Added `onTransformChangeRef` and `onInteractionEndRef` to store callbacks in refs (prevents stale closures)
+    - Used `queueMicrotask()` to defer `onTransformChange` callback execution after current frame
+    - Removed local state authority from PhotoRenderer (commented out setCurrentTransform in finalization)
+    - Added CSS `touch-action: none` to prevent browser gesture interference on mobile
+    - Added try-catch error handling around all callbacks for robustness
+  - Files Modified: 
+    - `components/PhotoRenderer.tsx` (lines 167-178, 975-1001, 1705-1712)
+  - Impact: Mobile auto-snap now works correctly for all gap scenarios (1, 2, 3+ gaps)
+  - Credit: Solution identified by ChatGPT analysis after multiple failed closure-based approaches
+
+### Fixed
 - **Auto-Snap Not Working**: Fixed auto-snap feature that stopped working after user interaction
   - Root Cause: Missing `onInteractionEnd` prop in InlinePhotoEditor's PhotoRenderer
   - Solution: Added `onInteractionEnd` callback to enable automatic gap detection and positioning

@@ -164,6 +164,19 @@ function PhotoRenderer({
   const [isInteracting, setIsInteracting] = useState(false);
   const interactionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // MOBILE FIX: Store callbacks in refs to prevent stale closures
+  const onTransformChangeRef = useRef<typeof onTransformChange>(onTransformChange);
+  const onInteractionEndRef = useRef<typeof onInteractionEnd>(onInteractionEnd);
+  
+  // Keep refs updated with latest callbacks
+  useEffect(() => {
+    onTransformChangeRef.current = onTransformChange;
+  }, [onTransformChange]);
+  
+  useEffect(() => {
+    onInteractionEndRef.current = onInteractionEnd;
+  }, [onInteractionEnd]);
+  
   // Debounced transform change to prevent excessive parent updates during dragging
   const debouncedTransformChange = useDebounce((transform: PhotoTransform) => {
     if (onTransformChange) {
@@ -961,21 +974,30 @@ function PhotoRenderer({
         
         if (transformsAreDifferent) {
           console.log('⚙️ EXECUTING TRANSFORM CHANGE...');
-          console.log('🎬 Applying auto-snap movement immediately');
+          console.log('🎬 Applying auto-snap movement via queueMicrotask');
           
-          // Apply transform immediately without animation states to prevent flashing
-          setCurrentTransform(finalizedTransform);
+          // MOBILE FIX: Don't set local state - let parent control
+          // Comment out: setCurrentTransform(finalizedTransform);
           
-          if (onTransformChange) {
-            console.log('📡 Calling onTransformChange callback...');
-            onTransformChange(finalizedTransform);
-            console.log('✅ Callback executed');
-          } else {
-            console.log('⚠️ No onTransformChange callback provided');
-          }
+          // MOBILE FIX: Use queueMicrotask to call callback after current frame
+          // This prevents same-frame race condition where parent prop overwrites child state
+          queueMicrotask(() => {
+            console.log('📡 Calling onTransformChange callback (via queueMicrotask)...');
+            try {
+              onTransformChangeRef.current?.(finalizedTransform);
+              console.log('✅ Callback executed');
+              
+              // Also notify interaction end on next frame
+              requestAnimationFrame(() => {
+                onInteractionEndRef.current?.(finalizedTransform);
+                console.log('✅ FINALIZATION COMPLETE - Transform applied');
+              });
+            } catch (error) {
+              console.error('❌ Callback error:', error);
+            }
+          });
           
-          console.log('✅ FINALIZATION COMPLETE - Transform applied');
-          if (debug) console.log('✅ Gap-based finalization complete');
+          if (debug) console.log('✅ Gap-based finalization queued');
           resolve(finalizedTransform);
         } else {
           console.log('ℹ️ NO CHANGE: Transforms are identical, resolving with current');
@@ -1682,7 +1704,11 @@ function PhotoRenderer({
       className={`relative overflow-hidden ${className}`}
       style={{
         ...style,
-        touchAction: interactive ? 'none' : 'auto' // Prevent browser zoom when interactive
+        // MOBILE FIX: Prevent all browser gestures when interactive
+        touchAction: interactive ? 'none' : 'auto',
+        WebkitUserSelect: interactive ? 'none' : 'auto',
+        userSelect: interactive ? 'none' : 'auto',
+        overscrollBehavior: 'contain'
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
