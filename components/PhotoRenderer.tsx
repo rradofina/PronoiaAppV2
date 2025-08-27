@@ -157,6 +157,9 @@ function PhotoRenderer({
       : createPhotoTransform(1, 0.5, 0.5) // Default: fit scale, centered
   );
   
+  // Ref to always have the latest transform value (fixes mobile auto-snap stale closure issue)
+  const currentTransformRef = useRef<PhotoTransform>(currentTransform);
+  
   // Auto-snap state removed - no longer needed after fixing flashing issue
   // Previously used for animation, but caused flashing due to multiple renders
   
@@ -207,8 +210,8 @@ function PhotoRenderer({
     }
   }, [onInteractionChange]);
   
-  // Use ref for handleInteractionEnd to avoid closure issues with touch events
-  const handleInteractionEndRef = useRef<(() => void) | null>(null);
+  // Use callback for handleInteractionEnd to ensure it's always available
+  // This fixes the timing issue where touch events could fire before useEffect runs
   
   // Check if user has recently interacted with photo (within last 3 seconds)
   const hasRecentUserInteraction = useCallback(() => {
@@ -655,8 +658,8 @@ function PhotoRenderer({
     if (!imageRef.current || !containerRef.current) {
       return {
         action: 'none',
-        newCenterX: currentTransform.photoCenterX,
-        newCenterY: currentTransform.photoCenterY,
+        newCenterX: currentTransformRef.current.photoCenterX,
+        newCenterY: currentTransformRef.current.photoCenterY,
         movements: { horizontal: 'no change', vertical: 'no change' }
       };
     }
@@ -678,8 +681,8 @@ function PhotoRenderer({
     if (gapCount === 0) {
       return {
         action: 'none',
-        newCenterX: currentTransform.photoCenterX,
-        newCenterY: currentTransform.photoCenterY,
+        newCenterX: currentTransformRef.current.photoCenterX,
+        newCenterY: currentTransformRef.current.photoCenterY,
         movements: { horizontal: 'no change', vertical: 'no change' }
       };
     }
@@ -716,8 +719,8 @@ function PhotoRenderer({
           gap: gaps.left,
           containerWidth: containerRect.width,
           movement: horizontalMovement,
-          currentPhotoCenterX: currentTransform.photoCenterX,
-          newPhotoCenterX: currentTransform.photoCenterX + horizontalMovement,
+          currentPhotoCenterX: currentTransformRef.current.photoCenterX,
+          newPhotoCenterX: currentTransformRef.current.photoCenterX + horizontalMovement,
           expectedTranslateChange: `${-(horizontalMovement * 100).toFixed(1)}%`
         });
       }
@@ -733,8 +736,8 @@ function PhotoRenderer({
           gap: gaps.right,
           containerWidth: containerRect.width,
           movement: horizontalMovement,
-          currentPhotoCenterX: currentTransform.photoCenterX,
-          newPhotoCenterX: currentTransform.photoCenterX + horizontalMovement,
+          currentPhotoCenterX: currentTransformRef.current.photoCenterX,
+          newPhotoCenterX: currentTransformRef.current.photoCenterX + horizontalMovement,
           expectedTranslateChange: `${-(horizontalMovement * 100).toFixed(1)}%`
         });
       }
@@ -763,8 +766,8 @@ function PhotoRenderer({
     };
     
     // Apply movements to current position (no artificial bounds - allow true edge positioning)
-    const newCenterX = currentTransform.photoCenterX + horizontalMovement;
-    const newCenterY = currentTransform.photoCenterY + verticalMovement;
+    const newCenterX = currentTransformRef.current.photoCenterX + horizontalMovement;
+    const newCenterY = currentTransformRef.current.photoCenterY + verticalMovement;
     
     // Post-snap validation: Check if the new position would result in 3+ gaps
     console.log('🔮 POST-SNAP VALIDATION: Checking if movement would create more gaps...');
@@ -833,11 +836,6 @@ function PhotoRenderer({
     return new Promise(async (resolve) => {
       const performFinalization = async () => {
         console.log('🚀 FINALIZATION STARTED - Checkmark clicked');
-        console.log('[MOBILE DEBUG] finalizePositioning', {
-          isMobile: /iPhone|iPad|Android/i.test(navigator.userAgent),
-          viewport: window.innerWidth,
-          currentTransform: currentTransform
-        });
         console.log('✅ PROCEEDING: Auto-snap executes regardless of recent interaction');
         
         // Detect gaps using accurate measurement
@@ -855,7 +853,7 @@ function PhotoRenderer({
           if (debug) {
             console.log('✅ No significant gaps detected - no adjustment needed');
           }
-          resolve(currentTransform);
+          resolve(currentTransformRef.current);
           return;
         }
         
@@ -882,7 +880,7 @@ function PhotoRenderer({
           if (debug) {
             console.log('✅ No action needed - current position is acceptable');
           }
-          resolve(currentTransform);
+          resolve(currentTransformRef.current);
           return;
         }
         
@@ -1001,7 +999,7 @@ function PhotoRenderer({
           resolve(finalizedTransform);
         } else {
           console.log('ℹ️ NO CHANGE: Transforms are identical, resolving with current');
-          resolve(currentTransform);
+          resolve(currentTransformRef.current);
         }
       };
 
@@ -1010,53 +1008,32 @@ function PhotoRenderer({
         requestAnimationFrame(performFinalization);
       });
     });
-  }, [currentTransform, detectGaps, calculateGapBasedMovement, onTransformChange, debug, hasRecentUserInteraction, createPhotoTransform]);
+  }, [detectGaps, calculateGapBasedMovement, onTransformChange, debug, hasRecentUserInteraction]);
 
-  // Define handleInteractionEnd and assign to ref
-  useEffect(() => {
-    console.log('[MOBILE DEBUG] Setting handleInteractionEndRef.current:', {
-      hasOnInteractionEnd: !!onInteractionEnd,
-      isMobile: /iPhone|iPad|Android/i.test(navigator.userAgent),
-      viewport: window.innerWidth
-    });
+  // Define handleInteractionEnd as a stable callback
+  const handleInteractionEnd = useCallback(async () => {
+    // Clear any existing timeout
+    if (interactionTimeoutRef.current) {
+      clearTimeout(interactionTimeoutRef.current);
+      interactionTimeoutRef.current = null;
+    }
     
-    handleInteractionEndRef.current = async () => {
-      console.log('[MOBILE DEBUG] handleInteractionEnd called!', {
-        hasOnInteractionEnd: !!onInteractionEnd,
-        currentTransform: currentTransform
-      });
-      
-      // Clear any existing timeout
-      if (interactionTimeoutRef.current) {
-        clearTimeout(interactionTimeoutRef.current);
-        interactionTimeoutRef.current = null;
+    // Show UI immediately
+    setIsInteracting(false);
+    onInteractionChange?.(false);
+    
+    // Immediate auto-snap without delay to prevent flashing
+    if (onInteractionEnd) {
+      try {
+        // Call finalization immediately to detect gaps and apply auto-snap
+        const finalizedTransform = await finalizePositioning();
+        onInteractionEnd(finalizedTransform);
+      } catch (error) {
+        console.error('❌ Auto-snap finalization failed:', error);
+        onInteractionEnd(currentTransformRef.current);
       }
-      
-      // Show UI immediately
-      setIsInteracting(false);
-      onInteractionChange?.(false);
-      
-      // Immediate auto-snap without delay to prevent flashing
-      if (onInteractionEnd) {
-        console.log('[MOBILE DEBUG] Calling finalizePositioning for auto-snap');
-        try {
-          // Call finalization immediately to detect gaps and apply auto-snap
-          finalizePositioning().then(finalizedTransform => {
-            console.log('[MOBILE DEBUG] Auto-snap finalized:', finalizedTransform);
-            onInteractionEnd(finalizedTransform);
-          }).catch(error => {
-            console.error('❌ Auto-snap finalization failed:', error);
-            onInteractionEnd(currentTransform);
-          });
-        } catch (error) {
-          console.error('❌ Auto-snap finalization failed:', error);
-          onInteractionEnd(currentTransform);
-        }
-      } else {
-        console.warn('[MOBILE DEBUG] No onInteractionEnd callback provided!');
-      }
-    };
-  }, [onInteractionChange, onInteractionEnd, currentTransform, finalizePositioning, setIsInteracting]);
+    }
+  }, [onInteractionChange, onInteractionEnd, finalizePositioning, setIsInteracting]);
 
   // Analyze image for clipping (overexposed/underexposed areas)
   const analyzeClipping = () => {
@@ -1171,7 +1148,12 @@ function PhotoRenderer({
       setLastPhotoUrlForTransform(photoUrl);
     }
     // Don't update if it's the same photo in interactive mode - prevents feedback loops
-  }, [interactive, transform, photoUrl, lastPhotoUrlForTransform, debug, createPhotoTransform]);
+  }, [interactive, transform, photoUrl, lastPhotoUrlForTransform, debug]);
+  
+  // Keep ref synchronized with state for use in callbacks (fixes mobile auto-snap)
+  useEffect(() => {
+    currentTransformRef.current = currentTransform;
+  }, [currentTransform]);
   
   // Helper function to determine if two URLs represent the same photo
   const isSamePhoto = useCallback((url1: string, url2: string): boolean => {
@@ -1453,12 +1435,6 @@ function PhotoRenderer({
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!interactive) return;
     
-    console.log('[MOBILE DEBUG] Touch start event', {
-      touches: e.touches.length,
-      hasInteractionEndRef: !!handleInteractionEndRef.current,
-      viewport: window.innerWidth
-    });
-    
     // Prevent browser zoom/scroll for all interactive touches
     e.preventDefault();
     e.stopPropagation();
@@ -1553,20 +1529,8 @@ function PhotoRenderer({
       setLastPointer(null);
       setLastTouchDistance(0);
       
-      // Debug logging for mobile auto-snap
-      console.log('[MOBILE DEBUG] Touch end - checking handleInteractionEndRef:', {
-        hasRef: !!handleInteractionEndRef.current,
-        isMobile: /iPhone|iPad|Android/i.test(navigator.userAgent),
-        viewport: window.innerWidth,
-        transform: currentTransform
-      });
-      
-      if (handleInteractionEndRef.current) {
-        console.log('[MOBILE DEBUG] Calling handleInteractionEndRef.current()');
-        handleInteractionEndRef.current();
-      } else {
-        console.error('[MOBILE DEBUG] handleInteractionEndRef.current is null!');
-      }
+      // Call handleInteractionEnd directly (no ref needed)
+      handleInteractionEnd();
       
       // No auto-corrections - user has complete control over positioning
     } else if (e.touches.length === 1) {
@@ -1636,9 +1600,8 @@ function PhotoRenderer({
     
     // Track user interaction
     trackUserInteraction('drag-end');
-    if (handleInteractionEndRef.current) {
-      handleInteractionEndRef.current();
-    }
+    // Call handleInteractionEnd directly
+    handleInteractionEnd();
     
     // No auto-corrections - user has complete control over positioning
   };
