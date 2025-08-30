@@ -180,12 +180,20 @@ function PhotoRenderer({
     onInteractionEndRef.current = onInteractionEnd;
   }, [onInteractionEnd]);
   
-  // Debounced transform change to prevent excessive parent updates during dragging
-  const debouncedTransformChange = useDebounce((transform: PhotoTransform) => {
+  // Separate debounced transform changes for different interaction types
+  // Fast debounce for zoom operations (60fps) to prevent jaggy/skipping behavior
+  const debouncedZoomChange = useDebounce((transform: PhotoTransform) => {
     if (onTransformChange) {
       onTransformChange(transform);
     }
-  }, 100); // 100ms debounce for smooth dragging
+  }, 16); // 16ms = ~60fps for smooth zoom
+  
+  // Normal debounce for drag operations to reduce update frequency
+  const debouncedDragChange = useDebounce((transform: PhotoTransform) => {
+    if (onTransformChange) {
+      onTransformChange(transform);
+    }
+  }, 100); // 100ms debounce for drag operations
   
   // User interaction tracking to prevent auto-snap on recently manipulated photos
   const [lastUserInteraction, setLastUserInteraction] = useState<number>(0);
@@ -1504,8 +1512,8 @@ function PhotoRenderer({
       );
       
       setCurrentTransform(newTransform);
-      // Use debounced transform change to prevent excessive parent updates during pinch
-      debouncedTransformChange(newTransform);
+      // Use fast zoom debounce for smooth pinch-to-zoom without jags
+      debouncedZoomChange(newTransform);
       setLastTouchDistance(distance);
     } else if (e.touches.length === 1 && isDragging && lastPointer && containerRef.current) {
       // Single finger - handle drag
@@ -1529,8 +1537,8 @@ function PhotoRenderer({
       );
       
       setCurrentTransform(newTransform);
-      // Use debounced transform change to prevent excessive parent updates during touch drag
-      debouncedTransformChange(newTransform);
+      // Use normal drag debounce for touch drag operations
+      debouncedDragChange(newTransform);
       setLastPointer({ x: touch.clientX, y: touch.clientY });
     }
   };
@@ -1609,8 +1617,8 @@ function PhotoRenderer({
     );
     
     setCurrentTransform(newTransform);
-    // Use debounced transform change to prevent excessive parent updates during pointer drag
-    debouncedTransformChange(newTransform);
+    // Use normal drag debounce for pointer drag operations
+    debouncedDragChange(newTransform);
     setLastPointer({ x: e.clientX, y: e.clientY });
   };
 
@@ -1650,8 +1658,8 @@ function PhotoRenderer({
     );
     
     setCurrentTransform(newTransform);
-    // Use debounced transform change to prevent excessive parent updates during wheel zoom
-    debouncedTransformChange(newTransform);
+    // Use fast zoom debounce for smooth wheel zoom without jags
+    debouncedZoomChange(newTransform);
     
     // Track user interaction
     trackUserInteraction('zoom');

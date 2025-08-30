@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-30] - Fix Jaggy Zoom Performance
+
+### Fixed
+- **Jaggy/Skipping Zoom Behavior**: Fixed zoom gestures appearing laggy and skipping frames
+  - Root Cause: 100ms debounce delay was batching zoom updates, causing visual jerkiness
+  - Solution: Implemented separate debounce delays for different interaction types
+  - Implementation:
+    - Zoom operations (pinch, wheel): 16ms debounce (~60fps) for smooth real-time feedback
+    - Drag operations: 100ms debounce to reduce update frequency
+  - Files Modified:
+    - `components/PhotoRenderer.tsx` (lines 183-196): Added `debouncedZoomChange` and `debouncedDragChange`
+    - Line 1516: Updated pinch zoom to use fast debounce
+    - Line 1541: Updated touch drag to use normal debounce
+    - Line 1662: Updated wheel zoom to use fast debounce
+    - Line 1621: Updated pointer drag to use normal debounce
+  - Impact: Zoom gestures now update at 60fps providing smooth, responsive zoom experience without jags or skips
+  - User Report: "when i pinch zoom or zoom in zoom out in general it becomes jaggy or skips"
+
 ## [2024-12-30] - Background Sync and Upload Debug Improvements
 
 ### Fixed
