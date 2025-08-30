@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-30] - Folder Loading Fix & DPI Metadata Fix
+
+### Fixed
+- **Folder Loading After Login**: Fixed folders appearing blank after initial login
+  - Root Cause: Race condition where FolderSelectionScreen tried to load folders before Google API client was ready
+  - Solution: Added Google API readiness check and retry mechanism
+  - Implementation:
+    - Added `window.gapi?.client?.drive` check before API calls
+    - Implemented retry logic with 5 attempts for initial load
+    - Better error handling to distinguish API readiness vs actual errors
+    - Falls back to pre-loaded clientFolders when API isn't ready
+  - Files Modified: `components/screens/FolderSelectionScreen.tsx`
+  - Impact: Folders now display immediately after login without requiring manual refresh
+
 ## [2025-08-30] - DPI Metadata Fix for Exported Images
 
 ### Fixed

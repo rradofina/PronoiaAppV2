@@ -458,7 +458,27 @@ export default function FolderSelectionScreen({
   const [availablePhotos, setAvailablePhotos] = useState<Photo[]>([]);
 
   // Load folders from a specific parent folder with cache bypass
-  const loadFolders = async (parentId: string | null = null, forceRefresh: boolean = false) => {
+  const loadFolders = async (parentId: string | null = null, forceRefresh: boolean = false, retryCount: number = 0) => {
+    // Check if Google API client is ready
+    if (!window.gapi?.client?.drive) {
+      console.warn('Google API client not ready, will retry...');
+      
+      // If this is the initial load (not a manual refresh), retry up to 5 times
+      if (!forceRefresh && retryCount < 5) {
+        setTimeout(() => {
+          console.log(`Retrying folder load (attempt ${retryCount + 1}/5)...`);
+          loadFolders(parentId, forceRefresh, retryCount + 1);
+        }, 1000); // Wait 1 second before retry
+        return;
+      }
+      
+      // If we've exhausted retries or this is a manual refresh that failed
+      console.log('Google API not ready after retries, using cached client folders');
+      setCurrentFolders(clientFolders);
+      setIsLoadingFolders(false);
+      return;
+    }
+    
     if (!forceRefresh) {
       setIsLoadingFolders(true);
     }
@@ -518,9 +538,25 @@ export default function FolderSelectionScreen({
           setLastRefreshTime(new Date());
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load folders:', error);
-      setCurrentFolders([]);
+      
+      // Check if error is due to authentication issues
+      if (error?.status === 401 || error?.status === 403) {
+        console.error('Authentication error - user may need to re-login');
+        setCurrentFolders([]);
+      } else if (!forceRefresh && retryCount < 3) {
+        // For other errors during initial load, retry a few times
+        console.log(`Error loading folders, retrying (attempt ${retryCount + 1}/3)...`);
+        setTimeout(() => {
+          loadFolders(parentId, forceRefresh, retryCount + 1);
+        }, 1500);
+        return;
+      } else {
+        // Fall back to client folders if available
+        console.log('Using cached client folders after error');
+        setCurrentFolders(clientFolders || []);
+      }
     } finally {
       if (!forceRefresh) {
         setIsLoadingFolders(false);
@@ -918,9 +954,20 @@ export default function FolderSelectionScreen({
   // Initialize folders on mount and always load fresh data
   useEffect(() => {
     if (!showPackageSelection) {
-      // Always load fresh data from Google Drive when entering folder selection
-      console.log('📂 Loading fresh folder data on mount...');
-      loadFolders(null, true);
+      // Load folder data when entering folder selection
+      console.log('📂 Loading folder data on mount...');
+      
+      // Check if we have clientFolders already loaded from the parent component
+      if (clientFolders && clientFolders.length > 0) {
+        console.log(`📂 Using ${clientFolders.length} pre-loaded folders from parent component`);
+        setCurrentFolders(clientFolders);
+        // Also try to load fresh data in the background
+        loadFolders(null, false);
+      } else {
+        // No pre-loaded folders, need to fetch from Google Drive
+        console.log('📂 No pre-loaded folders, fetching from Google Drive...');
+        loadFolders(null, false);
+      }
     }
   }, [showPackageSelection]);
   
