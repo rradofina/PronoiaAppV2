@@ -339,7 +339,7 @@ export default function TemplateGrid({
             {/* Sync status indicator */}
             {slots.every(s => s.photoId) && (
               <SyncStatusIndicator 
-                status={templateSyncService.getSyncStatus(templateId)} 
+                status={templateSyncService.getTemplateSyncStatus(templateId)} 
                 className="mr-2"
               />
             )}
