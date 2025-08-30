@@ -7,6 +7,9 @@
 import { TemplateSlot, Photo, PhotoTransform, isPhotoTransform, ManualTemplate } from '../types';
 import { getHighResPhotoUrls } from '../utils/photoUrlUtils';
 import { getPrintSizeDimensions } from '../utils/printSizeDimensions';
+import { supabase } from '../lib/supabase/client';
+// @ts-ignore - changedpi doesn't have TypeScript definitions
+import { changeDpiBlob } from 'changedpi';
 
 export interface RasterizedTemplate {
   blob: Blob;
@@ -31,6 +34,40 @@ class TemplateRasterizationService {
   private templateScale: number = 1;
   private templateOffsetX: number = 0;
   private templateOffsetY: number = 0;
+
+  /**
+   * Get print size configuration from database
+   * Falls back to default values if not found
+   */
+  private async getPrintSizeConfig(printSize: string) {
+    try {
+      const { data, error } = await supabase
+        .from('print_size_config')
+        .select('*')
+        .eq('print_size', printSize)
+        .single();
+      
+      if (error || !data) {
+        // Fall back to default values from utility
+        const defaults = getPrintSizeDimensions(printSize);
+        return {
+          width_inches: defaults.widthInches || 4,
+          height_inches: defaults.heightInches || 6,
+          default_dpi: defaults.dpi || 300
+        };
+      }
+      
+      return data;
+    } catch (error) {
+      console.warn('Failed to fetch print size config, using defaults:', error);
+      const defaults = getPrintSizeDimensions(printSize);
+      return {
+        width_inches: defaults.widthInches || 4,
+        height_inches: defaults.heightInches || 6,
+        default_dpi: defaults.dpi || 300
+      };
+    }
+  }
 
   private initializeCanvas(width: number, height: number): void {
     if (typeof window === 'undefined') return;
@@ -126,7 +163,7 @@ class TemplateRasterizationService {
         await this.drawTemplateBackground(template);
       }
 
-      const blob = await this.canvasToBlob(settings.format, settings.quality);
+      const blob = await this.canvasToBlob(template, settings.format, settings.quality);
       const fileName = this.generateFileName(template, settings);
 
       const actualDimensions = { width: this.canvas.width, height: this.canvas.height };
@@ -424,23 +461,60 @@ class TemplateRasterizationService {
   }
 
   /**
-   * Convert canvas to blob
-   * Note: Browser canvas API doesn't support DPI metadata, so images will show 96 DPI
-   * but have correct pixel dimensions for printing at 300 DPI when printed at intended size
+   * Convert canvas to blob with DPI metadata
+   * Embeds DPI information so images display at correct physical size in photo editors
    */
-  private async canvasToBlob(format: 'jpeg' | 'png', quality: number = 0.95): Promise<Blob> {
-    return new Promise((resolve, reject) => {
+  private async canvasToBlob(template: ManualTemplate, format: 'jpeg' | 'png', quality: number = 0.95): Promise<Blob> {
+    return new Promise(async (resolve, reject) => {
       if (!this.canvas) {
         return reject(new Error('Canvas not initialized'));
       }
-      this.canvas.toBlob(
-        (blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('Failed to create blob from canvas'));
-        },
-        format === 'jpeg' ? 'image/jpeg' : 'image/png',
-        quality
-      );
+
+      try {
+        // Create initial blob from canvas
+        const blob = await new Promise<Blob>((res, rej) => {
+          this.canvas!.toBlob(
+            (b) => {
+              if (b) res(b);
+              else rej(new Error('Failed to create blob from canvas'));
+            },
+            format === 'jpeg' ? 'image/jpeg' : 'image/png',
+            quality
+          );
+        });
+
+        // Get print size configuration for physical dimensions
+        const config = await this.getPrintSizeConfig(template.print_size);
+        
+        // Check for template-specific overrides
+        const widthInches = template.custom_width_inches || config.width_inches;
+        const heightInches = template.custom_height_inches || config.height_inches;
+        
+        // Calculate DPI based on actual canvas size and target physical dimensions
+        const dpiX = Math.round(this.canvas.width / widthInches);
+        const dpiY = Math.round(this.canvas.height / heightInches);
+        const targetDPI = Math.min(dpiX, dpiY); // Use smaller to ensure image fits
+        
+        console.log('📐 DPI Calculation:', {
+          canvasSize: `${this.canvas.width}x${this.canvas.height}px`,
+          physicalSize: `${widthInches}x${heightInches} inches`,
+          calculatedDPI: `${dpiX}x${dpiY}`,
+          targetDPI: targetDPI,
+          printSize: template.print_size
+        });
+
+        // Embed DPI metadata using changedpi
+        try {
+          const blobWithDPI = await changeDpiBlob(blob, targetDPI);
+          console.log(`✅ DPI metadata embedded: ${targetDPI} DPI for ${widthInches}x${heightInches}" print`);
+          resolve(blobWithDPI);
+        } catch (dpiError) {
+          console.warn('Failed to embed DPI metadata, returning original blob:', dpiError);
+          resolve(blob); // Fallback to original blob if DPI embedding fails
+        }
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 

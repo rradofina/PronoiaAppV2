@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-30] - DPI Metadata Fix for Exported Images
+
+### Fixed
+- **DPI Metadata Issue**: Exported images now display correct physical dimensions in photo editing software
+  - Problem: 3600x5400px images showed as 50x75 inches (72 DPI) instead of 4x6 inches
+  - Solution: Embedded proper DPI metadata using changedpi library
+  - Impact: Photoshop and print shops now see correct 4x6" dimensions at 900 DPI
+  - Files Modified: 
+    - `services/templateRasterizationService.ts` - Added DPI embedding logic
+    - `utils/printSizeDimensions.ts` - Added physical dimension properties
+    - `types/index.ts` - Added PrintSizeConfig interface and custom dimension fields
+
+### Added
+- **Print Size Configuration Table**: Database-driven physical dimensions configuration
+  - File: `lib/supabase/migrations/013_add_print_size_config.sql`
+  - Admin can configure width_inches, height_inches, and default_dpi per print size
+  - Templates can override default dimensions with custom values
+  - No hardcoding - all configurable via database
+
+- **DPI Metadata Embedding**: Automatic DPI calculation and embedding
+  - Calculates DPI based on actual pixel dimensions ÷ physical inches
+  - Supports different resolutions for same physical size (e.g., 300/600/900 DPI for 4x6")
+  - Fallback to default values if database config unavailable
+  - Library: changedpi v1.0.4
+
+### Changed
+- **printSizeDimensions utility**: Enhanced with physical dimension properties
+  - Added widthInches and heightInches to PrintDimensions interface
+  - Updated all print sizes (4R, 5R, A4) with correct physical dimensions
+
 ## [2025-08-27] - Autosnap Aspect Ratio Fix & Deployment Detection
 
 ### Fixed

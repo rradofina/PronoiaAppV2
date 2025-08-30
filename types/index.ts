@@ -873,6 +873,21 @@ export interface ManualTemplateDimensions {
   height: number;
 }
 
+export interface PrintSizeConfig {
+  id: string;
+  print_size: string;
+  width_inches: number;
+  height_inches: number;
+  default_dpi: number;
+  default_width_pixels?: number;
+  default_height_pixels?: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  updated_by?: string;
+}
+
 export interface ManualTemplate {
   id: string;
   name: string;
@@ -891,6 +906,10 @@ export interface ManualTemplate {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  // Custom physical dimensions (overrides print_size defaults)
+  custom_width_inches?: number;
+  custom_height_inches?: number;
+  custom_dpi?: number;
 }
 
 export interface PackageGroup {
@@ -966,6 +985,9 @@ export interface CreateManualTemplateRequest {
   sample_image_url?: string; // Sample image showing template filled with photos
   base64_preview?: string; // Base64-encoded small preview for instant loading
   category_id?: string;
+  custom_width_inches?: number;
+  custom_height_inches?: number;
+  custom_dpi?: number;
 }
 
 export interface CreateManualPackageRequest {

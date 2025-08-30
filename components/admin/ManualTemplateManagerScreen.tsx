@@ -35,6 +35,9 @@ interface TemplateFormData {
   dimensions: string; // JSON string for editing
   thumbnail_url: string;
   sample_image_url: string; // Sample image showing template filled with photos
+  custom_width_inches: string; // Optional custom width override
+  custom_height_inches: string; // Optional custom height override
+  custom_dpi: string; // Optional custom DPI override
 }
 
 // REMOVED: Hardcoded template types and print sizes - now loaded dynamically from database
@@ -48,7 +51,10 @@ const EMPTY_FORM: TemplateFormData = {
   holes_data: '[]',
   dimensions: '{"width": 1200, "height": 1800}',
   thumbnail_url: '',
-  sample_image_url: ''
+  sample_image_url: '',
+  custom_width_inches: '', // Leave empty to use defaults from print_size_config
+  custom_height_inches: '', // Leave empty to use defaults from print_size_config
+  custom_dpi: '' // Leave empty to calculate automatically
 };
 
 export default function ManualTemplateManagerScreen({
@@ -395,7 +401,10 @@ export default function ManualTemplateManagerScreen({
       holes_data: JSON.stringify(template.holes_data, null, 2),
       dimensions: JSON.stringify(template.dimensions, null, 2),
       thumbnail_url: template.thumbnail_url || '',
-      sample_image_url: template.sample_image_url || ''
+      sample_image_url: template.sample_image_url || '',
+      custom_width_inches: template.custom_width_inches?.toString() || '',
+      custom_height_inches: template.custom_height_inches?.toString() || '',
+      custom_dpi: template.custom_dpi?.toString() || ''
     });
     setEditingTemplate(template);
     
@@ -454,7 +463,10 @@ export default function ManualTemplateManagerScreen({
         holes_data: holesData,
         dimensions: dimensionsData,
         thumbnail_url: formData.thumbnail_url.trim() || undefined,
-        sample_image_url: formData.sample_image_url.trim() || undefined
+        sample_image_url: formData.sample_image_url.trim() || undefined,
+        custom_width_inches: formData.custom_width_inches ? parseFloat(formData.custom_width_inches) : undefined,
+        custom_height_inches: formData.custom_height_inches ? parseFloat(formData.custom_height_inches) : undefined,
+        custom_dpi: formData.custom_dpi ? parseInt(formData.custom_dpi) : undefined
       };
 
       if (editingTemplate) {
@@ -717,6 +729,13 @@ export default function ManualTemplateManagerScreen({
               <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
                 {template.print_size}
               </span>
+              {/* Display physical dimensions if custom values are set */}
+              {(template.custom_width_inches || template.custom_height_inches) && (
+                <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
+                  {template.custom_width_inches || '4'}x{template.custom_height_inches || '6'}" 
+                  {template.custom_dpi && ` @ ${template.custom_dpi}DPI`}
+                </span>
+              )}
               <span>{template.holes_data.length} holes</span>
               <span className="text-gray-400">
                 Created: {new Date(template.created_at).toLocaleDateString()}
@@ -977,6 +996,74 @@ export default function ManualTemplateManagerScreen({
                   )}
                 </select>
               </div>
+            </div>
+
+            {/* Physical Dimension Overrides */}
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                Physical Dimensions (Optional - Leave empty to use defaults)
+              </h4>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Width (inches)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.custom_width_inches}
+                    onChange={(e) => setFormData(prev => ({ ...prev, custom_width_inches: e.target.value }))}
+                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder={formData.print_size === '4R' ? '4' : formData.print_size === '5R' ? '5' : '8.27'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Height (inches)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.custom_height_inches}
+                    onChange={(e) => setFormData(prev => ({ ...prev, custom_height_inches: e.target.value }))}
+                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder={formData.print_size === '4R' ? '6' : formData.print_size === '5R' ? '7' : '11.69'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    DPI
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="72"
+                    max="1200"
+                    value={formData.custom_dpi}
+                    onChange={(e) => setFormData(prev => ({ ...prev, custom_dpi: e.target.value }))}
+                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Auto"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Override default dimensions for this template. DPI will be calculated automatically if left empty.
+              </p>
+              {/* Show calculated pixels if custom dimensions are provided */}
+              {(formData.custom_width_inches || formData.custom_height_inches) && (
+                <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-700">
+                  {(() => {
+                    const width = parseFloat(formData.custom_width_inches) || 4;
+                    const height = parseFloat(formData.custom_height_inches) || 6;
+                    const dpi = parseInt(formData.custom_dpi) || 300;
+                    const pixelWidth = Math.round(width * dpi);
+                    const pixelHeight = Math.round(height * dpi);
+                    return `Results in: ${pixelWidth}x${pixelHeight}px at ${dpi} DPI (${width}x${height} inches)`;
+                  })()}
+                </div>
+              )}
             </div>
 
             <div>

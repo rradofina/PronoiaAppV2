@@ -137,6 +137,9 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
           thumbnail_url: templateData.thumbnail_url,
           sample_image_url: templateData.sample_image_url,
           category_id: templateData.category_id,
+          custom_width_inches: templateData.custom_width_inches,
+          custom_height_inches: templateData.custom_height_inches,
+          custom_dpi: templateData.custom_dpi,
           created_by: await this.getCurrentUserEmail(),
         })
         .select()
