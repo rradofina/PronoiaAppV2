@@ -294,7 +294,6 @@ interface PhotoSelectionScreenProps {
   uploadProgress?: { current: number; total: number; templateName: string } | null;
   handlePhotoSelect: (photo: Photo) => void;
   handleSlotSelect: (slot: TemplateSlot) => void;
-  handleBack: () => void;
   totalAllowedPrints: number;
   setSelectedSlot: (slot: TemplateSlot | null) => void;
   setTemplateSlots: (slots: TemplateSlot[]) => void;
@@ -315,7 +314,6 @@ export default function PhotoSelectionScreen({
   uploadProgress = null,
   handlePhotoSelect,
   handleSlotSelect,
-  handleBack,
   totalAllowedPrints,
   setSelectedSlot,
   setTemplateSlots,
@@ -379,9 +377,6 @@ export default function PhotoSelectionScreen({
   
   // Remove confirmation state - kept for replacement confirmation
   const [slotShowingRemoveConfirmation, setSlotShowingRemoveConfirmation] = useState<TemplateSlot | null>(null);
-  
-  // Back navigation confirmation
-  const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   
   // Incomplete slots warning
   const [showIncompleteWarning, setShowIncompleteWarning] = useState(false);
@@ -1355,37 +1350,6 @@ export default function PhotoSelectionScreen({
     // NOTE: Removed collapse logic - using fixed height layout now
   };
 
-  // Handle back navigation with confirmation
-  const handleBackWithConfirmation = () => {
-    // Reset photo selection state before navigating back
-    setIsSelectingPhoto(false);
-    setSelectedSlot(null);
-    
-    // Check if user has made any selections
-    const hasSelections = templateSlots.some(slot => slot.photoId);
-    
-    if (hasSelections) {
-      // Show confirmation dialog
-      setShowBackConfirmation(true);
-    } else {
-      // No selections made, go back directly
-      handleBack();
-    }
-  };
-
-  // Confirm back navigation
-  const confirmBackNavigation = () => {
-    setShowBackConfirmation(false);
-    setIsSelectingPhoto(false); // Ensure overlay is cleared
-    setSelectedSlot(null); // Clear selected slot
-    handleBack();
-  };
-
-  // Cancel back navigation
-  const cancelBackNavigation = () => {
-    setShowBackConfirmation(false);
-  };
-
   // Handle finalize with validation
   const handleFinalizeClick = () => {
     // Count empty slots
@@ -1823,16 +1787,6 @@ export default function PhotoSelectionScreen({
                 {selectionMode === 'photo' ? '📷 Ready to Fill Prints' : '⭐ Back to Photo Selection'}
               </button>
               
-              {/* Back button for mobile - visible in header on mobile only */}
-              <button
-                onClick={handleBackWithConfirmation}
-                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 flex items-center whitespace-nowrap ${
-                  viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
-                }`}
-              >
-                ← Back
-              </button>
-              
               {/* Add Prints button - only in print mode */}
               {selectionMode === 'print' && (
                 <button
@@ -2196,80 +2150,6 @@ export default function PhotoSelectionScreen({
                       onClick={cancelIncompleteFinalize}
                     >
                       Go Back & Fill Slots
-                    </button>
-                  </div>
-                </Dialog.Panel>
-              </Transition.Child>
-            </div>
-          </div>
-        </Dialog>
-      </Transition>
-
-      {/* Back Navigation Confirmation Dialog */}
-      <Transition appear show={showBackConfirmation} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={cancelBackNavigation}>
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-black bg-opacity-50" />
-          </Transition.Child>
-
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4 text-center">
-              <Transition.Child
-                as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 scale-95"
-                enterTo="opacity-100 scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 scale-100"
-                leaveTo="opacity-0 scale-95"
-              >
-                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-                  <Dialog.Title
-                    as="h3"
-                    className="text-lg font-medium leading-6 text-gray-900 text-center"
-                  >
-                    Are you sure you want to go back?
-                  </Dialog.Title>
-                  
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-500 text-center">
-                      You have selected photos for your prints. Going back will lose your current selections.
-                    </p>
-                    
-                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <div className="text-sm text-yellow-800">
-                        <strong>Current Progress:</strong>
-                        <div className="mt-1">
-                          • {templateSlots.filter(s => s.photoId).length} photos selected
-                          <br />
-                          • {templateSlots.filter(s => !s.photoId).length} slots remaining
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 flex gap-3">
-                    <button
-                      type="button"
-                      className="flex-1 inline-flex justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                      onClick={cancelBackNavigation}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="flex-1 inline-flex justify-center rounded-lg border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-                      onClick={confirmBackNavigation}
-                    >
-                      Yes, Go Back
                     </button>
                   </div>
                 </Dialog.Panel>

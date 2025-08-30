@@ -1447,7 +1447,6 @@ export default function Home() {
             uploadProgress={uploadProgress}
             handlePhotoSelect={handlePhotoSelect}
             handleSlotSelect={handleSlotSelect}
-            handleBack={handleBack}
             totalAllowedPrints={getTotalAllowedPrints()}
             setTemplateSlots={setTemplateSlots}
           />

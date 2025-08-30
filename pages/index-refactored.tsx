@@ -491,7 +491,6 @@ export default function Home() {
             handlePhotoContinue={() => setError('Photo selection complete!')}
             handlePhotoSelect={handlePhotoSelect}
             handleSlotSelect={handleSlotSelect}
-            handleBack={handleBack}
             totalAllowedPrints={getTotalAllowedPrints()}
             setTemplateSlots={setTemplateSlots}
           />
