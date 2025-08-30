@@ -6,7 +6,7 @@ import { packageGroupService } from '../../services/packageGroupService';
 import { googleDriveService } from '../../services/googleDriveService';
 import AnimatedTemplateReveal from '../animations/AnimatedTemplateReveal';
 import PackageTemplatePreview from '../PackageTemplatePreview';
-import { ChevronRight, ChevronLeft, Folder } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Folder, RefreshCw } from 'lucide-react';
 
 // Template state management types with session storage
 interface TemplateState {
@@ -447,6 +447,8 @@ export default function FolderSelectionScreen({
   const [currentFolders, setCurrentFolders] = useState<DriveFolder[]>(clientFolders);
   const [isLoadingFolders, setIsLoadingFolders] = useState(false);
   const [selectedNavigationFolder, setSelectedNavigationFolder] = useState<DriveFolder | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   
   // Template state managed by reducer (replaces scattered useState)
   const [templateState, dispatchTemplate] = useReducer(templateReducer, initialTemplateState);
@@ -455,39 +457,90 @@ export default function FolderSelectionScreen({
   const [selectedTemplates, setSelectedTemplates] = useState<ManualTemplate[]>([]);
   const [availablePhotos, setAvailablePhotos] = useState<Photo[]>([]);
 
-  // Load folders from a specific parent folder
-  const loadFolders = async (parentId: string | null = null) => {
-    setIsLoadingFolders(true);
+  // Load folders from a specific parent folder with cache bypass
+  const loadFolders = async (parentId: string | null = null, forceRefresh: boolean = false) => {
+    if (!forceRefresh) {
+      setIsLoadingFolders(true);
+    }
     try {
       // If parentId is null, we're at the root (selectedMainFolder)
       if (parentId === null) {
         // Load folders from the main folder
         const mainFolderId = selectedMainFolder?.id;
         if (!mainFolderId) {
-          setCurrentFolders(clientFolders);
+          console.log('No main folder ID, falling back to client folders prop');
+          // If we're refreshing, try to reload from Google Drive anyway
+          if (forceRefresh && selectedMainFolder) {
+            const response = await window.gapi.client.drive.files.list({
+              q: `'${selectedMainFolder.id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+              fields: 'files(id, name, createdTime, modifiedTime)',
+              orderBy: 'name',
+              // Add cache-busting parameter
+              pageSize: 1000,
+              supportsAllDrives: true
+            });
+            const freshFolders = response.result.files || [];
+            console.log(`Refreshed folders: found ${freshFolders.length} folders`);
+            setCurrentFolders(freshFolders);
+            setLastRefreshTime(new Date());
+          } else {
+            setCurrentFolders(clientFolders);
+          }
           return;
         }
         
         const response = await window.gapi.client.drive.files.list({
           q: `'${mainFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-          fields: 'files(id, name, createdTime)',
-          orderBy: 'name'
+          fields: 'files(id, name, createdTime, modifiedTime)',
+          orderBy: 'name',
+          pageSize: 1000,
+          supportsAllDrives: true
         });
-        setCurrentFolders(response.result.files || []);
+        const freshFolders = response.result.files || [];
+        console.log(`Loaded ${freshFolders.length} folders from main folder`);
+        setCurrentFolders(freshFolders);
+        if (forceRefresh) {
+          setLastRefreshTime(new Date());
+        }
       } else {
         // Load subfolders from the specified parent
         const response = await window.gapi.client.drive.files.list({
           q: `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-          fields: 'files(id, name, createdTime)',
-          orderBy: 'name'
+          fields: 'files(id, name, createdTime, modifiedTime)',
+          orderBy: 'name',
+          pageSize: 1000,
+          supportsAllDrives: true
         });
-        setCurrentFolders(response.result.files || []);
+        const freshFolders = response.result.files || [];
+        console.log(`Loaded ${freshFolders.length} subfolders from parent ${parentId}`);
+        setCurrentFolders(freshFolders);
+        if (forceRefresh) {
+          setLastRefreshTime(new Date());
+        }
       }
     } catch (error) {
       console.error('Failed to load folders:', error);
       setCurrentFolders([]);
     } finally {
-      setIsLoadingFolders(false);
+      if (!forceRefresh) {
+        setIsLoadingFolders(false);
+      }
+    }
+  };
+
+  // Refresh folders from Google Drive
+  const refreshFolders = async () => {
+    console.log('🔄 Refreshing folders from Google Drive...');
+    setIsRefreshing(true);
+    setSelectedNavigationFolder(null); // Clear selection during refresh
+    
+    try {
+      await loadFolders(currentFolderId, true);
+      console.log('✅ Folders refreshed successfully');
+    } catch (error) {
+      console.error('❌ Failed to refresh folders:', error);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -862,12 +915,23 @@ export default function FolderSelectionScreen({
     }
   }, [showPackageSelection]);
 
-  // Initialize folders on mount
+  // Initialize folders on mount and always load fresh data
   useEffect(() => {
-    if (!showPackageSelection && clientFolders.length > 0) {
-      setCurrentFolders(clientFolders);
+    if (!showPackageSelection) {
+      // Always load fresh data from Google Drive when entering folder selection
+      console.log('📂 Loading fresh folder data on mount...');
+      loadFolders(null, true);
     }
-  }, [clientFolders, showPackageSelection]);
+  }, [showPackageSelection]);
+  
+  // Refresh when returning from package selection
+  useEffect(() => {
+    if (!showPackageSelection && folderPath.length === 0) {
+      // We're back at the root level, refresh the folder list
+      console.log('🔄 Returned to folder selection, refreshing...');
+      loadFolders(null, true);
+    }
+  }, [showPackageSelection]);
 
   const handleFolderSelect = (folder: DriveFolder) => {
     console.log('✅ Selecting folder as client folder:', folder.name);
@@ -947,12 +1011,34 @@ export default function FolderSelectionScreen({
                 <div className="mt-2 text-xs sm:text-sm text-blue-600">
                   Main folder: {selectedMainFolder?.name}
                 </div>
+                {lastRefreshTime && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    Last refreshed: {lastRefreshTime.toLocaleTimeString()}
+                  </div>
+                )}
               </div>
 
               <div className="bg-white rounded-lg p-3 sm:p-6 shadow-sm">
-                {/* Breadcrumb Navigation */}
-                {(folderPath.length > 0 || currentFolderId !== null) && (
-                  <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-b border-gray-200">
+                {/* Refresh Button and Breadcrumb Navigation */}
+                <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-b border-gray-200">
+                  {/* Refresh Button */}
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="text-sm font-medium text-gray-700">
+                      {currentFolders.length} folder{currentFolders.length !== 1 ? 's' : ''} found
+                    </div>
+                    <button
+                      onClick={refreshFolders}
+                      disabled={isRefreshing || isLoadingFolders}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Refresh folder list from Google Drive"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                      {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                    </button>
+                  </div>
+                  
+                  {/* Breadcrumb Navigation */}
+                  {(folderPath.length > 0 || currentFolderId !== null) && (
                     <div className="flex items-center flex-wrap gap-1 text-xs sm:text-sm">
                       {/* Root/Main Folder */}
                       <button
@@ -976,9 +1062,10 @@ export default function FolderSelectionScreen({
                         </div>
                       ))}
                     </div>
-                    
-                    {/* Back Button */}
-                    {folderPath.length > 0 && (
+                  )}
+                  
+                  {/* Back Button */}
+                  {folderPath.length > 0 && (
                       <button
                         onClick={handleBackClick}
                         className="mt-2 sm:mt-3 flex items-center text-gray-600 hover:text-gray-800 text-xs sm:text-sm"
@@ -986,15 +1073,14 @@ export default function FolderSelectionScreen({
                         <ChevronLeft className="w-3 sm:w-4 h-3 sm:h-4 mr-0.5 sm:mr-1" />
                         <span className="truncate">Back to {folderPath.length > 1 ? folderPath[folderPath.length - 1].name : selectedMainFolder?.name}</span>
                       </button>
-                    )}
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Loading state */}
-                {isLoadingFolders ? (
+                {(isLoadingFolders || isRefreshing) ? (
                   <div className="text-center py-8">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <p className="mt-2 text-gray-600">Loading folders...</p>
+                    <p className="mt-2 text-gray-600">{isRefreshing ? 'Refreshing folders...' : 'Loading folders...'}</p>
                   </div>
                 ) : (
                   <>

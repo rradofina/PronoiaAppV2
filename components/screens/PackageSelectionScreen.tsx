@@ -1,7 +1,8 @@
-import { Package, Photo, DriveFolder, ManualTemplate } from '../../types';
-import { useState, useEffect } from 'react';
+import { Package, Photo, DriveFolder, ManualTemplate, TemplateSlot } from '../../types';
+import { useState, useEffect, Fragment } from 'react';
 import PackageTemplatePreview from '../PackageTemplatePreview';
 import { manualPackageService } from '../../services/manualPackageService';
+import { Dialog, Transition } from '@headlessui/react';
 
 interface PackageSelectionScreenProps {
   clientName: string;
@@ -12,6 +13,7 @@ interface PackageSelectionScreenProps {
   setSelectedPackage: (pkg: Package) => void;
   handleBack: () => void;
   handlePackageContinue: (templates?: ManualTemplate[]) => void;
+  templateSlots?: TemplateSlot[];
 }
 
 export default function PackageSelectionScreen({
@@ -23,11 +25,13 @@ export default function PackageSelectionScreen({
   setSelectedPackage,
   handleBack,
   handlePackageContinue,
+  templateSlots = [],
 }: PackageSelectionScreenProps) {
   const [templates, setTemplates] = useState<ManualTemplate[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [originalTemplateCount, setOriginalTemplateCount] = useState(0);
+  const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   
   // Load templates when component mounts or selected package changes
   useEffect(() => {
@@ -58,6 +62,22 @@ export default function PackageSelectionScreen({
     
     loadTemplates();
   }, [selectedPackage]);
+  
+  // Handle back with confirmation
+  const handleBackWithConfirmation = () => {
+    setShowBackConfirmation(true);
+  };
+  
+  // Confirm back navigation
+  const confirmBackNavigation = () => {
+    setShowBackConfirmation(false);
+    handleBack();
+  };
+  
+  // Cancel back navigation
+  const cancelBackNavigation = () => {
+    setShowBackConfirmation(false);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -120,7 +140,7 @@ export default function PackageSelectionScreen({
                 console.log('📋 Continuing with templates:', templates.length, `(${originalTemplateCount} original, ${templates.length - originalTemplateCount} additional)`);
                 handlePackageContinue(templatesWithFlags);
               }}
-              onChangePackage={handleBack}
+              onChangePackage={handleBackWithConfirmation}
               availablePhotos={photos}
               loading={isLoadingTemplates}
               onTemplateReplace={(packageId, templateIndex, newTemplate) => {
@@ -160,6 +180,122 @@ export default function PackageSelectionScreen({
           </div>
         )}
       </div>
+      
+      {/* Back Navigation Confirmation Dialog */}
+      <Transition appear show={showBackConfirmation} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={cancelBackNavigation}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-50" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <Dialog.Title
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-gray-900 text-center"
+                  >
+                    Are you sure you want to go back?
+                  </Dialog.Title>
+                  
+                  <div className="mt-4">
+                    {(() => {
+                      const hasPhotoSelections = templateSlots.some(slot => slot.photoId);
+                      const filledSlots = templateSlots.filter(slot => slot.photoId).length;
+                      
+                      if (hasPhotoSelections) {
+                        return (
+                          <>
+                            <p className="text-sm text-gray-500 text-center">
+                              Your photo selections and package customizations will be lost.
+                            </p>
+                            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                              <div className="text-sm text-yellow-800">
+                                <strong>You will lose:</strong>
+                                <div className="mt-1">
+                                  • {filledSlots} photo{filledSlots !== 1 ? 's' : ''} already placed in templates
+                                  <br />
+                                  • Selected package: {selectedPackage?.name}
+                                  {templates.length !== originalTemplateCount && (
+                                    <>
+                                      <br />
+                                      • Template customizations
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      } else {
+                        return (
+                          <>
+                            <p className="text-sm text-gray-500 text-center">
+                              Your package selection and template customizations will be lost.
+                            </p>
+                            {selectedPackage && (
+                              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <div className="text-sm text-yellow-800">
+                                  <strong>You will lose:</strong>
+                                  <div className="mt-1">
+                                    • Selected package: {selectedPackage.name}
+                                    <br />
+                                    • {templates.length} configured templates
+                                    {templates.length !== originalTemplateCount && (
+                                      <>
+                                        <br />
+                                        • Template customizations
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      }
+                    })()}
+                  </div>
+
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      type="button"
+                      className="flex-1 inline-flex justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      onClick={cancelBackNavigation}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="flex-1 inline-flex justify-center rounded-lg border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                      onClick={confirmBackNavigation}
+                    >
+                      Yes, Go Back
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
     </div>
   );
 } 

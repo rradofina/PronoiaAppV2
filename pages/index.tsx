@@ -230,6 +230,7 @@ export default function Home() {
   const [localPhotos, setLocalPhotos] = useState<Photo[]>([]);
   const [isRestoringAuth, setIsRestoringAuth] = useState(false);
   const [additionalPrints, setAdditionalPrints] = useState(0);
+  const [favoritedPhotos, setFavoritedPhotos] = useState<Set<string>>(new Set());
   const [templateRefreshTrigger, setTemplateRefreshTrigger] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [printsFolderId, setPrintsFolderId] = useState<string | null>(null);
@@ -708,6 +709,7 @@ export default function Home() {
     setClientName('');
     setTemplateSlots([]);
     setSelectedSlot(null);
+    setFavoritedPhotos(new Set());
   };
 
   const handleChangeMainFolder = () => {
@@ -723,6 +725,7 @@ export default function Home() {
       setSelectedMainFolder(null);
       setClientFolders([]);
     } else if (currentScreen === 'package') {
+      // When going back from package to folder selection, clear everything including photo selections
       setCurrentScreen('folder-selection');
       setSelectedClientFolder(null);
       setLocalPhotos([]);
@@ -730,12 +733,17 @@ export default function Home() {
       setSelectedPackage(null);
       setClientName('');
       setAdditionalPrints(0);
+      // Also clear template slots and favorites if any photos were selected
+      setTemplateSlots([]);
+      setSelectedSlot(null);
+      setFavoritedPhotos(new Set());
     } else if (currentScreen === 'template') {
       setCurrentScreen('folder-selection'); // Go back to folder selection (which includes package selection)
     } else if (currentScreen === 'photos') {
+      // When going from photos back to package, keep templateSlots and photos
+      // This is handled by onBackToPackage which just changes screen
+      // Note: We don't clear templateSlots or selectedSlot here to preserve user's work
       setCurrentScreen('folder-selection'); // Go back to folder selection (which includes package selection)
-      setTemplateSlots([]);
-      setSelectedSlot(null);
     }
   };
 
@@ -1021,59 +1029,95 @@ export default function Home() {
         //   console.warn('⚠️ Template preloading failed (non-critical):', error);
         // });
         
-        // Create template slots from configured templates
-        const slots: TemplateSlot[] = [];
-        
-        // Add slots for each configured template
-        orderedTemplates.forEach((template, templateIndex) => {
-          // Check if this template is from an addition (added via Package Selection screen)
-          const isFromAddition = (template as any)._isFromAddition === true;
-          
-          // Use different naming for additional templates vs base package templates
-          const templateName = isFromAddition 
-            ? template.name // Additional templates: use name as-is
-            : `${template.name} (Print #${templateIndex + 1})`; // Base templates: add print number
-          
-          // Create slots for each hole in the template
-          for (let slotIndex = 0; slotIndex < template.holes_data.length; slotIndex++) {
-            slots.push({
-              id: `${template.id}_${templateIndex}_${slotIndex}`,
-              templateId: `${template.id}_${templateIndex}`,
-              templateName,
-              templateType: template.id.toString(), // Use unique template ID instead of generic type
-              printSize: template.print_size,
-              slotIndex,
-              photoId: undefined,
-              isAdditional: isFromAddition // Mark based on whether it's from an addition
-            });
-          }
+        // Calculate expected number of slots
+        let expectedSlotCount = 0;
+        orderedTemplates.forEach(template => {
+          expectedSlotCount += template.holes_data.length;
         });
-        
-        // Add additional prints if requested (repeat the configured templates)
         if (additionalPrints > 0) {
-          for (let additionalIndex = 0; additionalIndex < additionalPrints; additionalIndex++) {
-            const templateToRepeat = orderedTemplates[additionalIndex % orderedTemplates.length];
-            const templateName = `${templateToRepeat.name} (Additional #${additionalIndex + 1})`;
-            const templateId = `${templateToRepeat.id}_additional_${additionalIndex}`;
-            
-            for (let slotIndex = 0; slotIndex < templateToRepeat.holes_data.length; slotIndex++) {
-              slots.push({
-                id: `${templateId}_${slotIndex}`,
-                templateId,
-                templateName,
-                templateType: templateToRepeat.id.toString(), // Use unique template ID instead of generic type
-                printSize: templateToRepeat.print_size,
-                slotIndex,
-                photoId: undefined,
-                isAdditional: true // Mark as additional print added beyond base package
-              });
-            }
+          for (let i = 0; i < additionalPrints; i++) {
+            const template = orderedTemplates[i % orderedTemplates.length];
+            expectedSlotCount += template.holes_data.length;
           }
         }
         
-        setTemplateSlots(slots);
+        // Check if we already have template slots with photos
+        const hasExistingSlots = templateSlots.length > 0;
+        const slotsMatchExpected = templateSlots.length === expectedSlotCount;
+        const hasFilledSlots = templateSlots.some(slot => slot.photoId);
+        
+        // Only create new slots if:
+        // 1. No slots exist yet, OR
+        // 2. The slot count doesn't match (templates were modified), OR
+        // 3. No photos have been placed yet (safe to recreate)
+        if (!hasExistingSlots || !slotsMatchExpected || !hasFilledSlots) {
+          console.log('📝 Creating new template slots:', {
+            hasExistingSlots,
+            slotsMatchExpected,
+            hasFilledSlots,
+            expectedSlotCount,
+            currentSlotCount: templateSlots.length
+          });
+          
+          // Create template slots from configured templates
+          const slots: TemplateSlot[] = [];
+          
+          // Add slots for each configured template
+          orderedTemplates.forEach((template, templateIndex) => {
+            // Check if this template is from an addition (added via Package Selection screen)
+            const isFromAddition = (template as any)._isFromAddition === true;
+            
+            // Use different naming for additional templates vs base package templates
+            const templateName = isFromAddition 
+              ? template.name // Additional templates: use name as-is
+              : `${template.name} (Print #${templateIndex + 1})`; // Base templates: add print number
+            
+            // Create slots for each hole in the template
+            for (let slotIndex = 0; slotIndex < template.holes_data.length; slotIndex++) {
+              slots.push({
+                id: `${template.id}_${templateIndex}_${slotIndex}`,
+                templateId: `${template.id}_${templateIndex}`,
+                templateName,
+                templateType: template.id.toString(), // Use unique template ID instead of generic type
+                printSize: template.print_size,
+                slotIndex,
+                photoId: undefined,
+                isAdditional: isFromAddition // Mark based on whether it's from an addition
+              });
+            }
+          });
+          
+          // Add additional prints if requested (repeat the configured templates)
+          if (additionalPrints > 0) {
+            for (let additionalIndex = 0; additionalIndex < additionalPrints; additionalIndex++) {
+              const templateToRepeat = orderedTemplates[additionalIndex % orderedTemplates.length];
+              const templateName = `${templateToRepeat.name} (Additional #${additionalIndex + 1})`;
+              const templateId = `${templateToRepeat.id}_additional_${additionalIndex}`;
+              
+              for (let slotIndex = 0; slotIndex < templateToRepeat.holes_data.length; slotIndex++) {
+                slots.push({
+                  id: `${templateId}_${slotIndex}`,
+                  templateId,
+                  templateName,
+                  templateType: templateToRepeat.id.toString(), // Use unique template ID instead of generic type
+                  printSize: templateToRepeat.print_size,
+                  slotIndex,
+                  photoId: undefined,
+                  isAdditional: true // Mark as additional print added beyond base package
+                });
+              }
+            }
+          }
+          
+          setTemplateSlots(slots);
+        } else {
+          console.log('✅ Preserving existing template slots with filled photos:', {
+            totalSlots: templateSlots.length,
+            filledSlots: templateSlots.filter(s => s.photoId).length
+          });
+        }
         const endTime = performance.now();
-        console.log(`⚡ Manual package continue completed in ${(endTime - startTime).toFixed(0)}ms with ${slots.length} slots`);
+        console.log(`⚡ Manual package continue completed in ${(endTime - startTime).toFixed(0)}ms with ${templateSlots.length} slots`);
         console.log('📋 Package templates loaded and preloading initiated');
         setCurrentScreen('photos');
       } catch (error) {
@@ -1420,6 +1464,7 @@ export default function Home() {
             setSelectedPackage={setSelectedPackage}
             handleBack={handleBack}
             handlePackageContinue={handlePackageContinue}
+            templateSlots={templateSlots}
           />
         );
       case 'template-setup':
@@ -1449,6 +1494,9 @@ export default function Home() {
             handleSlotSelect={handleSlotSelect}
             totalAllowedPrints={getTotalAllowedPrints()}
             setTemplateSlots={setTemplateSlots}
+            onBackToPackage={() => setCurrentScreen('package')}
+            favoritedPhotos={favoritedPhotos}
+            setFavoritedPhotos={setFavoritedPhotos}
           />
         );
       case 'png-template-management':

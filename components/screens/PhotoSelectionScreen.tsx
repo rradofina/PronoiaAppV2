@@ -297,6 +297,9 @@ interface PhotoSelectionScreenProps {
   totalAllowedPrints: number;
   setSelectedSlot: (slot: TemplateSlot | null) => void;
   setTemplateSlots: (slots: TemplateSlot[]) => void;
+  onBackToPackage?: () => void;
+  favoritedPhotos: Set<string>;
+  setFavoritedPhotos: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
 
 export default function PhotoSelectionScreen({
@@ -317,6 +320,9 @@ export default function PhotoSelectionScreen({
   totalAllowedPrints,
   setSelectedSlot,
   setTemplateSlots,
+  onBackToPackage,
+  favoritedPhotos,
+  setFavoritedPhotos,
 }: PhotoSelectionScreenProps) {
   console.log('📷 PhotoSelectionScreen rendered with:', {
     photosCount: photos.length,
@@ -334,7 +340,7 @@ export default function PhotoSelectionScreen({
   
   // Two-mode system for photo selection
   const [selectionMode, setSelectionMode] = useState<'photo' | 'print'>('photo'); // Default to photo selection mode
-  const [favoritedPhotos, setFavoritedPhotos] = useState<Set<string>>(new Set()); // Photo IDs that are favorited
+  // NOTE: favoritedPhotos now comes from props, not local state
   
   // NOTE: Removed expansion state - using fixed height layout now
   
@@ -381,6 +387,10 @@ export default function PhotoSelectionScreen({
   // Incomplete slots warning
   const [showIncompleteWarning, setShowIncompleteWarning] = useState(false);
   const [showUploadOptions, setShowUploadOptions] = useState(false);
+  
+  // Double-tap navigation states
+  const [lastTapTime, setLastTapTime] = useState(0);
+  const [showBackToPackageConfirm, setShowBackToPackageConfirm] = useState(false);
   
   // Template management states (simplified)
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -1388,6 +1398,34 @@ export default function PhotoSelectionScreen({
   const cancelIncompleteFinalize = () => {
     setShowIncompleteWarning(false);
   };
+  
+  // Handle double-tap on client name
+  const handleClientNameTap = () => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300; // milliseconds
+    
+    if (now - lastTapTime < DOUBLE_TAP_DELAY) {
+      // Double tap detected
+      console.log('Double tap detected on client name');
+      if (onBackToPackage) {
+        setShowBackToPackageConfirm(true);
+      }
+    }
+    setLastTapTime(now);
+  };
+  
+  // Confirm navigation back to package
+  const confirmBackToPackage = () => {
+    setShowBackToPackageConfirm(false);
+    if (onBackToPackage) {
+      onBackToPackage();
+    }
+  };
+  
+  // Cancel navigation back
+  const cancelBackToPackage = () => {
+    setShowBackToPackageConfirm(false);
+  };
 
   // Get photos used in templates
   const getUsedPhotoIds = () => {
@@ -1756,7 +1794,13 @@ export default function PhotoSelectionScreen({
           <div className="bg-white border-b p-2 sm:p-3 flex items-center justify-between layout-header">
             <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
               <h2 className="text-sm sm:text-base font-medium text-gray-800">
-                <span className="text-blue-600">{clientName}</span>
+                <span 
+                  className="text-blue-600 cursor-pointer hover:text-blue-700 hover:underline transition-colors select-none"
+                  onClick={handleClientNameTap}
+                  title="Double-tap to go back to selected package"
+                >
+                  {clientName}
+                </span>
                 <span className="mx-1 text-gray-400">•</span>
                 {selectionMode === 'photo' ? 'Select Your Favorite Photos' : 'Fill Your Print Templates'}
               </h2>
@@ -2150,6 +2194,80 @@ export default function PhotoSelectionScreen({
                       onClick={cancelIncompleteFinalize}
                     >
                       Go Back & Fill Slots
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* Back to Package Confirmation Dialog */}
+      <Transition appear show={showBackToPackageConfirm} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={cancelBackToPackage}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-50" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <Dialog.Title
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-gray-900 text-center"
+                  >
+                    Go back to selected package?
+                  </Dialog.Title>
+                  
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-500 text-center">
+                      Your photo selections will be preserved and you can continue from where you left off.
+                    </p>
+                    
+                    <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="text-sm text-blue-800">
+                        <strong>Current Progress:</strong>
+                        <div className="mt-1">
+                          • {templateSlots.filter(s => s.photoId).length} slots filled
+                          <br />
+                          • {favoritedPhotos.size} photos favorited
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      type="button"
+                      className="flex-1 inline-flex justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      onClick={cancelBackToPackage}
+                    >
+                      Stay Here
+                    </button>
+                    <button
+                      type="button"
+                      className="flex-1 inline-flex justify-center rounded-lg border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      onClick={confirmBackToPackage}
+                    >
+                      Go Back
                     </button>
                   </div>
                 </Dialog.Panel>

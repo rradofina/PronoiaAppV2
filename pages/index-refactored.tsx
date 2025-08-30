@@ -78,6 +78,7 @@ export default function Home() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRestoringAuth, setIsRestoringAuth] = useState(false);
   const [additionalPrints, setAdditionalPrints] = useState(0);
+  const [favoritedPhotos, setFavoritedPhotos] = useState<Set<string>>(new Set());
 
   // Load Google API and handle authentication
   useEffect(() => {
@@ -493,6 +494,8 @@ export default function Home() {
             handleSlotSelect={handleSlotSelect}
             totalAllowedPrints={getTotalAllowedPrints()}
             setTemplateSlots={setTemplateSlots}
+            favoritedPhotos={favoritedPhotos}
+            setFavoritedPhotos={setFavoritedPhotos}
           />
         );
       default:
