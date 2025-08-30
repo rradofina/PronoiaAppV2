@@ -549,9 +549,9 @@ class TemplateSyncService {
   }
 
   /**
-   * Get sync status for a template
+   * Get sync status for a specific template
    */
-  getSyncStatus(templateId: string): SyncStatus {
+  getTemplateSyncStatus(templateId: string): SyncStatus {
     return this.syncStates.get(templateId)?.status || 'pending';
   }
 
