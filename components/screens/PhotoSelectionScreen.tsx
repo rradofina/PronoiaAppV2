@@ -470,6 +470,27 @@ export default function PhotoSelectionScreen({
       console.log('⏸️ Skipping initial sync - sync service not initialized');
     }
   }, []); // Only run once on mount
+  
+  // Update sync status periodically
+  useEffect(() => {
+    const updateSyncStatus = () => {
+      const status = templateSyncService.getSyncStatus();
+      setSyncStatus({
+        isInitialized: status.isInitialized,
+        isProcessing: status.isProcessing,
+        queueSize: status.queueSize,
+        syncedCount: status.syncedTemplates
+      });
+    };
+    
+    // Initial update
+    updateSyncStatus();
+    
+    // Update every second while processing
+    const interval = setInterval(updateSyncStatus, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Load available templates
   useEffect(() => {
@@ -522,6 +543,14 @@ export default function PhotoSelectionScreen({
 
 
   const [templateToNavigate, setTemplateToNavigate] = useState<string | null>(null);
+  
+  // Sync status tracking
+  const [syncStatus, setSyncStatus] = useState<{
+    isInitialized: boolean;
+    isProcessing: boolean;
+    queueSize: number;
+    syncedCount: number;
+  }>({ isInitialized: false, isProcessing: false, queueSize: 0, syncedCount: 0 });
 
   const handleTemplateAdd = (template: ManualTemplate) => {
     // Create new slots for the added template
@@ -1916,6 +1945,37 @@ export default function PhotoSelectionScreen({
 
         {/* UNIFIED NAVIGATION BAR - Mode toggle and Finalize buttons (all screen sizes) */}
         <div className="fixed bottom-[200px] left-0 right-0 z-40 bg-white border-t shadow-lg">
+          {/* Sync Status Indicator */}
+          {syncStatus.isInitialized && (syncStatus.isProcessing || syncStatus.queueSize > 0) && (
+            <div className="bg-blue-50 border-b border-blue-200 px-3 py-2">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  {syncStatus.isProcessing ? (
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <div className="w-4 h-4 border-2 border-yellow-500 rounded-full" />
+                  )}
+                  <span className="text-gray-700">
+                    {syncStatus.isProcessing 
+                      ? `Syncing templates to Google Drive...` 
+                      : `${syncStatus.queueSize} template${syncStatus.queueSize !== 1 ? 's' : ''} pending sync`}
+                  </span>
+                </div>
+                {syncStatus.syncedCount > 0 && (
+                  <span className="text-green-600 font-medium">
+                    ✓ {syncStatus.syncedCount} synced
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+          {!syncStatus.isInitialized && templateSlots.length > 0 && (
+            <div className="bg-yellow-50 border-b border-yellow-200 px-3 py-2">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-yellow-700">⚠️ Background sync disabled - templates won't auto-save</span>
+              </div>
+            </div>
+          )}
           <div className="flex p-3 gap-3">
             <button
               onClick={handleModeToggle}

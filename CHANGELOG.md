@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2024-12-30] - Background Sync and Upload Debug Improvements
+
+### Fixed
+- **Silent Sync Service Failure**: Template sync service now properly throws errors when initialization fails
+  - Files: `services/templateSyncService.ts` - Now throws errors instead of silently disabling
+  - Files: `pages/index.tsx` - Shows user warning when sync service fails to initialize
+  - Impact: Users are now informed when background sync is unavailable
+  - Commit: (pending)
+
+- **Queue Processing Race Condition**: Fixed issue where upload queue might not start processing
+  - Files: `services/templateSyncService.ts` - Added setTimeout to avoid race conditions
+  - Added better logging to track queue processing status
+  - Separated isProcessing check from empty queue check for clarity
+
+### Added
+- **Sync Status UI Indicator**: Visual feedback for background sync operations
+  - Files: `components/screens/PhotoSelectionScreen.tsx` - Added sync status bar
+  - Shows when templates are being synced to Google Drive
+  - Displays queue size and synced count
+  - Warns when sync service is disabled
+
+- **Debug Tools for Sync Service**: Added methods to diagnose sync issues
+  - Files: `services/templateSyncService.ts` - Added `forceProcessQueue()` and `getSyncStatus()`
+  - Exposed service to window object for console debugging
+  - Use `window.templateSyncService.getSyncStatus()` to check status
+  - Use `window.templateSyncService.forceProcessQueue()` to manually trigger
+
+- **Enhanced Logging**: Improved console logging for sync operations
+  - More detailed logging when sync is blocked or queued
+  - Clear indication of why sync might not be working
+  - Queue status and processing state visibility
+  - Debounce timer status logging
+
 ## [2025-08-30] - Folder Loading Fix & DPI Metadata Fix
 
 ### Fixed

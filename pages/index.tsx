@@ -645,12 +645,19 @@ export default function Home() {
     setClientName(folder.name);
     
     // Initialize template sync service for this client
+    let syncServiceInitialized = false;
     try {
       await templateSyncService.initialize(folder.id);
       console.log('✅ Template sync service initialized for client:', folder.name);
+      syncServiceInitialized = true;
     } catch (error) {
       console.error('Failed to initialize template sync service:', error);
-      // Continue anyway - sync is optional
+      // Show warning to user but continue
+      showWarning(
+        'Background sync disabled',
+        'Templates will not be automatically saved to Google Drive. You can still use manual upload.'
+      );
+      syncServiceInitialized = false;
     }
     
     try {

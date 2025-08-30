@@ -48,6 +48,7 @@ class TemplateSyncService {
 
   /**
    * Initialize sync service for a client session
+   * @throws Error if initialization fails
    */
   async initialize(clientFolderId: string): Promise<void> {
     console.log('🔄 Initializing template sync service for client:', clientFolderId);
@@ -66,8 +67,8 @@ class TemplateSyncService {
     } catch (error) {
       console.error('❌ Failed to initialize sync service:', error);
       this.isInitialized = false;
-      // Don't throw - allow app to continue without sync
-      console.warn('⚠️ Sync service will be disabled for this session');
+      // Throw error so UI can handle it properly
+      throw new Error(`Failed to initialize sync service: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -138,9 +139,12 @@ class TemplateSyncService {
     photos: Photo[],
     immediate: boolean = false
   ): void {
+    console.log('📌 queueTemplateSync called for:', templateId, { immediate });
+    
     // Guard: Don't sync if service not initialized
     if (!this.isInitialized) {
-      console.log('⚠️ Sync service not initialized, skipping sync for:', templateId);
+      console.warn('⚠️ SYNC BLOCKED: Service not initialized, skipping sync for:', templateId);
+      console.warn('  To enable sync, ensure prints folder can be created in Google Drive');
       return;
     }
 
@@ -161,12 +165,17 @@ class TemplateSyncService {
       clearTimeout(existingTimer);
     }
 
+    console.log('✅ Template is complete, will sync:', templateId);
+    console.log('  Current queue size:', this.uploadQueue.length);
+    console.log('  Is processing:', this.isProcessing);
+    
     if (immediate) {
+      console.log('⚡ Immediate sync requested');
       // Sync immediately
       this.addToUploadQueue(templateId, templateSlots, photos, 'high');
     } else {
       // Debounce for 3 seconds
-      console.log('⏱️ Queueing template sync (3s debounce):', templateId);
+      console.log(`⏱️ Queueing template sync (${this.DEBOUNCE_TIME}ms debounce):`, templateId);
       console.log('  Template slots count:', templateSlots.filter(s => s.templateId === templateId).length);
       console.log('  Photos available:', photos.length);
       const timer = setTimeout(() => {
@@ -214,19 +223,29 @@ class TemplateSyncService {
     console.log('📋 Added to upload queue:', templateId, 'Priority:', priority, 'Queue size:', this.uploadQueue.length);
     
     // Start processing if not already running
-    this.processUploadQueue();
+    // Use setTimeout to avoid potential race conditions
+    setTimeout(() => this.processUploadQueue(), 0);
   }
 
   /**
    * Process upload queue with parallel batch processing
    */
   private async processUploadQueue(): Promise<void> {
-    if (this.isProcessing || this.uploadQueue.length === 0) {
+    // Check if already processing
+    if (this.isProcessing) {
+      console.log('⏸️ Already processing queue, skipping');
+      return;
+    }
+    
+    // Check if queue is empty
+    if (this.uploadQueue.length === 0) {
+      console.log('📭 Queue is empty, nothing to process');
       return;
     }
     
     this.isProcessing = true;
     console.log(`🚀 Starting parallel sync processing with batch size ${this.PARALLEL_BATCH_SIZE}`);
+    console.log(`📦 Queue contains ${this.uploadQueue.length} items`);
     
     while (this.uploadQueue.length > 0) {
       // If user is interacting, pause all processing
@@ -710,6 +729,54 @@ class TemplateSyncService {
   }
 
   /**
+   * Manually trigger processing of the upload queue (for debugging)
+   */
+  async forceProcessQueue(): Promise<void> {
+    console.log('🔨 Force processing queue manually');
+    console.log('  Queue size:', this.uploadQueue.length);
+    console.log('  Is processing:', this.isProcessing);
+    console.log('  Is initialized:', this.isInitialized);
+    
+    if (!this.isInitialized) {
+      console.error('❌ Cannot process - service not initialized');
+      return;
+    }
+    
+    if (this.uploadQueue.length === 0) {
+      console.log('📭 Queue is empty, nothing to process');
+      return;
+    }
+    
+    if (this.isProcessing) {
+      console.log('⚠️ Already processing, forcing isProcessing to false and retrying');
+      this.isProcessing = false;
+    }
+    
+    await this.processUploadQueue();
+  }
+  
+  /**
+   * Get current sync status (for debugging)
+   */
+  getSyncStatus(): {
+    isInitialized: boolean;
+    isProcessing: boolean;
+    queueSize: number;
+    pendingDebounce: number;
+    syncedTemplates: number;
+    printsFolderId: string | null;
+  } {
+    return {
+      isInitialized: this.isInitialized,
+      isProcessing: this.isProcessing,
+      queueSize: this.uploadQueue.length,
+      pendingDebounce: this.syncQueue.size,
+      syncedTemplates: Array.from(this.syncStates.values()).filter(s => s.status === 'synced').length,
+      printsFolderId: this.printsFolderId
+    };
+  }
+  
+  /**
    * Clean up service (cancel all pending syncs)
    */
   cleanup(): void {
@@ -732,3 +799,11 @@ class TemplateSyncService {
 
 // Export singleton instance
 export const templateSyncService = new TemplateSyncService();
+
+// Expose to window for debugging
+if (typeof window !== 'undefined') {
+  (window as any).templateSyncService = templateSyncService;
+  console.log('📝 Template sync service exposed to window for debugging');
+  console.log('  Use window.templateSyncService.getSyncStatus() to check status');
+  console.log('  Use window.templateSyncService.forceProcessQueue() to manually trigger processing');
+}
