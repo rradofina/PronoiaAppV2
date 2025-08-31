@@ -95,6 +95,9 @@ class TemplateGenerationService {
   private async loadPhoto(photo: Photo): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const img = new Image();
+      
+      // Always set crossOrigin to avoid tainted canvas
+      // This is required for canvas export operations
       img.crossOrigin = 'anonymous';
       
       img.onload = () => resolve(img);

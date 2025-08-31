@@ -1501,9 +1501,8 @@ function PhotoRenderer({
       // Two finger pinch - handle zoom
       const distance = getTouchDistance(e.touches);
       const ratio = distance / lastTouchDistance;
-      const minCoverZoom = calculateMinimumCoverZoom();
-      const absoluteMinZoom = Math.max(0.1, minCoverZoom * 0.3); // More permissive minimum for pinch
-      const newScale = Math.max(absoluteMinZoom, Math.min(10, currentTransform.photoScale * ratio));
+      // Allow free zooming from 0.1x to 10x without constraints
+      const newScale = Math.max(0.1, Math.min(10, currentTransform.photoScale * ratio));
       
       const newTransform = createPhotoTransform(
         newScale,
@@ -1645,11 +1644,9 @@ function PhotoRenderer({
     
     // Scale factor for zoom
     const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    const minCoverZoom = calculateMinimumCoverZoom();
     
-    // Allow zooming below cover minimum temporarily, but limit extreme zoom out
-    const absoluteMinZoom = Math.max(0.1, minCoverZoom * 0.5);
-    const newScale = Math.max(absoluteMinZoom, Math.min(10, currentTransform.photoScale * scaleFactor));
+    // Allow free zooming from 0.1x to 10x without constraints
+    const newScale = Math.max(0.1, Math.min(10, currentTransform.photoScale * scaleFactor));
     
     const newTransform = createPhotoTransform(
       newScale,
