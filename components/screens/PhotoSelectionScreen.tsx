@@ -1181,9 +1181,18 @@ export default function PhotoSelectionScreen({
         const photoChanged = s.photoId !== photoId;
         const transformChanged = !s.transform || 
           (finalTransform && (
-            s.transform.photoScale !== finalTransform.photoScale ||
-            s.transform.photoCenterX !== finalTransform.photoCenterX ||
-            s.transform.photoCenterY !== finalTransform.photoCenterY
+            (isPhotoTransform(s.transform) && isPhotoTransform(finalTransform) && (
+              s.transform.photoScale !== finalTransform.photoScale ||
+              s.transform.photoCenterX !== finalTransform.photoCenterX ||
+              s.transform.photoCenterY !== finalTransform.photoCenterY
+            )) ||
+            (isContainerTransform(s.transform) && isContainerTransform(finalTransform) && (
+              s.transform.scale !== finalTransform.scale ||
+              s.transform.x !== finalTransform.x ||
+              s.transform.y !== finalTransform.y
+            )) ||
+            // Transform type changed (PhotoTransform vs ContainerTransform)
+            (isPhotoTransform(s.transform) !== isPhotoTransform(finalTransform))
           ));
         
         if (!photoChanged && !transformChanged) {
