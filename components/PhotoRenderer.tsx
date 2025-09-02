@@ -199,6 +199,12 @@ function PhotoRenderer({
   const [lastUserInteraction, setLastUserInteraction] = useState<number>(0);
   const [interactionType, setInteractionType] = useState<string>('none');
   
+  // Auto-snap animation state
+  const [isSnapping, setIsSnapping] = useState(false);
+  
+  // Mount state to prevent animation on initial render
+  const [isMounted, setIsMounted] = useState(false);
+  
   // Track user interactions to prevent auto-snap immediately after user manipulation
   const trackUserInteraction = useCallback((type: string) => {
     const now = Date.now();
@@ -365,12 +371,7 @@ function PhotoRenderer({
     gaps: { left: number; right: number; top: number; bottom: number };
     significantGaps: { left: boolean; right: boolean; top: boolean; bottom: boolean };
   } => {
-    console.log('🔍 DEBUG: detectGaps called');
-    console.log('📋 DEBUG: imageRef exists?', !!imageRef.current);
-    console.log('📋 DEBUG: containerRef exists?', !!containerRef.current);
-    
     if (!imageRef.current || !containerRef.current) {
-      console.warn('⚠️ DEBUG: detectGaps early return - missing refs');
       return { 
         hasGaps: false, 
         gapCount: 0,
@@ -1008,22 +1009,29 @@ function PhotoRenderer({
         if (transformsAreDifferent) {
           console.log('⚙️ EXECUTING TRANSFORM CHANGE...');
           
-          // First, apply the transform locally for immediate visual feedback
-          console.log('🔧 Applying transform locally first');
+          // Start animation for smooth auto-snap
+          console.log('🎬 Starting auto-snap animation');
+          setIsSnapping(true);
+          
+          // Apply the transform locally for immediate visual feedback
           setCurrentTransform(finalizedTransform);
           
-          // Then notify the parent to sync the state
-          console.log('📡 Notifying parent via onTransformChange callback');
+          // Notify the parent to sync the state
           if (onTransformChange) {
             try {
               onTransformChange(finalizedTransform);
-              console.log('✅ onTransformChange callback executed');
             } catch (error) {
               console.error('❌ onTransformChange callback error:', error);
             }
           } else {
             console.warn('⚠️ onTransformChange callback is missing!');
           }
+          
+          // End animation after transition duration
+          setTimeout(() => {
+            console.log('🎬 Auto-snap animation completed');
+            setIsSnapping(false);
+          }, 500); // Match CSS transition duration
           
           if (debug) console.log('✅ Gap-based transform applied');
           resolve(finalizedTransform);
@@ -1042,10 +1050,6 @@ function PhotoRenderer({
 
   // Define handleInteractionEnd as a stable callback
   const handleInteractionEnd = useCallback(async () => {
-    console.log('🚀 DEBUG: handleInteractionEnd called');
-    console.log('📋 DEBUG: onInteractionEnd prop exists?', !!onInteractionEnd);
-    console.log('📋 DEBUG: interactive prop?', interactive);
-    
     // Clear any existing timeout
     if (interactionTimeoutRef.current) {
       clearTimeout(interactionTimeoutRef.current);
@@ -1057,15 +1061,12 @@ function PhotoRenderer({
     onInteractionChange?.(false);
     
     // Immediate auto-snap without delay to prevent flashing
-    console.log('✅ DEBUG: Calling finalizePositioning for auto-snap');
     try {
       // Call finalization - it handles both transform application and parent notification
       const finalizedTransform = await finalizePositioning();
-      console.log('✅ DEBUG: finalizePositioning completed');
       
       // Only call onInteractionEnd if it's provided, for notification purposes
       if (onInteractionEnd) {
-        console.log('✅ DEBUG: Notifying parent via onInteractionEnd');
         onInteractionEnd(finalizedTransform);
       }
     } catch (error) {
@@ -1305,6 +1306,15 @@ function PhotoRenderer({
     };
   }, []);
   
+  // Set mounted state after brief delay to allow animations after initial render
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 50); // 50ms delay ensures browser has established initial state
+    
+    return () => clearTimeout(timer);
+  }, []); // Only on mount
+  
   // ClippingOverlay component - displays zebra stripes for clipped areas
   const ClippingOverlay = () => {
     if (!showClippingIndicators || (!clippingData.overexposed && !clippingData.underexposed)) {
@@ -1477,6 +1487,12 @@ function PhotoRenderer({
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!interactive) return;
     
+    // Prevent interactions during auto-snap animation
+    if (isSnapping) {
+      console.log('🎬 Touch interaction blocked during auto-snap animation');
+      return;
+    }
+    
     // Prevent browser zoom/scroll for all interactive touches
     e.preventDefault();
     e.stopPropagation();
@@ -1587,6 +1603,12 @@ function PhotoRenderer({
   const handlePointerDown = (e: React.PointerEvent) => {
     if (!interactive) return;
     
+    // Prevent interactions during auto-snap animation
+    if (isSnapping) {
+      console.log('🎬 Interaction blocked during auto-snap animation');
+      return;
+    }
+    
     e.preventDefault();
     // PHASE 2 FIX: Allow drag events to bubble to parent slots for drag-and-drop preview
     // Only prevent default and stop propagation for photo manipulation, not for drag events
@@ -1692,7 +1714,7 @@ function PhotoRenderer({
     interactive,
     isDragging,
     isTouching,
-    isSnapping: false, // Always false now - animation removed to fix flashing
+    isSnapping, // Auto-snap animation state
     calculateMathematicalGaps,
     calculateGapBasedMovement,
     hasRecentUserInteraction,
@@ -1727,8 +1749,10 @@ function PhotoRenderer({
         className="absolute inset-0"
         style={{
           ...photoStyle,
-          // No transitions for instant response
-          transition: 'none',
+          // Smooth transition for auto-snap, none for manual drag or initial render
+          transition: (isSnapping && isMounted)
+            ? 'transform 500ms cubic-bezier(0.4, 0, 0.2, 1)' // Material Design ease-out curve
+            : 'none', // Instant response during manual interaction or initial render
           // Improve image quality
           imageRendering: 'auto',
           backfaceVisibility: 'hidden',

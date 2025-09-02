@@ -326,7 +326,7 @@ export default function PngTemplateVisual({
                         onInlineApply(slot.id, slot.photoId!, finalTransform);
                       }
                     }}
-                    previewMode={isPreviewMode}
+                    previewMode={false}
                     className="w-full h-full"
                     fallbackUrls={slot && photos.find(p => p.id === slot.photoId) ? getHighResPhotoUrls(photos.find(p => p.id === slot.photoId)!) : []}
                     finalizationRef={{
@@ -493,7 +493,7 @@ export default function PngTemplateVisual({
       <img 
         src={pngUrl}
         alt={pngTemplate.name}
-        className={`absolute inset-0 w-full h-full z-10 pointer-events-none ${isActiveTemplate ? 'object-contain' : 'object-cover'}`}
+        className="absolute inset-0 w-full h-full z-10 pointer-events-none object-contain"
         onLoad={() => {}}
         onError={(e) => {
           console.error('❌ PNG failed to load:', pngTemplate.name, pngUrl);

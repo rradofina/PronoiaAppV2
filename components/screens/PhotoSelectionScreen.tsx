@@ -342,6 +342,9 @@ export default function PhotoSelectionScreen({
   const [selectionMode, setSelectionMode] = useState<'photo' | 'print'>('photo'); // Default to photo selection mode
   // NOTE: favoritedPhotos now comes from props, not local state
   
+  // Persistent template index state to remember current template when toggling modes
+  const [currentTemplateIndex, setCurrentTemplateIndex] = useState<number>(0);
+  
   // NOTE: Removed expansion state - using fixed height layout now
   
   // Note: Debug logging removed - viewport-aware expansion is working correctly in both modes
@@ -1102,6 +1105,9 @@ export default function PhotoSelectionScreen({
       templateId,
       currentSelectedSlot: selectedSlot?.id
     });
+    
+    // Save the current template index for persistence across mode changes
+    setCurrentTemplateIndex(templateIndex);
     
     // Don't change selection if we're in inline editing mode
     if (viewMode === 'inline-editing') {
@@ -1962,6 +1968,7 @@ export default function PhotoSelectionScreen({
                     onTemplateChange={handleTemplateChange}
                     templateToNavigate={templateToNavigate}
                     onNavigationComplete={() => setTemplateToNavigate(null)}
+                    initialIndex={currentTemplateIndex}
                     TemplateVisual={(props: any) => (
                       <TemplateVisual
                         {...props}

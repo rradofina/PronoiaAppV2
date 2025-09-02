@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TemplateSlot, Photo } from '../types';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
-import { templateSyncService, SyncStatus } from '../services/templateSyncService';
-import SyncStatusIndicator from './SyncStatusIndicator';
+import { templateSyncService } from '../services/templateSyncService';
+// import SyncStatusIndicator from './SyncStatusIndicator'; // Removed as redundant with global sync status
 
 interface TemplateGridProps {
   templateSlots: TemplateSlot[];
@@ -20,6 +20,7 @@ interface TemplateGridProps {
   onTemplateChange?: (templateIndex: number, templateId: string) => void;
   templateToNavigate?: string | null;
   onNavigationComplete?: () => void;
+  initialIndex?: number;
 }
 
 function TemplateGrid({
@@ -37,19 +38,20 @@ function TemplateGrid({
   editingSlot = null,
   onTemplateChange,
   templateToNavigate,
-  onNavigationComplete
+  onNavigationComplete,
+  initialIndex = 0
 }: TemplateGridProps) {
   
   // Cover Flow state
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
   
   // Container-aware sizing state
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
   
-  // Sync status state for all templates
-  const [syncStatuses, setSyncStatuses] = useState<Map<string, SyncStatus>>(new Map());
+  // Sync status state for all templates - Removed as redundant with global sync status
+  // const [syncStatuses, setSyncStatuses] = useState<Map<string, SyncStatus>>(new Map());
   
   // Dynamic sizing calculation based on actual available space
   const calculateOptimalSize = () => {
@@ -226,8 +228,8 @@ function TemplateGrid({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [layout, currentIndex, templateGroups.length]);
 
-  // Update sync statuses for all templates periodically
-  useEffect(() => {
+  // Update sync statuses for all templates periodically - Removed as redundant with global sync status
+  /* useEffect(() => {
     const updateSyncStatuses = () => {
       setSyncStatuses(prevStatuses => {
         const newStatuses = new Map<string, SyncStatus>();
@@ -259,7 +261,7 @@ function TemplateGrid({
     const interval = setInterval(updateSyncStatuses, 500);
     
     return () => clearInterval(interval);
-  }, [templateSlots]);
+  }, [templateSlots]); */
 
   const containerClasses = layout === 'horizontal' 
     ? "flex space-x-2 sm:space-x-3 overflow-x-auto h-full pb-2" 
@@ -374,13 +376,13 @@ function TemplateGrid({
               {templateName}
             </h3>
             
-            {/* Sync status indicator */}
-            {slots.every(s => s.photoId) && (
+            {/* Sync status indicator - Removed as redundant with global sync status */}
+            {/* {slots.every(s => s.photoId) && (
               <SyncStatusIndicator 
                 status={syncStatuses.get(templateId) || null} 
                 className="mr-2"
               />
-            )}
+            )} */}
             
             {showActions && (
               <div className="flex items-center space-x-1 sm:space-x-2 ml-2">
