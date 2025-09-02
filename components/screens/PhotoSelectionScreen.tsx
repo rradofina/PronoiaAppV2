@@ -475,11 +475,19 @@ export default function PhotoSelectionScreen({
   useEffect(() => {
     const updateSyncStatus = () => {
       const status = templateSyncService.getSyncStatus();
-      setSyncStatus({
-        isInitialized: status.isInitialized,
-        isProcessing: status.isProcessing,
-        queueSize: status.queueSize,
-        syncedCount: status.syncedTemplates
+      setSyncStatus(prev => {
+        if (prev.isInitialized !== status.isInitialized ||
+            prev.isProcessing !== status.isProcessing ||
+            prev.queueSize !== status.queueSize ||
+            prev.syncedCount !== status.syncedTemplates) {
+          return {
+            isInitialized: status.isInitialized,
+            isProcessing: status.isProcessing,
+            queueSize: status.queueSize,
+            syncedCount: status.syncedTemplates
+          };
+        }
+        return prev; // No change, don't trigger re-render
       });
     };
     
@@ -1137,6 +1145,19 @@ export default function PhotoSelectionScreen({
           console.log('📐 Keeping existing transform');
         }
         
+        // Check if anything actually changed
+        const photoChanged = s.photoId !== photoId;
+        const transformChanged = !s.transform || 
+          (finalTransform && (
+            s.transform.photoScale !== finalTransform.photoScale ||
+            s.transform.photoCenterX !== finalTransform.photoCenterX ||
+            s.transform.photoCenterY !== finalTransform.photoCenterY
+          ));
+        
+        if (!photoChanged && !transformChanged) {
+          return s; // No changes - keep same reference to prevent re-render
+        }
+        
         // Create a completely new slot object to ensure React detects the change
         const newSlot = {
           ...s,
@@ -1152,7 +1173,7 @@ export default function PhotoSelectionScreen({
         });
         return newSlot;
       }
-      return { ...s }; // Create new object references for all slots to force re-render
+      return s; // Keep same reference for unchanged slots
     });
     
     console.log('🔧 Updated slots after applying photo:', updatedSlots.map(s => ({ id: s.id, photoId: s.photoId, hasTransform: !!s.transform })));
