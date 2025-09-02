@@ -108,26 +108,13 @@ export function isContainerTransform(transform: ContainerTransform | PhotoTransf
 }
 
 // Calculate zoom-aware bounds for photo center coordinates
-// At 1x zoom: allows 0 to 1 (entire photo visible)
-// At 2x zoom: allows -0.5 to 1.5 (can access all parts of enlarged photo)
-// At 4x zoom: allows -1.5 to 2.5 (can access all parts of heavily enlarged photo)
+// Allow free movement at all zoom levels for full user control
 export function getPhotoTransformBounds(photoScale: number): { min: number; max: number } {
-  // At scale >= 1.5, photo is large enough to cover most containers
-  // Allow effectively unlimited movement for creative freedom
-  if (photoScale >= 1.5) {
-    return {
-      min: -10,  // Effectively no limit
-      max: 10    // Effectively no limit
-    };
-  }
-
-  // For smaller scales, use progressive bounds to prevent losing photo
-  // At 1x zoom: allows 0 to 1 (keeps photo visible)
-  // At 1.25x zoom: allows -0.125 to 1.125 (some movement freedom)
-  const halfExtraRange = (photoScale - 1) / 2;
+  // Allow effectively unlimited movement for all zoom levels
+  // This gives users complete freedom to position photos as they wish
   return {
-    min: 0 - halfExtraRange,
-    max: 1 + halfExtraRange
+    min: -10,  // Effectively no limit
+    max: 10    // Effectively no limit
   };
 }
 
@@ -453,22 +440,20 @@ export async function createSmartPhotoTransformFromSlot(
   return finalTransform;
 }
 
-// Create a photo-centric transform with zoom-aware bounds
+// Create a photo-centric transform without restrictive clamping
 export function createPhotoTransform(photoScale: number, photoCenterX: number, photoCenterY: number): PhotoTransform {
-  const clampedScale = Math.max(0.01, Math.min(10, photoScale)); // Clamp scale
-  const bounds = getPhotoTransformBounds(clampedScale);
+  const clampedScale = Math.max(0.01, Math.min(10, photoScale)); // Only clamp scale to reasonable limits
   
   const transform: PhotoTransform = {
     photoScale: clampedScale,
-    photoCenterX: Math.max(bounds.min, Math.min(bounds.max, photoCenterX)), // Zoom-aware clamp
-    photoCenterY: Math.max(bounds.min, Math.min(bounds.max, photoCenterY)), // Zoom-aware clamp
+    photoCenterX: photoCenterX, // No clamping - allow free movement
+    photoCenterY: photoCenterY, // No clamping - allow free movement
     version: 'photo-centric' as const
   };
   
   console.log('🔧 createPhotoTransform:', {
     input: { photoScale, photoCenterX, photoCenterY },
     clamped: { clampedScale, wasScaleClamped: clampedScale !== photoScale },
-    bounds,
     finalTransform: transform
   });
   

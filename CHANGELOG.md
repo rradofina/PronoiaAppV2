@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-08-31] - Fix CORS Errors and Zoom/Pan Issues
+
+### Fixed
+- **Image Loading CORS Errors**: Fixed template rasterization with better URL fallback strategy
+  - Root Cause: Some Google Drive URLs don't support CORS properly
+  - Solution: Added multiple URL formats with fallback logic
+  - Files Modified:
+    - `services/templateRasterizationService.ts` (lines 273-290): Added fallback URL logic
+    - `utils/photoUrlUtils.ts` (lines 274-278): Added lh3.googleusercontent.com/d/ format URLs
+    - Both services keep `crossOrigin = 'anonymous'` to prevent tainted canvas
+  - Impact: Templates can export using URLs that support CORS properly
+
+## [2025-08-31] - Fix Zoom/Pan Snap-Back and Movement Constraints
+
+### Fixed
+- **Background Sync Interference During Photo Manipulation**: Removed immediate sync that caused slots to flash and photos to snap
+  - Root Cause: `handleInlineTransformChange` was triggering `syncAllCompletedTemplates` on every drag/zoom event
+  - Solution: Implemented debounced sync with 2-second delay after last interaction
+  - Files Modified:
+    - `components/screens/PhotoSelectionScreen.tsx` (lines 533-544, 751-773): Added debounced sync function
+    - Removed immediate sync call from transform handler
+    - Added cleanup on unmount to prevent memory leaks
+  - Impact: Photo manipulation is now smooth without background processes interfering
+
+### Fixed
+- **Zoom Snap-Back Issue**: Removed aggressive minimum zoom constraints that caused photos to snap back
+  - Root Cause: `calculateMinimumCoverZoom()` was enforcing minimum zoom levels
+  - Solution: Allow free zooming from 0.1x to 10x without constraints
+  - Files Modified:
+    - `components/PhotoRenderer.tsx` (lines 1501-1506): Removed minimum zoom in touch pinch
+    - `components/PhotoRenderer.tsx` (lines 1646-1652): Removed minimum zoom in wheel zoom
+  - Impact: Users can now freely zoom out to see entire photo without snap-back
+
+- **Pan/Movement Snap-Back**: Removed restrictive movement bounds that caused position snap-back
+  - Root Cause: `getPhotoTransformBounds()` severely restricted panning at low zoom levels
+  - Solution: Allow unlimited movement at all zoom levels
+  - Files Modified:
+    - `types/index.ts` (lines 110-119): Relaxed bounds to effectively unlimited (-10 to 10)
+    - `types/index.ts` (lines 443-461): Removed double clamping in `createPhotoTransform`
+  - Impact: Users can freely pan photos without position constraints
+
+- **Auto-Snap on Every Interaction**: Removed unintended auto-snap after each drag/zoom
+  - Root Cause: `onInteractionEnd` callback triggered after every interaction
+  - Solution: Removed the callback, keeping auto-snap only for explicit checkmark clicks
+  - Files Modified:
+    - `components/FullscreenTemplateEditor.tsx` (lines 572-576): Removed onInteractionEnd callback
+  - Impact: Photo positioning stays exactly where user places it during editing
+
 ## [2025-08-30] - Fix Jaggy Zoom Performance
 
 ### Fixed

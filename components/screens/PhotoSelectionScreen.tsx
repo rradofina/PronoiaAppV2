@@ -1,5 +1,5 @@
 import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType, PrintSize, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, createPhotoTransform, createSmartPhotoTransformFromSlot, ManualPackage, ManualTemplate } from '../../types';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import toast from 'react-hot-toast';
@@ -538,6 +538,8 @@ export default function PhotoSelectionScreen({
     setEditingTemplate(null);
   };
 
+  // Debounced sync for background upload - only syncs after user stops manipulating
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleInlineTransformChange = (slotId: string, transform: { scale: number; x: number; y: number }) => {
     const updatedSlots = templateSlots.map(s =>
@@ -545,8 +547,9 @@ export default function PhotoSelectionScreen({
     );
     setTemplateSlots(updatedSlots);
     
-    // Sync ALL completed templates (transforms may affect multiple templates)
-    syncAllCompletedTemplates(updatedSlots);
+    // Use debounced sync instead of immediate sync to prevent interference during manipulation
+    // This will only trigger background sync after 2 seconds of no changes
+    debouncedSyncAllCompletedTemplates(updatedSlots);
   };
 
 
@@ -753,6 +756,29 @@ export default function PhotoSelectionScreen({
       syncedTemplateIds: syncedTemplates
     });
   };
+
+  // Debounced version of syncAllCompletedTemplates for use during photo manipulation
+  const debouncedSyncAllCompletedTemplates = useCallback((slots: TemplateSlot[]) => {
+    // Clear any existing timeout
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    
+    // Set new timeout - wait 2 seconds after last transform change
+    syncTimeoutRef.current = setTimeout(() => {
+      console.log('⏰ Debounced sync triggered after 2s of inactivity');
+      syncAllCompletedTemplates(slots);
+    }, 2000); // 2 second delay after last change
+  }, [photos]); // Include photos dependency since syncAllCompletedTemplates uses it
+
+  // Cleanup debounced sync timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handlePhotoClick = (photo: Photo) => {
     console.log('🔧 PHOTO CLICK DEBUG:', {

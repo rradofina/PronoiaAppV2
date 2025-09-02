@@ -269,8 +269,25 @@ class TemplateRasterizationService {
     if (!this.ctx || !this.canvas) return;
 
     const highResUrls = getHighResPhotoUrls(photo);
-    const photoUrl = highResUrls[0] || photo.url;
-    const img = await this.loadImage(photoUrl);
+    
+    // Try loading with each URL until one succeeds
+    let img: HTMLImageElement | null = null;
+    let lastError: Error | null = null;
+    
+    for (const url of highResUrls) {
+      try {
+        img = await this.loadImage(url);
+        console.log('✅ Successfully loaded image from:', url);
+        break;
+      } catch (error) {
+        console.warn('⚠️ Failed to load from URL, trying next:', url);
+        lastError = error as Error;
+      }
+    }
+    
+    if (!img) {
+      throw lastError || new Error('Failed to load image from all URLs');
+    }
 
     // Debug slot to hole mapping
     console.log('🎯 Slot to Hole Mapping:', {
@@ -445,12 +462,16 @@ class TemplateRasterizationService {
   }
 
   /**
-   * Load image from URL
+   * Load image from URL with CORS handling
    */
   private async loadImage(url: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const img = new Image();
+      
+      // Always set crossOrigin to avoid tainted canvas
+      // This is required for canvas export operations
       img.crossOrigin = 'anonymous';
+      
       img.onload = () => resolve(img);
       img.onerror = (e) => {
         console.error('Failed to load image:', url, e);

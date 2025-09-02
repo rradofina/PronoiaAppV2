@@ -569,11 +569,6 @@ export default function FullscreenTemplateEditor({
                         fallbackUrls={selectedPhoto ? getHighResPhotoUrls(selectedPhoto) : []}
                         showClippingIndicators={true} // Enable clipping indicators
                         onSmartReset={handleSmartReset} // Smart reset for intelligent photo repositioning
-                        onInteractionEnd={(finalTransform) => {
-                          // Update transform after auto-snap
-                          console.log('🎯 Auto-snap complete in FullscreenTemplateEditor');
-                          handleTransformChange(finalTransform);
-                        }}
                       />
                     ) : (
                       <div className="w-full h-full bg-gray-200 border border-gray-300 border-dashed flex items-center justify-center">

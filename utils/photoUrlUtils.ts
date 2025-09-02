@@ -271,7 +271,13 @@ export function getHighResPhotoUrls(photo: Photo): string[] {
     urls.push(photo.thumbnailUrl);
   }
   
-  // Try direct Google Drive link (often highest quality)
+  // Try lh3.googleusercontent.com/d/ format which often supports CORS
+  if (photo.googleDriveId) {
+    urls.push(`https://lh3.googleusercontent.com/d/${photo.googleDriveId}=w1600`);
+    urls.push(`https://lh3.googleusercontent.com/d/${photo.googleDriveId}=w1200`);
+  }
+  
+  // Try direct Google Drive link (may not support CORS)
   if (photo.googleDriveId) {
     urls.push(`https://drive.google.com/uc?id=${photo.googleDriveId}&export=view`);
   }
