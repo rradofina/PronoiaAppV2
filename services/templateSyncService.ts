@@ -421,8 +421,22 @@ class TemplateSyncService {
       }
       console.log('✅ Rasterized blob size:', rasterized.blob.size, 'bytes');
       
-      // Generate filename
-      const fileName = `${firstSlot.templateName.replace(/[^a-zA-Z0-9]/g, '_')}_${templateId.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
+      // Generate filename with new naming convention: Print_[Number]_[TemplateType]_[PrintSize]_[ShortTimestamp].jpg
+      // Extract print number from template name (e.g., "Print #1" -> "1")
+      const printMatch = firstSlot.templateName.match(/Print.*?(\d+)/i);
+      const printNumber = printMatch ? printMatch[1] : '1';
+      
+      // Get template type from manual template name (e.g., "collage", "photostrip", "solo")
+      const templateType = manualTemplate.template_type || firstSlot.templateType || 'Template';
+      const capitalizedType = templateType.charAt(0).toUpperCase() + templateType.slice(1);
+      
+      // Get print size
+      const printSize = firstSlot.printSize || manualTemplate.print_size || '4R';
+      
+      // Short timestamp (last 6 digits)
+      const shortTimestamp = Date.now().toString().slice(-6);
+      
+      const fileName = `Print_${printNumber}_${capitalizedType}_${printSize}_${shortTimestamp}.jpg`;
       
       // Check if file already exists (either in sync state or from previous session)
       const existingFileId = this.syncStates.get(templateId)?.driveFileId || this.existingFiles.get(templateId);

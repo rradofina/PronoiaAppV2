@@ -541,12 +541,27 @@ class TemplateRasterizationService {
 
   /**
    * Generate filename for rasterized template
+   * Format: Print_[Number]_[TemplateType]_[PrintSize]_[ShortTimestamp].[extension]
    */
   private generateFileName(template: ManualTemplate, options: RasterizationOptions): string {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-    const cleanName = template.name.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+    // Extract print number from template name (fallback to incrementing number)
+    const printMatch = template.name.match(/Print.*?(\d+)/i);
+    const printNumber = printMatch ? printMatch[1] : '1';
+    
+    // Get template type and capitalize
+    const templateType = template.template_type || 'Template';
+    const capitalizedType = templateType.charAt(0).toUpperCase() + templateType.slice(1);
+    
+    // Get print size
+    const printSize = template.print_size || '4R';
+    
+    // Short timestamp (last 6 digits)
+    const shortTimestamp = Date.now().toString().slice(-6);
+    
+    // File extension
     const extension = options.format === 'jpeg' ? 'jpg' : 'png';
-    return `${cleanName}_${options.dpi}dpi_${timestamp}.${extension}`;
+    
+    return `Print_${printNumber}_${capitalizedType}_${printSize}_${shortTimestamp}.${extension}`;
   }
 
   /**
