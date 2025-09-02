@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TemplateSlot, Photo } from '../types';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
-import { templateSyncService } from '../services/templateSyncService';
+import { templateSyncService, SyncStatus } from '../services/templateSyncService';
 import SyncStatusIndicator from './SyncStatusIndicator';
 
 interface TemplateGridProps {
@@ -22,7 +22,7 @@ interface TemplateGridProps {
   onNavigationComplete?: () => void;
 }
 
-export default function TemplateGrid({
+function TemplateGrid({
   templateSlots,
   photos,
   selectedSlot,
@@ -47,6 +47,9 @@ export default function TemplateGrid({
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+  
+  // Sync status state for all templates
+  const [syncStatuses, setSyncStatuses] = useState<Map<string, SyncStatus>>(new Map());
   
   // Dynamic sizing calculation based on actual available space
   const calculateOptimalSize = () => {
@@ -223,6 +226,41 @@ export default function TemplateGrid({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [layout, currentIndex, templateGroups.length]);
 
+  // Update sync statuses for all templates periodically
+  useEffect(() => {
+    const updateSyncStatuses = () => {
+      setSyncStatuses(prevStatuses => {
+        const newStatuses = new Map<string, SyncStatus>();
+        let hasChanges = false;
+        
+        // Get unique template IDs
+        const uniqueTemplateIds = [...new Set(templateSlots.map(slot => slot.templateId))];
+        
+        uniqueTemplateIds.forEach(templateId => {
+          const currentStatus = templateSyncService.getTemplateSyncStatus(templateId);
+          const previousStatus = prevStatuses.get(templateId);
+          
+          newStatuses.set(templateId, currentStatus);
+          
+          if (previousStatus !== currentStatus) {
+            hasChanges = true;
+          }
+        });
+        
+        // Only update state if there are actual changes
+        return hasChanges ? newStatuses : prevStatuses;
+      });
+    };
+    
+    // Initial update
+    updateSyncStatuses();
+    
+    // Update every 500ms (faster than the 1-second interval to catch status changes quickly)
+    const interval = setInterval(updateSyncStatuses, 500);
+    
+    return () => clearInterval(interval);
+  }, [templateSlots]);
+
   const containerClasses = layout === 'horizontal' 
     ? "flex space-x-2 sm:space-x-3 overflow-x-auto h-full pb-2" 
     : layout === 'main'
@@ -339,7 +377,7 @@ export default function TemplateGrid({
             {/* Sync status indicator */}
             {slots.every(s => s.photoId) && (
               <SyncStatusIndicator 
-                status={templateSyncService.getTemplateSyncStatus(templateId)} 
+                status={syncStatuses.get(templateId) || null} 
                 className="mr-2"
               />
             )}
@@ -473,3 +511,66 @@ export default function TemplateGrid({
     </div>
   );
 }
+
+// Custom comparison function for React.memo
+const arePropsEqual = (prevProps: TemplateGridProps, nextProps: TemplateGridProps): boolean => {
+  // Compare essential props that should trigger re-renders
+  if (
+    prevProps.layout !== nextProps.layout ||
+    prevProps.showActions !== nextProps.showActions ||
+    prevProps.isEditingMode !== nextProps.isEditingMode ||
+    prevProps.templateToNavigate !== nextProps.templateToNavigate
+  ) {
+    return false; // Props changed, re-render needed
+  }
+
+  // Compare selected slot
+  if (prevProps.selectedSlot?.id !== nextProps.selectedSlot?.id) {
+    return false; // Selection changed, re-render needed
+  }
+
+  // Compare editing slot
+  if (prevProps.editingSlot?.id !== nextProps.editingSlot?.id) {
+    return false; // Editing state changed, re-render needed
+  }
+
+  // Compare template slots length and essential properties
+  if (prevProps.templateSlots.length !== nextProps.templateSlots.length) {
+    return false; // Slots array length changed, re-render needed
+  }
+
+  // Compare slots by checking their essential properties
+  for (let i = 0; i < prevProps.templateSlots.length; i++) {
+    const prevSlot = prevProps.templateSlots[i];
+    const nextSlot = nextProps.templateSlots[i];
+
+    if (
+      prevSlot.id !== nextSlot.id ||
+      prevSlot.photoId !== nextSlot.photoId ||
+      prevSlot.templateId !== nextSlot.templateId
+    ) {
+      return false; // Slot changed, re-render needed
+    }
+  }
+
+  // Compare photos array length and essential properties
+  if (prevProps.photos.length !== nextProps.photos.length) {
+    return false; // Photos array length changed, re-render needed
+  }
+
+  // For photos, only compare IDs and URLs as they're most relevant for display
+  for (let i = 0; i < prevProps.photos.length; i++) {
+    const prevPhoto = prevProps.photos[i];
+    const nextPhoto = nextProps.photos[i];
+
+    if (prevPhoto.id !== nextPhoto.id || prevPhoto.url !== nextPhoto.url) {
+      return false; // Photo changed, re-render needed
+    }
+  }
+
+  // All other props are functions or non-critical, skip deep comparison
+  return true; // Props are equivalent, skip re-render
+};
+
+// Export memoized component to prevent unnecessary re-renders
+export default React.memo(TemplateGrid, arePropsEqual);

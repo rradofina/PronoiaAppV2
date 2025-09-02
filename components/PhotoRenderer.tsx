@@ -365,8 +365,12 @@ function PhotoRenderer({
     gaps: { left: number; right: number; top: number; bottom: number };
     significantGaps: { left: boolean; right: boolean; top: boolean; bottom: boolean };
   } => {
+    console.log('🔍 DEBUG: detectGaps called');
+    console.log('📋 DEBUG: imageRef exists?', !!imageRef.current);
+    console.log('📋 DEBUG: containerRef exists?', !!containerRef.current);
     
     if (!imageRef.current || !containerRef.current) {
+      console.warn('⚠️ DEBUG: detectGaps early return - missing refs');
       return { 
         hasGaps: false, 
         gapCount: 0,
@@ -1003,30 +1007,25 @@ function PhotoRenderer({
         
         if (transformsAreDifferent) {
           console.log('⚙️ EXECUTING TRANSFORM CHANGE...');
-          console.log('🎬 Applying auto-snap movement via queueMicrotask');
           
-          // MOBILE FIX: Don't set local state - let parent control
-          // Comment out: setCurrentTransform(finalizedTransform);
+          // First, apply the transform locally for immediate visual feedback
+          console.log('🔧 Applying transform locally first');
+          setCurrentTransform(finalizedTransform);
           
-          // MOBILE FIX: Use queueMicrotask to call callback after current frame
-          // This prevents same-frame race condition where parent prop overwrites child state
-          queueMicrotask(() => {
-            console.log('📡 Calling onTransformChange callback (via queueMicrotask)...');
+          // Then notify the parent to sync the state
+          console.log('📡 Notifying parent via onTransformChange callback');
+          if (onTransformChange) {
             try {
-              onTransformChangeRef.current?.(finalizedTransform);
-              console.log('✅ Callback executed');
-              
-              // Also notify interaction end on next frame
-              requestAnimationFrame(() => {
-                onInteractionEndRef.current?.(finalizedTransform);
-                console.log('✅ FINALIZATION COMPLETE - Transform applied');
-              });
+              onTransformChange(finalizedTransform);
+              console.log('✅ onTransformChange callback executed');
             } catch (error) {
-              console.error('❌ Callback error:', error);
+              console.error('❌ onTransformChange callback error:', error);
             }
-          });
+          } else {
+            console.warn('⚠️ onTransformChange callback is missing!');
+          }
           
-          if (debug) console.log('✅ Gap-based finalization queued');
+          if (debug) console.log('✅ Gap-based transform applied');
           resolve(finalizedTransform);
         } else {
           console.log('ℹ️ NO CHANGE: Transforms are identical, resolving with current');
@@ -1043,6 +1042,10 @@ function PhotoRenderer({
 
   // Define handleInteractionEnd as a stable callback
   const handleInteractionEnd = useCallback(async () => {
+    console.log('🚀 DEBUG: handleInteractionEnd called');
+    console.log('📋 DEBUG: onInteractionEnd prop exists?', !!onInteractionEnd);
+    console.log('📋 DEBUG: interactive prop?', interactive);
+    
     // Clear any existing timeout
     if (interactionTimeoutRef.current) {
       clearTimeout(interactionTimeoutRef.current);
@@ -1054,17 +1057,25 @@ function PhotoRenderer({
     onInteractionChange?.(false);
     
     // Immediate auto-snap without delay to prevent flashing
-    if (onInteractionEnd) {
-      try {
-        // Call finalization immediately to detect gaps and apply auto-snap
-        const finalizedTransform = await finalizePositioning();
+    console.log('✅ DEBUG: Calling finalizePositioning for auto-snap');
+    try {
+      // Call finalization - it handles both transform application and parent notification
+      const finalizedTransform = await finalizePositioning();
+      console.log('✅ DEBUG: finalizePositioning completed');
+      
+      // Only call onInteractionEnd if it's provided, for notification purposes
+      if (onInteractionEnd) {
+        console.log('✅ DEBUG: Notifying parent via onInteractionEnd');
         onInteractionEnd(finalizedTransform);
-      } catch (error) {
-        console.error('❌ Auto-snap finalization failed:', error);
+      }
+    } catch (error) {
+      console.error('❌ Auto-snap finalization failed:', error);
+      // Fallback notification if finalization fails
+      if (onInteractionEnd) {
         onInteractionEnd(currentTransformRef.current);
       }
     }
-  }, [onInteractionChange, onInteractionEnd, finalizePositioning, setIsInteracting]);
+  }, [onInteractionChange, onInteractionEnd, finalizePositioning, setIsInteracting, interactive]);
 
   // Analyze image for clipping (overexposed/underexposed areas)
   const analyzeClipping = () => {
