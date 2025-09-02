@@ -27,8 +27,7 @@ export interface RasterizationOptions {
 }
 
 class TemplateRasterizationService {
-  private canvas: HTMLCanvasElement | null = null;
-  private ctx: CanvasRenderingContext2D | null = null;
+  // Canvas instances are now created locally per operation to prevent cross-contamination
   
   // Stores the transform applied to the template background to align photo holes correctly
   private templateScale: number = 1;
@@ -69,24 +68,28 @@ class TemplateRasterizationService {
     }
   }
 
-  private initializeCanvas(width: number, height: number): void {
-    if (typeof window === 'undefined') return;
+  private initializeCanvas(width: number, height: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+    if (typeof window === 'undefined') return null;
 
     // Reset transform state for each new rasterization
     this.templateScale = 1;
     this.templateOffsetX = 0;
     this.templateOffsetY = 0;
 
-    this.canvas = document.createElement('canvas');
-    this.canvas.width = width;
-    this.canvas.height = height;
-    this.ctx = this.canvas.getContext('2d');
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
 
-    if (this.ctx) {
-      // Enable high-quality rendering
-      this.ctx.imageSmoothingEnabled = true;
-      this.ctx.imageSmoothingQuality = 'high';
+    if (!ctx) {
+      throw new Error('Failed to get canvas 2D context');
     }
+
+    // Enable high-quality rendering
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    return { canvas, ctx };
   }
 
   /**
@@ -145,28 +148,29 @@ class TemplateRasterizationService {
         dpi: settings.dpi
       });
       
-      this.initializeCanvas(canvasWidth, canvasHeight);
-      if (!this.canvas || !this.ctx) {
+      const canvasResult = this.initializeCanvas(canvasWidth, canvasHeight);
+      if (!canvasResult) {
         throw new Error('Failed to initialize canvas');
       }
+      const { canvas, ctx } = canvasResult;
 
       if (settings.includeBackground) {
-        this.ctx.fillStyle = settings.backgroundColor;
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillStyle = settings.backgroundColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
       // Draw photos FIRST so they appear BEHIND the template
-      await this.drawPhotosInSlots(templateSlots, photos, template);
+      await this.drawPhotosInSlots(templateSlots, photos, template, canvas, ctx);
 
       // Draw template LAST so it appears ON TOP of photos
       if (template.drive_file_id) {
-        await this.drawTemplateBackground(template);
+        await this.drawTemplateBackground(template, canvas, ctx);
       }
 
-      const blob = await this.canvasToBlob(template, settings.format, settings.quality);
+      const blob = await this.canvasToBlob(canvas, template, settings.format, settings.quality);
       const fileName = this.generateFileName(template, settings);
 
-      const actualDimensions = { width: this.canvas.width, height: this.canvas.height };
+      const actualDimensions = { width: canvas.width, height: canvas.height };
       console.log('✅ Template rasterization completed:', { fileName, blobSize: blob.size, actualDimensions });
       return { blob, fileName, dimensions: actualDimensions, generatedAt: new Date() };
 
@@ -204,9 +208,7 @@ class TemplateRasterizationService {
   /**
    * Load and draw PNG template background at natural 1:1 scale
    */
-  private async drawTemplateBackground(template: ManualTemplate): Promise<void> {
-    if (!this.ctx || !this.canvas) return;
-
+  private async drawTemplateBackground(template: ManualTemplate, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): Promise<void> {
     try {
       const fileId = template.drive_file_id;
       let pngUrl: string;
@@ -232,12 +234,12 @@ class TemplateRasterizationService {
       
       console.log('🎨 Drawing PNG at natural size (1:1 scale):', {
         pngSize: { width: img.width, height: img.height },
-        canvasSize: { width: this.canvas.width, height: this.canvas.height },
+        canvasSize: { width: canvas.width, height: canvas.height },
         scale: this.templateScale
       });
       
       // Draw the PNG at its natural size (1:1 pixel mapping)
-      this.ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0);
     } catch (error) {
       console.warn('⚠️ Failed to load template background, continuing without it:', error);
     }
@@ -246,13 +248,13 @@ class TemplateRasterizationService {
   /**
    * Draw photos in their respective template slots
    */
-  private async drawPhotosInSlots(templateSlots: TemplateSlot[], photos: Photo[], template: ManualTemplate): Promise<void> {
+  private async drawPhotosInSlots(templateSlots: TemplateSlot[], photos: Photo[], template: ManualTemplate, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): Promise<void> {
     for (const slot of templateSlots) {
       if (!slot.photoId) continue;
       try {
         const photo = photos.find(p => p.id === slot.photoId);
         if (photo) {
-          await this.drawPhotoInSlot(photo, slot, template);
+          await this.drawPhotoInSlot(photo, slot, template, canvas, ctx);
         } else {
           console.warn(`⚠️ Photo not found for slot ${slot.id}`);
         }
@@ -265,8 +267,7 @@ class TemplateRasterizationService {
   /**
    * Draw a single photo in its template slot, handling all coordinate transforms
    */
-  private async drawPhotoInSlot(photo: Photo, slot: TemplateSlot, template: ManualTemplate): Promise<void> {
-    if (!this.ctx || !this.canvas) return;
+  private async drawPhotoInSlot(photo: Photo, slot: TemplateSlot, template: ManualTemplate, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): Promise<void> {
 
     const highResUrls = getHighResPhotoUrls(photo);
     
@@ -311,8 +312,8 @@ class TemplateRasterizationService {
 
     // COORDINATE FIX: Scale hole coordinates from template.dimensions to PNG natural dimensions
     // Since PNG is drawn at 1:1 scale, we need to scale hole coordinates to match
-    const scaleX = this.canvas.width / template.dimensions.width;
-    const scaleY = this.canvas.height / template.dimensions.height;
+    const scaleX = canvas.width / template.dimensions.width;
+    const scaleY = canvas.height / template.dimensions.height;
     
     const transformedHole = {
       x: originalHole.x * scaleX,
@@ -323,7 +324,7 @@ class TemplateRasterizationService {
     
     console.log('🔄 Hole coordinate scaling:', {
       templateDimensions: template.dimensions,
-      canvasDimensions: { width: this.canvas.width, height: this.canvas.height },
+      canvasDimensions: { width: canvas.width, height: canvas.height },
       scaleFactors: { x: scaleX.toFixed(3), y: scaleY.toFixed(3) },
       originalHole: { x: originalHole.x, y: originalHole.y, width: originalHole.width, height: originalHole.height },
       transformedHole: { x: transformedHole.x.toFixed(1), y: transformedHole.y.toFixed(1), width: transformedHole.width.toFixed(1), height: transformedHole.height.toFixed(1) }
@@ -331,9 +332,9 @@ class TemplateRasterizationService {
 
     // Use transformed hole coordinates directly - no clamping to avoid clipping
     if (slot.transform && isPhotoTransform(slot.transform)) {
-      this.drawPhotoWithTransform(img, slot.transform, transformedHole);
+      this.drawPhotoWithTransform(img, slot.transform, transformedHole, ctx);
     } else {
-      this.drawPhotoFitInHole(img, transformedHole);
+      this.drawPhotoFitInHole(img, transformedHole, ctx);
     }
   }
 
@@ -343,16 +344,15 @@ class TemplateRasterizationService {
   private drawPhotoWithTransform(
     img: HTMLImageElement,
     transform: PhotoTransform,
-    hole: { x: number, y: number, width: number, height: number }
+    hole: { x: number, y: number, width: number, height: number },
+    ctx: CanvasRenderingContext2D
   ): void {
-    if (!this.ctx) return;
-
-    this.ctx.save();
+    ctx.save();
 
     // 1. Set the clipping region for the hole
-    this.ctx.beginPath();
-    this.ctx.rect(hole.x, hole.y, hole.width, hole.height);
-    this.ctx.clip();
+    ctx.beginPath();
+    ctx.rect(hole.x, hole.y, hole.width, hole.height);
+    ctx.clip();
 
     // 2. Calculate object-fit: contain scale (same as PhotoRenderer with transforms)
     const containScale = Math.min(hole.width / img.width, hole.height / img.height);
@@ -376,7 +376,7 @@ class TemplateRasterizationService {
     const centerY = containedY + renderedHeight / 2;
     
     // Move canvas origin to the center point
-    this.ctx.translate(centerX, centerY);
+    ctx.translate(centerX, centerY);
     
     // 7. Apply CSS transforms in order (translate then scale)
     // CRITICAL FIX: CSS translate percentages are relative to the ELEMENT size (hole size),
@@ -387,14 +387,14 @@ class TemplateRasterizationService {
     const translateYPixels = (translateYPercent / 100) * hole.height;
     
     // Apply translation
-    this.ctx.translate(translateXPixels, translateYPixels);
+    ctx.translate(translateXPixels, translateYPixels);
     
     // Apply scale
-    this.ctx.scale(photoScale, photoScale);
+    ctx.scale(photoScale, photoScale);
     
     // 8. Draw image centered at origin (since we've moved the origin to center)
     // We need to offset by half the rendered size to center it
-    this.ctx.drawImage(
+    ctx.drawImage(
       img, 
       -renderedWidth / 2, 
       -renderedHeight / 2, 
@@ -428,7 +428,7 @@ class TemplateRasterizationService {
       cssEquivalent: `object-fit:contain; transform: translate(${translateXPercent.toFixed(1)}%, ${translateYPercent.toFixed(1)}%) scale(${photoScale.toFixed(3)}); transform-origin: center`
     });
 
-    this.ctx.restore();
+    ctx.restore();
   }
 
   /**
@@ -436,15 +436,14 @@ class TemplateRasterizationService {
    */
   private drawPhotoFitInHole(
     img: HTMLImageElement,
-    hole: { x: number, y: number, width: number, height: number }
+    hole: { x: number, y: number, width: number, height: number },
+    ctx: CanvasRenderingContext2D
   ): void {
-    if (!this.ctx) return;
+    ctx.save();
 
-    this.ctx.save();
-
-    this.ctx.beginPath();
-    this.ctx.rect(hole.x, hole.y, hole.width, hole.height);
-    this.ctx.clip();
+    ctx.beginPath();
+    ctx.rect(hole.x, hole.y, hole.width, hole.height);
+    ctx.clip();
 
     // Use Math.max for object-fit: cover (fills entire hole)
     // This matches PhotoRenderer's default behavior
@@ -456,9 +455,9 @@ class TemplateRasterizationService {
     const offsetX = (hole.width - scaledWidth) / 2;
     const offsetY = (hole.height - scaledHeight) / 2;
 
-    this.ctx.drawImage(img, hole.x + offsetX, hole.y + offsetY, scaledWidth, scaledHeight);
+    ctx.drawImage(img, hole.x + offsetX, hole.y + offsetY, scaledWidth, scaledHeight);
     
-    this.ctx.restore();
+    ctx.restore();
   }
 
   /**
@@ -485,16 +484,12 @@ class TemplateRasterizationService {
    * Convert canvas to blob with DPI metadata
    * Embeds DPI information so images display at correct physical size in photo editors
    */
-  private async canvasToBlob(template: ManualTemplate, format: 'jpeg' | 'png', quality: number = 0.95): Promise<Blob> {
+  private async canvasToBlob(canvas: HTMLCanvasElement, template: ManualTemplate, format: 'jpeg' | 'png', quality: number = 0.95): Promise<Blob> {
     return new Promise(async (resolve, reject) => {
-      if (!this.canvas) {
-        return reject(new Error('Canvas not initialized'));
-      }
-
       try {
         // Create initial blob from canvas
         const blob = await new Promise<Blob>((res, rej) => {
-          this.canvas!.toBlob(
+          canvas.toBlob(
             (b) => {
               if (b) res(b);
               else rej(new Error('Failed to create blob from canvas'));
@@ -512,12 +507,12 @@ class TemplateRasterizationService {
         const heightInches = template.custom_height_inches || config.height_inches;
         
         // Calculate DPI based on actual canvas size and target physical dimensions
-        const dpiX = Math.round(this.canvas.width / widthInches);
-        const dpiY = Math.round(this.canvas.height / heightInches);
+        const dpiX = Math.round(canvas.width / widthInches);
+        const dpiY = Math.round(canvas.height / heightInches);
         const targetDPI = Math.min(dpiX, dpiY); // Use smaller to ensure image fits
         
         console.log('📐 DPI Calculation:', {
-          canvasSize: `${this.canvas.width}x${this.canvas.height}px`,
+          canvasSize: `${canvas.width}x${canvas.height}px`,
           physicalSize: `${widthInches}x${heightInches} inches`,
           calculatedDPI: `${dpiX}x${dpiY}`,
           targetDPI: targetDPI,
@@ -584,14 +579,10 @@ class TemplateRasterizationService {
   }
 
   /**
-   * Cleanup resources
+   * Cleanup resources - No longer needed since canvas is created locally per operation
    */
   cleanup(): void {
-    if (this.canvas) {
-      this.canvas.remove();
-      this.canvas = null;
-      this.ctx = null;
-    }
+    // Canvas instances are now created locally and garbage collected automatically
   }
 }
 
