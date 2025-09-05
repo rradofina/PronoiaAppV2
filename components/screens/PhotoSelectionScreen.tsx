@@ -4,6 +4,7 @@ import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import toast from 'react-hot-toast';
 import ConfirmationModal from '../ConfirmationModal';
+import ConfirmRemoveFavoriteModal from '../ConfirmRemoveFavoriteModal';
 import InlineTemplateEditor from '../InlineTemplateEditor';
 import InlinePhotoEditor from '../InlinePhotoEditor';
 import FullscreenPhotoViewer from '../FullscreenPhotoViewer';
@@ -407,6 +408,10 @@ export default function PhotoSelectionScreen({
   // Delete confirmation modal state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
+  
+  // Remove favorite confirmation modal state
+  const [showRemoveFavoriteConfirm, setShowRemoveFavoriteConfirm] = useState(false);
+  const [photoToRemoveFromFavorites, setPhotoToRemoveFromFavorites] = useState<Photo | null>(null);
 
   // Setup viewport handling for iPad Safari compatibility
   useEffect(() => {
@@ -1403,7 +1408,6 @@ export default function PhotoSelectionScreen({
 
   // Favorites management
   const handleToggleFavorite = (photoId: string) => {
-    // Check if trying to unfavorite a photo that's in a template slot
     const usedPhotoIds = getUsedPhotoIds();
     const isPhotoInSlot = usedPhotoIds.has(photoId);
     const isCurrentlyFavorited = favoritedPhotos.has(photoId);
@@ -1417,19 +1421,15 @@ export default function PhotoSelectionScreen({
       templateSlots: templateSlots.map(s => ({ id: s.id, photoId: s.photoId }))
     });
     
-    // If trying to unfavorite a photo that's in a slot, show warning
+    // If trying to unfavorite a photo that's in a template slot, show confirmation
     if (isCurrentlyFavorited && isPhotoInSlot) {
-      console.log('🚫 Blocking unfavorite - photo is in slot');
-      toast('Please remove from template slot first', {
-        id: 'unfavorite-locked',
-        duration: 3000,
-        icon: '⚠️',
-        style: {
-          background: '#FEF3C7',
-          color: '#92400E',
-        },
-      });
-      return; // Don't allow unfavoriting
+      console.log('⚠️ Photo is in template slot - showing confirmation modal');
+      const photo = photos.find(p => p.id === photoId);
+      if (photo) {
+        setPhotoToRemoveFromFavorites(photo);
+        setShowRemoveFavoriteConfirm(true);
+      }
+      return;
     }
     
     // Otherwise, toggle favorite normally
@@ -1443,6 +1443,25 @@ export default function PhotoSelectionScreen({
       }
       return newFavorites;
     });
+  };
+
+  // Handle confirmed removal from favorites
+  const handleConfirmRemoveFavorite = () => {
+    if (photoToRemoveFromFavorites) {
+      console.log('✅ Confirmed removal from favorites:', photoToRemoveFromFavorites.name);
+      setFavoritedPhotos(prev => {
+        const newFavorites = new Set(prev);
+        newFavorites.delete(photoToRemoveFromFavorites.id);
+        return newFavorites;
+      });
+      
+      toast.success(`Removed "${photoToRemoveFromFavorites.name}" from favorites`, {
+        duration: 3000,
+        icon: '⭐'
+      });
+      
+      setPhotoToRemoveFromFavorites(null);
+    }
   };
 
   // Mode toggling
@@ -2102,7 +2121,7 @@ export default function PhotoSelectionScreen({
               onRemoveFavorite={handleToggleFavorite}
               isActiveInteractionArea={viewMode === 'inline-editing' || isSelectingPhoto}
               layout="horizontal"
-              showRemoveButtons={false}
+              showRemoveButtons={true}
               usedPhotoIds={getUsedPhotoIds()}
               onDragStart={(photo) => {
                 setIsDraggingPhoto(true);
@@ -2230,6 +2249,19 @@ export default function PhotoSelectionScreen({
           total: uploadProgress.total,
           message: uploadProgress.templateName
         } : null}
+      />
+
+      {/* Remove Favorite Confirmation Modal */}
+      <ConfirmRemoveFavoriteModal
+        isOpen={showRemoveFavoriteConfirm}
+        onClose={() => {
+          setShowRemoveFavoriteConfirm(false);
+          setPhotoToRemoveFromFavorites(null);
+        }}
+        onConfirm={handleConfirmRemoveFavorite}
+        photo={photoToRemoveFromFavorites}
+        templateSlots={templateSlots}
+        photos={photos}
       />
 
       {/* Incomplete Slots Warning Dialog */}

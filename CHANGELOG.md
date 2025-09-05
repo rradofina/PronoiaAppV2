@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-09-05] - Allow Removing Photos from Favorites While Keeping in Template Slots
+
+### Added
+- **ConfirmRemoveFavoriteModal Component**: New confirmation dialog for removing photos from favorites
+  - **Live Template Previews**: Shows actual rendered templates with photos, not just gray placeholders
+  - Dynamic template preview thumbnails that scale based on number of templates containing the photo
+  - Shows which templates contain the photo being removed with real photo placements
+  - Clear messaging that photo remains in template slots
+  - File: `components/ConfirmRemoveFavoriteModal.tsx` (new)
+  - Uses PngTemplateVisual component for accurate template rendering
+  - Impact: Users can see exactly where their photo appears in templates before removing from favorites
+
+### Changed
+- **Photo Favorites Management**: Replaced blocking logic with confirmation flow
+  - Removed toast warning that prevented unfavoriting photos in template slots
+  - Added confirmation modal state management in PhotoSelectionScreen
+  - File: `components/screens/PhotoSelectionScreen.tsx` - Updated `handleToggleFavorite` logic
+  - Added success toast after confirmed removal from favorites
+  - Impact: Separates "photos for prints" from "photos for individual export" workflows
+
+- **FavoritesBar Remove Buttons**: Now shown in both photo and print selection modes
+  - Previously hidden in print filling mode (`showRemoveButtons={false}`)
+  - Now enabled in all modes (`showRemoveButtons={true}`)
+  - File: `components/screens/PhotoSelectionScreen.tsx` (line 2124)
+  - Impact: Users can access remove functionality regardless of current mode
+
+### Fixed
+- **User Workflow Issue**: Clients wanted different photos for templates vs favorites export
+  - Root Cause: System prevented removing photos from favorites if they were in template slots
+  - Solution: Allow removal with clear confirmation showing template usage
+  - Files Modified: PhotoSelectionScreen (handleToggleFavorite), new ConfirmRemoveFavoriteModal
+  - Impact: Gives clients full control over export photo selection while preserving template assignments
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
 ## [2025-08-31] - Fix CORS Errors and Zoom/Pan Issues
 
 ### Fixed
