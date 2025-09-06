@@ -1,4 +1,4 @@
-import { Package, Photo, DriveFolder, ManualTemplate, TemplateSlot } from '../../types';
+import { Package, ManualPackage, Photo, DriveFolder, ManualTemplate, TemplateSlot } from '../../types';
 import { useState, useEffect, Fragment } from 'react';
 import PackageTemplatePreview from '../PackageTemplatePreview';
 import { manualPackageService } from '../../services/manualPackageService';
@@ -9,8 +9,8 @@ interface PackageSelectionScreenProps {
   selectedClientFolder: DriveFolder | null;
   photos: Photo[];
   packages: Package[];
-  selectedPackage: Package | null;
-  setSelectedPackage: (pkg: Package) => void;
+  selectedPackage: Package | ManualPackage | null;
+  setSelectedPackage: (pkg: Package | ManualPackage) => void;
   handleBack: () => void;
   handlePackageContinue: (templates?: ManualTemplate[]) => void;
   templateSlots?: TemplateSlot[];
@@ -111,7 +111,7 @@ export default function PackageSelectionScreen({
                     ₱{selectedPackage.price}
                   </span>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                    {selectedPackage.templateCount} {selectedPackage.templateCount === 1 ? 'Print' : 'Prints'}
+                    {(selectedPackage as any).template_count || (selectedPackage as any).templateCount} {((selectedPackage as any).template_count || (selectedPackage as any).templateCount) === 1 ? 'Print' : 'Prints'}
                   </span>
                 </div>
                 

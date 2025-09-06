@@ -1556,10 +1556,24 @@ export default function PhotoSelectionScreen({
     );
   };
 
+  // Helper function to get template count from either Package or ManualPackage
+  const getTemplateCount = (pkg: Package | ManualPackage | null): number => {
+    if (!pkg) return 1;
+    // If it's a ManualPackage, use template_count, otherwise use templateCount
+    return (pkg as ManualPackage).template_count || (pkg as Package).templateCount || 1;
+  };
+
   // Calculate dynamic photo limit
   const calculatePhotoLimit = () => {
+    const pkg = selectedPackage as ManualPackage;
+    
+    // Handle unlimited photos packages
+    if (pkg?.is_unlimited_photos) {
+      return 9999; // Use large number instead of Infinity for better UI display
+    }
+    
     // Check if selectedPackage has photo_limit (ManualPackage) or use default
-    const baseLimit = (selectedPackage as ManualPackage)?.photo_limit || 10;
+    const baseLimit = pkg?.photo_limit || 10;
     const templatePhotoCount = templateSlots.length;
     return Math.max(baseLimit, templatePhotoCount);
   };
@@ -1929,17 +1943,6 @@ export default function PhotoSelectionScreen({
             </div>
             
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Mode toggle button for desktop */}
-              <button
-                onClick={handleModeToggle}
-                className={`hidden px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  selectionMode === 'photo'
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                } ${viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''}`}
-              >
-                {selectionMode === 'photo' ? '📷 Ready to Fill Prints' : '⭐ Back to Photo Selection'}
-              </button>
               
               {/* Add Prints button - only in print mode */}
               {selectionMode === 'print' && (
@@ -2249,6 +2252,8 @@ export default function PhotoSelectionScreen({
           total: uploadProgress.total,
           message: uploadProgress.templateName
         } : null}
+        photoLimit={calculatePhotoLimit()}
+        isUnlimitedPhotos={(selectedPackage as ManualPackage)?.is_unlimited_photos || false}
       />
 
       {/* Remove Favorite Confirmation Modal */}

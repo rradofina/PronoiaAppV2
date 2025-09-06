@@ -361,7 +361,7 @@ export default function Home() {
   };
 
   const getTotalAllowedPrints = () => {
-    const basePrints = selectedPackage?.templateCount || 0;
+    const basePrints = (selectedPackage as any)?.template_count || (selectedPackage as any)?.templateCount || 0;
     return basePrints + additionalPrints;
   };
 

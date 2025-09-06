@@ -13,6 +13,8 @@ interface UploadOptionsModalProps {
     total: number;
     message: string;
   } | null;
+  photoLimit: number;
+  isUnlimitedPhotos: boolean;
 }
 
 export default function UploadOptionsModal({
@@ -23,8 +25,16 @@ export default function UploadOptionsModal({
   favoritedPhotos,
   isUploading,
   uploadProgress,
+  photoLimit,
+  isUnlimitedPhotos,
 }: UploadOptionsModalProps) {
   if (!isOpen) return null;
+
+  // Calculate button state
+  const selectedCount = favoritedPhotos.length;
+  const isUnlimited = isUnlimitedPhotos;
+  const isOverLimit = !isUnlimited && selectedCount > photoLimit;
+  const canUpload = !isUnlimited && selectedCount === photoLimit;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -54,9 +64,9 @@ export default function UploadOptionsModal({
 
               <button
                 onClick={onUploadPhotos}
-                disabled={favoritedPhotos.length === 0}
+                disabled={!canUpload}
                 className={`w-full p-4 rounded-lg transition-colors duration-200 text-left ${
-                  favoritedPhotos.length > 0
+                  canUpload
                     ? 'bg-green-600 hover:bg-green-700 text-white'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
@@ -66,9 +76,16 @@ export default function UploadOptionsModal({
                   <div>
                     <h3 className="font-semibold text-lg mb-1">Upload Selected Photos</h3>
                     <p className="text-sm opacity-90">
-                      {favoritedPhotos.length > 0
-                        ? `Upload ${favoritedPhotos.length} favorited photo${favoritedPhotos.length !== 1 ? 's' : ''} to Google Drive`
-                        : 'No favorited photos to upload'}
+                      {isUnlimited 
+                        ? 'All soft copies will be provided by staff'
+                        : selectedCount === 0
+                          ? `No photos selected (0/${photoLimit})`
+                          : selectedCount > photoLimit
+                            ? `Too many selected (${selectedCount}/${photoLimit} max)`
+                            : selectedCount === photoLimit
+                              ? `Upload all ${photoLimit} selected photos ✓`
+                              : `Need to select exactly ${photoLimit} photos (${selectedCount}/${photoLimit})`
+                      }
                     </p>
                   </div>
                 </div>

@@ -263,8 +263,8 @@ interface FolderSelectionScreenProps {
   onSignOut: () => void;
   onChangeMainFolder: () => void;
   // New props for package selection
-  selectedPackage: Package | null;
-  setSelectedPackage: (pkg: Package | null) => void;
+  selectedPackage: Package | ManualPackage | null;
+  setSelectedPackage: (pkg: Package | ManualPackage | null) => void;
   handleContinue: (effectiveTemplates?: ManualTemplate[]) => void;
   // New prop for template management
   onManageTemplates: () => void;
@@ -1273,27 +1273,8 @@ export default function FolderSelectionScreen({
                                   <div key={pkg.id} className="space-y-0">
                                     <div
                                       onClick={() => {
-                                        const packageData = {
-                                          id: pkg.id,
-                                          name: pkg.name,
-                                          templateCount: pkg.template_count || 1,
-                                          price: pkg.price || 0,
-                                          description: pkg.description || `${pkg.template_count || 1} template${(pkg.template_count || 1) === 1 ? '' : 's'}`
-                                        };
-                                        
-                                        // DISABLED INLINE EXPANSION - Now navigates to PackageSelectionScreen
-                                        // If this package is already expanded, collapse it
-                                        // if (templateState.expandedPackageId === pkg.id.toString()) {
-                                        //   dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId: null });
-                                        //   setSelectedPackage(null);
-                                        // } else {
-                                        //   // Expand this package and load templates
-                                        //   setSelectedPackage(packageData);
-                                        //   loadPackageTemplates(pkg.id.toString(), pkg.name);
-                                        // }
-                                        
-                                        // NEW: Navigate to PackageSelectionScreen with selected package
-                                        setSelectedPackage(packageData);
+                                        // Pass the full ManualPackage object to preserve all fields including photo_limit
+                                        setSelectedPackage(pkg);
                                         handleContinue(); // This should navigate to 'package' screen
                                       }}
                                       className={`flex items-center p-4 rounded-lg cursor-pointer transition-all duration-200 border ${
@@ -1397,27 +1378,8 @@ export default function FolderSelectionScreen({
                                 <div key={pkg.id} className="space-y-0">
                                   <div
                                     onClick={() => {
-                                      const packageData = {
-                                        id: pkg.id,
-                                        name: pkg.name,
-                                        templateCount: pkg.template_count || 1,
-                                        price: pkg.price || 0,
-                                        description: pkg.description || `${pkg.template_count || 1} template${(pkg.template_count || 1) === 1 ? '' : 's'}`
-                                      };
-                                      
-                                      // DISABLED INLINE EXPANSION - Now navigates to PackageSelectionScreen
-                                      // If this package is already expanded, collapse it
-                                      // if (templateState.expandedPackageId === pkg.id.toString()) {
-                                      //   dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId: null });
-                                      //   setSelectedPackage(null);
-                                      // } else {
-                                      //   // Expand this package and load templates
-                                      //   setSelectedPackage(packageData);
-                                      //   loadPackageTemplates(pkg.id.toString(), pkg.name);
-                                      // }
-                                      
-                                      // NEW: Navigate to PackageSelectionScreen with selected package
-                                      setSelectedPackage(packageData);
+                                      // Pass the full ManualPackage object to preserve all fields including photo_limit
+                                      setSelectedPackage(pkg);
                                       handleContinue(); // This should navigate to 'package' screen
                                     }}
                                     className={`flex items-center p-4 rounded-lg cursor-pointer transition-all duration-200 border ${

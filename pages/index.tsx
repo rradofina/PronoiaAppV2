@@ -1179,7 +1179,7 @@ export default function Home() {
     setAdditionalPrints(newAdditionalPrints);
     
     // Check if current template count exceeds new total allowed prints
-    const newTotalAllowed = (selectedPackage?.templateCount || 0) + newAdditionalPrints;
+    const newTotalAllowed = ((selectedPackage as any)?.template_count || (selectedPackage as any)?.templateCount || 0) + newAdditionalPrints;
     const currentTemplateTotal = getTotalTemplateCount();
     
     if (currentTemplateTotal > newTotalAllowed) {
@@ -1210,7 +1210,7 @@ export default function Home() {
 
   // Helper function to get total allowed prints (base package + additional)
   const getTotalAllowedPrints = () => {
-    const basePrints = selectedPackage?.templateCount || 0;
+    const basePrints = (selectedPackage as any)?.template_count || (selectedPackage as any)?.templateCount || 0;
     return basePrints + additionalPrints;
   };
 

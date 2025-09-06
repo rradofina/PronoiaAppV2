@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Package, TemplateType, GoogleAuth, TemplateTypeInfo, PrintSize } from '../../types';
+import { Package, ManualPackage, TemplateType, GoogleAuth, TemplateTypeInfo, PrintSize } from '../../types';
 import { PngTemplate, pngTemplateService } from '../../services/pngTemplateService';
 import { templateConfigService } from '../../services/templateConfigService';
 import { printSizeService } from '../../services/printSizeService';
 
 interface TemplateSelectionScreenProps {
-  selectedPackage: Package | null;
+  selectedPackage: Package | ManualPackage | null;
   clientName: string;
   googleAuth: GoogleAuth;
   templateCounts: Record<string, number>;
@@ -86,8 +86,8 @@ export default function TemplateSelectionScreen({
           </p>
           <div className="mt-2 text-sm text-blue-600">
             {selectedPackage?.name} • ₱{selectedPackage?.price}
-            {totalAllowedPrints > (selectedPackage?.templateCount || 0) && (
-              <span className="ml-2 text-green-600">+ {totalAllowedPrints - (selectedPackage?.templateCount || 0)} additional</span>
+            {totalAllowedPrints > ((selectedPackage as any)?.template_count || (selectedPackage as any)?.templateCount || 0) && (
+              <span className="ml-2 text-green-600">+ {totalAllowedPrints - ((selectedPackage as any)?.template_count || (selectedPackage as any)?.templateCount || 0)} additional</span>
             )}
           </div>
         </div>

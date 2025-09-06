@@ -125,10 +125,10 @@ export default function TemplateSelection() {
           Select Template Types
         </h1>
         <p className="text-lg text-gray-600 mb-4">
-          Choose up to {session?.maxTemplates || selectedPackage.templateCount} template types for {session?.clientName || 'Client'}
+          Choose up to {session?.maxTemplates || (selectedPackage as any).template_count || (selectedPackage as any).templateCount} template types for {session?.clientName || 'Client'}
         </p>
         <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
-          <span>🎯 {templates.length} / {session?.maxTemplates || selectedPackage.templateCount} selected</span>
+          <span>🎯 {templates.length} / {session?.maxTemplates || (selectedPackage as any).template_count || (selectedPackage as any).templateCount} selected</span>
           <span>•</span>
           <span>📋 {getRemainingTemplates()} remaining</span>
         </div>

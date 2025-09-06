@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import { Session, Package } from '../types';
+import { Session, Package, ManualPackage } from '../types';
 import { STORAGE_KEYS } from '../utils/constants';
 import { supabaseService } from '../services/supabaseService';
 
 interface SessionStore {
   session: Session | null;
-  selectedPackage: Package | null;
+  selectedPackage: Package | ManualPackage | null;
   clientName: string;
   // Legacy packages removed - now using manual package management
   currentStep: 'package' | 'template' | 'photos' | 'preview' | 'complete';
@@ -14,7 +14,7 @@ interface SessionStore {
   
   setSession: (session: Session | null) => void;
   updateSession: (updates: Partial<Session>) => void;
-  setSelectedPackage: (pkg: Package | null) => void;
+  setSelectedPackage: (pkg: Package | ManualPackage | null) => void;
   setClientName: (name: string) => void;
   setCurrentStep: (step: 'package' | 'template' | 'photos' | 'preview' | 'complete') => void;
   nextStep: () => void;
