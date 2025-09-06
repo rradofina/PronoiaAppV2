@@ -13,6 +13,7 @@ interface FavoritesBarProps {
   maxPhotosToShow?: number;
   onDragStart?: (photo: Photo) => void;
   onDragEnd?: () => void;
+  selectionMode?: 'photo' | 'print';
 }
 
 export default function FavoritesBar({
@@ -25,7 +26,8 @@ export default function FavoritesBar({
   usedPhotoIds = new Set(),
   maxPhotosToShow,
   onDragStart,
-  onDragEnd
+  onDragEnd,
+  selectionMode = 'print'
 }: FavoritesBarProps) {
   
   // Apply adaptive photo limiting
@@ -210,7 +212,10 @@ export default function FavoritesBar({
       console.log('✅ Drag completed');
     } else if (draggedPhoto && !isDragging && gestureMode !== 'swipe') {
       // It was just a tap/click, not a drag or swipe
-      onPhotoClick(draggedPhoto);
+      // Only auto-click in print mode (fill templates)
+      if (selectionMode !== 'photo') {
+        onPhotoClick(draggedPhoto);
+      }
     }
     
     // Velocity-based swipe navigation
@@ -366,10 +371,22 @@ export default function FavoritesBar({
                     ⭐
                   </div>
                   
-                  {/* Drag indicator on hover */}
-                  <div className="absolute top-1 left-1 bg-gray-800 bg-opacity-75 text-white rounded px-1 py-0.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                    Drag me
-                  </div>
+                  {/* View button or drag indicator on hover */}
+                  {selectionMode === 'photo' ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPhotoClick(photo);
+                      }}
+                      className="absolute top-1 left-1 bg-blue-600 hover:bg-blue-700 text-white rounded px-1.5 py-0.5 text-xs opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      View
+                    </button>
+                  ) : (
+                    <div className="absolute top-1 left-1 bg-gray-800 bg-opacity-75 text-white rounded px-1 py-0.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                      Drag me
+                    </div>
+                  )}
                   </div>
                 );
               })}
@@ -486,10 +503,22 @@ export default function FavoritesBar({
                   ⭐
                 </div>
                 
-                {/* Drag indicator on hover */}
-                <div className="absolute top-1 left-1 bg-gray-800 bg-opacity-75 text-white rounded px-1 py-0.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                  Drag me
-                </div>
+                {/* View button or drag indicator on hover */}
+                {selectionMode === 'photo' ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPhotoClick(photo);
+                    }}
+                    className="absolute top-1 left-1 bg-blue-600 hover:bg-blue-700 text-white rounded px-1.5 py-0.5 text-xs opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    View
+                  </button>
+                ) : (
+                  <div className="absolute top-1 left-1 bg-gray-800 bg-opacity-75 text-white rounded px-1 py-0.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                    Drag me
+                  </div>
+                )}
                 </div>
               );
             })}

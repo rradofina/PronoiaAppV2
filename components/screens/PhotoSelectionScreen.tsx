@@ -2102,6 +2102,7 @@ export default function PhotoSelectionScreen({
               layout="horizontal"
               showRemoveButtons={true}
               usedPhotoIds={getUsedPhotoIds()}
+              selectionMode="photo"
               onDragStart={(photo) => {
                 setIsDraggingPhoto(true);
                 setPreviewPhotoId(photo.id);
@@ -2126,6 +2127,7 @@ export default function PhotoSelectionScreen({
               layout="horizontal"
               showRemoveButtons={true}
               usedPhotoIds={getUsedPhotoIds()}
+              selectionMode="print"
               onDragStart={(photo) => {
                 setIsDraggingPhoto(true);
                 setPreviewPhotoId(photo.id);
