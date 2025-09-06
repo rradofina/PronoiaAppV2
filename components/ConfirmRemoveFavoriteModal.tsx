@@ -18,6 +18,7 @@ interface ConfirmRemoveFavoriteModalProps {
   photo: Photo | null;
   templateSlots: TemplateSlot[];
   photos: Photo[]; // All photos for rendering templates
+  effectiveTemplates?: any[]; // The actual templates being displayed (including replacements)
 }
 
 export default function ConfirmRemoveFavoriteModal({
@@ -26,7 +27,8 @@ export default function ConfirmRemoveFavoriteModal({
   onConfirm,
   photo,
   templateSlots,
-  photos
+  photos,
+  effectiveTemplates
 }: ConfirmRemoveFavoriteModalProps) {
   const [templatePreviews, setTemplatePreviews] = useState<TemplatePreview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,12 +64,11 @@ export default function ConfirmRemoveFavoriteModal({
 
       setLoading(true);
       try {
-        // Get window templates (from package) first
-        const windowTemplates = (window as any).pngTemplates || [];
+        // Use effective templates first (includes replacements), then fall back to window/database
+        let allTemplates = effectiveTemplates || (window as any).pngTemplates || [];
         
-        // If window templates don't have what we need, fall back to database
-        let allTemplates = windowTemplates;
-        if (windowTemplates.length === 0) {
+        // If no effective templates, fall back to database
+        if (allTemplates.length === 0) {
           const dbTemplates = await manualTemplateService.getActiveTemplates();
           allTemplates = dbTemplates.map(template => ({
             ...template,
@@ -77,8 +78,9 @@ export default function ConfirmRemoveFavoriteModal({
         }
 
         const previews: TemplatePreview[] = templatesWithPhoto.map(({ templateId, templateName }) => {
-          // Find template by ID in available templates
+          // Find template by name first (works for replaced templates), then by ID
           const template = allTemplates.find((t: any) => 
+            t.name === templateName ||
             t.id === templateId || 
             t.id.toString() === templateId ||
             templateId.startsWith(t.id.toString())

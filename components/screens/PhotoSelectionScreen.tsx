@@ -2267,6 +2267,7 @@ export default function PhotoSelectionScreen({
         photo={photoToRemoveFromFavorites}
         templateSlots={templateSlots}
         photos={photos}
+        effectiveTemplates={(window as any).pngTemplates}
       />
 
       {/* Incomplete Slots Warning Dialog */}
