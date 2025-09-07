@@ -96,25 +96,4 @@ export function setupViewportHandler(callback?: (info: ViewportInfo) => void) {
   };
 }
 
-/**
- * Check if current device needs viewport fixes
- */
-export function needsViewportFix(): boolean {
-  const info = getViewportInfo();
-  return info.isIpad || (info.isMobile && info.orientation === 'portrait');
-}
-
-/**
- * Get safe viewport height for layout calculations
- */
-export function getSafeViewportHeight(): number {
-  const info = getViewportInfo();
-  
-  // On iPad Safari, use visual viewport height if available
-  if (info.isIpad && window.visualViewport) {
-    return window.visualViewport.height;
-  }
-  
-  // Use window.innerHeight for other devices
-  return info.height;
-}
+// REMOVED: Unused functions - needsViewportFix and getSafeViewportHeight

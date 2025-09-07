@@ -588,4 +588,3 @@ class TemplateRasterizationService {
 
 // Export singleton instance
 export const templateRasterizationService = new TemplateRasterizationService();
-export default templateRasterizationService;

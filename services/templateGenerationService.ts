@@ -394,6 +394,4 @@ class TemplateGenerationService {
   }
 }
 
-// Export singleton instance
-export const templateGenerationService = new TemplateGenerationService();
-export default templateGenerationService; 
+// Singleton instance removed as it was unused 

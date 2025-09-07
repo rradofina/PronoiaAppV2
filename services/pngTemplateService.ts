@@ -29,11 +29,7 @@ export interface PngTemplate {
   createdAt: Date;
 }
 
-export interface TemplateFolder {
-  id: string;
-  name: string;
-  printSize: PrintSize;
-}
+// Removed unused TemplateFolder interface
 
 export class PngTemplateService {
   private templates: PngTemplate[] = [];

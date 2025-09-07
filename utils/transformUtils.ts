@@ -13,14 +13,4 @@ export function createPhotoTransform(
   };
 }
 
-export function createContainerTransform(
-  scale: number = 1.0,
-  x: number = 0,
-  y: number = 0
-) {
-  return {
-    scale,
-    x,
-    y
-  };
-}
+// REMOVED: Unused function - createContainerTransform

@@ -318,5 +318,4 @@ class HybridTemplateServiceImpl {
   }
 }
 
-// Export singleton instance
-export const hybridTemplateService = new HybridTemplateServiceImpl();
+// Singleton instance removed as it was unused

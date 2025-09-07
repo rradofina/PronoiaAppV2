@@ -43,31 +43,4 @@ export function getPrintSizeDimensions(printSize: PrintSize | string): PrintDime
   }
 }
 
-/**
- * Get aspect ratio string for CSS
- * @param printSize - The print size (4R, 5R, A4)
- * @returns Aspect ratio string for CSS (e.g., "1200/1800")
- */
-export function getPrintSizeAspectRatio(printSize: PrintSize | string): string {
-  const dimensions = getPrintSizeDimensions(printSize);
-  return `${dimensions.width}/${dimensions.height}`;
-}
-
-/**
- * Check if dimensions match a specific print size
- * @param dimensions - Dimensions to check
- * @param printSize - Print size to compare against
- * @param tolerance - Tolerance in pixels (default 10)
- * @returns true if dimensions match the print size
- */
-export function dimensionsMatchPrintSize(
-  dimensions: PrintDimensions,
-  printSize: PrintSize | string,
-  tolerance: number = 10
-): boolean {
-  const expected = getPrintSizeDimensions(printSize);
-  return (
-    Math.abs(dimensions.width - expected.width) <= tolerance &&
-    Math.abs(dimensions.height - expected.height) <= tolerance
-  );
-}
+// REMOVED: Unused functions - getPrintSizeAspectRatio and dimensionsMatchPrintSize

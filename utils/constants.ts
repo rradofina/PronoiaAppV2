@@ -96,15 +96,7 @@ export const ERROR_MESSAGES = {
   UNKNOWN_ERROR: 'An unknown error occurred',
 };
 
-// Success messages
-export const SUCCESS_MESSAGES = {
-  GOOGLE_DRIVE_CONNECTED: 'Successfully connected to Google Drive',
-  TEMPLATE_CREATED: 'Template created successfully',
-  PHOTO_SELECTED: 'Photo selected successfully',
-  TEMPLATES_EXPORTED: 'Templates exported successfully',
-  SESSION_SAVED: 'Session saved successfully',
-  SESSION_RESTORED: 'Session restored successfully',
-};
+// Removed unused SUCCESS_MESSAGES constant
 
 // Local storage keys
 export const STORAGE_KEYS = {
@@ -116,16 +108,7 @@ export const STORAGE_KEYS = {
   TEMPLATE_CACHE: 'template_cache',
 };
 
-// Default values
-export const DEFAULTS = {
-  THUMBNAIL_SIZE: UI_CONSTANTS.THUMBNAIL_SIZES.medium,
-  VIEW_MODE: 'grid' as const,
-  SORT_BY: 'name' as const,
-  SORT_ORDER: 'asc' as const,
-  TEMPLATE_QUALITY: 0.95,
-  EXPORT_FORMAT: 'jpg' as const,
-  CACHE_DURATION: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-};
+// Removed unused DEFAULTS constant
 
 // REMOVED: Photo slot calculations are now pure database-driven
 // Use templateConfigService.getPhotoSlots() instead
@@ -133,22 +116,8 @@ export const DEFAULTS = {
 // Validation functions
 // Package validation moved to manual package service
 
-export const validateTemplateType = (templateType: string): templateType is TemplateType => {
-  // Template types are now dynamic - any non-empty string is valid
-  return typeof templateType === 'string' && templateType.trim().length > 0;
-};
-
-// REMOVED: Template type validation is now handled by templateConfigService
-// Use templateConfigService.getTemplateTypeConfig() to check if a template type exists
-
-export const validateImageFile = (file: File): boolean => {
-  return SUPPORTED_IMAGE_TYPES.indexOf(file.type) !== -1;
-};
-
-export const validateImageUrl = (url: string): boolean => {
-  const extension = url.split('.').pop()?.toLowerCase();
-  return extension ? SUPPORTED_IMAGE_EXTENSIONS.indexOf(`.${extension}`) !== -1 : false;
-};
+// REMOVED: Unused validation functions - validateTemplateType, validateImageFile, validateImageUrl
+// Template type validation is now handled by templateConfigService
 
 // Print size display ordering (configurable, not hardcoded in components)
 export const PRINT_SIZE_ORDER = ['4R', '5R', 'A4'] as const;
@@ -224,24 +193,4 @@ export const TEMPLATE_BUILDER = {
   }
 };
 
-// Admin role permissions
-export const ADMIN_PERMISSIONS = {
-  TEMPLATE_BUILDER: ['create', 'read', 'update', 'delete'],
-  TEMPLATE_CATEGORIES: ['create', 'read', 'update', 'delete'],
-  USER_MANAGEMENT: ['read', 'update'],
-  ANALYTICS: ['read'],
-  SYSTEM_SETTINGS: ['read', 'update'],
-};
-
-// Template validation rules
-export const TEMPLATE_VALIDATION = {
-  MIN_SLOTS: 1,
-  MAX_SLOTS: 20,
-  MIN_NAME_LENGTH: 3,
-  MAX_NAME_LENGTH: 50,
-  MAX_DESCRIPTION_LENGTH: 200,
-  ALLOWED_BACKGROUND_COLORS: [
-    '#FFFFFF', '#F8F9FA', '#E9ECEF', '#DEE2E6', '#CED4DA',
-    '#ADB5BD', '#6C757D', '#495057', '#343A40', '#212529'
-  ],
-}; 
+// REMOVED: Unused constants - ADMIN_PERMISSIONS and TEMPLATE_VALIDATION 

@@ -228,6 +228,3 @@ export const logger = new LoggerService();
 
 // Export convenience functions for backward compatibility
 export const log = logger.info.bind(logger);
-export const logError = logger.error.bind(logger);
-export const logWarn = logger.warn.bind(logger);
-export const logDebug = logger.debug.bind(logger);

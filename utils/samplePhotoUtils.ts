@@ -7,15 +7,7 @@ import { Photo } from '../types';
 
 // Removed placeholder photo generation functions since we now only use actual client folder photos
 
-/**
- * Check if we should use sample photos for a template
- */
-export function shouldUseSamplePhotos(
-  isPreviewMode: boolean,
-  hasAssignedPhotos: boolean
-): boolean {
-  return isPreviewMode && !hasAssignedPhotos;
-}
+// REMOVED: Unused function - shouldUseSamplePhotos
 
 /**
  * Get optimized photo URL for preview (smaller size for performance)
