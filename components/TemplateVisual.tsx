@@ -58,20 +58,20 @@ const TemplateVisual: React.FC<TemplateVisualProps> = ({
     
     const photo = photos.find(p => p.id === photoId);
     if (!photo) {
-      console.log('🖼️ TemplateVisual: Photo not found for ID:', photoId, 'Available photos:', photos.length);
+      if (process.env.NODE_ENV === 'development') console.log('🖼️ TemplateVisual: Photo not found for ID:', photoId, 'Available photos:', photos.length);
       return null;
     }
     
-    console.log('🖼️ TemplateVisual: Found photo:', photo.name, 'ID:', photoId);
+    if (process.env.NODE_ENV === 'development') console.log('🖼️ TemplateVisual: Found photo:', photo.name, 'ID:', photoId);
     
     // Use higher resolution thumbnail for better template preview quality
     if (photo.thumbnailUrl) {
       const url = photo.thumbnailUrl.replace('=s220', '=s600');
-      console.log('🖼️ TemplateVisual: Using thumbnail URL:', url);
+      if (process.env.NODE_ENV === 'development') console.log('🖼️ TemplateVisual: Using thumbnail URL:', url);
       return url;
     }
     
-    console.log('🖼️ TemplateVisual: Using original URL:', photo.url);
+    if (process.env.NODE_ENV === 'development') console.log('🖼️ TemplateVisual: Using original URL:', photo.url);
     return photo.url || null;
   };
 

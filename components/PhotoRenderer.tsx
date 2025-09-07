@@ -91,7 +91,7 @@ function convertPhotoToCSS(photoTransform: PhotoTransform, previewMode: boolean 
   
   const cssTransform = `translate(${translateX}%, ${translateY}%) scale(${photoTransform.photoScale})`;
   
-  console.log('🎨 PHOTO CSS CONVERSION:', {
+  if (process.env.NODE_ENV === 'development') console.log('🎨 PHOTO CSS CONVERSION:', {
     input: photoTransform,
     translation: { 
       translateX: `${translateX}%`, 
@@ -402,7 +402,7 @@ function PhotoRenderer({
     
     // Add comprehensive coordinate debugging
     if (debug) {
-      console.log('🔍 MATHEMATICAL GAP DETECTION:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔍 MATHEMATICAL GAP DETECTION:', {
         photoEdges: {
           left: photoEdges.left.toFixed(1),
           right: photoEdges.right.toFixed(1),
@@ -450,7 +450,7 @@ function PhotoRenderer({
     
     // Add simplified gap calculation debugging
     if (debug) {
-      console.log('🧮 FINAL GAP CALCULATION (MATHEMATICAL):', {
+      if (process.env.NODE_ENV === 'development') console.log('🧮 FINAL GAP CALCULATION (MATHEMATICAL):', {
         containerSize: {
           width: containerRect.width.toFixed(1),
           height: containerRect.height.toFixed(1)
@@ -479,7 +479,7 @@ function PhotoRenderer({
 
     // Add final gap values debugging  
     if (debug) {
-      console.log('🧮 FINAL GAP VALUES:', {
+      if (process.env.NODE_ENV === 'development') console.log('🧮 FINAL GAP VALUES:', {
         finalGaps: {
           left: gapLeft,
           right: gapRight,
@@ -504,7 +504,7 @@ function PhotoRenderer({
     const hasAnyGaps = gapCount > 0;
     
     if (debug) {
-      console.log('🔍 Gap Detection (MATHEMATICAL - ACCURATE AT ALL ZOOM LEVELS):', {
+      if (process.env.NODE_ENV === 'development') console.log('🔍 Gap Detection (MATHEMATICAL - ACCURATE AT ALL ZOOM LEVELS):', {
         photoPosition: {
           left: photoEdges.left.toFixed(1),
           right: photoEdges.right.toFixed(1),
@@ -540,7 +540,7 @@ function PhotoRenderer({
       });
     }
     
-    console.log('🔧 detectGaps - Completed successfully:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔧 detectGaps - Completed successfully:', {
       hasGaps: hasAnyGaps,
       gapCount,
       gaps: { left: gapLeft, right: gapRight, top: gapTop, bottom: gapBottom }
@@ -644,7 +644,7 @@ function PhotoRenderer({
     const gapCount = [hasLeftGap, hasRightGap, hasTopGap, hasBottomGap].filter(Boolean).length;
     
     if (debug) {
-      console.log('🔮 Post-Snap Gap Simulation:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔮 Post-Snap Gap Simulation:', {
         simulatedPosition: { centerX: newCenterX, centerY: newCenterY, scale },
         photoSize: { width: scaledWidth, height: scaledHeight },
         photoEdges: { left: photoLeft, right: photoRight, top: photoTop, bottom: photoBottom },
@@ -694,7 +694,7 @@ function PhotoRenderer({
     // Opposite gaps (left+right or top+bottom) indicate photo is too small and needs scaling
     if (gapCount >= 3 || hasOppositeHorizontalGaps || hasOppositeVerticalGaps) {
       if (debug) {
-        console.log('🎯 Reset triggered:', {
+        if (process.env.NODE_ENV === 'development') console.log('🎯 Reset triggered:', {
           gapCount,
           hasOppositeHorizontalGaps,
           hasOppositeVerticalGaps,
@@ -751,7 +751,7 @@ function PhotoRenderer({
       horizontalDescription = `left ${gaps.left.toFixed(1)}px`;
       
       if (debug) {
-        console.log('🔍 LEFT GAP MOVEMENT CALCULATION:', {
+        if (process.env.NODE_ENV === 'development') console.log('🔍 LEFT GAP MOVEMENT CALCULATION:', {
           gap: gaps.left,
           containerWidth: containerRect.width,
           movement: horizontalMovement,
@@ -768,7 +768,7 @@ function PhotoRenderer({
       horizontalDescription = `right ${gaps.right.toFixed(1)}px`;
       
       if (debug) {
-        console.log('🔍 RIGHT GAP MOVEMENT CALCULATION:', {
+        if (process.env.NODE_ENV === 'development') console.log('🔍 RIGHT GAP MOVEMENT CALCULATION:', {
           gap: gaps.right,
           containerWidth: containerRect.width,
           movement: horizontalMovement,
@@ -806,9 +806,9 @@ function PhotoRenderer({
     const newCenterY = currentTransformRef.current.photoCenterY + verticalMovement;
     
     // Post-snap validation: Check if the new position would result in 3+ gaps
-    console.log('🔮 POST-SNAP VALIDATION: Checking if movement would create more gaps...');
+    if (process.env.NODE_ENV === 'development') console.log('🔮 POST-SNAP VALIDATION: Checking if movement would create more gaps...');
     const postSnapGaps = detectPostSnapGaps(newCenterX, newCenterY);
-    console.log('📊 POST-SNAP RESULT:', {
+    if (process.env.NODE_ENV === 'development') console.log('📊 POST-SNAP RESULT:', {
       wouldHaveGaps: postSnapGaps.hasGaps,
       wouldHaveGapCount: postSnapGaps.gapCount,
       wouldHaveGapSides: postSnapGaps.gaps
@@ -816,7 +816,7 @@ function PhotoRenderer({
     
     // If post-snap would result in 3+ gaps, override to reset-to-default
     if (postSnapGaps.gapCount >= 3) {
-      console.log('🚨 POST-SNAP OVERRIDE: Movement would create 3+ gaps, resetting to default instead');
+      if (process.env.NODE_ENV === 'development') console.log('🚨 POST-SNAP OVERRIDE: Movement would create 3+ gaps, resetting to default instead');
       return {
         action: 'reset-to-default',
         newCenterX: 0.5,
@@ -828,13 +828,13 @@ function PhotoRenderer({
       };
     }
     
-    console.log('✅ POST-SNAP VALIDATION PASSED: Movement is safe, proceeding');
+    if (process.env.NODE_ENV === 'development') console.log('✅ POST-SNAP VALIDATION PASSED: Movement is safe, proceeding');
     
     if (debug) {
       // Get photo dimensions for debugging
       const mathGaps = calculateMathematicalGaps();
       
-      console.log('📐 Gap-Based Movement Calculation:', {
+      if (process.env.NODE_ENV === 'development') console.log('📐 Gap-Based Movement Calculation:', {
         photoInfo: {
           renderedSize: mathGaps.photoSize,
           photoScale: currentTransform.photoScale,
@@ -871,13 +871,13 @@ function PhotoRenderer({
   const finalizePositioning = useCallback((): Promise<PhotoTransform> => {
     return new Promise(async (resolve) => {
       const performFinalization = async () => {
-        console.log('🚀 FINALIZATION STARTED - Checkmark clicked');
-        console.log('✅ PROCEEDING: Auto-snap executes regardless of recent interaction');
+        if (process.env.NODE_ENV === 'development') console.log('🚀 FINALIZATION STARTED - Checkmark clicked');
+        if (process.env.NODE_ENV === 'development') console.log('✅ PROCEEDING: Auto-snap executes regardless of recent interaction');
         
         // Detect gaps using accurate measurement
-        console.log('🔍 MEASURING GAPS...');
+        if (process.env.NODE_ENV === 'development') console.log('🔍 MEASURING GAPS...');
         const gapData = detectGaps();
-        console.log('📊 GAP MEASUREMENT RESULT:', {
+        if (process.env.NODE_ENV === 'development') console.log('📊 GAP MEASUREMENT RESULT:', {
           hasGaps: gapData.hasGaps,
           gapCount: gapData.gapCount,
           gaps: gapData.gaps,
@@ -885,26 +885,26 @@ function PhotoRenderer({
         });
         
         if (!gapData.hasGaps) {
-          console.log('✅ NO GAPS: No adjustment needed');
+          if (process.env.NODE_ENV === 'development') console.log('✅ NO GAPS: No adjustment needed');
           if (debug) {
-            console.log('✅ No significant gaps detected - no adjustment needed');
+            if (process.env.NODE_ENV === 'development') console.log('✅ No significant gaps detected - no adjustment needed');
           }
           resolve(currentTransformRef.current);
           return;
         }
         
-        console.log('⚠️ GAPS DETECTED: Proceeding with movement calculation');
+        if (process.env.NODE_ENV === 'development') console.log('⚠️ GAPS DETECTED: Proceeding with movement calculation');
 
         // Calculate movement based on user specification
-        console.log('🧮 CALCULATING MOVEMENT...');
+        if (process.env.NODE_ENV === 'development') console.log('🧮 CALCULATING MOVEMENT...');
         const movement = calculateGapBasedMovement(gapData);
-        console.log('📊 MOVEMENT VALIDATION:');
+        if (process.env.NODE_ENV === 'development') console.log('📊 MOVEMENT VALIDATION:');
         const debugAction = gapData.gapCount >= 3 ? 'Reset to default' : 
                            gapData.gapCount === 2 ? 'Move by both gap amounts' :
                            gapData.gapCount === 1 ? 'Move by single gap amount' : 'No action needed';
-        console.log('  Debug UI shows:', debugAction);
-        console.log('  Finalization calculates:', movement.action);
-        console.log('🎯 MOVEMENT CALCULATION RESULT:', {
+        if (process.env.NODE_ENV === 'development') console.log('  Debug UI shows:', debugAction);
+        if (process.env.NODE_ENV === 'development') console.log('  Finalization calculates:', movement.action);
+        if (process.env.NODE_ENV === 'development') console.log('🎯 MOVEMENT CALCULATION RESULT:', {
           action: movement.action,
           newCenterX: movement.newCenterX,
           newCenterY: movement.newCenterY,
@@ -912,18 +912,18 @@ function PhotoRenderer({
         });
         
         if (movement.action === 'none') {
-          console.log('✅ NO ACTION: Current position is acceptable');
+          if (process.env.NODE_ENV === 'development') console.log('✅ NO ACTION: Current position is acceptable');
           if (debug) {
-            console.log('✅ No action needed - current position is acceptable');
+            if (process.env.NODE_ENV === 'development') console.log('✅ No action needed - current position is acceptable');
           }
           resolve(currentTransformRef.current);
           return;
         }
         
-        console.log('🛠️ APPLYING MOVEMENT: Action required');
+        if (process.env.NODE_ENV === 'development') console.log('🛠️ APPLYING MOVEMENT: Action required');
 
         if (debug) {
-          console.log('⚙️ Applying gap-based correction:', {
+          if (process.env.NODE_ENV === 'development') console.log('⚙️ Applying gap-based correction:', {
             gapCount: gapData.gapCount,
             action: movement.action,
             movements: movement.movements
@@ -935,51 +935,51 @@ function PhotoRenderer({
         if (movement.action === 'reset-to-default') {
           // 3+ sides with gaps → Smart reset to optimal placement
           if (onSmartReset) {
-            console.log('🎯 SMART RESET: Using intelligent photo placement');
+            if (process.env.NODE_ENV === 'development') console.log('🎯 SMART RESET: Using intelligent photo placement');
             try {
               finalizedTransform = await onSmartReset();
-              console.log('✅ SMART RESET SUCCESSFUL:', finalizedTransform);
+              if (process.env.NODE_ENV === 'development') console.log('✅ SMART RESET SUCCESSFUL:', finalizedTransform);
               if (debug) {
-                console.log('🎯 Smart reset applied: optimal placement restored');
+                if (process.env.NODE_ENV === 'development') console.log('🎯 Smart reset applied: optimal placement restored');
               }
             } catch (error) {
               console.error('❌ Smart reset failed, falling back to default:', error);
               finalizedTransform = createPhotoTransform(1, 0.5, 0.5);
               if (debug) {
-                console.log('⚠️ Fallback to default: smart reset unavailable');
+                if (process.env.NODE_ENV === 'development') console.log('⚠️ Fallback to default: smart reset unavailable');
               }
             }
           } else {
             // Fallback to default behavior when smart reset not available
-            console.log('🔄 DEFAULT RESET: Creating transform (1, 0.5, 0.5)');
+            if (process.env.NODE_ENV === 'development') console.log('🔄 DEFAULT RESET: Creating transform (1, 0.5, 0.5)');
             finalizedTransform = createPhotoTransform(1, 0.5, 0.5);
-            console.log('✅ CREATED DEFAULT RESET TRANSFORM:', finalizedTransform);
+            if (process.env.NODE_ENV === 'development') console.log('✅ CREATED DEFAULT RESET TRANSFORM:', finalizedTransform);
             if (debug) {
-              console.log('🔄 Default reset applied: 3+ sides have gaps');
+              if (process.env.NODE_ENV === 'development') console.log('🔄 Default reset applied: 3+ sides have gaps');
             }
           }
         } else if (movement.action === 'move-by-gaps') {
           // 1-2 sides with gaps → Move by exact gap amounts (preserve zoom)
-          console.log('📐 MOVE BY GAPS: Creating transform with movement');
-          console.log('  Current transform:', currentTransform);
-          console.log('  New center:', { x: movement.newCenterX, y: movement.newCenterY });
+          if (process.env.NODE_ENV === 'development') console.log('📐 MOVE BY GAPS: Creating transform with movement');
+          if (process.env.NODE_ENV === 'development') console.log('  Current transform:', currentTransform);
+          if (process.env.NODE_ENV === 'development') console.log('  New center:', { x: movement.newCenterX, y: movement.newCenterY });
           finalizedTransform = createPhotoTransform(
             currentTransform.photoScale, // Preserve zoom
             movement.newCenterX,
             movement.newCenterY
           );
-          console.log('✅ CREATED MOVEMENT TRANSFORM:', finalizedTransform);
+          if (process.env.NODE_ENV === 'development') console.log('✅ CREATED MOVEMENT TRANSFORM:', finalizedTransform);
           if (debug) {
-            console.log('📐 Moving by gap amounts:', movement.movements);
+            if (process.env.NODE_ENV === 'development') console.log('📐 Moving by gap amounts:', movement.movements);
           }
         } else {
           // Should not happen, but fallback to current transform
-          console.log('⚠️ FALLBACK: Unknown action, using current transform');
+          if (process.env.NODE_ENV === 'development') console.log('⚠️ FALLBACK: Unknown action, using current transform');
           finalizedTransform = currentTransform;
         }
         
         if (debug) {
-          console.log('✨ Gap-Based Finalization Result:', {
+          if (process.env.NODE_ENV === 'development') console.log('✨ Gap-Based Finalization Result:', {
             oldTransform: {
               scale: currentTransform.photoScale.toFixed(3),
               center: [currentTransform.photoCenterX.toFixed(3), currentTransform.photoCenterY.toFixed(3)]
@@ -993,10 +993,10 @@ function PhotoRenderer({
         }
         
         // Apply transformation
-        console.log('🔄 APPLYING TRANSFORM...');
-        console.log('  Current transform:', currentTransform);
-        console.log('  New transform:', finalizedTransform);
-        console.log('  Transforms are different:', finalizedTransform !== currentTransform);
+        if (process.env.NODE_ENV === 'development') console.log('🔄 APPLYING TRANSFORM...');
+        if (process.env.NODE_ENV === 'development') console.log('  Current transform:', currentTransform);
+        if (process.env.NODE_ENV === 'development') console.log('  New transform:', finalizedTransform);
+        if (process.env.NODE_ENV === 'development') console.log('  Transforms are different:', finalizedTransform !== currentTransform);
         
         // Check if transforms are actually different (deep comparison for safety)
         const transformsAreDifferent = 
@@ -1004,13 +1004,13 @@ function PhotoRenderer({
           finalizedTransform.photoCenterX !== currentTransform.photoCenterX ||
           finalizedTransform.photoCenterY !== currentTransform.photoCenterY;
         
-        console.log('  Deep comparison different:', transformsAreDifferent);
+        if (process.env.NODE_ENV === 'development') console.log('  Deep comparison different:', transformsAreDifferent);
         
         if (transformsAreDifferent) {
-          console.log('⚙️ EXECUTING TRANSFORM CHANGE...');
+          if (process.env.NODE_ENV === 'development') console.log('⚙️ EXECUTING TRANSFORM CHANGE...');
           
           // Start animation for smooth auto-snap
-          console.log('🎬 Starting auto-snap animation');
+          if (process.env.NODE_ENV === 'development') console.log('🎬 Starting auto-snap animation');
           setIsSnapping(true);
           
           // Apply the transform locally for immediate visual feedback
@@ -1029,14 +1029,14 @@ function PhotoRenderer({
           
           // End animation after transition duration
           setTimeout(() => {
-            console.log('🎬 Auto-snap animation completed');
+            if (process.env.NODE_ENV === 'development') console.log('🎬 Auto-snap animation completed');
             setIsSnapping(false);
           }, 500); // Match CSS transition duration
           
           if (debug) console.log('✅ Gap-based transform applied');
           resolve(finalizedTransform);
         } else {
-          console.log('ℹ️ NO CHANGE: Transforms are identical, resolving with current');
+          if (process.env.NODE_ENV === 'development') console.log('ℹ️ NO CHANGE: Transforms are identical, resolving with current');
           resolve(currentTransformRef.current);
         }
       };
@@ -1164,7 +1164,7 @@ function PhotoRenderer({
     if (!interactive && transform && isPhotoTransform(transform)) {
       // Non-interactive mode: always sync with prop for correct display
       if (debug) {
-        console.log('📐 PhotoRenderer NON-INTERACTIVE - Syncing transform from prop:', {
+        if (process.env.NODE_ENV === 'development') console.log('📐 PhotoRenderer NON-INTERACTIVE - Syncing transform from prop:', {
           photoScale: transform.photoScale,
           photoCenterX: transform.photoCenterX,
           photoCenterY: transform.photoCenterY
@@ -1175,7 +1175,7 @@ function PhotoRenderer({
       // Interactive mode: only sync when photo changes, not during dragging
       // This prevents feedback loops from parent updates
       if (transform && isPhotoTransform(transform)) {
-        console.log('📐 PhotoRenderer INTERACTIVE - New photo, initializing transform:', {
+        if (process.env.NODE_ENV === 'development') console.log('📐 PhotoRenderer INTERACTIVE - New photo, initializing transform:', {
           photoScale: transform.photoScale,
           photoCenterX: transform.photoCenterX,
           photoCenterY: transform.photoCenterY,
@@ -1185,7 +1185,7 @@ function PhotoRenderer({
         setCurrentTransform(transform);
       } else {
         // No transform provided, use default
-        console.log('📐 PhotoRenderer INTERACTIVE - New photo, using default transform');
+        if (process.env.NODE_ENV === 'development') console.log('📐 PhotoRenderer INTERACTIVE - New photo, using default transform');
         setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
       }
       setLastPhotoUrlForTransform(photoUrl);
@@ -1244,7 +1244,7 @@ function PhotoRenderer({
     // If both URLs have the same Google Drive file ID, they're the same photo
     if (fileId1 && fileId2 && fileId1 === fileId2) {
       if (debug) {
-        console.log('📸 PhotoRenderer - URL upgrade detected (same file ID):', {
+        if (process.env.NODE_ENV === 'development') console.log('📸 PhotoRenderer - URL upgrade detected (same file ID):', {
           fileId: fileId1,
           fromType: url1.includes('fife') ? 'immediate' : 'direct',
           toType: url2.includes('fife') ? 'immediate' : 'direct',
@@ -1392,7 +1392,7 @@ function PhotoRenderer({
     }
     
     if (currentUrlIndex < allUrls.length - 1) {
-      console.log(`🔄 PhotoRenderer - Trying fallback URL ${currentUrlIndex + 2}/${allUrls.length}`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 PhotoRenderer - Trying fallback URL ${currentUrlIndex + 2}/${allUrls.length}`);
       setCurrentUrlIndex(prev => prev + 1);
       setImageError(false);
       // Keep imageLoaded=true to prevent flashing during URL fallback
@@ -1410,7 +1410,7 @@ function PhotoRenderer({
     const isUpgrade = lastPhotoUrl && isSamePhoto(currentUrl, lastPhotoUrl);
     
     if (debug) {
-      console.log(`✅ PhotoRenderer - Image loaded successfully (${currentUrlIndex + 1}/${getAllUrls().length}):`, {
+      if (process.env.NODE_ENV === 'development') console.log(`✅ PhotoRenderer - Image loaded successfully (${currentUrlIndex + 1}/${getAllUrls().length}):`, {
         url: currentUrl,
         isUpgrade,
         naturalSize: imageRef.current ? {
@@ -1431,18 +1431,18 @@ function PhotoRenderer({
     if (!interactive) {
       if (transform && isPhotoTransform(transform)) {
         if (debug) {
-          console.log(`📸 PhotoRenderer NON-INTERACTIVE with transform for ${photoAlt}:`, transform);
+          if (process.env.NODE_ENV === 'development') console.log(`📸 PhotoRenderer NON-INTERACTIVE with transform for ${photoAlt}:`, transform);
         }
         return convertPhotoToCSS(transform, previewMode);
       } else if (transform && isContainerTransform(transform)) {
         if (debug) {
-          console.log(`📸 PhotoRenderer NON-INTERACTIVE with legacy transform for ${photoAlt}`);
+          if (process.env.NODE_ENV === 'development') console.log(`📸 PhotoRenderer NON-INTERACTIVE with legacy transform for ${photoAlt}`);
         }
         return convertLegacyToCSS(transform);
       } else {
         // Default for non-interactive without transform
         if (debug) {
-          console.log(`📸 PhotoRenderer NON-INTERACTIVE without transform for ${photoAlt}`);
+          if (process.env.NODE_ENV === 'development') console.log(`📸 PhotoRenderer NON-INTERACTIVE without transform for ${photoAlt}`);
         }
         return {
           width: '100%',
@@ -1457,7 +1457,7 @@ function PhotoRenderer({
     const baseStyle = convertPhotoToCSS(currentTransform, previewMode);
     
     if (debug) {
-      console.log(`📸 PhotoRenderer INTERACTIVE applying currentTransform for ${photoAlt}:`, {
+      if (process.env.NODE_ENV === 'development') console.log(`📸 PhotoRenderer INTERACTIVE applying currentTransform for ${photoAlt}:`, {
         currentTransform,
         isDragging,
         isTouching,
@@ -1489,7 +1489,7 @@ function PhotoRenderer({
     
     // Prevent interactions during auto-snap animation
     if (isSnapping) {
-      console.log('🎬 Touch interaction blocked during auto-snap animation');
+      if (process.env.NODE_ENV === 'development') console.log('🎬 Touch interaction blocked during auto-snap animation');
       return;
     }
     
@@ -1605,14 +1605,14 @@ function PhotoRenderer({
     
     // Prevent interactions during auto-snap animation
     if (isSnapping) {
-      console.log('🎬 Interaction blocked during auto-snap animation');
+      if (process.env.NODE_ENV === 'development') console.log('🎬 Interaction blocked during auto-snap animation');
       return;
     }
     
     e.preventDefault();
     // PHASE 2 FIX: Allow drag events to bubble to parent slots for drag-and-drop preview
     // Only prevent default and stop propagation for photo manipulation, not for drag events
-    console.log('🔥 PHASE 2 FIX: PhotoRenderer handlePointerDown - allowing drag events to bubble');
+    if (process.env.NODE_ENV === 'development') console.log('🔥 PHASE 2 FIX: PhotoRenderer handlePointerDown - allowing drag events to bubble');
     // e.stopPropagation(); // REMOVED - this was blocking drag events from reaching slot containers
     setIsDragging(true);
     setLastPointer({ x: e.clientX, y: e.clientY });

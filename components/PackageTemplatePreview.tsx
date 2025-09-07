@@ -90,11 +90,11 @@ export default function PackageTemplatePreview({
 
   const handleTemplateReplace = (newTemplate: ManualTemplate) => {
     if (!templateToChange) {
-      console.log('⚠️ No template selected for replacement');
+      if (process.env.NODE_ENV === 'development') console.log('⚠️ No template selected for replacement');
       return;
     }
 
-    console.log('🔄 POSITION-BASED TEMPLATE REPLACE:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔄 POSITION-BASED TEMPLATE REPLACE:', {
       templateIndex: templateToChange.index,
       oldTemplate: {
         id: templateToChange.template.id,
@@ -160,7 +160,7 @@ export default function PackageTemplatePreview({
     return photoFilenames[photoIndex];
   };
   
-  console.log(`📊 GLOBAL PHOTO ASSIGNMENT STRATEGY:`, {
+  if (process.env.NODE_ENV === 'development') console.log(`📊 GLOBAL PHOTO ASSIGNMENT STRATEGY:`, {
     totalTemplates: currentTemplates.length,
     totalHoles,
     availablePhotos: photoFilenames.length,
@@ -227,7 +227,7 @@ export default function PackageTemplatePreview({
       {/* Templates Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {currentTemplates.map((template, index) => {
-          console.log(`🎨 RENDERING TEMPLATE ${index + 1}:`, {
+          if (process.env.NODE_ENV === 'development') console.log(`🎨 RENDERING TEMPLATE ${index + 1}:`, {
             templateId: template.id,
             templateName: template.name,
             templateType: template.template_type,
@@ -238,7 +238,7 @@ export default function PackageTemplatePreview({
           const globalHoleOffset = currentTemplates.slice(0, index).reduce((offset, prevTemplate) => {
             return offset + (prevTemplate.holes_data?.length || 0);
           }, 0);
-          console.log(`🔍 TEMPLATE PREVIEW DEBUG - Processing template ${index + 1}:`, {
+          if (process.env.NODE_ENV === 'development') console.log(`🔍 TEMPLATE PREVIEW DEBUG - Processing template ${index + 1}:`, {
             templateId: template.id,
             templateName: template.name,
             templateType: template.template_type,
@@ -255,7 +255,7 @@ export default function PackageTemplatePreview({
             template.id.toString()
           );
 
-          console.log(`📸 PHOTO ASSIGNMENT DEBUG - Template ${template.id}:`, {
+          if (process.env.NODE_ENV === 'development') console.log(`📸 PHOTO ASSIGNMENT DEBUG - Template ${template.id}:`, {
             requestedPhotos: template.holes_data?.length || 0,
             generatedPhotos: samplePhotos.length,
             photoIds: samplePhotos.map(p => p.id),
@@ -275,7 +275,7 @@ export default function PackageTemplatePreview({
             // Create smart preview transform for this hole
             const previewTransform = createPreviewTransform(holeAspectRatio, photoAspectRatio);
             
-            console.log(`🎯 SMART PREVIEW TRANSFORM - Slot ${slotIndex + 1}:`, {
+            if (process.env.NODE_ENV === 'development') console.log(`🎯 SMART PREVIEW TRANSFORM - Slot ${slotIndex + 1}:`, {
               holeSize: hole ? `${Math.round(hole.width)}×${Math.round(hole.height)}` : 'unknown',
               holeAspectRatio: holeAspectRatio.toFixed(2),
               photoAspectRatio: photoAspectRatio.toFixed(2),
@@ -299,7 +299,7 @@ export default function PackageTemplatePreview({
             const globalHoleIndex = globalHoleOffset + holeIndex;
             const assignedFilename = createGlobalPhotoAssignment(globalHoleIndex);
             
-            console.log(`📸 HOLE ASSIGNMENT - Template ${template.id}, Hole ${holeIndex + 1}:`, {
+            if (process.env.NODE_ENV === 'development') console.log(`📸 HOLE ASSIGNMENT - Template ${template.id}, Hole ${holeIndex + 1}:`, {
               globalHoleIndex,
               localHoleIndex: holeIndex,
               assignedFilename,
@@ -309,7 +309,7 @@ export default function PackageTemplatePreview({
             return assignedFilename;
           });
 
-          console.log(`🎯 SLOT MAPPING DEBUG - Template ${template.id}:`, {
+          if (process.env.NODE_ENV === 'development') console.log(`🎯 SLOT MAPPING DEBUG - Template ${template.id}:`, {
             slotsCreated: sampleSlots.length,
             slotIds: sampleSlots.map(s => s.id),
             slotPhotoIds: sampleSlots.map(s => s.photoId),
@@ -389,7 +389,7 @@ export default function PackageTemplatePreview({
                           const cleanFileId = fileId?.replace(/[^a-zA-Z0-9-_]/g, ''); // Clean any extra characters
                           const pngUrl = cleanFileId ? `https://lh3.googleusercontent.com/d/${cleanFileId}` : '';
                           
-                          console.log(`🖼️ PNG TEMPLATE URL DEBUG - Template ${template.id}:`, {
+                          if (process.env.NODE_ENV === 'development') console.log(`🖼️ PNG TEMPLATE URL DEBUG - Template ${template.id}:`, {
                             originalDriveFileId: template.drive_file_id,
                             extractedFileId: fileId,
                             cleanFileId,

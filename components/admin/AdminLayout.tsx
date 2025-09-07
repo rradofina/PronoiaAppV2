@@ -78,7 +78,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   // Check admin authentication on mount
   useEffect(() => {
-    console.log('🔍 Admin auth check:', { 
+    if (process.env.NODE_ENV === 'development') console.log('🔍 Admin auth check:', { 
       isSignedIn: googleAuth.isSignedIn, 
       isAdminAuthenticated, 
       isCheckingAdminAuth,
@@ -86,7 +86,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     });
     
     if (googleAuth.isSignedIn && !isAdminAuthenticated && !isCheckingAdminAuth) {
-      console.log('🚀 Starting admin auth check...');
+      if (process.env.NODE_ENV === 'development') console.log('🚀 Starting admin auth check...');
       checkAdminAuth(googleAuth, supabaseUser);
     }
   }, [googleAuth.isSignedIn, isAdminAuthenticated, isCheckingAdminAuth, checkAdminAuth, supabaseUser]);
@@ -95,14 +95,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   useEffect(() => {
     if (!isCheckingAdminAuth) {
       if (!googleAuth.isSignedIn) {
-        console.log('❌ Redirecting: Not signed in', googleAuth);
+        if (process.env.NODE_ENV === 'development') console.log('❌ Redirecting: Not signed in', googleAuth);
         showWarning('Not signed in', 'Not signed in to Google. Please sign in first at localhost:3000');
         setTimeout(() => router.push('/'), 3000);
         return;
       }
       
       if (!isAdminAuthenticated) {
-        console.log('❌ Redirecting: Not admin authenticated', { isAdminAuthenticated, adminUser });
+        if (process.env.NODE_ENV === 'development') console.log('❌ Redirecting: Not admin authenticated', { isAdminAuthenticated, adminUser });
         showWarning('Access Denied', 'Not admin authenticated. Check console for details.');
         setTimeout(() => router.push('/'), 3000);
         return;

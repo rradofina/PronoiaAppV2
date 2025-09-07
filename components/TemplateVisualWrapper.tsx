@@ -40,7 +40,7 @@ const TemplateVisualWrapper = ({
           driveFileId: template.drive_file_id
         }));
         setDatabaseTemplates(convertedTemplates);
-        console.log('📋 Loaded all templates from database for consistent matching:', {
+        if (process.env.NODE_ENV === 'development') console.log('📋 Loaded all templates from database for consistent matching:', {
           totalCount: convertedTemplates.length,
           types: [...new Set(convertedTemplates.map(t => t.template_type))]
         });
@@ -80,7 +80,7 @@ const TemplateVisualWrapper = ({
   }
   
   // NAVIGATION DEBUG: Track what we receive each time this component renders
-  console.log('🔄 NAVIGATION DEBUG - TemplateVisualWrapper render:', {
+  if (process.env.NODE_ENV === 'development') console.log('🔄 NAVIGATION DEBUG - TemplateVisualWrapper render:', {
     timestamp: new Date().toISOString(),
     templateId: template.id,
     templateName: template.name,
@@ -92,7 +92,7 @@ const TemplateVisualWrapper = ({
   // ENHANCED: Safety check with detailed template type analysis
   if (pngTemplates.length === 0) {
     console.error('🚨 CRITICAL ERROR - No PNG templates found in window.pngTemplates');
-    console.log('🔧 This will cause template swapping to fail. Check hybridTemplateService loading.');
+    if (process.env.NODE_ENV === 'development') console.log('🔧 This will cause template swapping to fail. Check hybridTemplateService loading.');
   }
   
   // Strict template matching - NO fallbacks, NO hardcoding
@@ -109,7 +109,7 @@ const TemplateVisualWrapper = ({
         t.template_type === slots[0].templateType && 
         t.print_size === slots[0].printSize
       );
-      console.log('🔄 Fallback template matching by type+size:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔄 Fallback template matching by type+size:', {
         searchedType: slots[0].templateType,
         searchedSize: slots[0].printSize,
         found: !!candidateTemplate,
@@ -124,7 +124,7 @@ const TemplateVisualWrapper = ({
       
       if (templateHoles === expectedSlots) {
         pngTemplate = candidateTemplate;
-        console.log('✅ Compatible template found:', {
+        if (process.env.NODE_ENV === 'development') console.log('✅ Compatible template found:', {
           templateName: pngTemplate.name,
           templateType: pngTemplate.template_type,
           holes: templateHoles,
@@ -154,7 +154,7 @@ const TemplateVisualWrapper = ({
 
   // Render result: either exact match or error state
   if (pngTemplate) {
-    console.log('✅ Rendering exact template match:', pngTemplate.name);
+    if (process.env.NODE_ENV === 'development') console.log('✅ Rendering exact template match:', pngTemplate.name);
     return (
       <PngTemplateVisual
         pngTemplate={pngTemplate}
@@ -176,7 +176,7 @@ const TemplateVisualWrapper = ({
   const candidateTemplate = pngTemplates.find((t: any) => t.template_type === templateType);
   const availableTypes = [...new Set(pngTemplates.map((t: any) => t.template_type))];
   
-  console.log('❌ Template error, showing detailed error state for:', templateType);
+  if (process.env.NODE_ENV === 'development') console.log('❌ Template error, showing detailed error state for:', templateType);
   return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-red-50 border-2 border-red-200 rounded-lg p-4">
       <div className="text-red-600 text-4xl mb-4">⚠️</div>

@@ -291,7 +291,7 @@ export default function Home() {
       const allowedEmails = process.env.NEXT_PUBLIC_ALLOWED_EMAILS?.split(',').map(e => e.trim()) || [];
       
       if (!allowedEmails.includes(storedEmail)) {
-        console.log('🚫 Stored email not authorized, clearing auth');
+        if (process.env.NODE_ENV === 'development') console.log('🚫 Stored email not authorized, clearing auth');
         clearStoredAuth();
         return;
       }
@@ -402,7 +402,7 @@ export default function Home() {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
       
     if (!clientId || !apiKey || clientId === 'your_google_client_id_here') {
-      console.log('⚠️ Google API credentials not configured');
+      if (process.env.NODE_ENV === 'development') console.log('⚠️ Google API credentials not configured');
       addEvent('Google API credentials not configured');
       setIsGapiLoaded(true);
       return;
@@ -421,7 +421,7 @@ export default function Home() {
           discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
         });
         setIsGapiLoaded(true);
-        console.log('✅ GAPI client initialized');
+        if (process.env.NODE_ENV === 'development') console.log('✅ GAPI client initialized');
         addEvent('GAPI client initialized');
         
         // Try to restore authentication after GAPI is loaded
@@ -457,7 +457,7 @@ export default function Home() {
         setIsConnecting(true);
       }
 
-      console.log('✅ Google Identity Services initialized');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Google Identity Services initialized');
       addEvent('Google Identity Services initialized');
     };
     document.head.appendChild(gsiScript);
@@ -640,7 +640,7 @@ export default function Home() {
   };
 
   const handleClientFolderSelect = async (folder: DriveFolder) => {
-    console.log('📂 handleClientFolderSelect called with folder:', folder.name);
+    if (process.env.NODE_ENV === 'development') console.log('📂 handleClientFolderSelect called with folder:', folder.name);
     setSelectedClientFolder(folder);
     setClientName(folder.name);
     
@@ -648,7 +648,7 @@ export default function Home() {
     let syncServiceInitialized = false;
     try {
       await templateSyncService.initialize(folder.id);
-      console.log('✅ Template sync service initialized for client:', folder.name);
+      if (process.env.NODE_ENV === 'development') console.log('✅ Template sync service initialized for client:', folder.name);
       syncServiceInitialized = true;
     } catch (error) {
       console.error('Failed to initialize template sync service:', error);
@@ -661,11 +661,11 @@ export default function Home() {
     }
     
     try {
-      console.log(`📥 Loading photos from folder: ${folder.name} (${folder.id})`);
+      if (process.env.NODE_ENV === 'development') console.log(`📥 Loading photos from folder: ${folder.name} (${folder.id})`);
       
       // Use our Google Drive service instead of raw API
       const drivePhotos = await googleDriveService.getPhotosFromFolder(folder.id);
-      console.log(`✅ Loaded ${drivePhotos.length} photos from folder. Sample:`, drivePhotos.slice(0, 2));
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Loaded ${drivePhotos.length} photos from folder. Sample:`, drivePhotos.slice(0, 2));
       
       // CRITICAL DEBUG: Check if we actually have photos
       if (drivePhotos.length === 0) {
@@ -676,7 +676,7 @@ export default function Home() {
       
       setLocalPhotos(drivePhotos);
       setPhotos(drivePhotos);
-      console.log('📦 Photos stored in localPhotos and photos state');
+      if (process.env.NODE_ENV === 'development') console.log('📦 Photos stored in localPhotos and photos state');
       // Don't change screen here - let the FolderSelectionScreen handle the package selection
       // setCurrentScreen('package'); // Removed - package selection now happens in FolderSelectionScreen
     } catch (error) {
@@ -691,7 +691,7 @@ export default function Home() {
       const hint = googleAuth.userEmail || '';
       if (window.google?.accounts?.id?.revoke) {
         window.google.accounts.id.revoke(hint, () => {
-          console.log('✅ Authorization revoked for:', hint);
+          if (process.env.NODE_ENV === 'development') console.log('✅ Authorization revoked for:', hint);
           addEvent('Authorization revoked for: ' + hint);
         });
       }
@@ -761,7 +761,7 @@ export default function Home() {
     }
 
     const printsFolderName = `Prints - ${selectedClientFolder.name}`;
-    console.log(`📁 Checking/Creating prints folder: ${printsFolderName}`);
+    if (process.env.NODE_ENV === 'development') console.log(`📁 Checking/Creating prints folder: ${printsFolderName}`);
     
     const folderId = await googleDriveService.createOutputFolder(
       selectedClientFolder.id,
@@ -773,11 +773,11 @@ export default function Home() {
     
     // We now always overwrite - no warning needed
     if (folderContents.files && folderContents.files.length > 0) {
-      console.log('ℹ️ Prints folder has existing content - will be overwritten');
+      if (process.env.NODE_ENV === 'development') console.log('ℹ️ Prints folder has existing content - will be overwritten');
     }
     
     setPrintsFolderId(folderId);
-    console.log(`✅ Prints folder ready: ${folderId}`);
+    if (process.env.NODE_ENV === 'development') console.log(`✅ Prints folder ready: ${folderId}`);
     return folderId;
   };
 
@@ -788,7 +788,7 @@ export default function Home() {
     }
 
     const photosFolderName = `Photos - ${selectedClientFolder.name}`;
-    console.log(`📁 Checking/Creating photos folder: ${photosFolderName}`);
+    if (process.env.NODE_ENV === 'development') console.log(`📁 Checking/Creating photos folder: ${photosFolderName}`);
     
     const folderId = await googleDriveService.createOutputFolder(
       selectedClientFolder.id,
@@ -800,16 +800,16 @@ export default function Home() {
     
     // We now always overwrite - no warning needed
     if (folderContents.files && folderContents.files.length > 0) {
-      console.log('ℹ️ Photos folder has existing content - will be overwritten');
+      if (process.env.NODE_ENV === 'development') console.log('ℹ️ Photos folder has existing content - will be overwritten');
     }
     
-    console.log(`✅ Photos folder ready: ${folderId}`);
+    if (process.env.NODE_ENV === 'development') console.log(`✅ Photos folder ready: ${folderId}`);
     return folderId;
   };
 
   // Handle template finalization - process pending syncs and clean up
   const handleTemplateUpload = async () => {
-    console.log('🏁 Finalizing templates...');
+    if (process.env.NODE_ENV === 'development') console.log('🏁 Finalizing templates...');
     
     if (!selectedClientFolder) {
       showWarning('No client folder selected', 'Please go back and select a folder.');
@@ -827,7 +827,7 @@ export default function Home() {
       // Pass templateSlots and photos to ensure all changes are captured
       await templateSyncService.finalizeSession(templateSlots, photos);
       
-      console.log('✅ Templates finalized successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Templates finalized successfully');
 
       setUploadProgress(null);
       setUploadType(null);
@@ -852,7 +852,7 @@ export default function Home() {
 
   // Handle photo upload (copy favorited photos to Drive)
   const handlePhotoUpload = async (favoritedPhotos: Photo[]) => {
-    console.log('📸 Uploading favorited photos...');
+    if (process.env.NODE_ENV === 'development') console.log('📸 Uploading favorited photos...');
     
     if (!selectedClientFolder) {
       showWarning('No client folder selected', 'Please go back and select a folder.');
@@ -872,12 +872,12 @@ export default function Home() {
       
       // Check if folder setup failed due to existing content
       if (!folderId) {
-        console.log('❌ Cannot upload - folder has existing content');
+        if (process.env.NODE_ENV === 'development') console.log('❌ Cannot upload - folder has existing content');
         setIsUploading(false);
         return;
       }
       
-      console.log(`📋 Preparing to upload ${favoritedPhotos.length} photos`);
+      if (process.env.NODE_ENV === 'development') console.log(`📋 Preparing to upload ${favoritedPhotos.length} photos`);
       setUploadProgress({ 
         current: 0, 
         total: favoritedPhotos.length, 
@@ -891,7 +891,7 @@ export default function Home() {
       // Process photos in parallel batches
       for (let i = 0; i < favoritedPhotos.length; i += PARALLEL_BATCH_SIZE) {
         const batch = favoritedPhotos.slice(i, i + PARALLEL_BATCH_SIZE);
-        console.log(`📦 Processing batch ${Math.floor(i/PARALLEL_BATCH_SIZE) + 1}/${Math.ceil(favoritedPhotos.length/PARALLEL_BATCH_SIZE)} (${batch.length} photos)`);
+        if (process.env.NODE_ENV === 'development') console.log(`📦 Processing batch ${Math.floor(i/PARALLEL_BATCH_SIZE) + 1}/${Math.ceil(favoritedPhotos.length/PARALLEL_BATCH_SIZE)} (${batch.length} photos)`);
         
         // Update progress with batch info
         setUploadProgress({ 
@@ -903,7 +903,7 @@ export default function Home() {
         // Process batch in parallel
         const batchResults = await Promise.allSettled(
           batch.map(async (photo) => {
-            console.log(`📤 Copying photo: ${photo.name}`);
+            if (process.env.NODE_ENV === 'development') console.log(`📤 Copying photo: ${photo.name}`);
             
             try {
               // Copy the file to the prints folder
@@ -912,7 +912,7 @@ export default function Home() {
                 folderId
               );
               
-              console.log(`✅ Uploaded: ${photo.name}`);
+              if (process.env.NODE_ENV === 'development') console.log(`✅ Uploaded: ${photo.name}`);
               return { success: true, photo };
             } catch (error) {
               console.error(`❌ Failed to copy photo ${photo.name}:`, error);
@@ -972,7 +972,7 @@ export default function Home() {
   // Keep the original handlePhotoContinue for compatibility, now shows the modal
   const handlePhotoContinue = () => {
     // This will be called from PhotoSelectionScreen to show the upload options modal
-    console.log('📸 Ready to finalize - showing upload options');
+    if (process.env.NODE_ENV === 'development') console.log('📸 Ready to finalize - showing upload options');
   };
 
   const handlePackageContinue = async (effectiveTemplates?: ManualTemplate[]) => {
@@ -984,14 +984,14 @@ export default function Home() {
         
         if (effectiveTemplates && effectiveTemplates.length > 0) {
           // Use effective templates passed from package selection (includes session changes/additions)
-          console.log('📋 Using effective templates from package selection (includes session changes):', {
+          if (process.env.NODE_ENV === 'development') console.log('📋 Using effective templates from package selection (includes session changes):', {
             templatesCount: effectiveTemplates.length,
             templates: effectiveTemplates.map(t => ({ id: t.id, name: t.name }))
           });
           orderedTemplates = effectiveTemplates;
         } else {
           // Fallback: Load from database (original behavior)
-          console.log('📋 Fallback: Loading configured templates from database for manual package:', selectedPackage.name);
+          if (process.env.NODE_ENV === 'development') console.log('📋 Fallback: Loading configured templates from database for manual package:', selectedPackage.name);
           
           const packageWithTemplates = await manualPackageService.getPackageWithTemplates(selectedPackage.id);
           
@@ -1005,7 +1005,7 @@ export default function Home() {
             .map(pt => pt.template);
         }
         
-        console.log(`✅ Found ${orderedTemplates.length} configured templates for package:`, orderedTemplates.map(t => t.name));
+        if (process.env.NODE_ENV === 'development') console.log(`✅ Found ${orderedTemplates.length} configured templates for package:`, orderedTemplates.map(t => t.name));
         
         // Convert manual templates to hybrid format for compatibility
         const hybridTemplates = orderedTemplates.map(template => ({
@@ -1058,7 +1058,7 @@ export default function Home() {
         // 2. The slot count doesn't match (templates were modified), OR
         // 3. No photos have been placed yet (safe to recreate)
         if (!hasExistingSlots || !slotsMatchExpected || !hasFilledSlots) {
-          console.log('📝 Creating new template slots:', {
+          if (process.env.NODE_ENV === 'development') console.log('📝 Creating new template slots:', {
             hasExistingSlots,
             slotsMatchExpected,
             hasFilledSlots,
@@ -1118,14 +1118,14 @@ export default function Home() {
           
           setTemplateSlots(slots);
         } else {
-          console.log('✅ Preserving existing template slots with filled photos:', {
+          if (process.env.NODE_ENV === 'development') console.log('✅ Preserving existing template slots with filled photos:', {
             totalSlots: templateSlots.length,
             filledSlots: templateSlots.filter(s => s.photoId).length
           });
         }
         const endTime = performance.now();
-        console.log(`⚡ Manual package continue completed in ${(endTime - startTime).toFixed(0)}ms with ${templateSlots.length} slots`);
-        console.log('📋 Package templates loaded and preloading initiated');
+        if (process.env.NODE_ENV === 'development') console.log(`⚡ Manual package continue completed in ${(endTime - startTime).toFixed(0)}ms with ${templateSlots.length} slots`);
+        if (process.env.NODE_ENV === 'development') console.log('📋 Package templates loaded and preloading initiated');
         setCurrentScreen('photos');
       } catch (error) {
         console.error('Error loading package templates:', error);
@@ -1153,7 +1153,7 @@ export default function Home() {
       const templateSpecificSlots = updatedSlots.filter((s: TemplateSlot) => s.templateId === templateId);
       const isTemplateComplete = templateSpecificSlots.every((s: TemplateSlot) => s.photoId);
       
-      console.log('🔍 Template completion check:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔍 Template completion check:', {
         templateId,
         slotsCount: templateSpecificSlots.length,
         filledSlots: templateSpecificSlots.filter((s: TemplateSlot) => s.photoId).length,
@@ -1162,9 +1162,9 @@ export default function Home() {
       });
       
       if (isTemplateComplete) {
-        console.log('✅ Template completed, queueing sync:', templateId);
-        console.log('  Photos being passed:', localPhotos.length);
-        console.log('  First photo sample:', localPhotos[0]?.name);
+        if (process.env.NODE_ENV === 'development') console.log('✅ Template completed, queueing sync:', templateId);
+        if (process.env.NODE_ENV === 'development') console.log('  Photos being passed:', localPhotos.length);
+        if (process.env.NODE_ENV === 'development') console.log('  First photo sample:', localPhotos[0]?.name);
         templateSyncService.queueTemplateSync(templateId, updatedSlots, localPhotos);
       }
       
@@ -1310,15 +1310,15 @@ export default function Home() {
   useEffect(() => {
     const loadTemplatesFromDatabase = async () => {
       try {
-        console.log('🔄 Loading templates from database on app startup...');
+        if (process.env.NODE_ENV === 'development') console.log('🔄 Loading templates from database on app startup...');
         // Use database directly - much simpler and more reliable
         const dbTemplates = await manualTemplateService.getActiveTemplates();
         
         // Convert to format expected by window.pngTemplates with detailed debugging
-        console.log('🔄 TEMPLATE CONVERSION - Starting conversion of', dbTemplates.length, 'templates');
+        if (process.env.NODE_ENV === 'development') console.log('🔄 TEMPLATE CONVERSION - Starting conversion of', dbTemplates.length, 'templates');
         
         const allTemplates = dbTemplates.map((template, index) => {
-          console.log(`📝 Converting template ${index + 1}/${dbTemplates.length}:`, {
+          if (process.env.NODE_ENV === 'development') console.log(`📝 Converting template ${index + 1}/${dbTemplates.length}:`, {
             id: template.id,
             name: template.name,
             template_type: template.template_type,
@@ -1347,7 +1347,7 @@ export default function Home() {
               is_active: template.is_active
             };
             
-            console.log(`✅ Successfully converted template: ${template.name}`);
+            if (process.env.NODE_ENV === 'development') console.log(`✅ Successfully converted template: ${template.name}`);
             return convertedTemplate;
           } catch (error) {
             console.error(`❌ Error converting template ${template.name}:`, error);
@@ -1355,7 +1355,7 @@ export default function Home() {
           }
         }).filter(Boolean); // Remove any null templates from conversion errors
         
-        console.log('🎯 TEMPLATE CONVERSION COMPLETE:', {
+        if (process.env.NODE_ENV === 'development') console.log('🎯 TEMPLATE CONVERSION COMPLETE:', {
           originalCount: dbTemplates.length,
           convertedCount: allTemplates.length,
           droppedCount: dbTemplates.length - allTemplates.length,
@@ -1365,7 +1365,7 @@ export default function Home() {
         // Store all templates globally for fullscreen editor access
         (window as any).pngTemplates = allTemplates;
         
-        console.log('✅ PNG templates loaded on startup:', {
+        if (process.env.NODE_ENV === 'development') console.log('✅ PNG templates loaded on startup:', {
           totalTemplates: allTemplates.length,
           templateTypes: allTemplates.map(t => `${t?.name || 'Unknown'} (${t?.template_type || 'Unknown'})`).slice(0, 5),
           printSizes: [...new Set(allTemplates.map(t => t?.print_size).filter(Boolean))],
@@ -1388,7 +1388,7 @@ export default function Home() {
         // TEMPLATE TYPE CHECK: Verify template types are loaded (dynamic from database)
         const loadedTypes = [...new Set(allTemplates.map(t => t?.template_type).filter(Boolean))];
         
-        console.log('✅ Template types loaded from database:', {
+        if (process.env.NODE_ENV === 'development') console.log('✅ Template types loaded from database:', {
           loadedTypes,
           totalTemplates: allTemplates.length,
           typeBreakdown: loadedTypes.map(type => ({
@@ -1414,7 +1414,7 @@ export default function Home() {
         try {
           const activePackages = await manualPackageService.getActivePackages();
           setPackages(activePackages);
-          console.log('📦 Loaded packages for PackageSelectionScreen:', activePackages.length);
+          if (process.env.NODE_ENV === 'development') console.log('📦 Loaded packages for PackageSelectionScreen:', activePackages.length);
         } catch (error) {
           console.error('❌ Error loading packages:', error);
           setPackages([]);

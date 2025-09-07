@@ -39,7 +39,7 @@ class SessionTemplateServiceImpl {
    */
   async getOrCreateSession(userId: string, packageId: string, clientName: string): Promise<string> {
     try {
-      console.log('🔍 SESSION CREATION DEBUG - Validating parameters:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔍 SESSION CREATION DEBUG - Validating parameters:', {
         userId,
         packageId,
         clientName,
@@ -52,7 +52,7 @@ class SessionTemplateServiceImpl {
       validateUUID(packageId, 'packageId');
 
       // Check if user already has a session for this package
-      console.log('🔍 Querying existing sessions...');
+      if (process.env.NODE_ENV === 'development') console.log('🔍 Querying existing sessions...');
       const { data: existingSessions, error: queryError } = await supabase
         .from('sessions')
         .select('id')
@@ -67,11 +67,11 @@ class SessionTemplateServiceImpl {
       }
 
       if (existingSessions && existingSessions.length > 0) {
-        console.log('✅ Using existing session:', existingSessions[0].id);
+        if (process.env.NODE_ENV === 'development') console.log('✅ Using existing session:', existingSessions[0].id);
         return existingSessions[0].id;
       }
 
-      console.log('🔄 No existing session found, creating new session...');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 No existing session found, creating new session...');
 
       // Create new session with validated UUIDs
       const sessionData = await supabaseService.createSession({
@@ -82,7 +82,7 @@ class SessionTemplateServiceImpl {
         max_templates: 10, // Default max
       });
 
-      console.log('✅ Created new session for template customization:', {
+      if (process.env.NODE_ENV === 'development') console.log('✅ Created new session for template customization:', {
         sessionId: sessionData.id,
         userId,
         packageId,
@@ -122,7 +122,7 @@ class SessionTemplateServiceImpl {
         .order('position', { ascending: true });
 
       if (sessionTemplates && sessionTemplates.length > 0) {
-        console.log('📋 Found existing session templates:', sessionTemplates.length);
+        if (process.env.NODE_ENV === 'development') console.log('📋 Found existing session templates:', sessionTemplates.length);
         return sessionTemplates
           .map(st => {
             // Handle both array and object responses from Supabase
@@ -133,7 +133,7 @@ class SessionTemplateServiceImpl {
       }
 
       // No session templates yet, return default package templates
-      console.log('📋 No session templates found, using default package templates');
+      if (process.env.NODE_ENV === 'development') console.log('📋 No session templates found, using default package templates');
       const packageWithTemplates = await manualPackageService.getPackageWithTemplates(packageId);
       return packageWithTemplates?.templates || [];
     } catch (error) {
@@ -149,7 +149,7 @@ class SessionTemplateServiceImpl {
    */
   async initializeSessionTemplates(sessionId: string, packageId: string): Promise<void> {
     try {
-      console.log('🔄 Initializing session templates from default package:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔄 Initializing session templates from default package:', {
         sessionId,
         packageId,
         timestamp: new Date().toISOString()
@@ -162,7 +162,7 @@ class SessionTemplateServiceImpl {
         throw new Error(`No default templates found in package ${packageId}`);
       }
 
-      console.log('📋 Default package templates found:', {
+      if (process.env.NODE_ENV === 'development') console.log('📋 Default package templates found:', {
         packageId,
         templatesCount: packageWithTemplates.templates.length,
         templateIds: packageWithTemplates.templates.map(t => ({
@@ -179,7 +179,7 @@ class SessionTemplateServiceImpl {
         template_id: template.id.toString() // Ensure string type consistency
       }));
 
-      console.log('📝 Inserting session template records:', {
+      if (process.env.NODE_ENV === 'development') console.log('📝 Inserting session template records:', {
         sessionId,
         insertsCount: sessionTemplateInserts.length,
         inserts: sessionTemplateInserts.map(insert => ({
@@ -198,7 +198,7 @@ class SessionTemplateServiceImpl {
         throw new Error(`Failed to initialize session templates: ${insertError.message}`);
       }
 
-      console.log('✅ Session templates initialized successfully:', {
+      if (process.env.NODE_ENV === 'development') console.log('✅ Session templates initialized successfully:', {
         sessionId,
         insertedCount: insertData?.length || 0,
         insertedTemplates: insertData?.map(t => ({
@@ -228,7 +228,7 @@ class SessionTemplateServiceImpl {
     newTemplateId: string
   ): Promise<void> {
     try {
-      console.log('🔍 DETAILED SESSION TEMPLATE DEBUGGING - Starting replacement:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔍 DETAILED SESSION TEMPLATE DEBUGGING - Starting replacement:', {
         userId,
         packageId,
         clientName,
@@ -239,10 +239,10 @@ class SessionTemplateServiceImpl {
       });
 
       // UUID Validation - Critical for database constraints
-      console.log('🔍 UUID VALIDATION - Checking ID formats:');
+      if (process.env.NODE_ENV === 'development') console.log('🔍 UUID VALIDATION - Checking ID formats:');
       try {
         validateUUID(userId, 'userId');
-        console.log('✅ userId UUID valid:', userId);
+        if (process.env.NODE_ENV === 'development') console.log('✅ userId UUID valid:', userId);
       } catch (error) {
         console.error('❌ userId UUID invalid:', error);
         throw error;
@@ -250,7 +250,7 @@ class SessionTemplateServiceImpl {
 
       try {
         validateUUID(packageId, 'packageId');
-        console.log('✅ packageId UUID valid:', packageId);
+        if (process.env.NODE_ENV === 'development') console.log('✅ packageId UUID valid:', packageId);
       } catch (error) {
         console.error('❌ packageId UUID invalid:', error);
         throw error;
@@ -258,14 +258,14 @@ class SessionTemplateServiceImpl {
 
       try {
         validateUUID(newTemplateId, 'newTemplateId');
-        console.log('✅ newTemplateId UUID valid:', newTemplateId);
+        if (process.env.NODE_ENV === 'development') console.log('✅ newTemplateId UUID valid:', newTemplateId);
       } catch (error) {
         console.error('❌ newTemplateId UUID invalid:', error);
         throw error;
       }
       
       const sessionId = await this.getOrCreateSession(userId, packageId, clientName);
-      console.log('📋 Session ID obtained:', sessionId);
+      if (process.env.NODE_ENV === 'development') console.log('📋 Session ID obtained:', sessionId);
       
       // Get ALL existing session templates to understand current state
       const { data: initialSessionTemplates, error: selectError } = await supabase
@@ -282,7 +282,7 @@ class SessionTemplateServiceImpl {
       // Track current session templates (mutable)
       let allSessionTemplates = initialSessionTemplates;
 
-      console.log('📋 Current session templates:', {
+      if (process.env.NODE_ENV === 'development') console.log('📋 Current session templates:', {
         sessionId,
         templatesFound: allSessionTemplates?.length || 0,
         templates: allSessionTemplates?.map(t => ({
@@ -294,7 +294,7 @@ class SessionTemplateServiceImpl {
 
       // Initialize session templates if none exist
       if (!allSessionTemplates || allSessionTemplates.length === 0) {
-        console.log('🔄 No session templates found, initializing...');
+        if (process.env.NODE_ENV === 'development') console.log('🔄 No session templates found, initializing...');
         await this.initializeSessionTemplates(sessionId, packageId);
         
         // Re-query after initialization to get the updated list
@@ -304,7 +304,7 @@ class SessionTemplateServiceImpl {
           .eq('session_id', sessionId)
           .order('position', { ascending: true });
         
-        console.log('📋 Templates after initialization:', {
+        if (process.env.NODE_ENV === 'development') console.log('📋 Templates after initialization:', {
           templatesFound: requeriedTemplates?.length || 0,
           templates: requeriedTemplates?.map(t => ({
             position: t.position,
@@ -327,14 +327,14 @@ class SessionTemplateServiceImpl {
         throw new Error(`Position ${position} does not exist. Available positions: ${allSessionTemplates?.map(t => t.position).join(', ') || 'none'}`);
       }
 
-      console.log('✅ Position validation passed:', {
+      if (process.env.NODE_ENV === 'development') console.log('✅ Position validation passed:', {
         targetPosition: position,
         currentTemplateId: targetTemplate.template_id,
         newTemplateId
       });
 
       // Validate that the new template actually exists in the database
-      console.log('🔍 Validating new template exists in database...');
+      if (process.env.NODE_ENV === 'development') console.log('🔍 Validating new template exists in database...');
       const { data: templateExists, error: templateCheckError } = await supabase
         .from('manual_templates')
         .select('id, name')
@@ -355,7 +355,7 @@ class SessionTemplateServiceImpl {
         throw new Error(`Template ${newTemplateId} does not exist or is not active`);
       }
 
-      console.log('✅ New template validated:', {
+      if (process.env.NODE_ENV === 'development') console.log('✅ New template validated:', {
         templateId: templateExists[0].id,
         templateName: templateExists[0].name
       });
@@ -373,7 +373,7 @@ class SessionTemplateServiceImpl {
         throw new Error(`Failed to replace session template: ${updateError.message}`);
       }
 
-      console.log('🔍 Database update result:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔍 Database update result:', {
         updateData,
         affectedRows: count,
         updateSuccess: !!updateData && updateData.length > 0
@@ -384,7 +384,7 @@ class SessionTemplateServiceImpl {
         throw new Error(`Update succeeded but affected 0 rows. Position ${position} may not exist in session ${sessionId}`);
       }
 
-      console.log('✅ Session template replaced successfully:', {
+      if (process.env.NODE_ENV === 'development') console.log('✅ Session template replaced successfully:', {
         sessionId,
         position,
         oldTemplateId: targetTemplate.template_id,
@@ -415,7 +415,7 @@ class SessionTemplateServiceImpl {
     newTemplateId: string
   ): Promise<void> {
     try {
-      console.log('➕ Adding template to session:', { newTemplateId });
+      if (process.env.NODE_ENV === 'development') console.log('➕ Adding template to session:', { newTemplateId });
       
       const sessionId = await this.getOrCreateSession(userId, packageId, clientName);
       
@@ -447,7 +447,7 @@ class SessionTemplateServiceImpl {
         nextPosition = existingSessionTemplates[0].position + 1;
       }
 
-      console.log('📍 Adding template at position:', nextPosition);
+      if (process.env.NODE_ENV === 'development') console.log('📍 Adding template at position:', nextPosition);
 
       // Insert new template at the end
       const { error } = await supabase
@@ -462,7 +462,7 @@ class SessionTemplateServiceImpl {
         throw new Error(`Failed to add session template: ${error.message}`);
       }
 
-      console.log('✅ Template added to session successfully at position:', nextPosition);
+      if (process.env.NODE_ENV === 'development') console.log('✅ Template added to session successfully at position:', nextPosition);
     } catch (error) {
       console.error('❌ Error adding template to session:', error);
       throw error;

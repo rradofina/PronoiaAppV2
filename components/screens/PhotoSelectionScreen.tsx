@@ -1,5 +1,5 @@
 import { Package, TemplateSlot, Photo, GoogleAuth, TemplateType, PrintSize, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, createPhotoTransform, createSmartPhotoTransformFromSlot, ManualPackage, ManualTemplate } from '../../types';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import toast from 'react-hot-toast';
@@ -46,7 +46,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
           driveFileId: template.drive_file_id
         }));
         setDatabaseTemplates(convertedTemplates);
-        console.log('📋 Loaded all templates from database for consistent matching:', {
+        if (process.env.NODE_ENV === 'development') console.log('📋 Loaded all templates from database for consistent matching:', {
           totalCount: convertedTemplates.length,
           types: [...new Set(convertedTemplates.map(t => t.template_type))]
         });
@@ -86,7 +86,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
   }
   
   // NAVIGATION DEBUG: Track what we receive each time this component renders
-  console.log('🔄 NAVIGATION DEBUG - TemplateVisual render:', {
+  if (process.env.NODE_ENV === 'development') console.log('🔄 NAVIGATION DEBUG - TemplateVisual render:', {
     timestamp: new Date().toISOString(),
     templateId: template.id,
     templateName: template.name,
@@ -111,12 +111,12 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
   // ENHANCED: Safety check with detailed template type analysis
   if (pngTemplates.length === 0) {
     console.error('🚨 CRITICAL ERROR - No PNG templates found in window.pngTemplates');
-    console.log('🔧 This will cause template swapping to fail. Check hybridTemplateService loading.');
+    if (process.env.NODE_ENV === 'development') console.log('🔧 This will cause template swapping to fail. Check hybridTemplateService loading.');
   } else {
     // Dynamic template types - get available types from loaded templates
     const availableTypes = [...new Set(pngTemplates.map((t: any) => t.template_type || t.templateType))];
     
-    console.log('✅ TEMPLATE DEBUG - PNG templates analysis:', {
+    if (process.env.NODE_ENV === 'development') console.log('✅ TEMPLATE DEBUG - PNG templates analysis:', {
       totalCount: pngTemplates.length,
       availableTemplateTypes: availableTypes,
       searchingFor: templateType,
@@ -131,7 +131,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
     });
   }
   
-  console.log('🔍 TEMPLATE DEBUG - TemplateVisual matching:', {
+  if (process.env.NODE_ENV === 'development') console.log('🔍 TEMPLATE DEBUG - TemplateVisual matching:', {
     templateType,
     templateId: template.id,
     availableTemplates: pngTemplates.map((t: any) => ({ 
@@ -163,7 +163,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
         t.template_type === slots[0].templateType && 
         t.print_size === slots[0].printSize
       );
-      console.log('🔄 Fallback template matching by type+size:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔄 Fallback template matching by type+size:', {
         searchedType: slots[0].templateType,
         searchedSize: slots[0].printSize,
         found: !!candidateTemplate,
@@ -178,7 +178,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
       
       if (templateHoles === expectedSlots) {
         pngTemplate = candidateTemplate;
-        console.log('✅ Compatible template found:', {
+        if (process.env.NODE_ENV === 'development') console.log('✅ Compatible template found:', {
           templateName: pngTemplate.name,
           templateType: pngTemplate.template_type,
           holes: templateHoles,
@@ -213,7 +213,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
   }
 
   // Final matching decision - strict, no fallbacks
-  console.log('🎯 Template matching decision:', {
+  if (process.env.NODE_ENV === 'development') console.log('🎯 Template matching decision:', {
     searchedFor: templateType,
     found: !!pngTemplate,
     templateName: pngTemplate?.name || 'NOT FOUND',
@@ -224,7 +224,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
 
   // Render result: either exact match or error state
   if (pngTemplate) {
-    console.log('✅ Rendering exact template match:', pngTemplate.name);
+    if (process.env.NODE_ENV === 'development') console.log('✅ Rendering exact template match:', pngTemplate.name);
     return (
       <PngTemplateVisual
         pngTemplate={pngTemplate}
@@ -246,7 +246,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
   const candidateTemplate = pngTemplates.find((t: any) => t.template_type === templateType);
   const availableTypes = [...new Set(pngTemplates.map((t: any) => t.template_type))];
   
-  console.log('❌ Template error, showing detailed error state for:', templateType);
+  if (process.env.NODE_ENV === 'development') console.log('❌ Template error, showing detailed error state for:', templateType);
   return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-red-50 border-2 border-red-200 rounded-lg p-4">
       <div className="text-red-600 text-4xl mb-4">⚠️</div>
@@ -303,7 +303,7 @@ interface PhotoSelectionScreenProps {
   setFavoritedPhotos: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
 
-export default function PhotoSelectionScreen({
+function PhotoSelectionScreen({
   clientName,
   selectedPackage,
   googleAuth,
@@ -325,7 +325,7 @@ export default function PhotoSelectionScreen({
   favoritedPhotos,
   setFavoritedPhotos,
 }: PhotoSelectionScreenProps) {
-  console.log('📷 PhotoSelectionScreen rendered with:', {
+  if (process.env.NODE_ENV === 'development') console.log('📷 PhotoSelectionScreen rendered with:', {
     photosCount: photos.length,
     clientName,
     templateSlotsCount: templateSlots.length,
@@ -416,7 +416,7 @@ export default function PhotoSelectionScreen({
   // Setup viewport handling for iPad Safari compatibility
   useEffect(() => {
     const cleanup = setupViewportHandler((info) => {
-      console.log('📱 PhotoSelectionScreen viewport update:', {
+      if (process.env.NODE_ENV === 'development') console.log('📱 PhotoSelectionScreen viewport update:', {
         dimensions: `${info.width}×${info.height}`,
         visualHeight: info.visualHeight,
         isIpad: info.isIpad,
@@ -430,12 +430,12 @@ export default function PhotoSelectionScreen({
   // Batch preload all photos when screen mounts
   useEffect(() => {
     if (photos && photos.length > 0) {
-      console.log(`🚀 Starting batch preload of ${photos.length} photos`);
+      if (process.env.NODE_ENV === 'development') console.log(`🚀 Starting batch preload of ${photos.length} photos`);
       
       // First, preload favorited photos with highest priority
       if (favoritedPhotos.size > 0) {
         const favPhotos = photos.filter(p => favoritedPhotos.has(p.id));
-        console.log(`⭐ Prioritizing preload of ${favPhotos.length} favorited photos`);
+        if (process.env.NODE_ENV === 'development') console.log(`⭐ Prioritizing preload of ${favPhotos.length} favorited photos`);
         photoCacheService.batchPreloadPhotos(favPhotos, { 
           priority: 'high',
           concurrency: 5 
@@ -453,13 +453,13 @@ export default function PhotoSelectionScreen({
       if (photos.length > 20) {
         setTimeout(() => {
           const remainingPhotos = photos.slice(20);
-          console.log(`📦 Preloading remaining ${remainingPhotos.length} photos in background`);
+          if (process.env.NODE_ENV === 'development') console.log(`📦 Preloading remaining ${remainingPhotos.length} photos in background`);
           photoCacheService.batchPreloadPhotos(remainingPhotos, { 
             priority: 'low',
             concurrency: 2,
             onProgress: (loaded, total) => {
               if (loaded % 10 === 0 || loaded === total) {
-                console.log(`📊 Background preload progress: ${loaded}/${total}`);
+                if (process.env.NODE_ENV === 'development') console.log(`📊 Background preload progress: ${loaded}/${total}`);
               }
             }
           });
@@ -472,10 +472,10 @@ export default function PhotoSelectionScreen({
   useEffect(() => {
     // Only sync if we have both slots and photos AND service is initialized
     if (templateSlots.length > 0 && photos.length > 0 && templateSyncService.getIsInitialized()) {
-      console.log('🚀 Initial sync check for all completed templates');
+      if (process.env.NODE_ENV === 'development') console.log('🚀 Initial sync check for all completed templates');
       syncAllCompletedTemplates(templateSlots);
     } else if (templateSlots.length > 0 && photos.length > 0) {
-      console.log('⏸️ Skipping initial sync - sync service not initialized');
+      if (process.env.NODE_ENV === 'development') console.log('⏸️ Skipping initial sync - sync service not initialized');
     }
   }, []); // Only run once on mount
   
@@ -514,7 +514,7 @@ export default function PhotoSelectionScreen({
       try {
         // Use database directly - simple and reliable
         const dbTemplates = await manualTemplateService.getActiveTemplates();
-        console.log('🔄 PhotoSelectionScreen - Loaded database templates:', {
+        if (process.env.NODE_ENV === 'development') console.log('🔄 PhotoSelectionScreen - Loaded database templates:', {
           totalCount: dbTemplates.length,
           templateTypes: [...new Set(dbTemplates.map(t => t.template_type))],
           templateNames: dbTemplates.map(t => t.name),
@@ -607,7 +607,7 @@ export default function PhotoSelectionScreen({
     if (!existsInCache) {
       windowTemplates.push(convertedTemplate);
       (window as any).pngTemplates = windowTemplates;
-      console.log('✅ Added template to window cache:', {
+      if (process.env.NODE_ENV === 'development') console.log('✅ Added template to window cache:', {
         templateId: template.id,
         templateName: template.name,
         cacheSize: windowTemplates.length
@@ -646,7 +646,7 @@ export default function PhotoSelectionScreen({
     const templateIdToDelete = templateToDelete;
     
     // Delete from Google Drive sync immediately
-    console.log('🗑️ Deleting template from Drive sync:', templateIdToDelete);
+    if (process.env.NODE_ENV === 'development') console.log('🗑️ Deleting template from Drive sync:', templateIdToDelete);
     templateSyncService.deleteFromDrive(templateIdToDelete);
     
       // Get current template groups before deletion
@@ -708,7 +708,7 @@ export default function PhotoSelectionScreen({
             targetTemplateId = newGroups[0].templateId;
           }
           
-          console.log('🔄 Auto-navigating after deletion to template:', targetTemplateId);
+          if (process.env.NODE_ENV === 'development') console.log('🔄 Auto-navigating after deletion to template:', targetTemplateId);
           setTemplateToNavigate(targetTemplateId);
         }
       }
@@ -727,13 +727,13 @@ export default function PhotoSelectionScreen({
   const syncAllCompletedTemplates = (slots: TemplateSlot[]) => {
     // Guard: Only sync if service is initialized
     if (!templateSyncService.getIsInitialized()) {
-      console.log('⚠️ Sync service not initialized, skipping template sync');
+      if (process.env.NODE_ENV === 'development') console.log('⚠️ Sync service not initialized, skipping template sync');
       return;
     }
     
     // Get all unique template IDs
     const templateIds = new Set(slots.map(s => s.templateId));
-    console.log('🔍 Checking ALL templates for completion:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔍 Checking ALL templates for completion:', {
       totalTemplates: templateIds.size,
       templateIds: Array.from(templateIds)
     });
@@ -750,15 +750,15 @@ export default function PhotoSelectionScreen({
       if (isComplete) {
         completedCount++;
         syncedTemplates.push(templateId);
-        console.log(`✅ Template ${templateId} is complete (${templateSpecificSlots.length} slots filled)`);
+        if (process.env.NODE_ENV === 'development') console.log(`✅ Template ${templateId} is complete (${templateSpecificSlots.length} slots filled)`);
         templateSyncService.queueTemplateSync(templateId, slots, photos);
       } else {
         const filledSlots = templateSpecificSlots.filter(s => s.photoId).length;
-        console.log(`⏸️ Template ${templateId} is incomplete (${filledSlots}/${templateSpecificSlots.length} slots filled)`);
+        if (process.env.NODE_ENV === 'development') console.log(`⏸️ Template ${templateId} is incomplete (${filledSlots}/${templateSpecificSlots.length} slots filled)`);
       }
     });
     
-    console.log('📊 Sync summary:', {
+    if (process.env.NODE_ENV === 'development') console.log('📊 Sync summary:', {
       totalTemplates: templateIds.size,
       completedTemplates: completedCount,
       syncedTemplateIds: syncedTemplates
@@ -774,7 +774,7 @@ export default function PhotoSelectionScreen({
     
     // Set new timeout - wait 2 seconds after last transform change
     syncTimeoutRef.current = setTimeout(() => {
-      console.log('⏰ Debounced sync triggered after 2s of inactivity');
+      if (process.env.NODE_ENV === 'development') console.log('⏰ Debounced sync triggered after 2s of inactivity');
       syncAllCompletedTemplates(slots);
     }, 2000); // 2 second delay after last change
   }, [photos]); // Include photos dependency since syncAllCompletedTemplates uses it
@@ -789,7 +789,7 @@ export default function PhotoSelectionScreen({
   }, []);
 
   const handlePhotoClick = (photo: Photo) => {
-    console.log('🔧 PHOTO CLICK DEBUG:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔧 PHOTO CLICK DEBUG:', {
       photoId: photo.id,
       photoName: photo.name,
       currentViewMode: viewMode,
@@ -805,14 +805,14 @@ export default function PhotoSelectionScreen({
 
     // Check if we're in inline editing mode first
     if (viewMode === 'inline-editing') {
-      console.log('🔧 In inline editing mode - photo selection disabled');
+      if (process.env.NODE_ENV === 'development') console.log('🔧 In inline editing mode - photo selection disabled');
       // Don't allow photo switching during editing - user must save or cancel first
       return;
     }
     
     // In print mode with selected slot and favorites expanded - start inline editing
     if (selectionMode === 'print' && selectedSlot && isSelectingPhoto) {
-      console.log('🔧 Starting inline editing from expanded favorites:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔧 Starting inline editing from expanded favorites:', {
         photo: photo.name,
         slotId: selectedSlot.id
       });
@@ -820,7 +820,7 @@ export default function PhotoSelectionScreen({
       // Calculate smart transform for initial position, then start inline editing
       createSmartPhotoTransformFromSlot(photo, selectedSlot)
         .then(smartTransform => {
-          console.log('📐 Smart transform calculated for initial position:', smartTransform);
+          if (process.env.NODE_ENV === 'development') console.log('📐 Smart transform calculated for initial position:', smartTransform);
           
           // Apply photo to slot with smart transform first
           // This ensures the photo is in the slot for inline editing
@@ -842,7 +842,7 @@ export default function PhotoSelectionScreen({
           // Direct manipulation - photos are immediately interactive
           setIsSelectingPhoto(false); // Close expanded favorites bar
           
-          console.log('✅ Photo applied with smart transform - inline editor opened for adjustment');
+          if (process.env.NODE_ENV === 'development') console.log('✅ Photo applied with smart transform - inline editor opened for adjustment');
         })
         .catch(error => {
           console.error('❌ Failed to calculate smart transform, using default:', error);
@@ -868,13 +868,13 @@ export default function PhotoSelectionScreen({
           // Photos are now immediately interactive via PhotoRenderer
         });
       
-      console.log('✅ Starting inline editing with auto-fit Process 1 (smart scale)');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Starting inline editing with auto-fit Process 1 (smart scale)');
     } else if (selectionMode === 'print' && selectedSlot) {
       // Direct manipulation - photo is immediately interactive
-      console.log('🔧 Photo applied for direct manipulation');
+      if (process.env.NODE_ENV === 'development') console.log('🔧 Photo applied for direct manipulation');
     } else if (selectionMode === 'photo') {
       // In photo mode - show photo viewer for starring/unstarring
-      console.log('🔧 Opening photo viewer in photo mode');
+      if (process.env.NODE_ENV === 'development') console.log('🔧 Opening photo viewer in photo mode');
       setSelectedPhotoForViewer(photo);
       setViewMode('photo-viewer');
     }
@@ -884,7 +884,7 @@ export default function PhotoSelectionScreen({
     setSelectedPhotoForTemplate(photo);
     if (selectedSlot) {
       // Photos are immediately interactive via PhotoRenderer
-      console.log('🔧 Photo ready for direct manipulation');
+      if (process.env.NODE_ENV === 'development') console.log('🔧 Photo ready for direct manipulation');
     } else {
       // Fallback to sliding templates if no slot selected
       setViewMode('sliding-templates');
@@ -913,7 +913,7 @@ export default function PhotoSelectionScreen({
     // Get fresh slot data in case of stale closure
     const currentSlot = templateSlots.find(s => s.id === slot.id) || slot;
     
-    console.log('🎯 Photo dropped on slot:', { 
+    if (process.env.NODE_ENV === 'development') console.log('🎯 Photo dropped on slot:', { 
       slotId: currentSlot.id, 
       photoId, 
       hasExistingPhoto: !!currentSlot.photoId,
@@ -922,7 +922,7 @@ export default function PhotoSelectionScreen({
     
     // Check if it's the same photo being dropped
     if (currentSlot.photoId === photoId) {
-      console.log('⚠️ Same photo dropped - no action needed');
+      if (process.env.NODE_ENV === 'development') console.log('⚠️ Same photo dropped - no action needed');
       // Clear any preview states
       setPreviewSlotId(null);
       setPreviewPhotoId(null);
@@ -931,7 +931,7 @@ export default function PhotoSelectionScreen({
     
     // Check if slot already has a different photo
     if (currentSlot.photoId) {
-      console.log('🔄 Showing replacement confirmation for occupied slot');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 Showing replacement confirmation for occupied slot');
       // Store pending replacement and show confirmation
       setPendingReplacement({ slot: currentSlot, photoId });
       setShowReplaceConfirmation(true);
@@ -947,7 +947,7 @@ export default function PhotoSelectionScreen({
     
     // Calculate smart transform for initial position
     const smartTransform = await createSmartPhotoTransformFromSlot(photo, slot);
-    console.log('📠 Smart transform calculated for dropped photo:', smartTransform);
+    if (process.env.NODE_ENV === 'development') console.log('📠 Smart transform calculated for dropped photo:', smartTransform);
     
     // Update the slot with the photo and smart transform
     const updatedSlot: TemplateSlot = {
@@ -968,7 +968,7 @@ export default function PhotoSelectionScreen({
     // Direct manipulation - no mode switching needed
     // Photo is now immediately interactive via PhotoRenderer
     
-    console.log('✅ Photo dropped with smart alignment - ready for continuous interaction');
+    if (process.env.NODE_ENV === 'development') console.log('✅ Photo dropped with smart alignment - ready for continuous interaction');
   };
 
   // Handle confirmed replacement
@@ -976,7 +976,7 @@ export default function PhotoSelectionScreen({
     if (!pendingReplacement) return;
     
     const { slot, photoId } = pendingReplacement;
-    console.log('✅ Replacing photo in slot:', { slotId: slot.id, newPhotoId: photoId });
+    if (process.env.NODE_ENV === 'development') console.log('✅ Replacing photo in slot:', { slotId: slot.id, newPhotoId: photoId });
     
     // Find the photo
     const photo = photos.find(p => p.id === photoId);
@@ -989,7 +989,7 @@ export default function PhotoSelectionScreen({
     
     // Calculate smart transform for initial position
     const smartTransform = await createSmartPhotoTransformFromSlot(photo, slot);
-    console.log('📠 Smart transform calculated for replacement photo:', smartTransform);
+    if (process.env.NODE_ENV === 'development') console.log('📠 Smart transform calculated for replacement photo:', smartTransform);
     
     // Update the slot with the new photo and smart transform
     const updatedSlot: TemplateSlot = {
@@ -1013,7 +1013,7 @@ export default function PhotoSelectionScreen({
     setShowReplaceConfirmation(false);
     setPendingReplacement(null);
     
-    console.log('✅ Photo replaced with smart alignment and inline editing started');
+    if (process.env.NODE_ENV === 'development') console.log('✅ Photo replaced with smart alignment and inline editing started');
   };
   
   // Handle change button click for filled slots - opens favorites bar
@@ -1021,7 +1021,7 @@ export default function PhotoSelectionScreen({
 
   // Handle confirmed photo removal
   const handleConfirmRemove = async (slot: TemplateSlot) => {
-    console.log('🔧 Confirming photo removal for slot:', slot.id);
+    if (process.env.NODE_ENV === 'development') console.log('🔧 Confirming photo removal for slot:', slot.id);
     
     try {
       // Remove photo from slot
@@ -1037,7 +1037,7 @@ export default function PhotoSelectionScreen({
       );
 
       // Update template slots using the provided setter
-      console.log('🔧 Photo removed from slot, updating template slots');
+      if (process.env.NODE_ENV === 'development') console.log('🔧 Photo removed from slot, updating template slots');
       setTemplateSlots(updatedTemplateSlots);
       
       // Check if template is now incomplete and delete from Drive if it was synced
@@ -1046,7 +1046,7 @@ export default function PhotoSelectionScreen({
       const isTemplateComplete = templateSpecificSlots.every(s => s.photoId);
       
       if (!isTemplateComplete) {
-        console.log('❌ Template now incomplete, removing from Drive sync:', templateId);
+        if (process.env.NODE_ENV === 'development') console.log('❌ Template now incomplete, removing from Drive sync:', templateId);
         templateSyncService.deleteFromDrive(templateId);
       }
       
@@ -1054,7 +1054,7 @@ export default function PhotoSelectionScreen({
       setSlotShowingRemoveConfirmation(null);
       setSelectedSlot(null);
       
-      console.log('✅ Photo removal completed and template slots updated');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Photo removal completed and template slots updated');
       
     } catch (error) {
       console.error('❌ Error removing photo from slot:', error);
@@ -1063,7 +1063,7 @@ export default function PhotoSelectionScreen({
 
   // Handle remove confirmation cancellation
   const handleCancelRemove = () => {
-    console.log('🔧 Remove confirmation cancelled - returning to edit buttons');
+    if (process.env.NODE_ENV === 'development') console.log('🔧 Remove confirmation cancelled - returning to edit buttons');
     
     // Get the slot that was being considered for removal
     const slot = slotShowingRemoveConfirmation;
@@ -1087,7 +1087,7 @@ export default function PhotoSelectionScreen({
 
     // Clear remove confirmation if shown
     if (slotShowingRemoveConfirmation) {
-      console.log('🔧 Background clicked - clearing remove confirmation');
+      if (process.env.NODE_ENV === 'development') console.log('🔧 Background clicked - clearing remove confirmation');
       setSlotShowingRemoveConfirmation(null);
       return;
     }
@@ -1098,14 +1098,14 @@ export default function PhotoSelectionScreen({
     const allSlotsHavePhotos = templateSlots.every(slot => slot.photoId);
     
     if (allSlotsHavePhotos && selectedSlot) {
-      console.log('🔧 Background clicked - deselecting for clean view');
+      if (process.env.NODE_ENV === 'development') console.log('🔧 Background clicked - deselecting for clean view');
       setSelectedSlot(null);
     }
   };
 
   // Handle template navigation changes from TemplateGrid
   const handleTemplateChange = (templateIndex: number, templateId: string) => {
-    console.log('📱 Template changed via swipe/navigation:', {
+    if (process.env.NODE_ENV === 'development') console.log('📱 Template changed via swipe/navigation:', {
       templateIndex,
       templateId,
       currentSelectedSlot: selectedSlot?.id
@@ -1116,7 +1116,7 @@ export default function PhotoSelectionScreen({
     
     // Don't change selection if we're in inline editing mode
     if (viewMode === 'inline-editing') {
-      console.log('⏭️ Skipping slot auto-select - inline editing in progress');
+      if (process.env.NODE_ENV === 'development') console.log('⏭️ Skipping slot auto-select - inline editing in progress');
       return;
     }
     
@@ -1126,7 +1126,7 @@ export default function PhotoSelectionScreen({
     // When switching templates, clear selection
     // User must manually select a slot they want to work with
     setSelectedSlot(null);
-    console.log('🔧 Template switched - selection cleared for manual slot selection:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔧 Template switched - selection cleared for manual slot selection:', {
       templateId,
       totalSlots: newTemplateSlots.length
     });
@@ -1134,12 +1134,12 @@ export default function PhotoSelectionScreen({
 
   // Template editor
   const handleApplyPhotoToSlot = (slotId: string, photoId: string, transform?: PhotoTransform | ContainerTransform) => {
-    console.log('🔧 FULLSCREEN EDITOR - Apply button clicked:', { slotId, photoId, transform });
-    console.log('🔧 Current templateSlots before update:', templateSlots.map(s => ({ id: s.id, photoId: s.photoId, hasTransform: !!s.transform })));
+    if (process.env.NODE_ENV === 'development') console.log('🔧 FULLSCREEN EDITOR - Apply button clicked:', { slotId, photoId, transform });
+    if (process.env.NODE_ENV === 'development') console.log('🔧 Current templateSlots before update:', templateSlots.map(s => ({ id: s.id, photoId: s.photoId, hasTransform: !!s.transform })));
     
     // Validate transform
     if (transform) {
-      console.log('🔍 Transform validation:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔍 Transform validation:', {
         hasTransform: !!transform,
         isPhotoTransform: isPhotoTransform(transform),
         isContainerTransform: isContainerTransform(transform),
@@ -1163,7 +1163,7 @@ export default function PhotoSelectionScreen({
       });
       return; // Don't proceed if photo doesn't exist
     }
-    console.log('✅ Photo found in photos array:', photo.name, photo.url);
+    if (process.env.NODE_ENV === 'development') console.log('✅ Photo found in photos array:', photo.name, photo.url);
     
     // Create completely new array to ensure React detects the change
     const updatedSlots = templateSlots.map(s => {
@@ -1175,11 +1175,11 @@ export default function PhotoSelectionScreen({
         if (!transform && !s.transform) {
           // Create default transform for new photos
           finalTransform = createPhotoTransform(1, 0.5, 0.5);
-          console.log('📐 Creating default transform for new photo');
+          if (process.env.NODE_ENV === 'development') console.log('📐 Creating default transform for new photo');
         } else if (!transform && s.transform) {
           // Keep existing transform if no new one provided
           finalTransform = s.transform;
-          console.log('📐 Keeping existing transform');
+          if (process.env.NODE_ENV === 'development') console.log('📐 Keeping existing transform');
         }
         
         // Check if anything actually changed
@@ -1210,7 +1210,7 @@ export default function PhotoSelectionScreen({
           photoId: photoId, // Ensure the photoId is properly set
           transform: finalTransform
         };
-        console.log('🔧 Creating new slot object:', {
+        if (process.env.NODE_ENV === 'development') console.log('🔧 Creating new slot object:', {
           slotId: newSlot.id,
           photoId: newSlot.photoId,
           hasTransform: !!newSlot.transform,
@@ -1222,11 +1222,11 @@ export default function PhotoSelectionScreen({
       return s; // Keep same reference for unchanged slots
     });
     
-    console.log('🔧 Updated slots after applying photo:', updatedSlots.map(s => ({ id: s.id, photoId: s.photoId, hasTransform: !!s.transform })));
+    if (process.env.NODE_ENV === 'development') console.log('🔧 Updated slots after applying photo:', updatedSlots.map(s => ({ id: s.id, photoId: s.photoId, hasTransform: !!s.transform })));
     
     // Verify the slot that was updated
     const updatedSlot = updatedSlots.find(s => s.id === slotId);
-    console.log('🔧 Slot that was updated:', updatedSlot);
+    if (process.env.NODE_ENV === 'development') console.log('🔧 Slot that was updated:', updatedSlot);
     
     // Validate that the update actually took place
     if (updatedSlot?.photoId !== photoId) {
@@ -1234,11 +1234,11 @@ export default function PhotoSelectionScreen({
       console.error('Expected photoId:', photoId, 'Actual photoId:', updatedSlot?.photoId);
       return; // Don't proceed with state update if it failed
     } else {
-      console.log('✅ Slot update successful - photoId set correctly');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Slot update successful - photoId set correctly');
     }
     
     // Force component to re-render by also updating a dummy counter
-    console.log('🔧 FORCING COMPONENT RE-RENDER - Calling setTemplateSlots');
+    if (process.env.NODE_ENV === 'development') console.log('🔧 FORCING COMPONENT RE-RENDER - Calling setTemplateSlots');
     setTemplateSlots(updatedSlots);
     
     // Sync ALL completed templates
@@ -1246,11 +1246,11 @@ export default function PhotoSelectionScreen({
     
     // Force immediate re-render check
     const immediateCheck = () => {
-      console.log('🔧 IMMEDIATE CHECK - templateSlots should be updated now');
+      if (process.env.NODE_ENV === 'development') console.log('🔧 IMMEDIATE CHECK - templateSlots should be updated now');
       // Force a re-render by updating the state again if needed
       const verification = updatedSlots.find(s => s.id === slotId);
       if (verification?.photoId === photoId) {
-        console.log('✅ VERIFICATION PASSED: Updated slots array contains correct photoId');
+        if (process.env.NODE_ENV === 'development') console.log('✅ VERIFICATION PASSED: Updated slots array contains correct photoId');
       } else {
         console.error('❌ VERIFICATION FAILED: Updated slots array does not contain correct photoId');
       }
@@ -1259,11 +1259,11 @@ export default function PhotoSelectionScreen({
     // Check immediately and after a brief delay
     immediateCheck();
     setTimeout(() => {
-      console.log('🔧 DELAYED CHECK - Verifying templateSlots state after React update cycle');
+      if (process.env.NODE_ENV === 'development') console.log('🔧 DELAYED CHECK - Verifying templateSlots state after React update cycle');
       // This will still show the old state due to closure, but the TemplateVisual should have re-rendered
       const currentSlots = templateSlots; // This will be the old state due to closure
-      console.log('Current templateSlots (closure - will be old):', currentSlots.map(s => ({ id: s.id, photoId: s.photoId })));
-      console.log('Updated templateSlots (what we set):', updatedSlots.map(s => ({ id: s.id, photoId: s.photoId })));
+      if (process.env.NODE_ENV === 'development') console.log('Current templateSlots (closure - will be old):', currentSlots.map(s => ({ id: s.id, photoId: s.photoId })));
+      if (process.env.NODE_ENV === 'development') console.log('Updated templateSlots (what we set):', updatedSlots.map(s => ({ id: s.id, photoId: s.photoId })));
     }, 50);
     
     // Simple template completion check and deselect
@@ -1276,23 +1276,23 @@ export default function PhotoSelectionScreen({
       const filledSlotsCount = sameTemplateSlots.filter(slot => slot.photoId).length;
       const totalSlotsInTemplate = sameTemplateSlots.length;
       
-      console.log(`🔧 Template ${currentSlot.templateId}: ${filledSlotsCount}/${totalSlotsInTemplate} slots filled`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔧 Template ${currentSlot.templateId}: ${filledSlotsCount}/${totalSlotsInTemplate} slots filled`);
       
       if (filledSlotsCount === totalSlotsInTemplate) {
         // Template is complete - deselect for clean viewing
-        console.log('🔧 Template completed - deselecting for clean view');
+        if (process.env.NODE_ENV === 'development') console.log('🔧 Template completed - deselecting for clean view');
         setSelectedSlot(null);
       } else {
         // Don't auto-select next slot - let user decide what to do next
         // They may want to edit the photo they just placed
-        console.log('🔧 Photo placed - keeping current slot selected so user can edit if needed');
+        if (process.env.NODE_ENV === 'development') console.log('🔧 Photo placed - keeping current slot selected so user can edit if needed');
         // Keep the current slot selected so user can click it to edit
         setSelectedSlot(currentSlot);
       }
     }
     
     // Reset states and return to normal view
-    console.log('🔧 Resetting view states and closing fullscreen editor');
+    if (process.env.NODE_ENV === 'development') console.log('🔧 Resetting view states and closing fullscreen editor');
     // NOTE: Removed collapse logic - using fixed height layout now
     resetViewStates();
     
@@ -1301,7 +1301,7 @@ export default function PhotoSelectionScreen({
   };
 
   const resetViewStates = () => {
-    console.log('🔧 Resetting all view states to normal mode');
+    if (process.env.NODE_ENV === 'development') console.log('🔧 Resetting all view states to normal mode');
     setViewMode('normal');
     setSelectedPhotoForViewer(null);
     setSelectedPhotoForTemplate(null);
@@ -1314,7 +1314,7 @@ export default function PhotoSelectionScreen({
 
   // Enhanced escape mechanism for stuck states
   const forceResetEditingState = () => {
-    console.log('🚨 FORCE RESET - Clearing all editing states');
+    if (process.env.NODE_ENV === 'development') console.log('🚨 FORCE RESET - Clearing all editing states');
     setViewMode('normal');
     setInlineEditingSlot(null);
     setInlineEditingPhoto(null);
@@ -1330,7 +1330,7 @@ export default function PhotoSelectionScreen({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && viewMode === 'inline-editing') {
-        console.log('🔧 ESC key pressed - cancelling inline editing');
+        if (process.env.NODE_ENV === 'development') console.log('🔧 ESC key pressed - cancelling inline editing');
         handleInlineCancel();
       }
     };
@@ -1343,7 +1343,7 @@ export default function PhotoSelectionScreen({
 
   // Inline editing handlers
   const handleInlinePhotoSelect = (photo: Photo) => {
-    console.log('🔧 handleInlinePhotoSelect called:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔧 handleInlinePhotoSelect called:', {
       photoId: photo.id,
       photoName: photo.name,
       currentViewMode: viewMode,
@@ -1352,7 +1352,7 @@ export default function PhotoSelectionScreen({
     });
 
     if (viewMode === 'inline-editing' && inlineEditingSlot) {
-      console.log('✅ Setting photo for inline editing - conditions met');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Setting photo for inline editing - conditions met');
       setInlineEditingPhoto(photo);
     } else {
       console.warn('❌ Cannot set photo for inline editing - conditions not met:', {
@@ -1401,7 +1401,7 @@ export default function PhotoSelectionScreen({
       handleInlineCancel();
     } else if (selectedSlot) {
       // Just slot selected (not editing), deselect it
-      console.log('🔧 Deselecting slot via overlay click');
+      if (process.env.NODE_ENV === 'development') console.log('🔧 Deselecting slot via overlay click');
       setSelectedSlot(null);
     }
   };
@@ -1412,7 +1412,7 @@ export default function PhotoSelectionScreen({
     const isPhotoInSlot = usedPhotoIds.has(photoId);
     const isCurrentlyFavorited = favoritedPhotos.has(photoId);
     
-    console.log('⭐ Toggle Favorite Debug:', {
+    if (process.env.NODE_ENV === 'development') console.log('⭐ Toggle Favorite Debug:', {
       photoId,
       isCurrentlyFavorited,
       isPhotoInSlot,
@@ -1423,7 +1423,7 @@ export default function PhotoSelectionScreen({
     
     // If trying to unfavorite a photo that's in a template slot, show confirmation
     if (isCurrentlyFavorited && isPhotoInSlot) {
-      console.log('⚠️ Photo is in template slot - showing confirmation modal');
+      if (process.env.NODE_ENV === 'development') console.log('⚠️ Photo is in template slot - showing confirmation modal');
       const photo = photos.find(p => p.id === photoId);
       if (photo) {
         setPhotoToRemoveFromFavorites(photo);
@@ -1433,7 +1433,7 @@ export default function PhotoSelectionScreen({
     }
     
     // Otherwise, toggle favorite normally
-    console.log('✅ Allowing favorite toggle');
+    if (process.env.NODE_ENV === 'development') console.log('✅ Allowing favorite toggle');
     setFavoritedPhotos(prev => {
       const newFavorites = new Set(prev);
       if (newFavorites.has(photoId)) {
@@ -1448,7 +1448,7 @@ export default function PhotoSelectionScreen({
   // Handle confirmed removal from favorites
   const handleConfirmRemoveFavorite = () => {
     if (photoToRemoveFromFavorites) {
-      console.log('✅ Confirmed removal from favorites:', photoToRemoveFromFavorites.name);
+      if (process.env.NODE_ENV === 'development') console.log('✅ Confirmed removal from favorites:', photoToRemoveFromFavorites.name);
       setFavoritedPhotos(prev => {
         const newFavorites = new Set(prev);
         newFavorites.delete(photoToRemoveFromFavorites.id);
@@ -1516,7 +1516,7 @@ export default function PhotoSelectionScreen({
     
     if (now - lastTapTime < DOUBLE_TAP_DELAY) {
       // Double tap detected
-      console.log('Double tap detected on client name');
+      if (process.env.NODE_ENV === 'development') console.log('Double tap detected on client name');
       if (onBackToPackage) {
         setShowBackToPackageConfirm(true);
       }
@@ -1617,7 +1617,7 @@ export default function PhotoSelectionScreen({
   const handleConfirmTemplateSwap = (newTemplate: ManualTemplate) => {
     if (!templateToChange) return;
     
-    console.log('🔄 Template replacement confirmed:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔄 Template replacement confirmed:', {
       position: templateToChange.index,
       oldTemplate: templateToChange.template.name,
       newTemplate: newTemplate.name,
@@ -1658,7 +1658,7 @@ export default function PhotoSelectionScreen({
         });
       }
       
-      console.log('📝 Creating new slots for template swap:', {
+      if (process.env.NODE_ENV === 'development') console.log('📝 Creating new slots for template swap:', {
         oldSlotCount: oldSlots.length,
         newSlotCount: newSlots.length,
         preservedPhotos: newSlots.filter(s => s.photoId).length
@@ -1677,7 +1677,7 @@ export default function PhotoSelectionScreen({
       if (!existsInCache) {
         windowTemplates.push(convertedTemplate);
         (window as any).pngTemplates = windowTemplates;
-        console.log('✅ Added swapped template to window cache:', {
+        if (process.env.NODE_ENV === 'development') console.log('✅ Added swapped template to window cache:', {
           templateId: newTemplate.id,
           templateName: newTemplate.name,
           templateType: newTemplate.template_type,
@@ -1709,7 +1709,7 @@ export default function PhotoSelectionScreen({
   };
 
   const handleSwapTemplate = (template: { templateId: string; templateName: string; slots: TemplateSlot[] }, index: number) => {
-    console.log('🔄 Template change requested:', { 
+    if (process.env.NODE_ENV === 'development') console.log('🔄 Template change requested:', { 
       templateName: template.templateName, 
       templateId: template.templateId,
       index,
@@ -1746,7 +1746,7 @@ export default function PhotoSelectionScreen({
       }
       
       if (currentTemplate) {
-        console.log('✅ Found template for change:', {
+        if (process.env.NODE_ENV === 'development') console.log('✅ Found template for change:', {
           id: currentTemplate.id,
           name: currentTemplate.name,
           type: currentTemplate.template_type
@@ -1767,7 +1767,7 @@ export default function PhotoSelectionScreen({
 
   const handleDownloadTemplate = async (template: { templateId: string; templateName: string; slots: TemplateSlot[] }) => {
     try {
-      console.log('📥 Template download requested:', template);
+      if (process.env.NODE_ENV === 'development') console.log('📥 Template download requested:', template);
 
       // Find the manual template for this template group
       const firstSlot = template.slots[0];
@@ -1786,7 +1786,7 @@ export default function PhotoSelectionScreen({
         throw new Error(`Manual template not found for type: ${firstSlot.templateType}`);
       }
 
-      console.log('📝 Found manual template:', manualTemplate.name);
+      if (process.env.NODE_ENV === 'development') console.log('📝 Found manual template:', manualTemplate.name);
 
       // Rasterize and download the template
       const rasterized = await templateRasterizationService.rasterizeTemplate(
@@ -1802,7 +1802,7 @@ export default function PhotoSelectionScreen({
 
       await templateRasterizationService.downloadTemplate(rasterized);
 
-      console.log('✅ Template download completed');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Template download completed');
     } catch (error) {
       console.error('❌ Template download failed:', error);
       // Show user-friendly error message
@@ -1849,7 +1849,7 @@ export default function PhotoSelectionScreen({
               if (e.target === e.currentTarget) {
                 setIsSelectingPhoto(false);
                 setSelectedSlot(null);
-                console.log('📌 Photo selection overlay cancelled');
+                if (process.env.NODE_ENV === 'development') console.log('📌 Photo selection overlay cancelled');
               }
             }}
           >
@@ -2458,4 +2458,20 @@ export default function PhotoSelectionScreen({
     </div>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export default React.memo(PhotoSelectionScreen, (prevProps, nextProps) => {
+  // Compare key props that should trigger re-renders
+  return (
+    prevProps.photos === nextProps.photos &&
+    prevProps.templateSlots === nextProps.templateSlots &&
+    prevProps.selectedSlot === nextProps.selectedSlot &&
+    prevProps.clientName === nextProps.clientName &&
+    prevProps.selectedPackage === nextProps.selectedPackage &&
+    prevProps.isUploading === nextProps.isUploading &&
+    prevProps.uploadProgress === nextProps.uploadProgress &&
+    prevProps.totalAllowedPrints === nextProps.totalAllowedPrints &&
+    prevProps.favoritedPhotos === nextProps.favoritedPhotos
+  );
+});
  

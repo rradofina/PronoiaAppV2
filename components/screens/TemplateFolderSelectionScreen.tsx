@@ -90,21 +90,21 @@ export default function TemplateFolderSelectionScreen({
     }, 10000); // 10 second timeout
     
     try {
-      console.log(`🔧 Step 1: Updating template folder to: ${folder.name} (${folder.id})`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔧 Step 1: Updating template folder to: ${folder.name} (${folder.id})`);
       // Update the template folder in the database
       await pngTemplateService.setTemplateFolderId(folder.id);
-      console.log(`✅ Step 1 complete: Template folder updated`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Step 1 complete: Template folder updated`);
       
-      console.log(`🔧 Step 2: Clearing template cache...`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔧 Step 2: Clearing template cache...`);
       // Clear template cache so it reloads from new folder
       await pngTemplateService.clearCache();
-      console.log(`✅ Step 2 complete: Cache cleared`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Step 2 complete: Cache cleared`);
       
-      console.log(`🔧 Step 3: Waiting for database propagation...`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔧 Step 3: Waiting for database propagation...`);
       // Wait a bit longer for database propagation
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      console.log(`🔧 Step 4: Verifying folder ID was saved...`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔧 Step 4: Verifying folder ID was saved...`);
       // Verify the folder ID was actually saved (with retries)
       let savedFolderId: string;
       let attempts = 0;
@@ -112,16 +112,16 @@ export default function TemplateFolderSelectionScreen({
       
       do {
         attempts++;
-        console.log(`📁 Verification attempt ${attempts}/${maxAttempts}...`);
+        if (process.env.NODE_ENV === 'development') console.log(`📁 Verification attempt ${attempts}/${maxAttempts}...`);
         savedFolderId = await pngTemplateService.getTemplateFolderId();
-        console.log(`📁 Verification: Saved folder ID is: ${savedFolderId}`);
+        if (process.env.NODE_ENV === 'development') console.log(`📁 Verification: Saved folder ID is: ${savedFolderId}`);
         
         if (savedFolderId === folder.id) {
           break;
         }
         
         if (attempts < maxAttempts) {
-          console.log(`⏳ Folder ID mismatch, waiting 300ms before retry...`);
+          if (process.env.NODE_ENV === 'development') console.log(`⏳ Folder ID mismatch, waiting 300ms before retry...`);
           await new Promise(resolve => setTimeout(resolve, 300));
         }
       } while (attempts < maxAttempts);
@@ -132,7 +132,7 @@ export default function TemplateFolderSelectionScreen({
         return;
       }
       
-      console.log(`✅ All steps complete, navigating back...`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ All steps complete, navigating back...`);
       clearTimeout(timeoutId); // Clear timeout on success
       onFolderSelected();
     } catch (error) {

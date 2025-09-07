@@ -77,7 +77,7 @@ isEditingMode = false, onDragStart }: PhotoCardProps & { isEditingMode?: boolean
   };
 
   const handleImageLoad = () => {
-    console.log(`✅ PhotoGrid image loaded successfully: ${photo.name} (URL ${currentUrlIndex + 1}/${fallbackUrls.length})`);
+    if (process.env.NODE_ENV === 'development') console.log(`✅ PhotoGrid image loaded successfully: ${photo.name} (URL ${currentUrlIndex + 1}/${fallbackUrls.length})`);
     setImageLoaded(true);
     setImageError(false);
   };
@@ -97,7 +97,7 @@ isEditingMode = false, onDragStart }: PhotoCardProps & { isEditingMode?: boolean
     
     // Try next fallback URL
     if (currentUrlIndex < fallbackUrls.length - 1) {
-      console.log(`🔄 Trying next fallback URL for ${photo.name} (${currentUrlIndex + 2}/${fallbackUrls.length})`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Trying next fallback URL for ${photo.name} (${currentUrlIndex + 2}/${fallbackUrls.length})`);
       setCurrentUrlIndex(prev => prev + 1);
       setImageError(false); // Reset error state to try next URL
     } else {
@@ -117,17 +117,17 @@ isEditingMode = false, onDragStart }: PhotoCardProps & { isEditingMode?: boolean
   };
 
   const handleDragStart = (e: React.DragEvent) => {
-    console.log('🎯 PhotoCard: handleDragStart called for photo:', photo.name);
+    if (process.env.NODE_ENV === 'development') console.log('🎯 PhotoCard: handleDragStart called for photo:', photo.name);
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData('photoId', photo.id);
     e.dataTransfer.setData('photoUrl', photo.thumbnailUrl || photo.url);
     e.dataTransfer.setData('photoName', photo.name);
 
     if (onDragStart) {
-      console.log('🎯 PhotoCard: Calling parent onDragStart callback');
+      if (process.env.NODE_ENV === 'development') console.log('🎯 PhotoCard: Calling parent onDragStart callback');
       onDragStart(photo);
     } else {
-      console.log('⚠️ PhotoCard: No onDragStart callback provided');
+      if (process.env.NODE_ENV === 'development') console.log('⚠️ PhotoCard: No onDragStart callback provided');
     }
   };
 

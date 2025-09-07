@@ -64,10 +64,10 @@ class GoogleDriveService {
   // Set access token from external auth (Google Identity Services)
   setAccessToken(token: string): void {
     this.accessToken = token;
-    console.log('🔑 Access token set in GoogleDriveService:', token ? 'Token provided' : 'No token');
+    if (process.env.NODE_ENV === 'development') console.log('🔑 Access token set in GoogleDriveService:', token ? 'Token provided' : 'No token');
     if (window.gapi && window.gapi.client) {
       window.gapi.client.setToken({ access_token: token });
-      console.log('🔑 Token also set in gapi.client');
+      if (process.env.NODE_ENV === 'development') console.log('🔑 Token also set in gapi.client');
     }
   }
 
@@ -95,12 +95,12 @@ class GoogleDriveService {
 
   async getFolderContents(folderId: string): Promise<GoogleDriveFolder> {
     try {
-      console.log(`📁 Getting folder contents for: ${folderId}`);
+      if (process.env.NODE_ENV === 'development') console.log(`📁 Getting folder contents for: ${folderId}`);
       if (!this.isSignedIn()) {
         console.error('❌ Not signed in to Google Drive');
         throw new Error(ERROR_MESSAGES.GOOGLE_DRIVE_AUTH_FAILED);
       }
-      console.log('✅ Google Drive authentication verified');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Google Drive authentication verified');
 
       // Get folder info
       const folderResponse = await window.gapi.client.drive.files.get({
@@ -130,7 +130,7 @@ class GoogleDriveService {
         });
 
         for (const file of filesResponse.result.files || []) {
-          console.log(`📄 Found file: ${file.name}`, { mimeType: file.mimeType, hasThumb: !!file.thumbnailLink });
+          if (process.env.NODE_ENV === 'development') console.log(`📄 Found file: ${file.name}`, { mimeType: file.mimeType, hasThumb: !!file.thumbnailLink });
           logger.drive.debug(`Found file: ${file.name}`, { mimeType: file.mimeType, thumbnailLink: file.thumbnailLink });
           
           if (file.mimeType === 'application/vnd.google-apps.folder') {
@@ -144,7 +144,7 @@ class GoogleDriveService {
               folders: [],
             });
           } else if (this.isImageFile(file.mimeType || '')) {
-            console.log(`🖼️ Adding image: ${file.name}`, { 
+            if (process.env.NODE_ENV === 'development') console.log(`🖼️ Adding image: ${file.name}`, { 
               thumbnailLink: file.thumbnailLink,
               webContentLink: file.webContentLink,
               mimeType: file.mimeType 
@@ -188,7 +188,7 @@ class GoogleDriveService {
     try {
       const folder = await this.getFolderContents(folderId);
       const files = folder.files || [];
-      console.log(`📁 Found ${files.length} files in folder: ${folder.name}`);
+      if (process.env.NODE_ENV === 'development') console.log(`📁 Found ${files.length} files in folder: ${folder.name}`);
       
       // Fast: Use thumbnail URLs directly
       const photos = files.map((file) => {
@@ -214,7 +214,7 @@ class GoogleDriveService {
         };
       });
 
-      console.log(`✅ Returning ${photos.length} photos instantly`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Returning ${photos.length} photos instantly`);
       return photos;
     } catch (error) {
       console.error('❌ Failed to get photos from folder:', error);
@@ -254,7 +254,7 @@ class GoogleDriveService {
       urls.thumbnail = file.thumbnailLink; // Keep original =s220 for grid
       urls.fallbacks.push(thumbUrl);
       urls.fallbacks.push(file.thumbnailLink.replace('=s220', '=s600'));
-      console.log(`✅ Using thumbnail URLs for ${file.name}`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Using thumbnail URLs for ${file.name}`);
       return urls;
     }
 
@@ -264,7 +264,7 @@ class GoogleDriveService {
         const blobUrl = await this.createBlobUrlForImage(file.id);
         urls.primary = blobUrl;
         urls.thumbnail = blobUrl;
-        console.log(`⚠️ Created blob URL for ${file.name} (no thumbnails available)`);
+        if (process.env.NODE_ENV === 'development') console.log(`⚠️ Created blob URL for ${file.name} (no thumbnails available)`);
         return urls;
       }
     } catch (blobError) {
@@ -277,7 +277,7 @@ class GoogleDriveService {
       urls.primary = thumbUrl;
       urls.thumbnail = file.thumbnailLink;
       urls.fallbacks.push(thumbUrl);
-      console.log(`Using thumbnail URL for ${file.name}: ${thumbUrl}`);
+      if (process.env.NODE_ENV === 'development') console.log(`Using thumbnail URL for ${file.name}: ${thumbUrl}`);
     }
 
     // Strategy 4: Google Drive direct link
@@ -392,7 +392,7 @@ class GoogleDriveService {
       // First check if folder already exists
       const existingFolderId = await this.checkFolderExists(parentFolderId, folderName);
       if (existingFolderId) {
-        console.log(`Folder "${folderName}" already exists with ID: ${existingFolderId}`);
+        if (process.env.NODE_ENV === 'development') console.log(`Folder "${folderName}" already exists with ID: ${existingFolderId}`);
         return existingFolderId;
       }
 
@@ -406,7 +406,7 @@ class GoogleDriveService {
         fields: 'id',
       });
 
-      console.log(`Created new folder "${folderName}" with ID: ${response.result.id}`);
+      if (process.env.NODE_ENV === 'development') console.log(`Created new folder "${folderName}" with ID: ${response.result.id}`);
       return response.result.id;
     } catch (error) {
       console.error('Failed to create output folder:', error);
@@ -522,7 +522,7 @@ class GoogleDriveService {
       }
 
       const result = await response.json();
-      console.log(`✅ File copied successfully: ${result.name} (${result.id})`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ File copied successfully: ${result.name} (${result.id})`);
       return result.id;
     } catch (error) {
       console.error('Failed to copy file:', error);
@@ -581,7 +581,7 @@ class GoogleDriveService {
       // Handle legacy URLs stored as template IDs (extract file ID from URL)
       let cleanFileId = templateId;
       if (templateId.includes('drive.google.com') || templateId.includes('http')) {
-        console.log('🔧 Legacy URL detected, extracting file ID:', templateId);
+        if (process.env.NODE_ENV === 'development') console.log('🔧 Legacy URL detected, extracting file ID:', templateId);
         
         const patterns = [
           /\/file\/d\/([a-zA-Z0-9-_]+)/,  // /file/d/FILE_ID
@@ -595,7 +595,7 @@ class GoogleDriveService {
           if (match && match[1]) {
             cleanFileId = match[1];
             extracted = true;
-            console.log('✅ Extracted file ID from legacy URL:', cleanFileId);
+            if (process.env.NODE_ENV === 'development') console.log('✅ Extracted file ID from legacy URL:', cleanFileId);
             break;
           }
         }
@@ -618,7 +618,7 @@ class GoogleDriveService {
         throw new Error('Not authenticated with Google Drive');
       }
 
-      console.log(`📥 Downloading template: ${cleanFileId}${cleanFileId !== templateId ? ` (extracted from legacy URL: ${templateId})` : ''}`);
+      if (process.env.NODE_ENV === 'development') console.log(`📥 Downloading template: ${cleanFileId}${cleanFileId !== templateId ? ` (extracted from legacy URL: ${templateId})` : ''}`);
       
       // Add timeout and better error handling for network issues
       const controller = new AbortController();
@@ -651,7 +651,7 @@ class GoogleDriveService {
         }
         
         const blob = await response.blob();
-        console.log(`✅ Template downloaded successfully: ${cleanFileId}${cleanFileId !== templateId ? ` (extracted from legacy URL: ${templateId})` : ''}`);
+        if (process.env.NODE_ENV === 'development') console.log(`✅ Template downloaded successfully: ${cleanFileId}${cleanFileId !== templateId ? ` (extracted from legacy URL: ${templateId})` : ''}`);
         return blob;
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
@@ -690,7 +690,7 @@ class GoogleDriveService {
 
   private isImageFile(mimeType: string): boolean {
     const isImage = SUPPORTED_IMAGE_TYPES.indexOf(mimeType) !== -1;
-    console.log(`Checking if ${mimeType} is image: ${isImage}, supported types:`, SUPPORTED_IMAGE_TYPES);
+    if (process.env.NODE_ENV === 'development') console.log(`Checking if ${mimeType} is image: ${isImage}, supported types:`, SUPPORTED_IMAGE_TYPES);
     return isImage;
   }
 
@@ -922,7 +922,7 @@ class GoogleDriveService {
         throw new Error(`Update failed: ${errorBody.error?.message || 'Unknown error'}`);
       }
 
-      console.log(`Successfully updated file: ${fileName}`);
+      if (process.env.NODE_ENV === 'development') console.log(`Successfully updated file: ${fileName}`);
     } catch (error) {
       console.error('Failed to update file:', error);
       throw new Error(ERROR_MESSAGES.EXPORT_FAILED);
@@ -942,7 +942,7 @@ class GoogleDriveService {
         fileId: fileId,
       });
 
-      console.log(`Successfully deleted file: ${fileId}`);
+      if (process.env.NODE_ENV === 'development') console.log(`Successfully deleted file: ${fileId}`);
     } catch (error) {
       console.error('Failed to delete file:', error);
       throw new Error('Failed to delete file from Google Drive');
@@ -963,7 +963,7 @@ class GoogleDriveService {
         fileId: folderId,
       });
 
-      console.log(`Successfully deleted folder: ${folderId}`);
+      if (process.env.NODE_ENV === 'development') console.log(`Successfully deleted folder: ${folderId}`);
     } catch (error) {
       console.error('Failed to delete folder:', error);
       throw new Error('Failed to delete folder from Google Drive');
@@ -987,7 +987,7 @@ class GoogleDriveService {
         fields: 'id,name',
       });
 
-      console.log(`Successfully renamed folder to: ${newName}`);
+      if (process.env.NODE_ENV === 'development') console.log(`Successfully renamed folder to: ${newName}`);
     } catch (error) {
       console.error('Failed to rename folder:', error);
       throw new Error('Failed to rename folder in Google Drive');

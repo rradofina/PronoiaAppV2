@@ -34,7 +34,7 @@ export default function TemplateExportModal({ isOpen, onClose }: TemplateExportM
       try {
         const types = await manualTemplateService.getUniqueTemplateTypes();
         setAvailableTemplateTypes(types);
-        console.log('📋 Export Modal - Loaded dynamic template types:', types);
+        if (process.env.NODE_ENV === 'development') console.log('📋 Export Modal - Loaded dynamic template types:', types);
       } catch (error) {
         console.error('❌ Export Modal - Error loading template types:', error);
         // Fallback to empty array if service fails

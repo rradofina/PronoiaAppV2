@@ -263,7 +263,7 @@ export default function ManualTemplateManagerScreen({
     try {
       const data = await manualTemplateService.getAllTemplates();
       setTemplates(data);
-      console.log('✅ Loaded manual templates:', data.length);
+      if (process.env.NODE_ENV === 'development') console.log('✅ Loaded manual templates:', data.length);
     } catch (err: any) {
       setError(err.message || 'Failed to load templates');
       console.error('❌ Error loading templates:', err);
@@ -299,7 +299,7 @@ export default function ManualTemplateManagerScreen({
       }
     });
     
-    console.log('✅ Template order updated locally');
+    if (process.env.NODE_ENV === 'development') console.log('✅ Template order updated locally');
   };
 
 
@@ -418,7 +418,7 @@ export default function ManualTemplateManagerScreen({
     // Load the template image for preview if we have a valid drive_file_id
     if (template.drive_file_id && template.drive_file_id.length > 10) {
       try {
-        console.log('🔍 Loading existing template preview for editing:', template.name);
+        if (process.env.NODE_ENV === 'development') console.log('🔍 Loading existing template preview for editing:', template.name);
         const { googleDriveService } = await import('../../services/googleDriveService');
         
         // Check if authenticated first
@@ -428,7 +428,7 @@ export default function ManualTemplateManagerScreen({
           const blob = await googleDriveService.downloadTemplate(template.drive_file_id);
           const blobUrl = URL.createObjectURL(blob);
           setPreviewBlobUrl(blobUrl);
-          console.log('✅ Template preview loaded for editing:', template.name);
+          if (process.env.NODE_ENV === 'development') console.log('✅ Template preview loaded for editing:', template.name);
         }
       } catch (error) {
         console.warn('Could not load template preview for editing:', error);
@@ -471,10 +471,10 @@ export default function ManualTemplateManagerScreen({
 
       if (editingTemplate) {
         await manualTemplateService.updateTemplate(editingTemplate.id, templateData);
-        console.log('✅ Template updated successfully');
+        if (process.env.NODE_ENV === 'development') console.log('✅ Template updated successfully');
       } else {
         await manualTemplateService.createTemplate(templateData);
-        console.log('✅ Template created successfully');
+        if (process.env.NODE_ENV === 'development') console.log('✅ Template created successfully');
       }
 
       setShowCreateForm(false);
@@ -499,7 +499,7 @@ export default function ManualTemplateManagerScreen({
   const handleDelete = async (template: ManualTemplate) => {
     try {
       await manualTemplateService.deleteTemplate(template.id);
-      console.log('✅ Template deleted successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Template deleted successfully');
       await loadTemplates();
     } catch (err: any) {
       setError(err.message || 'Failed to delete template');
@@ -514,7 +514,7 @@ export default function ManualTemplateManagerScreen({
       } else {
         await manualTemplateService.activateTemplate(template.id);
       }
-      console.log('✅ Template status updated');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Template status updated');
       await loadTemplates();
     } catch (err: any) {
       setError(err.message || 'Failed to update template status');
@@ -543,7 +543,7 @@ export default function ManualTemplateManagerScreen({
       const match = trimmedInput.match(pattern);
       if (match && match[1]) {
         fileId = match[1];
-        console.log(`✅ Extracted file ID: ${fileId} from URL`);
+        if (process.env.NODE_ENV === 'development') console.log(`✅ Extracted file ID: ${fileId} from URL`);
         break;
       }
     }
@@ -556,7 +556,7 @@ export default function ManualTemplateManagerScreen({
           trimmedInput.length <= 100 && 
           /^[a-zA-Z0-9-_]+$/.test(trimmedInput)) {
         fileId = trimmedInput;
-        console.log(`✅ Using direct file ID: ${fileId}`);
+        if (process.env.NODE_ENV === 'development') console.log(`✅ Using direct file ID: ${fileId}`);
       }
     }
     
@@ -597,24 +597,24 @@ export default function ManualTemplateManagerScreen({
 
     try {
       // Extract and validate file ID from URL
-      console.log('🔍 Starting file ID extraction for:', formData.drive_file_id);
+      if (process.env.NODE_ENV === 'development') console.log('🔍 Starting file ID extraction for:', formData.drive_file_id);
       
       let fileId;
       try {
         fileId = extractFileIdFromUrl(formData.drive_file_id);
-        console.log('🔍 Successfully extracted file ID:', fileId);
+        if (process.env.NODE_ENV === 'development') console.log('🔍 Successfully extracted file ID:', fileId);
       } catch (validationError: any) {
-        console.log('❌ Validation error caught:', validationError.message);
+        if (process.env.NODE_ENV === 'development') console.log('❌ Validation error caught:', validationError.message);
         setError(validationError.message);
         return; // Exit early if validation fails
       }
       
-      console.log('🔍 Using validated file ID:', fileId);
+      if (process.env.NODE_ENV === 'development') console.log('🔍 Using validated file ID:', fileId);
       
       // Import the template detection service
       const { TemplateDetectionService } = await import('../../services/templateDetectionService');
       
-      console.log('🔍 Auto-detecting template structure for:', fileId);
+      if (process.env.NODE_ENV === 'development') console.log('🔍 Auto-detecting template structure for:', fileId);
       
       // Create an instance of the service and analyze the template
       const detectionService = new TemplateDetectionService();
@@ -646,7 +646,7 @@ export default function ManualTemplateManagerScreen({
           console.warn('Could not load preview image:', previewError);
         }
         
-        console.log('✅ Auto-detection successful:', detectedData);
+        if (process.env.NODE_ENV === 'development') console.log('✅ Auto-detection successful:', detectedData);
         
         // Show success message
         const holesCount = detectedData.holes?.length || 0;

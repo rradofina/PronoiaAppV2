@@ -17,12 +17,12 @@ class PackageGroupServiceImpl {
    */
   async getAllGroups(): Promise<PackageGroup[]> {
     if (this.isCacheValid()) {
-      console.log('📦 Using cached package groups');
+      if (process.env.NODE_ENV === 'development') console.log('📦 Using cached package groups');
       return this.cache;
     }
 
     try {
-      console.log('🔄 Loading package groups from database...');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 Loading package groups from database...');
       
       const { data, error } = await supabase
         .from('package_groups')
@@ -36,7 +36,7 @@ class PackageGroupServiceImpl {
       this.cache = data || [];
       this.lastSync = new Date();
 
-      console.log(`✅ Loaded ${this.cache.length} package groups from database`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Loaded ${this.cache.length} package groups from database`);
       return this.cache;
     } catch (error) {
       console.error('❌ Error loading package groups:', error);
@@ -65,7 +65,7 @@ class PackageGroupServiceImpl {
    */
   async createGroup(groupData: CreatePackageGroupRequest): Promise<PackageGroup> {
     try {
-      console.log('🔄 Creating new package group...');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 Creating new package group...');
       
       const { data, error } = await supabase
         .from('package_groups')
@@ -84,7 +84,7 @@ class PackageGroupServiceImpl {
       }
 
       this.clearCache();
-      console.log(`✅ Package group created: ${data.name}`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Package group created: ${data.name}`);
       return data;
     } catch (error) {
       console.error('❌ Error creating package group:', error);
@@ -97,7 +97,7 @@ class PackageGroupServiceImpl {
    */
   async updateGroup(id: string, updates: Partial<PackageGroup>): Promise<PackageGroup> {
     try {
-      console.log(`🔄 Updating package group: ${id}`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Updating package group: ${id}`);
       
       const { data, error } = await supabase
         .from('package_groups')
@@ -114,7 +114,7 @@ class PackageGroupServiceImpl {
       }
 
       this.clearCache();
-      console.log(`✅ Package group updated: ${data.name}`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Package group updated: ${data.name}`);
       return data;
     } catch (error) {
       console.error(`❌ Error updating package group ${id}:`, error);
@@ -127,7 +127,7 @@ class PackageGroupServiceImpl {
    */
   async deleteGroup(id: string): Promise<void> {
     try {
-      console.log(`🔄 Deleting package group: ${id}`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Deleting package group: ${id}`);
       
       // First, ungroup all packages in this group
       const { error: ungroupError } = await supabase
@@ -150,7 +150,7 @@ class PackageGroupServiceImpl {
       }
 
       this.clearCache();
-      console.log('✅ Package group deleted successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Package group deleted successfully');
     } catch (error) {
       console.error(`❌ Error deleting package group ${id}:`, error);
       throw error;
@@ -162,7 +162,7 @@ class PackageGroupServiceImpl {
    */
   async reorderGroups(groupOrder: { group_id: string; sort_order: number }[]): Promise<void> {
     try {
-      console.log(`🔄 Reordering ${groupOrder.length} package groups`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Reordering ${groupOrder.length} package groups`);
       
       // Update sort order for each group
       for (const item of groupOrder) {
@@ -177,7 +177,7 @@ class PackageGroupServiceImpl {
       }
       
       this.clearCache();
-      console.log('✅ Groups reordered successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Groups reordered successfully');
     } catch (error) {
       console.error('❌ Error reordering groups:', error);
       throw error;
@@ -203,7 +203,7 @@ class PackageGroupServiceImpl {
    */
   async getGroupsWithPackages(): Promise<PackageGroup[]> {
     try {
-      console.log('🔄 Loading groups with packages...');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 Loading groups with packages...');
       
       const { data, error } = await supabase
         .from('package_groups')
@@ -230,7 +230,7 @@ class PackageGroupServiceImpl {
         throw new Error(`Failed to load groups with packages: ${error.message}`);
       }
 
-      console.log(`✅ Loaded ${data?.length || 0} groups with packages`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Loaded ${data?.length || 0} groups with packages`);
       return data || [];
     } catch (error) {
       console.error('❌ Error loading groups with packages:', error);
@@ -244,7 +244,7 @@ class PackageGroupServiceImpl {
   clearCache(): void {
     this.cache = [];
     this.lastSync = null;
-    console.log('🗑️ Package group cache cleared');
+    if (process.env.NODE_ENV === 'development') console.log('🗑️ Package group cache cleared');
   }
 
   /**

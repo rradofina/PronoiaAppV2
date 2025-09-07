@@ -51,7 +51,7 @@ class TemplateSyncService {
    * @throws Error if initialization fails
    */
   async initialize(clientFolderId: string): Promise<void> {
-    console.log('🔄 Initializing template sync service for client:', clientFolderId);
+    if (process.env.NODE_ENV === 'development') console.log('🔄 Initializing template sync service for client:', clientFolderId);
     this.isInitialized = false; // Reset initialization state
     this.clientFolderId = clientFolderId;
     this.syncStates.clear();
@@ -62,8 +62,8 @@ class TemplateSyncService {
       // Create or get prints folder
       await this.ensurePrintsFolder();
       this.isInitialized = true; // Mark as initialized only after successful setup
-      console.log('✅ Sync service initialized successfully');
-      console.log('  Prints folder ID:', this.printsFolderId);
+      if (process.env.NODE_ENV === 'development') console.log('✅ Sync service initialized successfully');
+      if (process.env.NODE_ENV === 'development') console.log('  Prints folder ID:', this.printsFolderId);
     } catch (error) {
       console.error('❌ Failed to initialize sync service:', error);
       this.isInitialized = false;
@@ -82,14 +82,14 @@ class TemplateSyncService {
 
     try {
       // Check if prints folder exists
-      console.log('📂 Checking for existing prints folder in:', this.clientFolderId);
+      if (process.env.NODE_ENV === 'development') console.log('📂 Checking for existing prints folder in:', this.clientFolderId);
       const folders = await googleDriveService.listFolders(this.clientFolderId);
-      console.log('  Found folders:', folders.map(f => f.name));
+      if (process.env.NODE_ENV === 'development') console.log('  Found folders:', folders.map(f => f.name));
       const printsFolder = folders.find(f => f.name === 'prints');
       
       if (printsFolder) {
         this.printsFolderId = printsFolder.id;
-        console.log('✅ Found existing prints folder:', this.printsFolderId);
+        if (process.env.NODE_ENV === 'development') console.log('✅ Found existing prints folder:', this.printsFolderId);
         
         // Load existing files to track what's already uploaded
         const files = await googleDriveService.listFiles(this.printsFolderId, {});
@@ -101,17 +101,17 @@ class TemplateSyncService {
           if (match) {
             const templateId = match[1];
             this.existingFiles.set(templateId, file.id);
-            console.log(`  📄 Found existing template: ${templateId} -> ${file.id}`);
+            if (process.env.NODE_ENV === 'development') console.log(`  📄 Found existing template: ${templateId} -> ${file.id}`);
           }
         }
-        console.log(`📊 Loaded ${this.existingFiles.size} existing templates`);
+        if (process.env.NODE_ENV === 'development') console.log(`📊 Loaded ${this.existingFiles.size} existing templates`);
       } else {
         // Create new prints folder
         this.printsFolderId = await googleDriveService.createOutputFolder(
           this.clientFolderId,
           'prints'
         );
-        console.log('📁 Created new prints folder:', this.printsFolderId);
+        if (process.env.NODE_ENV === 'development') console.log('📁 Created new prints folder:', this.printsFolderId);
       }
       
       return this.printsFolderId;
@@ -139,7 +139,7 @@ class TemplateSyncService {
     photos: Photo[],
     immediate: boolean = false
   ): void {
-    console.log('📌 queueTemplateSync called for:', templateId, { immediate });
+    if (process.env.NODE_ENV === 'development') console.log('📌 queueTemplateSync called for:', templateId, { immediate });
     
     // Guard: Don't sync if service not initialized
     if (!this.isInitialized) {
@@ -150,7 +150,7 @@ class TemplateSyncService {
 
     // Check if template is complete
     if (!this.isTemplateComplete(templateSlots, templateId)) {
-      console.log('⏸️ Template incomplete, skipping sync:', templateId);
+      if (process.env.NODE_ENV === 'development') console.log('⏸️ Template incomplete, skipping sync:', templateId);
       // If it was previously synced, delete it from Drive
       const syncState = this.syncStates.get(templateId);
       if (syncState?.status === 'synced') {
@@ -165,21 +165,21 @@ class TemplateSyncService {
       clearTimeout(existingTimer);
     }
 
-    console.log('✅ Template is complete, will sync:', templateId);
-    console.log('  Current queue size:', this.uploadQueue.length);
-    console.log('  Is processing:', this.isProcessing);
+    if (process.env.NODE_ENV === 'development') console.log('✅ Template is complete, will sync:', templateId);
+    if (process.env.NODE_ENV === 'development') console.log('  Current queue size:', this.uploadQueue.length);
+    if (process.env.NODE_ENV === 'development') console.log('  Is processing:', this.isProcessing);
     
     if (immediate) {
-      console.log('⚡ Immediate sync requested');
+      if (process.env.NODE_ENV === 'development') console.log('⚡ Immediate sync requested');
       // Sync immediately
       this.addToUploadQueue(templateId, templateSlots, photos, 'high');
     } else {
       // Debounce for 3 seconds
-      console.log(`⏱️ Queueing template sync (${this.DEBOUNCE_TIME}ms debounce):`, templateId);
-      console.log('  Template slots count:', templateSlots.filter(s => s.templateId === templateId).length);
-      console.log('  Photos available:', photos.length);
+      if (process.env.NODE_ENV === 'development') console.log(`⏱️ Queueing template sync (${this.DEBOUNCE_TIME}ms debounce):`, templateId);
+      if (process.env.NODE_ENV === 'development') console.log('  Template slots count:', templateSlots.filter(s => s.templateId === templateId).length);
+      if (process.env.NODE_ENV === 'development') console.log('  Photos available:', photos.length);
       const timer = setTimeout(() => {
-        console.log('⏰ Debounce complete, adding to upload queue:', templateId);
+        if (process.env.NODE_ENV === 'development') console.log('⏰ Debounce complete, adding to upload queue:', templateId);
         this.addToUploadQueue(templateId, templateSlots, photos, 'normal');
         this.syncQueue.delete(templateId);
       }, this.DEBOUNCE_TIME);
@@ -220,7 +220,7 @@ class TemplateSyncService {
       this.uploadQueue.push(queueItem);
     }
     
-    console.log('📋 Added to upload queue:', templateId, 'Priority:', priority, 'Queue size:', this.uploadQueue.length);
+    if (process.env.NODE_ENV === 'development') console.log('📋 Added to upload queue:', templateId, 'Priority:', priority, 'Queue size:', this.uploadQueue.length);
     
     // Start processing if not already running
     // Use setTimeout to avoid potential race conditions
@@ -233,24 +233,24 @@ class TemplateSyncService {
   private async processUploadQueue(): Promise<void> {
     // Check if already processing
     if (this.isProcessing) {
-      console.log('⏸️ Already processing queue, skipping');
+      if (process.env.NODE_ENV === 'development') console.log('⏸️ Already processing queue, skipping');
       return;
     }
     
     // Check if queue is empty
     if (this.uploadQueue.length === 0) {
-      console.log('📭 Queue is empty, nothing to process');
+      if (process.env.NODE_ENV === 'development') console.log('📭 Queue is empty, nothing to process');
       return;
     }
     
     this.isProcessing = true;
-    console.log(`🚀 Starting parallel sync processing with batch size ${this.PARALLEL_BATCH_SIZE}`);
-    console.log(`📦 Queue contains ${this.uploadQueue.length} items`);
+    if (process.env.NODE_ENV === 'development') console.log(`🚀 Starting parallel sync processing with batch size ${this.PARALLEL_BATCH_SIZE}`);
+    if (process.env.NODE_ENV === 'development') console.log(`📦 Queue contains ${this.uploadQueue.length} items`);
     
     while (this.uploadQueue.length > 0) {
       // If user is interacting, pause all processing
       if (this.isUserInteracting) {
-        console.log('⏸️ Pausing sync - user is interacting');
+        if (process.env.NODE_ENV === 'development') console.log('⏸️ Pausing sync - user is interacting');
         await new Promise(resolve => setTimeout(resolve, 500)); // Wait for interaction to complete
         continue;
       }
@@ -259,7 +259,7 @@ class TemplateSyncService {
       const batchSize = Math.min(this.PARALLEL_BATCH_SIZE, this.uploadQueue.length);
       const batch = this.uploadQueue.splice(0, batchSize);
       
-      console.log(`📦 Processing batch of ${batch.length} templates in parallel`);
+      if (process.env.NODE_ENV === 'development') console.log(`📦 Processing batch of ${batch.length} templates in parallel`);
       this.activeOperations = batch.length;
       
       try {
@@ -290,14 +290,14 @@ class TemplateSyncService {
               // Normal retry logic for other failures
               if (item.retryCount < this.MAX_RETRIES) {
                 item.retryCount++;
-                console.log('🔄 Retrying sync:', item.templateId, 'Attempt:', item.retryCount);
+                if (process.env.NODE_ENV === 'development') console.log('🔄 Retrying sync:', item.templateId, 'Attempt:', item.retryCount);
                 this.uploadQueue.push(item); // Add back to end of queue
               } else {
                 this.updateSyncState(item.templateId, 'error', `Failed after ${this.MAX_RETRIES} retries`);
               }
             }
           } else {
-            console.log('✅ Successfully synced in batch:', item.templateId);
+            if (process.env.NODE_ENV === 'development') console.log('✅ Successfully synced in batch:', item.templateId);
           }
         });
         
@@ -320,12 +320,12 @@ class TemplateSyncService {
       
       // Additional pause if user started interacting during batch
       if (this.isUserInteracting) {
-        console.log('⏸️ User interaction detected after batch, pausing...');
+        if (process.env.NODE_ENV === 'development') console.log('⏸️ User interaction detected after batch, pausing...');
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
     
-    console.log('✅ Parallel sync processing complete');
+    if (process.env.NODE_ENV === 'development') console.log('✅ Parallel sync processing complete');
     this.isProcessing = false;
   }
 
@@ -355,9 +355,9 @@ class TemplateSyncService {
       await this.ensurePrintsFolder();
     }
     
-    console.log('🔄 Syncing template:', templateId);
-    console.log('  Slots for this template:', templateSlots.length);
-    console.log('  Photos available:', photos.length);
+    if (process.env.NODE_ENV === 'development') console.log('🔄 Syncing template:', templateId);
+    if (process.env.NODE_ENV === 'development') console.log('  Slots for this template:', templateSlots.length);
+    if (process.env.NODE_ENV === 'development') console.log('  Photos available:', photos.length);
     this.updateSyncState(templateId, 'syncing');
     
     try {
@@ -397,7 +397,7 @@ class TemplateSyncService {
       }
       
       // Rasterize the template - use lower quality for drafts to speed up processing
-      console.log('🎨 Starting rasterization for template:', manualTemplate.name);
+      if (process.env.NODE_ENV === 'development') console.log('🎨 Starting rasterization for template:', manualTemplate.name);
       const rasterized = await templateRasterizationService.rasterizeTemplate(
         manualTemplate,
         templateSlots,
@@ -419,7 +419,7 @@ class TemplateSyncService {
       if (!rasterized.blob) {
         throw new Error('Rasterization failed - no blob returned');
       }
-      console.log('✅ Rasterized blob size:', rasterized.blob.size, 'bytes');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Rasterized blob size:', rasterized.blob.size, 'bytes');
       
       // Generate filename with new naming convention: Print_[Number]_[TemplateType]_[PrintSize]_[ShortTimestamp].jpg
       // Extract print number from template name (e.g., "Print #1" -> "1")
@@ -443,7 +443,7 @@ class TemplateSyncService {
       
       if (existingFileId) {
         // Try to update existing file
-        console.log('📝 Updating existing file:', fileName);
+        if (process.env.NODE_ENV === 'development') console.log('📝 Updating existing file:', fileName);
         try {
           await googleDriveService.updateFile(
             existingFileId,
@@ -456,7 +456,7 @@ class TemplateSyncService {
         } catch (updateError: any) {
           // Check if file was deleted from Drive
           if (updateError.message && updateError.message.includes('File not found')) {
-            console.log('⚠️ File not found in Drive, uploading as new file:', fileName);
+            if (process.env.NODE_ENV === 'development') console.log('⚠️ File not found in Drive, uploading as new file:', fileName);
             // File was deleted, upload as new
             const fileId = await googleDriveService.uploadFile(
               rasterized.blob,
@@ -464,7 +464,7 @@ class TemplateSyncService {
               this.printsFolderId!,
               'image/jpeg'
             );
-            console.log('📁 New file uploaded with ID:', fileId);
+            if (process.env.NODE_ENV === 'development') console.log('📁 New file uploaded with ID:', fileId);
             this.updateSyncState(templateId, 'synced', undefined, fileId);
             // Update tracking with new file ID
             this.existingFiles.set(templateId, fileId);
@@ -475,7 +475,7 @@ class TemplateSyncService {
         }
       } else {
         // Upload new file
-        console.log('📤 Uploading new file:', fileName);
+        if (process.env.NODE_ENV === 'development') console.log('📤 Uploading new file:', fileName);
         const fileId = await googleDriveService.uploadFile(
           rasterized.blob,
           fileName,
@@ -484,13 +484,13 @@ class TemplateSyncService {
         );
         
         // Store the file ID
-        console.log('📁 File uploaded with ID:', fileId);
+        if (process.env.NODE_ENV === 'development') console.log('📁 File uploaded with ID:', fileId);
         this.updateSyncState(templateId, 'synced', undefined, fileId);
         // Also track in existing files for future updates
         this.existingFiles.set(templateId, fileId);
       }
       
-      console.log('✅ Successfully synced:', templateId);
+      if (process.env.NODE_ENV === 'development') console.log('✅ Successfully synced:', templateId);
       // REMOVED DUPLICATE STATE UPDATE - This was overwriting the fileId!
       
     } catch (error) {
@@ -508,7 +508,7 @@ class TemplateSyncService {
   async deleteFromDrive(templateId: string): Promise<void> {
     // Guard: Don't try to delete if not initialized
     if (!this.isInitialized) {
-      console.log('⚠️ Sync service not initialized, skipping delete for:', templateId);
+      if (process.env.NODE_ENV === 'development') console.log('⚠️ Sync service not initialized, skipping delete for:', templateId);
       return;
     }
 
@@ -528,9 +528,9 @@ class TemplateSyncService {
     // Delete from Drive if it exists
     if (existingFileId) {
       try {
-        console.log('🗑️ Deleting template from Drive:', templateId);
+        if (process.env.NODE_ENV === 'development') console.log('🗑️ Deleting template from Drive:', templateId);
         await googleDriveService.deleteFile(existingFileId);
-        console.log('✅ Deleted from Drive:', templateId);
+        if (process.env.NODE_ENV === 'development') console.log('✅ Deleted from Drive:', templateId);
         // Remove from existing files map
         this.existingFiles.delete(templateId);
       } catch (error) {
@@ -594,9 +594,9 @@ class TemplateSyncService {
     
     this.isUserInteracting = isInteracting;
     if (isInteracting) {
-      console.log('🔄 User interaction started - background sync will pause');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 User interaction started - background sync will pause');
     } else {
-      console.log('▶️ User interaction ended - background sync will resume');
+      if (process.env.NODE_ENV === 'development') console.log('▶️ User interaction ended - background sync will resume');
       // Resume processing if there are pending items
       if (this.uploadQueue.length > 0 && !this.isProcessing) {
         this.processUploadQueue();
@@ -608,11 +608,11 @@ class TemplateSyncService {
    * Flush all pending syncs - process immediately without waiting for debounce
    */
   private flushPendingSync(templateSlots: TemplateSlot[], photos: Photo[]): void {
-    console.log('🚀 Flushing pending syncs before finalization');
+    if (process.env.NODE_ENV === 'development') console.log('🚀 Flushing pending syncs before finalization');
     const pendingCount = this.syncQueue.size;
     
     if (pendingCount > 0) {
-      console.log(`⚡ Processing ${pendingCount} pending sync(s) immediately`);
+      if (process.env.NODE_ENV === 'development') console.log(`⚡ Processing ${pendingCount} pending sync(s) immediately`);
       
       // Process each pending sync immediately
       for (const [templateId, timer] of this.syncQueue.entries()) {
@@ -620,7 +620,7 @@ class TemplateSyncService {
         clearTimeout(timer);
         
         // Add to upload queue with high priority
-        console.log(`  📤 Flushing template: ${templateId}`);
+        if (process.env.NODE_ENV === 'development') console.log(`  📤 Flushing template: ${templateId}`);
         const templateSpecificSlots = templateSlots.filter(s => s.templateId === templateId);
         
         if (this.isTemplateComplete(templateSpecificSlots, templateId)) {
@@ -631,7 +631,7 @@ class TemplateSyncService {
       // Clear the sync queue
       this.syncQueue.clear();
     } else {
-      console.log('✅ No pending syncs to flush');
+      if (process.env.NODE_ENV === 'development') console.log('✅ No pending syncs to flush');
     }
   }
 
@@ -639,9 +639,9 @@ class TemplateSyncService {
    * Wait for all uploads to complete
    */
   private async waitForUploads(): Promise<void> {
-    console.log('⏳ Waiting for upload queue to complete...');
-    console.log(`  📦 Queue size: ${this.uploadQueue.length}`);
-    console.log(`  🔄 Processing: ${this.isProcessing}`);
+    if (process.env.NODE_ENV === 'development') console.log('⏳ Waiting for upload queue to complete...');
+    if (process.env.NODE_ENV === 'development') console.log(`  📦 Queue size: ${this.uploadQueue.length}`);
+    if (process.env.NODE_ENV === 'development') console.log(`  🔄 Processing: ${this.isProcessing}`);
     
     // Start processing if there are items and not already processing
     if (this.uploadQueue.length > 0 && !this.isProcessing) {
@@ -656,17 +656,17 @@ class TemplateSyncService {
       
       // Log progress every second
       if (checkCount % 10 === 0) {
-        console.log(`  ⏱️ Still waiting... Queue: ${this.uploadQueue.length}, Processing: ${this.isProcessing}`);
+        if (process.env.NODE_ENV === 'development') console.log(`  ⏱️ Still waiting... Queue: ${this.uploadQueue.length}, Processing: ${this.isProcessing}`);
       }
       
       // Safety check - if stuck for too long, try to restart processing
       if (checkCount > 300 && this.uploadQueue.length > 0 && !this.isProcessing) {
-        console.log('  ⚠️ Processing seems stuck, restarting...');
+        if (process.env.NODE_ENV === 'development') console.log('  ⚠️ Processing seems stuck, restarting...');
         this.processUploadQueue();
       }
     }
     
-    console.log('✅ All uploads completed');
+    if (process.env.NODE_ENV === 'development') console.log('✅ All uploads completed');
   }
 
   /**
@@ -675,15 +675,15 @@ class TemplateSyncService {
   async finalizeSession(templateSlots: TemplateSlot[], photos: Photo[]): Promise<void> {
     // Guard: Don't finalize if not initialized
     if (!this.isInitialized) {
-      console.log('⚠️ Sync service not initialized, skipping finalization');
+      if (process.env.NODE_ENV === 'development') console.log('⚠️ Sync service not initialized, skipping finalization');
       return;
     }
 
     try {
-      console.log('🏁 Finalizing session - processing pending syncs');
+      if (process.env.NODE_ENV === 'development') console.log('🏁 Finalizing session - processing pending syncs');
       
       // Step 1: Flush all pending syncs (process immediately without waiting for debounce)
-      console.log('🔍 Current sync status:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔍 Current sync status:', {
         pendingSyncs: this.syncQueue.size,
         uploadQueueSize: this.uploadQueue.length,
         isProcessing: this.isProcessing
@@ -692,10 +692,10 @@ class TemplateSyncService {
       this.flushPendingSync(templateSlots, photos);
       
       // Step 2: Wait for all uploads to complete
-      console.log('⏳ Waiting for all uploads to complete...');
+      if (process.env.NODE_ENV === 'development') console.log('⏳ Waiting for all uploads to complete...');
       await this.waitForUploads();
       
-      console.log('✅ All templates synced successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ All templates synced successfully');
       
       // Step 3: Clean up templates that are no longer in the session
       await this.cleanupRemovedTemplates(templateSlots);
@@ -705,7 +705,7 @@ class TemplateSyncService {
       this.syncQueue.clear();
       this.uploadQueue = [];
       
-      console.log('🎯 Session finalized - prints folder is ready');
+      if (process.env.NODE_ENV === 'development') console.log('🎯 Session finalized - prints folder is ready');
       
     } catch (error) {
       console.error('❌ Failed to finalize session:', error);
@@ -733,12 +733,12 @@ class TemplateSyncService {
     }
     
     if (templatesToDelete.length > 0) {
-      console.log(`🧹 Cleaning up ${templatesToDelete.length} removed templates`);
+      if (process.env.NODE_ENV === 'development') console.log(`🧹 Cleaning up ${templatesToDelete.length} removed templates`);
       for (const templateId of templatesToDelete) {
         await this.deleteFromDrive(templateId);
       }
     } else {
-      console.log('✅ No templates to clean up');
+      if (process.env.NODE_ENV === 'development') console.log('✅ No templates to clean up');
     }
   }
 
@@ -746,10 +746,10 @@ class TemplateSyncService {
    * Manually trigger processing of the upload queue (for debugging)
    */
   async forceProcessQueue(): Promise<void> {
-    console.log('🔨 Force processing queue manually');
-    console.log('  Queue size:', this.uploadQueue.length);
-    console.log('  Is processing:', this.isProcessing);
-    console.log('  Is initialized:', this.isInitialized);
+    if (process.env.NODE_ENV === 'development') console.log('🔨 Force processing queue manually');
+    if (process.env.NODE_ENV === 'development') console.log('  Queue size:', this.uploadQueue.length);
+    if (process.env.NODE_ENV === 'development') console.log('  Is processing:', this.isProcessing);
+    if (process.env.NODE_ENV === 'development') console.log('  Is initialized:', this.isInitialized);
     
     if (!this.isInitialized) {
       console.error('❌ Cannot process - service not initialized');
@@ -757,12 +757,12 @@ class TemplateSyncService {
     }
     
     if (this.uploadQueue.length === 0) {
-      console.log('📭 Queue is empty, nothing to process');
+      if (process.env.NODE_ENV === 'development') console.log('📭 Queue is empty, nothing to process');
       return;
     }
     
     if (this.isProcessing) {
-      console.log('⚠️ Already processing, forcing isProcessing to false and retrying');
+      if (process.env.NODE_ENV === 'development') console.log('⚠️ Already processing, forcing isProcessing to false and retrying');
       this.isProcessing = false;
     }
     
@@ -807,17 +807,17 @@ class TemplateSyncService {
     // Keep printsFolderId and existingFiles for next session
     // This allows us to reuse the same folder and track existing files
     
-    console.log('🧹 Template sync service cleaned up');
+    if (process.env.NODE_ENV === 'development') console.log('🧹 Template sync service cleaned up');
   }
 }
 
 // Export singleton instance
 export const templateSyncService = new TemplateSyncService();
 
-// Expose to window for debugging
-if (typeof window !== 'undefined') {
+// Expose to window for debugging (development only)
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   (window as any).templateSyncService = templateSyncService;
-  console.log('📝 Template sync service exposed to window for debugging');
-  console.log('  Use window.templateSyncService.getSyncStatus() to check status');
-  console.log('  Use window.templateSyncService.forceProcessQueue() to manually trigger processing');
+  if (process.env.NODE_ENV === 'development') console.log('📝 Template sync service exposed to window for debugging');
+  if (process.env.NODE_ENV === 'development') console.log('  Use window.templateSyncService.getSyncStatus() to check status');
+  if (process.env.NODE_ENV === 'development') console.log('  Use window.templateSyncService.forceProcessQueue() to manually trigger processing');
 }

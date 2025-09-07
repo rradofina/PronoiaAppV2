@@ -137,13 +137,8 @@ const initialLoadingState: LoadingState = {
   progress: undefined,
 };
 
-const createTemplate = async (type: TemplateType): Promise<Template> => {
-  const id = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  const now = new Date();
-  
-  // REMOVED: No hardcoded values - everything comes from database
-  throw new Error('createTemplate is deprecated. Use templateStore.addTemplate() which queries database for configuration.');
-};
+// REMOVED: createTemplate function is deprecated
+// Use templateStore.addTemplate() which queries database for configuration.
 
 const useAppStore = create<AppStore>()(
   devtools(

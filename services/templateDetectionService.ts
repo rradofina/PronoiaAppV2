@@ -74,7 +74,7 @@ export class TemplateDetectionService {
             // Clean up blob URL
             URL.revokeObjectURL(blobUrl);
             
-            console.log(`📐 TEMPLATE ANALYSIS COMPLETE:`, {
+            if (process.env.NODE_ENV === 'development') console.log(`📐 TEMPLATE ANALYSIS COMPLETE:`, {
               filename,
               imageDimensions: { width: img.width, height: img.height },
               holesFound: holes.length,
@@ -149,7 +149,7 @@ export class TemplateDetectionService {
     const ENABLE_PHOTOCARD_DETECTION = false; // Set to true to enable
     
     if (ENABLE_PHOTOCARD_DETECTION && this.isPhotocardLayout(imageData)) {
-      console.log('🎴 Detected photocard layout - using grid-based detection');
+      if (process.env.NODE_ENV === 'development') console.log('🎴 Detected photocard layout - using grid-based detection');
       return this.detectPhotocardHoles(imageData);
     }
     
@@ -172,7 +172,7 @@ export class TemplateDetectionService {
           const holeHeight = preciseBounds.height;
           
           // DEBUG: Log actual vs precise bounds
-          console.log(`🔍 HOLE DETECTION DEBUG:`, {
+          if (process.env.NODE_ENV === 'development') console.log(`🔍 HOLE DETECTION DEBUG:`, {
             roughBounds: { 
               x: bounds.minX, y: bounds.minY, 
               width: bounds.maxX - bounds.minX + 1, 
@@ -209,7 +209,7 @@ export class TemplateDetectionService {
                 height: preciseBounds.height
               };
               
-              console.log(`🎯 Precise hole detected: ${hole.id} at (${hole.x},${hole.y}) size ${hole.width}×${hole.height}px`);
+              if (process.env.NODE_ENV === 'development') console.log(`🎯 Precise hole detected: ${hole.id} at (${hole.x},${hole.y}) size ${hole.width}×${hole.height}px`);
               holes.push(hole);
             }
           }
@@ -275,7 +275,7 @@ export class TemplateDetectionService {
     const edgePlaceholderRatio = edgePlaceholderPixels / edgePixelsToCheck.length;
     const isPhotocard = edgePlaceholderRatio > 0.2 && totalPlaceholderPixels > 100;
     
-    console.log('🎴 Photocard detection:', {
+    if (process.env.NODE_ENV === 'development') console.log('🎴 Photocard detection:', {
       edgePlaceholderPixels,
       totalEdgePixels: edgePixelsToCheck.length,
       edgePlaceholderRatio: edgePlaceholderRatio.toFixed(3),
@@ -315,7 +315,7 @@ export class TemplateDetectionService {
     }
     
     if (bestConfig && bestScore > 0.5) {
-      console.log(`🎯 Best grid configuration: ${bestConfig.rows}x${bestConfig.cols} (score: ${bestScore.toFixed(3)})`);
+      if (process.env.NODE_ENV === 'development') console.log(`🎯 Best grid configuration: ${bestConfig.rows}x${bestConfig.cols} (score: ${bestScore.toFixed(3)})`);
       
       // Create holes based on the best grid
       const cellWidth = width / bestConfig.cols;
@@ -336,7 +336,7 @@ export class TemplateDetectionService {
             height: h
           });
           
-          console.log(`🎴 Photocard hole ${holes.length}: (${x},${y}) ${w}×${h}px`);
+          if (process.env.NODE_ENV === 'development') console.log(`🎴 Photocard hole ${holes.length}: (${x},${y}) ${w}×${h}px`);
         }
       }
     }
@@ -382,7 +382,7 @@ export class TemplateDetectionService {
     }
     
     const score = totalSamples > 0 ? placeholderInCells / totalSamples : 0;
-    console.log(`🧪 Grid ${config.rows}x${config.cols}: ${placeholderInCells}/${totalSamples} = ${score.toFixed(3)}`);
+    if (process.env.NODE_ENV === 'development') console.log(`🧪 Grid ${config.rows}x${config.cols}: ${placeholderInCells}/${totalSamples} = ${score.toFixed(3)}`);
     
     return score;
   }
@@ -462,7 +462,7 @@ export class TemplateDetectionService {
       height: maxY - minY + 1
     };
     
-    console.log(`🎯 PRECISE BOUNDS:`, {
+    if (process.env.NODE_ENV === 'development') console.log(`🎯 PRECISE BOUNDS:`, {
       rough: { 
         x: roughBounds.minX, y: roughBounds.minY, 
         w: roughBounds.maxX - roughBounds.minX + 1, 
@@ -554,7 +554,7 @@ export class TemplateDetectionService {
    * Determine template type based on filename and hole count - using dynamic database configuration
    */
   private async determineTemplateType(holes: TemplateHole[], filename?: string): Promise<string> {
-    console.log('🔍 TEMPLATE TYPE DETECTION:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔍 TEMPLATE TYPE DETECTION:', {
       filename,
       holeCount: holes.length,
       holes: holes.map(h => ({ id: h.id, size: `${h.width}×${h.height}` }))
@@ -563,7 +563,7 @@ export class TemplateDetectionService {
     try {
       // Load available template types from database
       const availableTypes = await templateConfigService.getTemplateTypes();
-      console.log('📋 Available template types from database:', availableTypes);
+      if (process.env.NODE_ENV === 'development') console.log('📋 Available template types from database:', availableTypes);
       
       if (availableTypes.length === 0) {
         console.warn('⚠️ No template types found in database, using generic fallback');
@@ -573,7 +573,7 @@ export class TemplateDetectionService {
       // First try to detect from filename using dynamic keywords
       if (filename) {
         const name = filename.toLowerCase();
-        console.log('📝 Checking filename keywords for:', name);
+        if (process.env.NODE_ENV === 'development') console.log('📝 Checking filename keywords for:', name);
         
         // Check against each available template type and its common keywords
         for (const templateType of availableTypes) {
@@ -581,31 +581,31 @@ export class TemplateDetectionService {
           
           for (const keyword of typeKeywords) {
             if (name.includes(keyword.toLowerCase())) {
-              console.log(`✅ Detected ${templateType.name.toUpperCase()} from filename keyword: ${keyword}`);
+              if (process.env.NODE_ENV === 'development') console.log(`✅ Detected ${templateType.name.toUpperCase()} from filename keyword: ${keyword}`);
               return templateType.name;
             }
           }
         }
         
-        console.log('⚠️ No filename keywords matched available types, falling back to hole count detection');
+        if (process.env.NODE_ENV === 'development') console.log('⚠️ No filename keywords matched available types, falling back to hole count detection');
       }
       
       // Fallback to hole count detection with dynamic types
       const holeCount = holes.length;
-      console.log('🔢 Using hole count detection:', holeCount, 'holes');
+      if (process.env.NODE_ENV === 'development') console.log('🔢 Using hole count detection:', holeCount, 'holes');
       
       // Create a mapping of hole count to most likely template types
       const typeMapping = this.createHoleCountMapping(availableTypes.map(t => t.name), holeCount);
       
       if (typeMapping.length > 0) {
         const detectedType = typeMapping[0]; // Use first (most likely) match
-        console.log(`✅ Detected ${detectedType.toUpperCase()} from hole count mapping`);
+        if (process.env.NODE_ENV === 'development') console.log(`✅ Detected ${detectedType.toUpperCase()} from hole count mapping`);
         return detectedType;
       }
       
       // Final fallback - use first available type
       const fallbackType = availableTypes[0].name;
-      console.log(`⚠️ Using database fallback: ${holeCount} holes → ${fallbackType}`);
+      if (process.env.NODE_ENV === 'development') console.log(`⚠️ Using database fallback: ${holeCount} holes → ${fallbackType}`);
       return fallbackType;
     } catch (error) {
       console.error('❌ Error loading template types from database:', error);
@@ -683,7 +683,7 @@ export class TemplateDetectionService {
       mapping.push(...availableTypes);
     }
     
-    console.log(`🎯 Hole count ${holeCount} mapped to types:`, mapping);
+    if (process.env.NODE_ENV === 'development') console.log(`🎯 Hole count ${holeCount} mapped to types:`, mapping);
     return mapping;
   }
 

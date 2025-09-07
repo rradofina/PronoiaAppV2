@@ -113,19 +113,19 @@ export const useAdminStore = create<AdminState & AdminActions>()(
       
       try {
         
-        console.log('🔍 AdminStore checkAdminAuth:', { 
+        if (process.env.NODE_ENV === 'development') console.log('🔍 AdminStore checkAdminAuth:', { 
           googleAuth, 
           supabaseUser,
           isSignedIn: googleAuth.isSignedIn 
         });
         
         if (!googleAuth.isSignedIn || !supabaseUser) {
-          console.log('❌ Admin auth failed: Not signed in or no Supabase user');
+          if (process.env.NODE_ENV === 'development') console.log('❌ Admin auth failed: Not signed in or no Supabase user');
           set({ isAdminAuthenticated: false, adminUser: null, isCheckingAdminAuth: false });
           return false;
         }
 
-        console.log('🔍 Checking if user is admin for google_id:', supabaseUser.google_id);
+        if (process.env.NODE_ENV === 'development') console.log('🔍 Checking if user is admin for google_id:', supabaseUser.google_id);
         const isAdmin = await supabaseService.isUserAdmin(supabaseUser.google_id);
         
         if (isAdmin) {
@@ -175,7 +175,7 @@ export const useAdminStore = create<AdminState & AdminActions>()(
         if (availableSizes.length > 0) {
           const defaultSize = availableSizes[0].name;
           set({ selectedPrintSize: defaultSize });
-          console.log('📐 Admin store initialized with default print size:', defaultSize);
+          if (process.env.NODE_ENV === 'development') console.log('📐 Admin store initialized with default print size:', defaultSize);
           return defaultSize;
         }
       } catch (error) {

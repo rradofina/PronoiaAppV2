@@ -378,7 +378,7 @@ export class SupabaseService {
         })
         .eq('email', userEmail);
       
-      console.log('✅ Auto-granted admin role to:', userEmail);
+      if (process.env.NODE_ENV === 'development') console.log('✅ Auto-granted admin role to:', userEmail);
     } catch (error) {
       console.error('❌ Failed to auto-grant admin role:', error);
     }

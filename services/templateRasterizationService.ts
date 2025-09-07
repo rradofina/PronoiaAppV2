@@ -123,24 +123,24 @@ class TemplateRasterizationService {
         if (pngDimensions) {
           canvasWidth = pngDimensions.width;
           canvasHeight = pngDimensions.height;
-          console.log('📐 Using PNG natural dimensions:', pngDimensions);
+          if (process.env.NODE_ENV === 'development') console.log('📐 Using PNG natural dimensions:', pngDimensions);
         } else {
           // Fallback to standard print dimensions if PNG dimensions can't be determined
           const expectedDimensions = getPrintSizeDimensions(template.print_size);
           canvasWidth = expectedDimensions.width;
           canvasHeight = expectedDimensions.height;
-          console.log('⚠️ Using fallback print dimensions:', expectedDimensions);
+          if (process.env.NODE_ENV === 'development') console.log('⚠️ Using fallback print dimensions:', expectedDimensions);
         }
       } else {
         // No PNG, use standard print dimensions
         const expectedDimensions = getPrintSizeDimensions(template.print_size);
         canvasWidth = expectedDimensions.width;
         canvasHeight = expectedDimensions.height;
-        console.log('📐 Using standard print dimensions (no PNG):', expectedDimensions);
+        if (process.env.NODE_ENV === 'development') console.log('📐 Using standard print dimensions (no PNG):', expectedDimensions);
       }
       
       // Log dimension information for debugging
-      console.log('📐 Final canvas dimensions:', {
+      if (process.env.NODE_ENV === 'development') console.log('📐 Final canvas dimensions:', {
         width: canvasWidth,
         height: canvasHeight,
         printSize: template.print_size,
@@ -171,7 +171,7 @@ class TemplateRasterizationService {
       const fileName = this.generateFileName(template, settings);
 
       const actualDimensions = { width: canvas.width, height: canvas.height };
-      console.log('✅ Template rasterization completed:', { fileName, blobSize: blob.size, actualDimensions });
+      if (process.env.NODE_ENV === 'development') console.log('✅ Template rasterization completed:', { fileName, blobSize: blob.size, actualDimensions });
       return { blob, fileName, dimensions: actualDimensions, generatedAt: new Date() };
 
     } catch (error) {
@@ -223,7 +223,7 @@ class TemplateRasterizationService {
         pngUrl = `https://lh3.googleusercontent.com/d/${fileId}=w4000`;
       }
 
-      console.log('🔗 Loading PNG template from:', pngUrl);
+      if (process.env.NODE_ENV === 'development') console.log('🔗 Loading PNG template from:', pngUrl);
       const img = await this.loadImage(pngUrl);
       
       // Since canvas is now sized to match PNG, we draw at 1:1 scale
@@ -232,7 +232,7 @@ class TemplateRasterizationService {
       this.templateOffsetX = 0;
       this.templateOffsetY = 0;
       
-      console.log('🎨 Drawing PNG at natural size (1:1 scale):', {
+      if (process.env.NODE_ENV === 'development') console.log('🎨 Drawing PNG at natural size (1:1 scale):', {
         pngSize: { width: img.width, height: img.height },
         canvasSize: { width: canvas.width, height: canvas.height },
         scale: this.templateScale
@@ -278,7 +278,7 @@ class TemplateRasterizationService {
     for (const url of highResUrls) {
       try {
         img = await this.loadImage(url);
-        console.log('✅ Successfully loaded image from:', url);
+        if (process.env.NODE_ENV === 'development') console.log('✅ Successfully loaded image from:', url);
         break;
       } catch (error) {
         console.warn('⚠️ Failed to load from URL, trying next:', url);
@@ -291,7 +291,7 @@ class TemplateRasterizationService {
     }
 
     // Debug slot to hole mapping
-    console.log('🎯 Slot to Hole Mapping:', {
+    if (process.env.NODE_ENV === 'development') console.log('🎯 Slot to Hole Mapping:', {
       slotId: slot.id,
       slotIndex: slot.slotIndex,
       slotTemplateType: slot.templateType,
@@ -322,7 +322,7 @@ class TemplateRasterizationService {
       height: originalHole.height * scaleY
     };
     
-    console.log('🔄 Hole coordinate scaling:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔄 Hole coordinate scaling:', {
       templateDimensions: template.dimensions,
       canvasDimensions: { width: canvas.width, height: canvas.height },
       scaleFactors: { x: scaleX.toFixed(3), y: scaleY.toFixed(3) },
@@ -402,7 +402,7 @@ class TemplateRasterizationService {
       renderedHeight
     );
     
-    console.log('🎨 NATIVE TRANSFORM RASTERIZATION:', {
+    if (process.env.NODE_ENV === 'development') console.log('🎨 NATIVE TRANSFORM RASTERIZATION:', {
       originalImage: { width: img.width, height: img.height },
       hole: { x: hole.x, y: hole.y, width: hole.width, height: hole.height },
       containScale: containScale.toFixed(3),
@@ -511,7 +511,7 @@ class TemplateRasterizationService {
         const dpiY = Math.round(canvas.height / heightInches);
         const targetDPI = Math.min(dpiX, dpiY); // Use smaller to ensure image fits
         
-        console.log('📐 DPI Calculation:', {
+        if (process.env.NODE_ENV === 'development') console.log('📐 DPI Calculation:', {
           canvasSize: `${canvas.width}x${canvas.height}px`,
           physicalSize: `${widthInches}x${heightInches} inches`,
           calculatedDPI: `${dpiX}x${dpiY}`,
@@ -522,7 +522,7 @@ class TemplateRasterizationService {
         // Embed DPI metadata using changedpi
         try {
           const blobWithDPI = await changeDpiBlob(blob, targetDPI);
-          console.log(`✅ DPI metadata embedded: ${targetDPI} DPI for ${widthInches}x${heightInches}" print`);
+          if (process.env.NODE_ENV === 'development') console.log(`✅ DPI metadata embedded: ${targetDPI} DPI for ${widthInches}x${heightInches}" print`);
           resolve(blobWithDPI);
         } catch (dpiError) {
           console.warn('Failed to embed DPI metadata, returning original blob:', dpiError);

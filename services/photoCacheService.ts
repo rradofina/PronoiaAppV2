@@ -43,7 +43,7 @@ class PhotoCacheService {
       cached.lastAccessed = Date.now();
       this.performanceMetrics.cacheHits++;
       if (this.debug) {
-        console.log(`📦 Photo cache HIT for ${photo.name} (cached ${Math.round((Date.now() - cached.downloadTime) / 1000)}s ago)`);
+        if (process.env.NODE_ENV === 'development') console.log(`📦 Photo cache HIT for ${photo.name} (cached ${Math.round((Date.now() - cached.downloadTime) / 1000)}s ago)`);
       }
       return cached.blobUrl;
     }
@@ -54,7 +54,7 @@ class PhotoCacheService {
     const loading = this.loadingQueue.get(photoId);
     if (loading) {
       if (this.debug) {
-        console.log(`⏳ Photo already loading for ${photo.name} (${Math.round((Date.now() - loading.startTime) / 1000)}s elapsed)`);
+        if (process.env.NODE_ENV === 'development') console.log(`⏳ Photo already loading for ${photo.name} (${Math.round((Date.now() - loading.startTime) / 1000)}s elapsed)`);
       }
       return loading.promise;
     }
@@ -88,7 +88,7 @@ class PhotoCacheService {
     if (cached && Date.now() < cached.expiresAt) {
       cached.lastAccessed = Date.now();
       if (this.debug) {
-        console.log(`🔥 PHASE 4 CACHE: Returning cached blob for ${photo.name}:`, cached.blobUrl);
+        if (process.env.NODE_ENV === 'development') console.log(`🔥 PHASE 4 CACHE: Returning cached blob for ${photo.name}:`, cached.blobUrl);
       }
       return cached.blobUrl; // Return cached blob if available
     }
@@ -98,7 +98,7 @@ class PhotoCacheService {
     const bestUrl = getBestPhotoUrl(photo);
 
     if (this.debug) {
-      console.log(`🔥 PHASE 4 CACHE: No cache for ${photo.name}, returning best URL:`, {
+      if (process.env.NODE_ENV === 'development') console.log(`🔥 PHASE 4 CACHE: No cache for ${photo.name}, returning best URL:`, {
         photoId,
         photoName: photo.name,
         bestUrl,
@@ -127,13 +127,13 @@ class PhotoCacheService {
       this.preloadQueue.push(photoId);
       
       if (this.debug) {
-        console.log(`🔄 Preloading photo: ${photo.name}`);
+        if (process.env.NODE_ENV === 'development') console.log(`🔄 Preloading photo: ${photo.name}`);
       }
       
       try {
         await this.getBlobUrl(photo);
         if (this.debug) {
-          console.log(`✅ Preloaded photo: ${photo.name}`);
+          if (process.env.NODE_ENV === 'development') console.log(`✅ Preloaded photo: ${photo.name}`);
         }
       } catch (error) {
         if (this.debug) {
@@ -175,11 +175,11 @@ class PhotoCacheService {
     });
     
     if (photosToPreload.length === 0) {
-      console.log('📦 All photos already cached');
+      if (process.env.NODE_ENV === 'development') console.log('📦 All photos already cached');
       return;
     }
     
-    console.log(`🚀 Batch preloading ${photosToPreload.length} photos with priority: ${priority}`);
+    if (process.env.NODE_ENV === 'development') console.log(`🚀 Batch preloading ${photosToPreload.length} photos with priority: ${priority}`);
     
     let loaded = 0;
     const total = photosToPreload.length;
@@ -213,7 +213,7 @@ class PhotoCacheService {
       }
     }
     
-    console.log(`✅ Batch preload complete: ${loaded}/${total} photos loaded`);
+    if (process.env.NODE_ENV === 'development') console.log(`✅ Batch preload complete: ${loaded}/${total} photos loaded`);
   }
 
   /**
@@ -225,7 +225,7 @@ class PhotoCacheService {
 
     try {
       if (this.debug) {
-        console.log(`🔄 Loading blob for ${photo.name}...`);
+        if (process.env.NODE_ENV === 'development') console.log(`🔄 Loading blob for ${photo.name}...`);
       }
 
       const { googleDriveService } = await import('./googleDriveService');
@@ -253,7 +253,7 @@ class PhotoCacheService {
       this.performanceMetrics.averageLoadTime = this.performanceMetrics.totalLoadTime / this.performanceMetrics.cacheMisses;
 
       if (this.debug) {
-        console.log(`✅ Loaded blob for ${photo.name} in ${downloadTime}ms (avg: ${Math.round(this.performanceMetrics.averageLoadTime)}ms)`);
+        if (process.env.NODE_ENV === 'development') console.log(`✅ Loaded blob for ${photo.name} in ${downloadTime}ms (avg: ${Math.round(this.performanceMetrics.averageLoadTime)}ms)`);
       }
 
       return blobUrl;
@@ -280,7 +280,7 @@ class PhotoCacheService {
         URL.revokeObjectURL(cached.blobUrl);
         this.cache.delete(photoId);
         if (this.debug) {
-          console.log(`🧹 Expired cache entry for photo ${cached.photo.name}`);
+          if (process.env.NODE_ENV === 'development') console.log(`🧹 Expired cache entry for photo ${cached.photo.name}`);
         }
       }
     }
@@ -297,7 +297,7 @@ class PhotoCacheService {
         URL.revokeObjectURL(cached.blobUrl);
         this.cache.delete(photoId);
         if (this.debug) {
-          console.log(`🧹 Removed LRU cache entry for photo ${cached.photo.name}`);
+          if (process.env.NODE_ENV === 'development') console.log(`🧹 Removed LRU cache entry for photo ${cached.photo.name}`);
         }
       }
     }
@@ -313,7 +313,7 @@ class PhotoCacheService {
     this.cache.clear();
     this.preloadQueue.length = 0;
     if (this.debug) {
-      console.log('🧹 Photo cache cleared');
+      if (process.env.NODE_ENV === 'development') console.log('🧹 Photo cache cleared');
     }
   }
 
@@ -348,12 +348,12 @@ class PhotoCacheService {
   logPerformanceStats(): void {
     const stats = this.getCacheStats();
     console.group('📊 Photo Cache Performance Stats');
-    console.log(`Cache Hit Rate: ${stats.cacheHitRate}%`);
-    console.log(`Average Load Time: ${stats.averageLoadTime}ms`);
-    console.log(`Total Requests: ${stats.totalRequests}`);
-    console.log(`Cache Size: ${stats.cacheSize}/${this.maxCacheSize}`);
-    console.log(`Currently Loading: ${stats.loadingCount}`);
-    console.log(`Preload Queue: ${stats.preloadQueueSize}`);
+    if (process.env.NODE_ENV === 'development') console.log(`Cache Hit Rate: ${stats.cacheHitRate}%`);
+    if (process.env.NODE_ENV === 'development') console.log(`Average Load Time: ${stats.averageLoadTime}ms`);
+    if (process.env.NODE_ENV === 'development') console.log(`Total Requests: ${stats.totalRequests}`);
+    if (process.env.NODE_ENV === 'development') console.log(`Cache Size: ${stats.cacheSize}/${this.maxCacheSize}`);
+    if (process.env.NODE_ENV === 'development') console.log(`Currently Loading: ${stats.loadingCount}`);
+    if (process.env.NODE_ENV === 'development') console.log(`Preload Queue: ${stats.preloadQueueSize}`);
     console.groupEnd();
   }
 
@@ -378,8 +378,8 @@ class PhotoCacheService {
 // Export singleton instance
 export const photoCacheService = new PhotoCacheService();
 
-// Make performance functions available globally for console access
-if (typeof window !== 'undefined') {
+// Make performance functions available globally for console access (development only)
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   (window as any).photoCacheStats = () => photoCacheService.logPerformanceStats();
   (window as any).clearPhotoCache = () => photoCacheService.clearCache();
   

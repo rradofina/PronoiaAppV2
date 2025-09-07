@@ -61,7 +61,7 @@ export default function TemplateSelectionModal({
       
       setIsLoading(true);
       try {
-        console.log('🔄 TemplateSelectionModal - Loading templates for print size:', currentTemplate.template.print_size);
+        if (process.env.NODE_ENV === 'development') console.log('🔄 TemplateSelectionModal - Loading templates for print size:', currentTemplate.template.print_size);
         
         // Get all templates with same print size in natural database order
         const printSizeTemplates = await manualTemplateService.getTemplatesByPrintSize(currentTemplate.template.print_size);
@@ -70,7 +70,7 @@ export default function TemplateSelectionModal({
         // Current template will appear in its proper position and be visually distinguished
         const allTemplates = printSizeTemplates;
         
-        console.log('📋 Available templates for', currentTemplate.template.print_size + ':', {
+        if (process.env.NODE_ENV === 'development') console.log('📋 Available templates for', currentTemplate.template.print_size + ':', {
           totalFound: printSizeTemplates.length,
           currentTemplateId: currentTemplate.template.id,
           templateNames: allTemplates.map(t => t.name),
@@ -96,11 +96,11 @@ export default function TemplateSelectionModal({
 
   const handleConfirm = () => {
     if (!selectedTemplate) {
-      console.log('⚠️ No template selected for replacement');
+      if (process.env.NODE_ENV === 'development') console.log('⚠️ No template selected for replacement');
       return;
     }
 
-    console.log('🔄 SIMPLE TEMPLATE CONFIRM:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔄 SIMPLE TEMPLATE CONFIRM:', {
       selectedTemplateId: selectedTemplate.id,
       selectedTemplateName: selectedTemplate.name,
       currentTemplateId: currentTemplate.template.id,

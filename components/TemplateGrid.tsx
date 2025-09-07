@@ -107,7 +107,7 @@ function TemplateGrid({
   // Cover Flow navigation
   const navigateToTemplate = (index: number) => {
     if (isEditingMode) {
-      console.log('🚫 Template navigation blocked - editing in progress');
+      if (process.env.NODE_ENV === 'development') console.log('🚫 Template navigation blocked - editing in progress');
       return;
     }
     if (index >= 0 && index < templateGroups.length) {
@@ -117,7 +117,7 @@ function TemplateGrid({
       // Notify parent of template change
       if (onTemplateChange && index !== oldIndex) {
         const newTemplate = templateGroups[index];
-        console.log('📱 Template navigation - notifying parent:', {
+        if (process.env.NODE_ENV === 'development') console.log('📱 Template navigation - notifying parent:', {
           fromIndex: oldIndex,
           toIndex: index,
           templateId: newTemplate.templateId,
@@ -169,7 +169,7 @@ function TemplateGrid({
       const targetIndex = templateGroups.findIndex(group => group.templateId === templateToNavigate);
       
       if (targetIndex !== -1 && targetIndex !== currentIndex) {
-        console.log('🚀 Auto-navigating to newly added template:', {
+        if (process.env.NODE_ENV === 'development') console.log('🚀 Auto-navigating to newly added template:', {
           templateId: templateToNavigate,
           targetIndex,
           currentIndex
@@ -391,7 +391,7 @@ function TemplateGrid({
                   <button
                     onClick={() => {
                       if (isEditingMode) {
-                        console.log('🚫 Download blocked - editing in progress');
+                        if (process.env.NODE_ENV === 'development') console.log('🚫 Download blocked - editing in progress');
                         return;
                       }
                       onDownloadTemplate({ templateId, templateName, slots });
@@ -412,7 +412,7 @@ function TemplateGrid({
                   <button
                     onClick={() => {
                       if (isEditingMode) {
-                        console.log('🚫 Template swap blocked - editing in progress');
+                        if (process.env.NODE_ENV === 'development') console.log('🚫 Template swap blocked - editing in progress');
                         return;
                       }
                       onSwapTemplate({ templateId, templateName, slots }, index);
@@ -430,7 +430,7 @@ function TemplateGrid({
                   <button
                     onClick={() => {
                       if (isEditingMode) {
-                        console.log('🚫 Template delete blocked - editing in progress');
+                        if (process.env.NODE_ENV === 'development') console.log('🚫 Template delete blocked - editing in progress');
                         return;
                       }
                       onDeleteTemplate(templateId);
@@ -472,7 +472,7 @@ function TemplateGrid({
             <button
               onClick={() => {
                 if (isEditingMode) {
-                  console.log('🚫 Previous template blocked - editing in progress');
+                  if (process.env.NODE_ENV === 'development') console.log('🚫 Previous template blocked - editing in progress');
                   return;
                 }
                 navigateToTemplate(currentIndex - 1);
@@ -493,7 +493,7 @@ function TemplateGrid({
             <button
               onClick={() => {
                 if (isEditingMode) {
-                  console.log('🚫 Next template blocked - editing in progress');
+                  if (process.env.NODE_ENV === 'development') console.log('🚫 Next template blocked - editing in progress');
                   return;
                 }
                 navigateToTemplate(currentIndex + 1);

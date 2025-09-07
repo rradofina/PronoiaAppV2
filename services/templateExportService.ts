@@ -27,7 +27,7 @@ class TemplateExportServiceImpl implements ITemplateExportService {
    * Export a single template by ID
    */
   async exportSingleTemplate(id: string, options: Partial<TemplateExportOptions> = {}): Promise<Blob> {
-    console.log('📤 Exporting single template:', id);
+    if (process.env.NODE_ENV === 'development') console.log('📤 Exporting single template:', id);
     
     const template = await this.getTemplateById(id);
     if (!template) {
@@ -42,7 +42,7 @@ class TemplateExportServiceImpl implements ITemplateExportService {
    * Export all templates of a specific type
    */
   async exportTemplatesByType(type: TemplateType, options: Partial<TemplateExportOptions> = {}): Promise<Blob> {
-    console.log('📤 Exporting templates by type:', type);
+    if (process.env.NODE_ENV === 'development') console.log('📤 Exporting templates by type:', type);
     
     const templates = await this.getTemplatesByFilters({ templateTypes: [type], ...options });
     const exportedTemplates = await Promise.all(
@@ -56,7 +56,7 @@ class TemplateExportServiceImpl implements ITemplateExportService {
    * Export all templates of a specific print size
    */
   async exportTemplatesBySize(size: PrintSize, options: Partial<TemplateExportOptions> = {}): Promise<Blob> {
-    console.log('📤 Exporting templates by size:', size);
+    if (process.env.NODE_ENV === 'development') console.log('📤 Exporting templates by size:', size);
     
     const templates = await this.getTemplatesByFilters({ printSizes: [size], ...options });
     const exportedTemplates = await Promise.all(
@@ -70,7 +70,7 @@ class TemplateExportServiceImpl implements ITemplateExportService {
    * Export all templates
    */
   async exportAllTemplates(options: Partial<TemplateExportOptions> = {}): Promise<Blob> {
-    console.log('📤 Exporting all templates');
+    if (process.env.NODE_ENV === 'development') console.log('📤 Exporting all templates');
     
     const templates = await this.getTemplatesByFilters(options);
     const exportedTemplates = await Promise.all(
@@ -104,7 +104,7 @@ class TemplateExportServiceImpl implements ITemplateExportService {
    * Import templates from exported file
    */
   async importFromExport(file: File): Promise<TemplateImportResult> {
-    console.log('📥 Importing templates from file:', file.name);
+    if (process.env.NODE_ENV === 'development') console.log('📥 Importing templates from file:', file.name);
     
     const result: TemplateImportResult = {
       success: false,
@@ -167,7 +167,7 @@ class TemplateExportServiceImpl implements ITemplateExportService {
       }
 
       result.success = result.errorCount === 0;
-      console.log('📥 Import completed:', result);
+      if (process.env.NODE_ENV === 'development') console.log('📥 Import completed:', result);
       return result;
 
     } catch (error) {

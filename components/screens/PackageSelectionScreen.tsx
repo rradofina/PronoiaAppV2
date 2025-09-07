@@ -44,7 +44,7 @@ export default function PackageSelectionScreen({
           if (packageWithTemplates && packageWithTemplates.templates) {
             setTemplates(packageWithTemplates.templates);
             setOriginalTemplateCount(packageWithTemplates.templates.length); // Track original count
-            console.log('✅ Loaded templates for package:', packageWithTemplates.templates.length);
+            if (process.env.NODE_ENV === 'development') console.log('✅ Loaded templates for package:', packageWithTemplates.templates.length);
           } else {
             setTemplates([]);
             setOriginalTemplateCount(0);
@@ -137,7 +137,7 @@ export default function PackageSelectionScreen({
                   _isFromAddition: index >= originalTemplateCount
                 }));
                 // Pass the current templates (including added ones) to handlePackageContinue
-                console.log('📋 Continuing with templates:', templates.length, `(${originalTemplateCount} original, ${templates.length - originalTemplateCount} additional)`);
+                if (process.env.NODE_ENV === 'development') console.log('📋 Continuing with templates:', templates.length, `(${originalTemplateCount} original, ${templates.length - originalTemplateCount} additional)`);
                 handlePackageContinue(templatesWithFlags);
               }}
               onChangePackage={handleBackWithConfirmation}
@@ -148,18 +148,18 @@ export default function PackageSelectionScreen({
                 const updatedTemplates = [...templates];
                 updatedTemplates[templateIndex] = newTemplate;
                 setTemplates(updatedTemplates);
-                console.log('✅ Template replaced at index:', templateIndex, 'with:', newTemplate.name);
+                if (process.env.NODE_ENV === 'development') console.log('✅ Template replaced at index:', templateIndex, 'with:', newTemplate.name);
               }}
               onTemplateAdd={(template) => {
                 // Add the new template to the list
                 const newTemplates = [...templates, template];
                 setTemplates(newTemplates);
-                console.log('✅ Template added:', template.name);
+                if (process.env.NODE_ENV === 'development') console.log('✅ Template added:', template.name);
               }}
               onTemplateDelete={(templateIndex) => {
                 // Remove the template at the specified index
                 setTemplates(templates.filter((_, index) => index !== templateIndex));
-                console.log('Template deleted at index:', templateIndex);
+                if (process.env.NODE_ENV === 'development') console.log('Template deleted at index:', templateIndex);
               }}
             />
           </>

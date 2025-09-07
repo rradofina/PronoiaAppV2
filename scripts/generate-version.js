@@ -42,7 +42,7 @@ const generateVersion = () => {
   
   fs.writeFileSync(swPath, swContent);
 
-  console.log('✅ Version generated:', version);
+  if (process.env.NODE_ENV === 'development') console.log('✅ Version generated:', version);
   return version;
 };
 

@@ -34,12 +34,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
-  // Return script to set tokens in localStorage and redirect
+  // Return script to set tokens in localStorage and redirect - escape tokens to prevent XSS
   res.send(`
     <script>
-      localStorage.setItem('google_access_token', '${data.access_token}');
-      localStorage.setItem('google_refresh_token', '${data.refresh_token}');
-      localStorage.setItem('google_token_expiry', ${Date.now() + data.expires_in * 1000});
+      localStorage.setItem('google_access_token', ${JSON.stringify(data.access_token)});
+      localStorage.setItem('google_refresh_token', ${JSON.stringify(data.refresh_token || '')});
+      localStorage.setItem('google_token_expiry', ${Date.now() + (data.expires_in || 3600) * 1000});
       window.location.href = '/';
     </script>
   `);

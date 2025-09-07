@@ -32,11 +32,11 @@ const useAuthStore = create<AuthStore>()(
             const { googleAuth } = get();
             
             if (!googleAuth.isSignedIn || !googleUserInfo) {
-              console.log('🔄 Not syncing - not signed in or no user info');
+              if (process.env.NODE_ENV === 'development') console.log('🔄 Not syncing - not signed in or no user info');
               return;
             }
 
-            console.log('🔄 Syncing user with Supabase:', googleUserInfo.email);
+            if (process.env.NODE_ENV === 'development') console.log('🔄 Syncing user with Supabase:', googleUserInfo.email);
 
             // Create or update user in Supabase
             const userData = {
@@ -49,7 +49,7 @@ const useAuthStore = create<AuthStore>()(
             const supabaseUser = await supabaseService.createOrUpdateUser(userData);
             set({ supabaseUser: supabaseUser as SupabaseUser });
             
-            console.log('✅ Successfully synced with Supabase:', supabaseUser.email);
+            if (process.env.NODE_ENV === 'development') console.log('✅ Successfully synced with Supabase:', supabaseUser.email);
           } catch (error) {
             console.warn('⚠️ Supabase sync failed (app will continue without database features):', error);
             // Don't throw - keep the app working even if Supabase fails

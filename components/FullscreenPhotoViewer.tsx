@@ -159,7 +159,7 @@ export default function FullscreenPhotoViewer({
         img.src = highResUrl;
         img.onload = () => {
           imageCache.current.set(photoToPreload.id, { url: highResUrl, loaded: true });
-          console.log(`✅ Preloaded high-res: ${photoToPreload.name}`);
+          if (process.env.NODE_ENV === 'development') console.log(`✅ Preloaded high-res: ${photoToPreload.name}`);
         };
         preloadedImages.current.set(photoToPreload.id, img);
         photoCacheService.preloadPhoto(photoToPreload);
@@ -235,7 +235,7 @@ export default function FullscreenPhotoViewer({
     const newIndex = currentPhotoIndex > 0 ? currentPhotoIndex - 1 : photos.length - 1;
     // Ensure the new index is valid before updating
     if (newIndex >= 0 && newIndex < photos.length && photos[newIndex]) {
-      console.log(`📸 Previous: ${currentPhotoIndex} → ${newIndex} (${photos[newIndex]?.name || 'unknown'})`);
+      if (process.env.NODE_ENV === 'development') console.log(`📸 Previous: ${currentPhotoIndex} → ${newIndex} (${photos[newIndex]?.name || 'unknown'})`);
       setCurrentPhotoIndex(newIndex);
     } else {
       console.error('Invalid previous index:', newIndex);
@@ -246,7 +246,7 @@ export default function FullscreenPhotoViewer({
     const newIndex = currentPhotoIndex < photos.length - 1 ? currentPhotoIndex + 1 : 0;
     // Ensure the new index is valid before updating
     if (newIndex >= 0 && newIndex < photos.length && photos[newIndex]) {
-      console.log(`📸 Next: ${currentPhotoIndex} → ${newIndex} (${photos[newIndex]?.name || 'unknown'})`);
+      if (process.env.NODE_ENV === 'development') console.log(`📸 Next: ${currentPhotoIndex} → ${newIndex} (${photos[newIndex]?.name || 'unknown'})`);
       setCurrentPhotoIndex(newIndex);
     } else {
       console.error('Invalid next index:', newIndex);
@@ -441,7 +441,7 @@ export default function FullscreenPhotoViewer({
             e.stopPropagation();
             // Don't allow navigation when zoomed
             if (isZoomed) return;
-            console.log('🔙 Previous button clicked');
+            if (process.env.NODE_ENV === 'development') console.log('🔙 Previous button clicked');
             handlePrevious();
           }}
           className={`absolute left-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg ${isDimmed || isSwiping || isZoomed ? 'opacity-30 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
@@ -497,7 +497,7 @@ export default function FullscreenPhotoViewer({
             e.stopPropagation();
             // Don't allow navigation when zoomed
             if (isZoomed) return;
-            console.log('➡️ Next button clicked');
+            if (process.env.NODE_ENV === 'development') console.log('➡️ Next button clicked');
             handleNext();
           }}
           className={`absolute right-4 top-1/2 transform -translate-y-1/2 z-50 bg-black bg-opacity-70 text-white rounded-full p-3 hover:bg-opacity-90 active:bg-opacity-100 transition-all shadow-lg ${isDimmed || isSwiping || isZoomed ? 'opacity-30 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}

@@ -43,7 +43,7 @@ class AdminServiceImpl {
    */
   async updateUserRole(userId: string, role: 'admin' | 'super_admin' | null): Promise<void> {
     try {
-      console.log(`🔄 Updating user role: ${userId} to ${role}`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Updating user role: ${userId} to ${role}`);
 
       const updates: any = {
         preferences: role 
@@ -61,7 +61,7 @@ class AdminServiceImpl {
         throw new Error(`Failed to update user role: ${error.message}`);
       }
 
-      console.log(`✅ User role updated successfully`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ User role updated successfully`);
     } catch (error) {
       console.error(`❌ Error updating user role:`, error);
       throw error;
@@ -78,7 +78,7 @@ class AdminServiceImpl {
     }
     
     try {
-      console.log(`🔄 Updating user role by email: ${email} to ${role}`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Updating user role by email: ${email} to ${role}`);
 
       const updates: any = {
         preferences: role 
@@ -96,7 +96,7 @@ class AdminServiceImpl {
         throw new Error(`Failed to update user role: ${error.message}`);
       }
 
-      console.log(`✅ User role updated successfully`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ User role updated successfully`);
     } catch (error) {
       console.error(`❌ Error updating user role by email:`, error);
       throw error;
@@ -165,7 +165,7 @@ class AdminServiceImpl {
     }
 
     try {
-      console.log(`🔄 Creating user: ${userData.email}`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Creating user: ${userData.email}`);
 
       const newUser = {
         email: userData.email,
@@ -185,7 +185,7 @@ class AdminServiceImpl {
         throw new Error(`Failed to create user: ${error.message}`);
       }
 
-      console.log(`✅ User created successfully:`, data);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ User created successfully:`, data);
       return data as User;
     } catch (error) {
       console.error('❌ Error creating user:', error);

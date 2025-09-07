@@ -5,6 +5,11 @@ import { supabase } from '../../../lib/supabase/client';
 // After granting admin access, this endpoint should be removed or secured
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Security: Only allow in development or with specific production override
+  if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_ADMIN_SETUP) {
+    return res.status(404).json({ error: 'Endpoint not available' });
+  }
+
   // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -27,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    console.log('🔍 Admin Setup API: Looking for user with email:', email);
+    if (process.env.NODE_ENV === 'development') console.log('🔍 Admin Setup API: Looking for user with email:', email);
 
     // Find user by email
     const { data: users, error: usersError } = await supabase
@@ -48,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const user = users[0];
-    console.log('✅ Found user:', user.email);
+    if (process.env.NODE_ENV === 'development') console.log('✅ Found user:', user.email);
 
     // Update user to admin
     const { data: updatedUser, error: updateError } = await supabase
@@ -68,7 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'Failed to grant admin privileges' });
     }
 
-    console.log('🎉 Admin privileges granted to:', user.email);
+    if (process.env.NODE_ENV === 'development') console.log('🎉 Admin privileges granted to:', user.email);
 
     return res.status(200).json({
       success: true,

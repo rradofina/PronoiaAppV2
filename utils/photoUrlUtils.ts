@@ -32,7 +32,7 @@ const DEBUG_URL_QUALITY = getDebugMode();
 export function enablePhotoUrlDebug(): void {
   if (typeof window !== 'undefined') {
     localStorage.setItem('debugPhotoUrls', 'true');
-    console.log('🔧 Photo URL debug mode enabled. Reload the page to see detailed logging.');
+    if (process.env.NODE_ENV === 'development') console.log('🔧 Photo URL debug mode enabled. Reload the page to see detailed logging.');
   }
 }
 
@@ -43,7 +43,7 @@ export function enablePhotoUrlDebug(): void {
 export function disablePhotoUrlDebug(): void {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('debugPhotoUrls');
-    console.log('🔇 Photo URL debug mode disabled. Reload the page to stop detailed logging.');
+    if (process.env.NODE_ENV === 'development') console.log('🔇 Photo URL debug mode disabled. Reload the page to stop detailed logging.');
   }
 }
 
@@ -53,14 +53,14 @@ export function disablePhotoUrlDebug(): void {
  */
 export function showPhotoUrlDebugStatus(): void {
   const isEnabled = getDebugMode();
-  console.log(`📊 Photo URL Debug Status: ${isEnabled ? 'ENABLED' : 'DISABLED'}`);
-  console.log('To enable:  enablePhotoUrlDebug()');
-  console.log('To disable: disablePhotoUrlDebug()');
-  console.log('Or add ?debugPhotos=true to URL for temporary debugging');
+  if (process.env.NODE_ENV === 'development') console.log(`📊 Photo URL Debug Status: ${isEnabled ? 'ENABLED' : 'DISABLED'}`);
+  if (process.env.NODE_ENV === 'development') console.log('To enable:  enablePhotoUrlDebug()');
+  if (process.env.NODE_ENV === 'development') console.log('To disable: disablePhotoUrlDebug()');
+  if (process.env.NODE_ENV === 'development') console.log('Or add ?debugPhotos=true to URL for temporary debugging');
 }
 
-// Make debug functions available globally for console access
-if (typeof window !== 'undefined') {
+// Make debug functions available globally for console access (development only)
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   (window as any).enablePhotoUrlDebug = enablePhotoUrlDebug;
   (window as any).disablePhotoUrlDebug = disablePhotoUrlDebug;
   (window as any).showPhotoUrlDebugStatus = showPhotoUrlDebugStatus;
@@ -77,7 +77,7 @@ function analyzePhotoUrlQuality(photo: Photo, context: string = ''): void {
   // Analyze main URL
   if (photo.url) {
     const urlInfo = analyzeUrl(photo.url, 'main URL');
-    console.log('📄 Main URL:', urlInfo);
+    if (process.env.NODE_ENV === 'development') console.log('📄 Main URL:', urlInfo);
   } else {
     console.warn('❌ No main URL available');
   }
@@ -85,14 +85,14 @@ function analyzePhotoUrlQuality(photo: Photo, context: string = ''): void {
   // Analyze thumbnail URL
   if (photo.thumbnailUrl) {
     const thumbnailInfo = analyzeUrl(photo.thumbnailUrl, 'thumbnail URL');
-    console.log('🖼️ Thumbnail URL:', thumbnailInfo);
+    if (process.env.NODE_ENV === 'development') console.log('🖼️ Thumbnail URL:', thumbnailInfo);
   } else {
     console.warn('❌ No thumbnail URL available');
   }
   
   // Analyze Google Drive ID
   if (photo.googleDriveId) {
-    console.log('☁️ Google Drive ID:', photo.googleDriveId);
+    if (process.env.NODE_ENV === 'development') console.log('☁️ Google Drive ID:', photo.googleDriveId);
   } else {
     console.warn('❌ No Google Drive ID available');
   }
@@ -199,7 +199,7 @@ function sortUrlsByQuality(urls: string[]): string[] {
   });
   
   if (DEBUG_URL_QUALITY) {
-    console.log('🏆 URL Quality Ranking:', urlsWithScores.map((item, index) => ({
+    if (process.env.NODE_ENV === 'development') console.log('🏆 URL Quality Ranking:', urlsWithScores.map((item, index) => ({
       rank: index + 1,
       score: item.analysis.score,
       quality: item.analysis.quality,
@@ -298,7 +298,7 @@ export function getHighResPhotoUrls(photo: Photo): string[] {
   const finalUrls = sortUrlsByQuality(filteredUrls);
   
   if (DEBUG_URL_QUALITY) {
-    console.log(`📋 Generated ${finalUrls.length} high-res URLs for ${photo.name}:`);
+    if (process.env.NODE_ENV === 'development') console.log(`📋 Generated ${finalUrls.length} high-res URLs for ${photo.name}:`);
   }
   
   return finalUrls;
@@ -345,7 +345,7 @@ export function getBestPhotoUrl(photo: Photo): string {
   const bestUrl = urls[0] || photo.url || photo.thumbnailUrl || '';
   
   if (DEBUG_URL_QUALITY) {
-    console.log(`🎯 Best Photo URL selected for ${photo.name}:`, {
+    if (process.env.NODE_ENV === 'development') console.log(`🎯 Best Photo URL selected for ${photo.name}:`, {
       selectedUrl: bestUrl.substring(0, 80) + '...',
       analysis: analyzeUrl(bestUrl, 'best URL'),
       totalOptions: urls.length
@@ -366,7 +366,7 @@ export function getBestGridPhotoUrl(photo: Photo): string {
   const bestUrl = urls[0] || photo.url || photo.thumbnailUrl || '';
   
   if (DEBUG_URL_QUALITY) {
-    console.log(`📊 Grid Photo URL selected for ${photo.name}:`, {
+    if (process.env.NODE_ENV === 'development') console.log(`📊 Grid Photo URL selected for ${photo.name}:`, {
       selectedUrl: bestUrl.substring(0, 80) + '...',
       analysis: analyzeUrl(bestUrl, 'grid URL'),
       totalOptions: urls.length

@@ -129,10 +129,6 @@ export const DEFAULTS = {
 
 // REMOVED: Photo slot calculations are now pure database-driven
 // Use templateConfigService.getPhotoSlots() instead
-// This function is deprecated and should not be used
-export const calculatePhotoSlots = () => {
-  throw new Error('calculatePhotoSlots is deprecated. Use templateConfigService.getPhotoSlots() instead.');
-};
 
 // Validation functions
 // Package validation moved to manual package service

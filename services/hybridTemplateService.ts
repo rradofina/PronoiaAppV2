@@ -45,16 +45,16 @@ class HybridTemplateServiceImpl {
    */
   async getAllTemplates(forceRefresh = false): Promise<HybridTemplate[]> {
     if (!forceRefresh && this.isCacheValid()) {
-      console.log('📦 Using cached hybrid templates');
+      if (process.env.NODE_ENV === 'development') console.log('📦 Using cached hybrid templates');
       return this.cache;
     }
 
     try {
-      console.log('🔄 Loading hybrid templates (manual + auto)...');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 Loading hybrid templates (manual + auto)...');
       
       // Load manual templates first
       const manualTemplates = await manualTemplateService.getActiveTemplates();
-      console.log(`📋 HYBRID SERVICE - Manual templates loaded:`, {
+      if (process.env.NODE_ENV === 'development') console.log(`📋 HYBRID SERVICE - Manual templates loaded:`, {
         count: manualTemplates.length,
         types: manualTemplates.map(t => `${t.name} (${t.template_type})`),
         driveFileIds: manualTemplates.map(t => t.drive_file_id)
@@ -62,7 +62,7 @@ class HybridTemplateServiceImpl {
 
       // Load auto-detected templates
       const autoTemplates = await pngTemplateService.loadTemplates();
-      console.log(`🤖 HYBRID SERVICE - Auto templates loaded:`, {
+      if (process.env.NODE_ENV === 'development') console.log(`🤖 HYBRID SERVICE - Auto templates loaded:`, {
         count: autoTemplates.length,
         types: autoTemplates.map(t => `${t.name} (${t.templateType})`),
         driveFileIds: autoTemplates.map(t => t.driveFileId || t.id)
@@ -78,7 +78,7 @@ class HybridTemplateServiceImpl {
         !manualDriveFileIds.has(autoTemplate.drive_file_id)
       );
 
-      console.log(`🔀 HYBRID SERVICE - Filtering auto templates:`, {
+      if (process.env.NODE_ENV === 'development') console.log(`🔀 HYBRID SERVICE - Filtering auto templates:`, {
         manualDriveFileIds: Array.from(manualDriveFileIds),
         autoTemplatesBeforeFilter: hybridAuto.length,
         autoTemplatesAfterFilter: filteredAuto.length,
@@ -90,7 +90,7 @@ class HybridTemplateServiceImpl {
       this.cache = [...hybridManual, ...filteredAuto];
       this.lastSync = new Date();
 
-      console.log(`✅ HYBRID SERVICE - Final combined result:`, {
+      if (process.env.NODE_ENV === 'development') console.log(`✅ HYBRID SERVICE - Final combined result:`, {
         totalTemplates: this.cache.length,
         manualCount: hybridManual.length,
         autoCount: filteredAuto.length,
@@ -107,7 +107,7 @@ class HybridTemplateServiceImpl {
         return acc;
       }, {} as Record<string, number>);
       
-      console.log('📊 Hybrid template type distribution:', {
+      if (process.env.NODE_ENV === 'development') console.log('📊 Hybrid template type distribution:', {
         typeDistribution,
         totalTemplates: this.cache.length,
         templateDetails: this.cache.map(t => ({
@@ -218,7 +218,7 @@ class HybridTemplateServiceImpl {
   clearCache(): void {
     this.cache = [];
     this.lastSync = null;
-    console.log('🗑️ Hybrid template cache cleared');
+    if (process.env.NODE_ENV === 'development') console.log('🗑️ Hybrid template cache cleared');
   }
 
   /**

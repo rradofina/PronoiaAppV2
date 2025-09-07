@@ -12,7 +12,7 @@ async function generateIcons() {
     
     // Check if logo exists
     if (!fs.existsSync(logoPath)) {
-      console.log('Logo not found. Creating placeholder icons...');
+      if (process.env.NODE_ENV === 'development') console.log('Logo not found. Creating placeholder icons...');
       
       // Create placeholder icons with "P" letter in circle
       for (const size of sizes) {
@@ -59,7 +59,7 @@ async function generateIcons() {
         const buffer = canvas.toBuffer('image/png');
         const outputPath = path.join(__dirname, `../public/icons/icon-${size}x${size}.png`);
         fs.writeFileSync(outputPath, buffer);
-        console.log(`Created circular icon: ${size}x${size}`);
+        if (process.env.NODE_ENV === 'development') console.log(`Created circular icon: ${size}x${size}`);
       }
     } else {
       // Use existing logo
@@ -105,11 +105,11 @@ async function generateIcons() {
         const buffer = canvas.toBuffer('image/png');
         const outputPath = path.join(__dirname, `../public/icons/icon-${size}x${size}.png`);
         fs.writeFileSync(outputPath, buffer);
-        console.log(`Generated circular icon: ${size}x${size}`);
+        if (process.env.NODE_ENV === 'development') console.log(`Generated circular icon: ${size}x${size}`);
       }
     }
     
-    console.log('All circular icons generated successfully!');
+    if (process.env.NODE_ENV === 'development') console.log('All circular icons generated successfully!');
   } catch (error) {
     console.error('Error generating icons:', error);
   }

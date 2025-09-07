@@ -56,7 +56,7 @@ function templateReducer(state: TemplateState, action: TemplateAction): Template
     
     case 'INVALIDATE_BASE_TEMPLATES':
       const { [action.packageId]: removed, ...remainingBase } = state.basePackageTemplates;
-      console.log('🗑️ INVALIDATING BASE TEMPLATE CACHE for package:', {
+      if (process.env.NODE_ENV === 'development') console.log('🗑️ INVALIDATING BASE TEMPLATE CACHE for package:', {
         packageId: action.packageId,
         removedTemplatesCount: removed?.length || 0,
         remainingPackages: Object.keys(remainingBase)
@@ -83,7 +83,7 @@ function templateReducer(state: TemplateState, action: TemplateAction): Template
       
       const currentOverrides = state.sessionOverrides[action.packageId] || { replacements: {}, additions: [] };
       
-      console.log('🔄 SESSION-BASED TEMPLATE REPLACEMENT:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔄 SESSION-BASED TEMPLATE REPLACEMENT:', {
         packageId: action.packageId,
         templateIndex: action.templateIndex,
         oldTemplate: {
@@ -113,7 +113,7 @@ function templateReducer(state: TemplateState, action: TemplateAction): Template
     case 'ADD_TEMPLATE_TO_SESSION':
       const currentSessionOverrides = state.sessionOverrides[action.packageId] || { replacements: {}, additions: [] };
       
-      console.log('➕ SESSION-BASED TEMPLATE ADDITION:', {
+      if (process.env.NODE_ENV === 'development') console.log('➕ SESSION-BASED TEMPLATE ADDITION:', {
         packageId: action.packageId,
         newTemplate: {
           id: action.template.id,
@@ -154,7 +154,7 @@ function templateReducer(state: TemplateState, action: TemplateAction): Template
         return state;
       }
       
-      console.log('🗑️ SESSION-BASED TEMPLATE DELETION:', {
+      if (process.env.NODE_ENV === 'development') console.log('🗑️ SESSION-BASED TEMPLATE DELETION:', {
         packageId: action.packageId,
         templateIndex: action.templateIndex,
         additionIndex,
@@ -280,19 +280,19 @@ const transformGoogleDriveImageUrl = (photo: any, size: string = 's100'): string
   if (photo.googleDriveId || photo.id) {
     const fileId = photo.googleDriveId || photo.id;
     const transformedUrl = `https://lh3.googleusercontent.com/d/${fileId}=${size}`;
-    console.log(`🔄 Transformed URL for ${photo.name}: ${transformedUrl}`);
+    if (process.env.NODE_ENV === 'development') console.log(`🔄 Transformed URL for ${photo.name}: ${transformedUrl}`);
     return transformedUrl;
   }
   
   // Fallback to thumbnail URL with size adjustment
   if (photo.thumbnailUrl) {
     const fallbackUrl = photo.thumbnailUrl.replace('=s220', `=${size}`);
-    console.log(`📷 Fallback URL for ${photo.name}: ${fallbackUrl}`);
+    if (process.env.NODE_ENV === 'development') console.log(`📷 Fallback URL for ${photo.name}: ${fallbackUrl}`);
     return fallbackUrl;
   }
   
   // Last resort: use regular URL
-  console.log(`⚠️ Using regular URL for ${photo.name}: ${photo.url}`);
+  if (process.env.NODE_ENV === 'development') console.log(`⚠️ Using regular URL for ${photo.name}: ${photo.url}`);
   return photo.url || '';
 };
 
@@ -313,9 +313,9 @@ function FolderCard({
   useEffect(() => {
     const fetchFolderImages = async () => {
       try {
-        console.log(`📁 Fetching images for folder: ${folder.name}`);
+        if (process.env.NODE_ENV === 'development') console.log(`📁 Fetching images for folder: ${folder.name}`);
         const photos = await googleDriveService.getPhotosFromFolder(folder.id);
-        console.log(`📸 Found ${photos.length} photos in ${folder.name}`);
+        if (process.env.NODE_ENV === 'development') console.log(`📸 Found ${photos.length} photos in ${folder.name}`);
         
         if (photos.length > 0) {
           // Get first photo for main thumbnail
@@ -327,7 +327,7 @@ function FolderCard({
           const previewPhotos = photos.slice(0, 3).map(photo => 
             transformGoogleDriveImageUrl(photo, 's100')
           );
-          console.log(`🖼️ Preview URLs for ${folder.name}:`, previewPhotos);
+          if (process.env.NODE_ENV === 'development') console.log(`🖼️ Preview URLs for ${folder.name}:`, previewPhotos);
           setPreviewImages(previewPhotos);
         }
       } catch (error) {
@@ -466,14 +466,14 @@ export default function FolderSelectionScreen({
       // If this is the initial load (not a manual refresh), retry up to 5 times
       if (!forceRefresh && retryCount < 5) {
         setTimeout(() => {
-          console.log(`Retrying folder load (attempt ${retryCount + 1}/5)...`);
+          if (process.env.NODE_ENV === 'development') console.log(`Retrying folder load (attempt ${retryCount + 1}/5)...`);
           loadFolders(parentId, forceRefresh, retryCount + 1);
         }, 1000); // Wait 1 second before retry
         return;
       }
       
       // If we've exhausted retries or this is a manual refresh that failed
-      console.log('Google API not ready after retries, using cached client folders');
+      if (process.env.NODE_ENV === 'development') console.log('Google API not ready after retries, using cached client folders');
       setCurrentFolders(clientFolders);
       setIsLoadingFolders(false);
       return;
@@ -488,7 +488,7 @@ export default function FolderSelectionScreen({
         // Load folders from the main folder
         const mainFolderId = selectedMainFolder?.id;
         if (!mainFolderId) {
-          console.log('No main folder ID, falling back to client folders prop');
+          if (process.env.NODE_ENV === 'development') console.log('No main folder ID, falling back to client folders prop');
           // If we're refreshing, try to reload from Google Drive anyway
           if (forceRefresh && selectedMainFolder) {
             const response = await window.gapi.client.drive.files.list({
@@ -500,7 +500,7 @@ export default function FolderSelectionScreen({
               supportsAllDrives: true
             });
             const freshFolders = response.result.files || [];
-            console.log(`Refreshed folders: found ${freshFolders.length} folders`);
+            if (process.env.NODE_ENV === 'development') console.log(`Refreshed folders: found ${freshFolders.length} folders`);
             setCurrentFolders(freshFolders);
             setLastRefreshTime(new Date());
           } else {
@@ -517,7 +517,7 @@ export default function FolderSelectionScreen({
           supportsAllDrives: true
         });
         const freshFolders = response.result.files || [];
-        console.log(`Loaded ${freshFolders.length} folders from main folder`);
+        if (process.env.NODE_ENV === 'development') console.log(`Loaded ${freshFolders.length} folders from main folder`);
         setCurrentFolders(freshFolders);
         if (forceRefresh) {
           setLastRefreshTime(new Date());
@@ -532,7 +532,7 @@ export default function FolderSelectionScreen({
           supportsAllDrives: true
         });
         const freshFolders = response.result.files || [];
-        console.log(`Loaded ${freshFolders.length} subfolders from parent ${parentId}`);
+        if (process.env.NODE_ENV === 'development') console.log(`Loaded ${freshFolders.length} subfolders from parent ${parentId}`);
         setCurrentFolders(freshFolders);
         if (forceRefresh) {
           setLastRefreshTime(new Date());
@@ -547,14 +547,14 @@ export default function FolderSelectionScreen({
         setCurrentFolders([]);
       } else if (!forceRefresh && retryCount < 3) {
         // For other errors during initial load, retry a few times
-        console.log(`Error loading folders, retrying (attempt ${retryCount + 1}/3)...`);
+        if (process.env.NODE_ENV === 'development') console.log(`Error loading folders, retrying (attempt ${retryCount + 1}/3)...`);
         setTimeout(() => {
           loadFolders(parentId, forceRefresh, retryCount + 1);
         }, 1500);
         return;
       } else {
         // Fall back to client folders if available
-        console.log('Using cached client folders after error');
+        if (process.env.NODE_ENV === 'development') console.log('Using cached client folders after error');
         setCurrentFolders(clientFolders || []);
       }
     } finally {
@@ -566,13 +566,13 @@ export default function FolderSelectionScreen({
 
   // Refresh folders from Google Drive
   const refreshFolders = async () => {
-    console.log('🔄 Refreshing folders from Google Drive...');
+    if (process.env.NODE_ENV === 'development') console.log('🔄 Refreshing folders from Google Drive...');
     setIsRefreshing(true);
     setSelectedNavigationFolder(null); // Clear selection during refresh
     
     try {
       await loadFolders(currentFolderId, true);
-      console.log('✅ Folders refreshed successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Folders refreshed successfully');
     } catch (error) {
       console.error('❌ Failed to refresh folders:', error);
     } finally {
@@ -582,7 +582,7 @@ export default function FolderSelectionScreen({
 
   // Navigate into a folder (browse its contents)
   const handleFolderNavigate = async (folder: DriveFolder) => {
-    console.log('📂 Navigating into folder:', folder.name);
+    if (process.env.NODE_ENV === 'development') console.log('📂 Navigating into folder:', folder.name);
     
     // Add to path
     setFolderPath([...folderPath, { id: folder.id, name: folder.name }]);
@@ -595,7 +595,7 @@ export default function FolderSelectionScreen({
 
   // Navigate via breadcrumb
   const handleBreadcrumbClick = async (index: number) => {
-    console.log('🔙 Navigating to breadcrumb index:', index);
+    if (process.env.NODE_ENV === 'development') console.log('🔙 Navigating to breadcrumb index:', index);
     
     setSelectedNavigationFolder(null); // Clear selection when navigating
     
@@ -636,7 +636,7 @@ export default function FolderSelectionScreen({
 
   // Database-first template replacement (eliminates race conditions)
   const handleTemplateReplace = useCallback((packageId: string, packageName: string, templateIndex: number, newTemplate: ManualTemplate) => {
-    console.log('🔄 SESSION-BASED TEMPLATE REPLACEMENT:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔄 SESSION-BASED TEMPLATE REPLACEMENT:', {
       packageId,
       packageName,
       templateIndex,
@@ -648,7 +648,7 @@ export default function FolderSelectionScreen({
     dispatchTemplate({ type: 'SET_ERROR', error: null });
 
     try {
-      console.log('💾 Storing template replacement in session (no database modification)');
+      if (process.env.NODE_ENV === 'development') console.log('💾 Storing template replacement in session (no database modification)');
       
       // Store replacement in session overrides (does not modify database)
       dispatchTemplate({
@@ -658,8 +658,8 @@ export default function FolderSelectionScreen({
         newTemplate
       });
       
-      console.log('✅ Template replacement stored in session successfully');
-      console.log('📝 Admin-configured base package remains unchanged in database');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Template replacement stored in session successfully');
+      if (process.env.NODE_ENV === 'development') console.log('📝 Admin-configured base package remains unchanged in database');
     } catch (error) {
       console.error('❌ Template replacement failed:', error);
       
@@ -672,14 +672,14 @@ export default function FolderSelectionScreen({
 
   // Add template to session (does not modify database)
   const handleTemplateAdd = useCallback((packageId: string, newTemplate: ManualTemplate) => {
-    console.log('➕ Adding template to session:', {
+    if (process.env.NODE_ENV === 'development') console.log('➕ Adding template to session:', {
       packageId,
       newTemplateId: newTemplate.id,
       newTemplateName: newTemplate.name
     });
 
     try {
-      console.log('💾 Storing template addition in session (no database modification)');
+      if (process.env.NODE_ENV === 'development') console.log('💾 Storing template addition in session (no database modification)');
       
       // Add template to session overrides (does not modify database)
       dispatchTemplate({
@@ -688,8 +688,8 @@ export default function FolderSelectionScreen({
         template: newTemplate
       });
       
-      console.log('✅ Template added to session successfully');
-      console.log('📝 Admin-configured base package remains unchanged in database');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Template added to session successfully');
+      if (process.env.NODE_ENV === 'development') console.log('📝 Admin-configured base package remains unchanged in database');
     } catch (error) {
       console.error('❌ Failed to add template to session:', error);
       dispatchTemplate({ 
@@ -701,7 +701,7 @@ export default function FolderSelectionScreen({
   
   // Delete template from session (only for additions)
   const handleTemplateDelete = useCallback((packageId: string, templateIndex: number) => {
-    console.log('🗑️ Deleting template from session:', {
+    if (process.env.NODE_ENV === 'development') console.log('🗑️ Deleting template from session:', {
       packageId,
       templateIndex
     });
@@ -714,7 +714,7 @@ export default function FolderSelectionScreen({
         templateIndex
       });
       
-      console.log('✅ Template deleted from session successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Template deleted from session successfully');
     } catch (error) {
       console.error('❌ Failed to delete template from session:', error);
       dispatchTemplate({ 
@@ -814,7 +814,7 @@ export default function FolderSelectionScreen({
       setGroupedPackages(grouped);
       setUngroupedPackages(ungrouped);
       
-      console.log('✅ Loaded', allPackages.length, 'packages from manual package service');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Loaded', allPackages.length, 'packages from manual package service');
     } catch (error: any) {
       console.error('❌ Error loading packages:', error);
       setPackageError(error.message || 'Failed to load packages');
@@ -830,15 +830,15 @@ export default function FolderSelectionScreen({
   // Load photos from selected folder for template auto-fill
   const loadAvailablePhotos = async (folder: DriveFolder) => {
     try {
-      console.log(`📸 Loading photos from folder for template auto-fill: ${folder.name}`);
+      if (process.env.NODE_ENV === 'development') console.log(`📸 Loading photos from folder for template auto-fill: ${folder.name}`);
       const photos = await googleDriveService.getPhotosFromFolder(folder.id);
-      console.log(`📸 Loaded ${photos.length} photos for template auto-fill`);
+      if (process.env.NODE_ENV === 'development') console.log(`📸 Loaded ${photos.length} photos for template auto-fill`);
       
       // Use more photos for better variety in template auto-fill (limit to 50 for performance)
       const photosForTemplates = photos.slice(0, 50);
       setAvailablePhotos(photosForTemplates);
       
-      console.log(`📸 Using ${photosForTemplates.length} photos for template preview auto-fill`);
+      if (process.env.NODE_ENV === 'development') console.log(`📸 Using ${photosForTemplates.length} photos for template preview auto-fill`);
     } catch (error) {
       console.error('❌ Error loading photos for template auto-fill:', error);
       setAvailablePhotos([]); // Fallback to empty array
@@ -847,7 +847,7 @@ export default function FolderSelectionScreen({
 
   // Handle individual template selection
   const handleTemplateSelect = (template: ManualTemplate) => {
-    console.log('🎯 Individual template selected:', template.name);
+    if (process.env.NODE_ENV === 'development') console.log('🎯 Individual template selected:', template.name);
     
     // Add to selected templates if not already selected
     setSelectedTemplates(prev => {
@@ -862,7 +862,7 @@ export default function FolderSelectionScreen({
 
   // Load templates for the selected package with debugging
   const loadPackageTemplates = async (packageId: string, packageName: string) => {
-    console.log('📋 Loading base templates for package:', {
+    if (process.env.NODE_ENV === 'development') console.log('📋 Loading base templates for package:', {
       packageId,
       packageName,
       packageIdType: typeof packageId
@@ -870,7 +870,7 @@ export default function FolderSelectionScreen({
     
     // Check if we already have base templates for this package
     if (templateState.basePackageTemplates[packageId]) {
-      console.log('📋 Using cached base templates for package:', packageId);
+      if (process.env.NODE_ENV === 'development') console.log('📋 Using cached base templates for package:', packageId);
       dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId });
       return;
     }
@@ -879,10 +879,10 @@ export default function FolderSelectionScreen({
     dispatchTemplate({ type: 'SET_ERROR', error: null });
     
     try {
-      console.log('🔄 Loading base templates from database (admin-configured, read-only)...');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 Loading base templates from database (admin-configured, read-only)...');
       const packageWithTemplates = await manualPackageService.getPackageWithTemplates(packageId);
       
-      console.log('📦 Base templates loaded:', {
+      if (process.env.NODE_ENV === 'development') console.log('📦 Base templates loaded:', {
         response: packageWithTemplates,
         hasResponse: !!packageWithTemplates,
         templates: packageWithTemplates?.templates,
@@ -891,8 +891,8 @@ export default function FolderSelectionScreen({
       });
       
       if (packageWithTemplates && packageWithTemplates.templates) {
-        console.log('✅ Base templates found:', packageWithTemplates.templates.length);
-        console.log('📋 Base template details:', packageWithTemplates.templates.map(t => ({
+        if (process.env.NODE_ENV === 'development') console.log('✅ Base templates found:', packageWithTemplates.templates.length);
+        if (process.env.NODE_ENV === 'development') console.log('📋 Base template details:', packageWithTemplates.templates.map(t => ({
           id: t.id,
           name: t.name,
           type: t.template_type,
@@ -909,9 +909,9 @@ export default function FolderSelectionScreen({
         });
         dispatchTemplate({ type: 'SET_EXPANDED_PACKAGE', packageId });
         
-        console.log('📝 Base templates preserved - client changes will be session-only');
+        if (process.env.NODE_ENV === 'development') console.log('📝 Base templates preserved - client changes will be session-only');
       } else {
-        console.log('⚠️ No base templates found or invalid response structure');
+        if (process.env.NODE_ENV === 'development') console.log('⚠️ No base templates found or invalid response structure');
         // Store empty array for this package so we don't keep trying to load
         dispatchTemplate({
           type: 'SET_BASE_TEMPLATES',
@@ -955,17 +955,17 @@ export default function FolderSelectionScreen({
   useEffect(() => {
     if (!showPackageSelection) {
       // Load folder data when entering folder selection
-      console.log('📂 Loading folder data on mount...');
+      if (process.env.NODE_ENV === 'development') console.log('📂 Loading folder data on mount...');
       
       // Check if we have clientFolders already loaded from the parent component
       if (clientFolders && clientFolders.length > 0) {
-        console.log(`📂 Using ${clientFolders.length} pre-loaded folders from parent component`);
+        if (process.env.NODE_ENV === 'development') console.log(`📂 Using ${clientFolders.length} pre-loaded folders from parent component`);
         setCurrentFolders(clientFolders);
         // Also try to load fresh data in the background
         loadFolders(null, false);
       } else {
         // No pre-loaded folders, need to fetch from Google Drive
-        console.log('📂 No pre-loaded folders, fetching from Google Drive...');
+        if (process.env.NODE_ENV === 'development') console.log('📂 No pre-loaded folders, fetching from Google Drive...');
         loadFolders(null, false);
       }
     }
@@ -975,13 +975,13 @@ export default function FolderSelectionScreen({
   useEffect(() => {
     if (!showPackageSelection && folderPath.length === 0) {
       // We're back at the root level, refresh the folder list
-      console.log('🔄 Returned to folder selection, refreshing...');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 Returned to folder selection, refreshing...');
       loadFolders(null, true);
     }
   }, [showPackageSelection]);
 
   const handleFolderSelect = (folder: DriveFolder) => {
-    console.log('✅ Selecting folder as client folder:', folder.name);
+    if (process.env.NODE_ENV === 'development') console.log('✅ Selecting folder as client folder:', folder.name);
     setSelectedFolder(folder);
     handleClientFolderSelect(folder); // Still call the original handler for data loading
     loadAvailablePhotos(folder); // Load photos for sample generation
@@ -1008,7 +1008,7 @@ export default function FolderSelectionScreen({
       const sessionOverrides = templateState.sessionOverrides[selectedPackage.id.toString()];
       const effectiveTemplates = getEffectiveTemplates(baseTemplates, sessionOverrides);
       
-      console.log('📋 Passing effective templates to photo screen:', {
+      if (process.env.NODE_ENV === 'development') console.log('📋 Passing effective templates to photo screen:', {
         baseTemplatesCount: baseTemplates.length,
         sessionReplacements: Object.keys(sessionOverrides?.replacements || {}).length,
         sessionAdditions: sessionOverrides?.additions?.length || 0,

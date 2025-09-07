@@ -98,7 +98,7 @@ export default function PngTemplateManagement() {
         const storedToken = localStorage.getItem('google_access_token');
         
         if (storedToken && googleAuth.isSignedIn) {
-          console.log('🔑 Initializing Google Drive service with stored token');
+          if (process.env.NODE_ENV === 'development') console.log('🔑 Initializing Google Drive service with stored token');
           await googleDriveService.initialize();
           googleDriveService.setAccessToken(storedToken);
           setIsInitialized(true);

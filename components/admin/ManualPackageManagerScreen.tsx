@@ -367,7 +367,7 @@ export default function ManualPackageManagerScreen({
       const data = await manualPackageService.getAllPackages();
       setPackages(data);
       organizePackagesByGroup(data);
-      console.log('✅ Loaded packages:', data.length);
+      if (process.env.NODE_ENV === 'development') console.log('✅ Loaded packages:', data.length);
     } catch (err: any) {
       setError(err.message || 'Failed to load packages');
       console.error('❌ Error loading packages:', err);
@@ -380,7 +380,7 @@ export default function ManualPackageManagerScreen({
     try {
       const data = await packageGroupService.getActiveGroups();
       setGroups(data);
-      console.log('✅ Loaded groups:', data.length);
+      if (process.env.NODE_ENV === 'development') console.log('✅ Loaded groups:', data.length);
     } catch (err: any) {
       console.error('❌ Error loading groups:', err);
       setError(err.message || 'Failed to load groups');
@@ -616,10 +616,10 @@ export default function ManualPackageManagerScreen({
           }
         }
 
-        console.log('✅ Package updated successfully');
+        if (process.env.NODE_ENV === 'development') console.log('✅ Package updated successfully');
       } else {
         await manualPackageService.createPackage(packageData);
-        console.log('✅ Package created successfully');
+        if (process.env.NODE_ENV === 'development') console.log('✅ Package created successfully');
       }
 
       setShowCreateForm(false);
@@ -642,7 +642,7 @@ export default function ManualPackageManagerScreen({
 
     try {
       await manualPackageService.deletePackage(pkg.id);
-      console.log('✅ Package deleted successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Package deleted successfully');
       await loadPackages();
     } catch (err: any) {
       setError(err.message || 'Failed to delete package');
@@ -657,7 +657,7 @@ export default function ManualPackageManagerScreen({
       } else {
         await manualPackageService.activatePackage(pkg.id);
       }
-      console.log('✅ Package status updated');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Package status updated');
       await loadPackages();
     } catch (err: any) {
       setError(err.message || 'Failed to update package status');
@@ -668,7 +668,7 @@ export default function ManualPackageManagerScreen({
   const handleSetDefault = async (pkg: ManualPackage) => {
     try {
       await manualPackageService.setAsDefault(pkg.id);
-      console.log('✅ Package set as default');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Package set as default');
       await loadPackages();
     } catch (err: any) {
       setError(err.message || 'Failed to set default package');
@@ -678,7 +678,7 @@ export default function ManualPackageManagerScreen({
 
   const handleTemplateSelection = (templateId: string, isSelected: boolean) => {
     // This function is no longer used with the new print position approach
-    console.log('Template selection (deprecated):', templateId, isSelected);
+    if (process.env.NODE_ENV === 'development') console.log('Template selection (deprecated):', templateId, isSelected);
   };
 
   const handleReorderPackages = async (newOrder: ManualPackage[]) => {
@@ -694,7 +694,7 @@ export default function ManualPackageManagerScreen({
       );
       
       await Promise.all(updatePromises);
-      console.log('✅ Package order updated successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Package order updated successfully');
     } catch (error) {
       console.error('❌ Error updating package order:', error);
       // Revert to original order on error
@@ -721,13 +721,13 @@ export default function ManualPackageManagerScreen({
           name: groupFormData.name.trim(),
           description: groupFormData.description.trim() || undefined // Use undefined for optional field
         });
-        console.log('✅ Group updated successfully');
+        if (process.env.NODE_ENV === 'development') console.log('✅ Group updated successfully');
       } else {
         await packageGroupService.createGroup({
           name: groupFormData.name.trim(),
           description: groupFormData.description.trim() || undefined // Use undefined for optional field
         });
-        console.log('✅ Group created successfully');
+        if (process.env.NODE_ENV === 'development') console.log('✅ Group created successfully');
       }
 
       setShowCreateGroupForm(false);
@@ -759,7 +759,7 @@ export default function ManualPackageManagerScreen({
 
     try {
       await packageGroupService.deleteGroup(group.id);
-      console.log('✅ Group deleted successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Group deleted successfully');
       await loadGroups();
       await loadPackages();
     } catch (err: any) {
@@ -771,7 +771,7 @@ export default function ManualPackageManagerScreen({
   const handleMovePackageToGroup = async (packageId: string, groupId: string | null) => {
     try {
       await manualPackageService.updatePackage(packageId, { group_id: groupId || undefined });
-      console.log('✅ Package moved to group successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Package moved to group successfully');
       await loadPackages();
     } catch (err: any) {
       setError(err.message || 'Failed to move package');
@@ -791,7 +791,7 @@ export default function ManualPackageManagerScreen({
       }));
       
       await packageGroupService.reorderGroups(groupOrder);
-      console.log('✅ Group order updated successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Group order updated successfully');
     } catch (error) {
       console.error('❌ Error updating group order:', error);
       // Revert to original order on error

@@ -69,7 +69,7 @@ export default function FavoritesBar({
       onDragStart(photo);
     }
     
-    console.log('🖱️ Desktop drag started:', photo.name);
+    if (process.env.NODE_ENV === 'development') console.log('🖱️ Desktop drag started:', photo.name);
   };
   
   const handleDragEnd = () => {
@@ -77,7 +77,7 @@ export default function FavoritesBar({
     if (onDragEnd) {
       onDragEnd();
     }
-    console.log('🖱️ Desktop drag ended');
+    if (process.env.NODE_ENV === 'development') console.log('🖱️ Desktop drag ended');
   };
   
   // Pointer event handlers for mobile (and desktop fallback)
@@ -103,7 +103,7 @@ export default function FavoritesBar({
     // Store in window for drop detection
     (window as any).draggedPhoto = photo;
     
-    console.log('👆 Pointer down on photo:', photo.name);
+    if (process.env.NODE_ENV === 'development') console.log('👆 Pointer down on photo:', photo.name);
   };
   
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -123,7 +123,7 @@ export default function FavoritesBar({
         if (ady <= adx * K_LOCK) {
           // Movement is within ±15° of horizontal - SWIPE MODE
           setGestureMode('swipe');
-          console.log(`↔️ Swipe mode (ratio: ${(ady/adx).toFixed(2)})`);
+          if (process.env.NODE_ENV === 'development') console.log(`↔️ Swipe mode (ratio: ${(ady/adx).toFixed(2)})`);
           
           // Release pointer capture for smooth scrolling
           try {
@@ -134,7 +134,7 @@ export default function FavoritesBar({
         } else {
           // Movement is outside horizontal cone - DRAG MODE (immediate!)
           setGestureMode('drag');
-          console.log(`🎯 Drag mode (ratio: ${adx > 0 ? (ady/adx).toFixed(2) : 'vertical'})`);
+          if (process.env.NODE_ENV === 'development') console.log(`🎯 Drag mode (ratio: ${adx > 0 ? (ady/adx).toFixed(2) : 'vertical'})`);
         }
       } 
       // Long-press fallback ONLY for stationary/micro movements
@@ -142,7 +142,7 @@ export default function FavoritesBar({
         const timeDelta = Date.now() - touchStartTime.current;
         if (timeDelta > 500) {
           setGestureMode('drag');
-          console.log('🕐 Long press (stationary) - drag mode');
+          if (process.env.NODE_ENV === 'development') console.log('🕐 Long press (stationary) - drag mode');
         }
       }
       // Still undecided - waiting for more movement
@@ -173,7 +173,7 @@ export default function FavoritesBar({
           onDragStart(draggedPhoto);
         }
         
-        console.log('📦 Photo drag active');
+        if (process.env.NODE_ENV === 'development') console.log('📦 Photo drag active');
       }
       
       // Update drag position
@@ -209,7 +209,7 @@ export default function FavoritesBar({
         elementBelow.dispatchEvent(dropEvent);
       }
       
-      console.log('✅ Drag completed');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Drag completed');
     } else if (draggedPhoto && !isDragging && gestureMode !== 'swipe') {
       // It was just a tap/click, not a drag or swipe
       // Only auto-click in print mode (fill templates)
@@ -237,7 +237,7 @@ export default function FavoritesBar({
             left: targetScroll,
             behavior: 'smooth'
           });
-          console.log(`⏩ Fast swipe right (velocity: ${velocity.toFixed(2)})`);
+          if (process.env.NODE_ENV === 'development') console.log(`⏩ Fast swipe right (velocity: ${velocity.toFixed(2)})`);
         } else {
           // Swiped right - scroll left
           const targetScroll = Math.floor(currentScroll / photoWidth) * photoWidth;
@@ -245,7 +245,7 @@ export default function FavoritesBar({
             left: targetScroll,
             behavior: 'smooth'
           });
-          console.log(`⏪ Fast swipe left (velocity: ${velocity.toFixed(2)})`);
+          if (process.env.NODE_ENV === 'development') console.log(`⏪ Fast swipe left (velocity: ${velocity.toFixed(2)})`);
         }
       }
     }

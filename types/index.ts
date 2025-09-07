@@ -6,12 +6,12 @@ import { googleDriveService } from '../services/googleDriveService';
 // Helper function to get real photo dimensions from Google Drive API
 async function getRealPhotoDimensions(photo: Photo): Promise<{ width: number; height: number }> {
   try {
-    console.log('🔍 FETCHING REAL DIMENSIONS from Google Drive API...');
+    if (process.env.NODE_ENV === 'development') console.log('🔍 FETCHING REAL DIMENSIONS from Google Drive API...');
     const metadata = await googleDriveService.getPhotoMetadata(photo.googleDriveId);
     
     if (metadata && metadata.imageMediaMetadata) {
       const { width, height } = metadata.imageMediaMetadata;
-      console.log('✅ GOOGLE DRIVE API SUCCESS:', { width, height });
+      if (process.env.NODE_ENV === 'development') console.log('✅ GOOGLE DRIVE API SUCCESS:', { width, height });
       return { width: parseInt(width), height: parseInt(height) };
     } else {
       throw new Error('No imageMediaMetadata in API response');
@@ -23,7 +23,7 @@ async function getRealPhotoDimensions(photo: Photo): Promise<{ width: number; he
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
-        console.log('📷 IMAGE LOADING FALLBACK:', { width: img.naturalWidth, height: img.naturalHeight });
+        if (process.env.NODE_ENV === 'development') console.log('📷 IMAGE LOADING FALLBACK:', { width: img.naturalWidth, height: img.naturalHeight });
         resolve({ width: img.naturalWidth, height: img.naturalHeight });
       };
       img.onerror = (imgError) => {
@@ -190,7 +190,7 @@ export function calculateSmartFillScale(
   // This is how much additional scaling we need on top of 'contain' baseline
   const adjustmentFactor = gapEliminationScale / containScale;
   
-  console.log('🎯 Smart Fill Scale (CONTAIN BASELINE + ADJUSTMENT):', {
+  if (process.env.NODE_ENV === 'development') console.log('🎯 Smart Fill Scale (CONTAIN BASELINE + ADJUSTMENT):', {
     photo: { width: photoWidth, height: photoHeight, aspectRatio: photoAspectRatio.toFixed(3) },
     container: { width: containerWidth, height: containerHeight, aspectRatio: containerAspectRatio.toFixed(3) },
     baseline: {
@@ -274,7 +274,7 @@ export function getHoleDimensions(slot: TemplateSlot): { width: number; height: 
     // Get PNG templates from global window object (same way as components do)
     const pngTemplates = (window as any).pngTemplates || [];
     
-    console.log('🔍 RAW DATABASE DATA DEBUG:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔍 RAW DATABASE DATA DEBUG:', {
       totalPngTemplates: pngTemplates.length,
       lookingFor: { templateType: slot.templateType, printSize: slot.printSize, slotIndex: slot.slotIndex },
       availableTemplates: pngTemplates.map((t: any) => ({ 
@@ -299,7 +299,7 @@ export function getHoleDimensions(slot: TemplateSlot): { width: number; height: 
       return null;
     }
     
-    console.log('🕳️ FOUND TEMPLATE WITH HOLES:', {
+    if (process.env.NODE_ENV === 'development') console.log('🕳️ FOUND TEMPLATE WITH HOLES:', {
       templateType: pngTemplate.template_type,
       printSize: pngTemplate.print_size,
       totalHoles: pngTemplate.holes.length,
@@ -322,7 +322,7 @@ export function getHoleDimensions(slot: TemplateSlot): { width: number; height: 
       return null;
     }
     
-    console.log('✅ HOLE DIMENSIONS EXTRACTED:', {
+    if (process.env.NODE_ENV === 'development') console.log('✅ HOLE DIMENSIONS EXTRACTED:', {
       slotIndex: slot.slotIndex,
       holeDimensions: { width: hole.width, height: hole.height },
       rawHoleData: hole
@@ -353,7 +353,7 @@ export async function createSmartPhotoTransformFromSlot(
   photoCenterX: number = 0.5,
   photoCenterY: number = 0.5
 ): Promise<PhotoTransform> {
-  console.log('🚀 FUNCTION CALLED: createSmartPhotoTransformFromSlot', {
+  if (process.env.NODE_ENV === 'development') console.log('🚀 FUNCTION CALLED: createSmartPhotoTransformFromSlot', {
     photoId: photo.id,
     slotId: slot.id,
     templateType: slot.templateType,
@@ -367,11 +367,11 @@ export async function createSmartPhotoTransformFromSlot(
   // If metadata is missing, get real dimensions from Google Drive API
   if (!photoWidth || !photoHeight) {
     try {
-      console.log('🔍 MISSING METADATA - Getting real dimensions from Google Drive API...');
+      if (process.env.NODE_ENV === 'development') console.log('🔍 MISSING METADATA - Getting real dimensions from Google Drive API...');
       const dimensions = await getRealPhotoDimensions(photo);
       photoWidth = dimensions.width;
       photoHeight = dimensions.height;
-      console.log('✅ REAL DIMENSIONS RETRIEVED:', { width: photoWidth, height: photoHeight });
+      if (process.env.NODE_ENV === 'development') console.log('✅ REAL DIMENSIONS RETRIEVED:', { width: photoWidth, height: photoHeight });
     } catch (error) {
       console.warn('❌ Failed to get real dimensions, using defaults:', error);
       photoWidth = 1600;  // Default to common photo size
@@ -379,7 +379,7 @@ export async function createSmartPhotoTransformFromSlot(
     }
   }
   
-  console.log('📏 PHOTO DIMENSIONS DEBUG:', {
+  if (process.env.NODE_ENV === 'development') console.log('📏 PHOTO DIMENSIONS DEBUG:', {
     photoId: photo.id,
     photoName: photo.name,
     rawMetadata: photo.metadata,
@@ -400,7 +400,7 @@ export async function createSmartPhotoTransformFromSlot(
   const rawHoleDimensions = getHoleDimensions(slot);
   const holeDimensions = rawHoleDimensions || { width: 400, height: 400 }; // Default to square
   
-  console.log('🕳️ HOLE DIMENSIONS DEBUG:', {
+  if (process.env.NODE_ENV === 'development') console.log('🕳️ HOLE DIMENSIONS DEBUG:', {
     slotInfo: { 
       id: slot.id, 
       templateType: slot.templateType, 
@@ -427,7 +427,7 @@ export async function createSmartPhotoTransformFromSlot(
   
   const finalTransform = createPhotoTransform(smartScale, photoCenterX, photoCenterY);
   
-  console.log('✅ FINAL TRANSFORM CREATED:', {
+  if (process.env.NODE_ENV === 'development') console.log('✅ FINAL TRANSFORM CREATED:', {
     smartScale,
     finalTransform,
     expectedResult: {
@@ -451,7 +451,7 @@ export function createPhotoTransform(photoScale: number, photoCenterX: number, p
     version: 'photo-centric' as const
   };
   
-  console.log('🔧 createPhotoTransform:', {
+  if (process.env.NODE_ENV === 'development') console.log('🔧 createPhotoTransform:', {
     input: { photoScale, photoCenterX, photoCenterY },
     clamped: { clampedScale, wasScaleClamped: clampedScale !== photoScale },
     finalTransform: transform
@@ -485,7 +485,7 @@ export function migrateContainerToPhotoTransform(
     const photoCenterX = 0.5 - (containerTransform.x / holeWidth);
     const photoCenterY = 0.5 - (containerTransform.y / holeHeight);
     
-    console.log('📈 Migrating container transform to photo-centric:', {
+    if (process.env.NODE_ENV === 'development') console.log('📈 Migrating container transform to photo-centric:', {
       original: containerTransform,
       estimated: { photoScale, photoCenterX, photoCenterY },
       context: { photoWidth, photoHeight, holeWidth, holeHeight, fitScale }

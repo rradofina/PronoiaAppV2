@@ -136,7 +136,7 @@ export default function SlidingTemplateBar({
                       selectedSlot={null}
                       onSlotClick={(slot: TemplateSlot) => {
                         if (isEditingMode) {
-                          console.log('🚫 Slot selection blocked - editing in progress');
+                          if (process.env.NODE_ENV === 'development') console.log('🚫 Slot selection blocked - editing in progress');
                           return;
                         }
                         onSlotSelect(slot);

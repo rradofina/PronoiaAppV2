@@ -64,7 +64,7 @@ export function usePhotoDebug({
   let errorMessage: string | null = null;
 
   try {
-    console.log('🔧 usePhotoDebug - Using mathematical gap calculation...');
+    if (process.env.NODE_ENV === 'development') console.log('🔧 usePhotoDebug - Using mathematical gap calculation...');
     
     // Use mathematical calculation instead of DOM-based detectGaps
     const mathGaps = calculateMathematicalGaps();
@@ -89,7 +89,7 @@ export function usePhotoDebug({
       }
     };
     
-    console.log('🔧 usePhotoDebug - Mathematical gap data:', gapData);
+    if (process.env.NODE_ENV === 'development') console.log('🔧 usePhotoDebug - Mathematical gap data:', gapData);
     movement = gapData.hasGaps ? calculateGapBasedMovement(gapData) : null;
   } catch (error) {
     console.error('❌ usePhotoDebug - Error in mathematical gap detection:', error);

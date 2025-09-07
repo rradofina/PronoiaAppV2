@@ -1,7 +1,7 @@
 // Service Worker for Pronoia Studios PH PWA
 // Version info is injected at build time by generate-version.js
-const BUILD_TIMESTAMP = '2025-08-30T06:57:00.798Z';
-const DEPLOYMENT_ID = '1756537020798';
+const BUILD_TIMESTAMP = '2025-09-07T01:52:53.606Z';
+const DEPLOYMENT_ID = '1757209973606';
 const CACHE_NAME = `pronoia-v-${DEPLOYMENT_ID}`;
 const urlsToCache = [
   '/manifest.json',
@@ -12,11 +12,11 @@ const urlsToCache = [
 
 // Install event - cache essential files
 self.addEventListener('install', (event) => {
-  console.log('New service worker installing with version:', DEPLOYMENT_ID);
+  if (process.env.NODE_ENV === 'development') console.log('New service worker installing with version:', DEPLOYMENT_ID);
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Opened cache:', CACHE_NAME);
+        if (process.env.NODE_ENV === 'development') console.log('Opened cache:', CACHE_NAME);
         return cache.addAll(urlsToCache);
       })
       .then(() => {
@@ -34,7 +34,7 @@ self.addEventListener('activate', (event) => {
         cacheNames.map((cacheName) => {
           // Delete all caches that don't match current version
           if (cacheName.startsWith('pronoia-v-') && cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
+            if (process.env.NODE_ENV === 'development') console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })

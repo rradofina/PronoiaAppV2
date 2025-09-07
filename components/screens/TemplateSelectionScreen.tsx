@@ -59,7 +59,7 @@ export default function TemplateSelectionScreen({
       const filteredTemplates = allTemplates.filter(t => t.printSize === currentPrintSize);
       
       setPngTemplates(filteredTemplates);
-      console.log(`📐 Loaded ${filteredTemplates.length} ${currentPrintSize} templates`);
+      if (process.env.NODE_ENV === 'development') console.log(`📐 Loaded ${filteredTemplates.length} ${currentPrintSize} templates`);
     } catch (error: any) {
       console.error('Error loading PNG templates:', error);
       setError(error instanceof Error ? error.message : 'Failed to load templates');

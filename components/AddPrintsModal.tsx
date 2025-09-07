@@ -45,13 +45,13 @@ export default function AddPrintsModal({
         setError(null);
         setSelectedTemplate(null); // Reset selection when opening
 
-        console.log('🔄 Loading templates for Add Prints modal...');
+        if (process.env.NODE_ENV === 'development') console.log('🔄 Loading templates for Add Prints modal...');
 
         // Get all available print sizes from database
         const printSizeConfigs = await printSizeService.getAvailablePrintSizes();
         const availablePrintSizes = printSizeConfigs.map(config => config.name);
         
-        console.log('📏 Available print sizes:', availablePrintSizes);
+        if (process.env.NODE_ENV === 'development') console.log('📏 Available print sizes:', availablePrintSizes);
 
         // Load templates for each print size
         const grouped: GroupedTemplates = {};
@@ -63,7 +63,7 @@ export default function AddPrintsModal({
           }
         }
 
-        console.log('📋 Grouped templates:', {
+        if (process.env.NODE_ENV === 'development') console.log('📋 Grouped templates:', {
           printSizes: Object.keys(grouped),
           totalTemplates: Object.values(grouped).flat().length,
           templateCounts: Object.entries(grouped).reduce((acc, [size, templates]) => {
@@ -93,7 +93,7 @@ export default function AddPrintsModal({
   }, [isOpen]);
 
   const handleTemplateSelect = (template: ManualTemplate) => {
-    console.log('✅ Template selected:', {
+    if (process.env.NODE_ENV === 'development') console.log('✅ Template selected:', {
       templateId: template.id,
       templateName: template.name,
       printSize: template.print_size
@@ -104,11 +104,11 @@ export default function AddPrintsModal({
 
   const handleConfirmAdd = () => {
     if (!selectedTemplate) {
-      console.log('⚠️ No template selected for adding');
+      if (process.env.NODE_ENV === 'development') console.log('⚠️ No template selected for adding');
       return;
     }
 
-    console.log('➕ Adding template to package:', {
+    if (process.env.NODE_ENV === 'development') console.log('➕ Adding template to package:', {
       templateId: selectedTemplate.id,
       templateName: selectedTemplate.name,
       printSize: selectedTemplate.print_size

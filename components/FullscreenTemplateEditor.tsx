@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { TemplateSlot, Photo, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform, createPhotoTransform, createSmartPhotoTransformFromSlot } from '../types';
 import PhotoRenderer from './PhotoRenderer';
 import { getBestPhotoUrl, addCacheBuster, getHighResPhotoUrls } from '../utils/photoUrlUtils';
@@ -19,7 +19,7 @@ interface FullscreenTemplateEditorProps {
   onRemovePhoto?: (slot: TemplateSlot) => void;
 }
 
-export default function FullscreenTemplateEditor({
+function FullscreenTemplateEditor({
   templateSlots,
   selectedSlot,
   selectedPhoto,
@@ -44,7 +44,7 @@ export default function FullscreenTemplateEditor({
   // Cleanup function for blob URLs
   const cleanupPhotoUrl = () => {
     if (selectedPhotoUrl && selectedPhotoUrl.startsWith('blob:')) {
-      console.log('🧹 Cleaning up blob URL:', selectedPhotoUrl);
+      if (process.env.NODE_ENV === 'development') console.log('🧹 Cleaning up blob URL:', selectedPhotoUrl);
       URL.revokeObjectURL(selectedPhotoUrl);
     }
   };
@@ -62,7 +62,7 @@ export default function FullscreenTemplateEditor({
       });
       setOriginalTransforms(initialTransforms);
       setHasUnsavedChanges(false);
-      console.log('🔧 Multi-slot mode - Captured original transforms:', initialTransforms);
+      if (process.env.NODE_ENV === 'development') console.log('🔧 Multi-slot mode - Captured original transforms:', initialTransforms);
     }
   }, [viewMode, templateToView, isVisible]);
 
@@ -84,12 +84,12 @@ export default function FullscreenTemplateEditor({
       }
     }
     
-    console.log('🔧 FullscreenTemplateEditor - Transform updated:', newTransform);
+    if (process.env.NODE_ENV === 'development') console.log('🔧 FullscreenTemplateEditor - Transform updated:', newTransform);
   };
 
   // Smart reset callback for intelligent photo repositioning
   const handleSmartReset = useCallback(async (): Promise<PhotoTransform> => {
-    console.log('🎯 FullscreenTemplateEditor - Smart reset requested');
+    if (process.env.NODE_ENV === 'development') console.log('🎯 FullscreenTemplateEditor - Smart reset requested');
     if (!selectedPhoto || !selectedSlot) {
       console.warn('⚠️ Smart reset failed: missing photo or slot data');
       return createPhotoTransform(1, 0.5, 0.5);
@@ -97,7 +97,7 @@ export default function FullscreenTemplateEditor({
     
     try {
       const smartTransform = await createSmartPhotoTransformFromSlot(selectedPhoto, selectedSlot);
-      console.log('✅ FullscreenTemplateEditor - Smart reset successful:', smartTransform);
+      if (process.env.NODE_ENV === 'development') console.log('✅ FullscreenTemplateEditor - Smart reset successful:', smartTransform);
       return smartTransform;
     } catch (error) {
       console.error('❌ FullscreenTemplateEditor - Smart reset failed:', error);
@@ -107,7 +107,7 @@ export default function FullscreenTemplateEditor({
 
   // Initialize transform when selectedSlot changes
   useEffect(() => {
-    console.log('🔧 TRANSFORM DEBUG - useEffect triggered for slot change:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔧 TRANSFORM DEBUG - useEffect triggered for slot change:', {
       slotId: selectedSlot?.id,
       hasExistingTransform: !!selectedSlot?.transform,
       existingTransform: selectedSlot?.transform
@@ -121,10 +121,10 @@ export default function FullscreenTemplateEditor({
     
     // If the slot already has a transform, use it; otherwise use smart scaling
     if (selectedSlot?.transform && isPhotoTransform(selectedSlot.transform)) {
-      console.log('✅ TRANSFORM DEBUG - Using existing photo-centric transform');
+      if (process.env.NODE_ENV === 'development') console.log('✅ TRANSFORM DEBUG - Using existing photo-centric transform');
       setCurrentTransform(selectedSlot.transform);
     } else if (selectedSlot?.transform && isContainerTransform(selectedSlot.transform)) {
-      console.log('🔧 TRANSFORM DEBUG - Found legacy transform, using smart scaling with slot data');
+      if (process.env.NODE_ENV === 'development') console.log('🔧 TRANSFORM DEBUG - Found legacy transform, using smart scaling with slot data');
       // Legacy transforms can't be easily converted without photo dimensions
       // Use smart scaling with slot data instead - async
       if (selectedPhoto && selectedSlot) {
@@ -138,7 +138,7 @@ export default function FullscreenTemplateEditor({
         setCurrentTransform(createPhotoTransform(1, 0.5, 0.5));
       }
     } else {
-      console.log('🔄 TRANSFORM DEBUG - No existing transform, using smart scaling with slot data');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 TRANSFORM DEBUG - No existing transform, using smart scaling with slot data');
       // Use smart scaling with slot data - async
       if (selectedPhoto && selectedSlot) {
         createSmartPhotoTransformFromSlot(selectedPhoto, selectedSlot)
@@ -158,7 +158,7 @@ export default function FullscreenTemplateEditor({
     const newPhotoId = selectedPhoto?.id || null;
     const slotPhotoId = selectedSlot?.photoId || null;
     
-    console.log('🔧 TRANSFORM DEBUG - Photo change detected:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔧 TRANSFORM DEBUG - Photo change detected:', {
       newPhotoId,
       currentPhotoId,
       slotPhotoId,
@@ -168,12 +168,12 @@ export default function FullscreenTemplateEditor({
 
     // If re-editing the same photo that's already in the slot, preserve its transform
     if (newPhotoId === slotPhotoId && selectedSlot?.transform && isPhotoTransform(selectedSlot.transform)) {
-      console.log('✅ TRANSFORM DEBUG - Re-editing same photo, preserving transform');
+      if (process.env.NODE_ENV === 'development') console.log('✅ TRANSFORM DEBUG - Re-editing same photo, preserving transform');
       setCurrentTransform(selectedSlot.transform);
     }
     // If it's a different photo, reset with smart scaling using slot data
     else if (newPhotoId !== currentPhotoId && newPhotoId !== null) {
-      console.log('🔄 TRANSFORM DEBUG - Different photo selected, using smart scaling with slot data');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 TRANSFORM DEBUG - Different photo selected, using smart scaling with slot data');
       if (selectedPhoto && selectedSlot) {
         createSmartPhotoTransformFromSlot(selectedPhoto, selectedSlot)
           .then(transform => setCurrentTransform(transform))
@@ -199,7 +199,7 @@ export default function FullscreenTemplateEditor({
     // Both template type and print size must match for template swap compatibility
     const isCompatible = templateTypeMatch && printSizeMatch;
     
-    console.log('🔍 Simplified template matching:', { 
+    if (process.env.NODE_ENV === 'development') console.log('🔍 Simplified template matching:', { 
       slotTemplateType: selectedSlot.templateType,
       slotPrintSize: selectedSlot.printSize,
       templateType: t.template_type,
@@ -212,7 +212,7 @@ export default function FullscreenTemplateEditor({
   }) : null;
 
   // Debug: log what template was matched
-  console.log('🎯 Template match result:', {
+  if (process.env.NODE_ENV === 'development') console.log('🎯 Template match result:', {
     slotType: selectedSlot?.templateType,
     slotPrintSize: selectedSlot?.printSize,
     matchedTemplate: pngTemplate ? {
@@ -259,18 +259,18 @@ export default function FullscreenTemplateEditor({
       const immediateUrl = photoCacheService.getImmediateUrl(selectedPhoto);
       setSelectedPhotoUrl(immediateUrl);
       
-      console.log('🚀 Instant display with immediate URL for', selectedPhoto.name);
+      if (process.env.NODE_ENV === 'development') console.log('🚀 Instant display with immediate URL for', selectedPhoto.name);
       
       // Load high-quality blob in background and update when ready
       const loadOptimalPhoto = async () => {
         try {
-          console.log('🔄 Loading optimal blob for template editor...');
+          if (process.env.NODE_ENV === 'development') console.log('🔄 Loading optimal blob for template editor...');
           const blobUrl = await photoCacheService.getBlobUrl(selectedPhoto);
           
           // Only update if this is still the current photo
           if (selectedPhoto && isVisible) {
             setSelectedPhotoUrl(blobUrl);
-            console.log('✅ Upgraded to optimal blob URL for', selectedPhoto.name);
+            if (process.env.NODE_ENV === 'development') console.log('✅ Upgraded to optimal blob URL for', selectedPhoto.name);
           }
         } catch (error) {
           console.error('❌ Failed to load optimal photo:', error);
@@ -289,7 +289,7 @@ export default function FullscreenTemplateEditor({
   }, [selectedPhoto?.id, isVisible]);
 
   // Debug photos array and templateSlots
-  console.log('🔍 FullscreenTemplateEditor state:', {
+  if (process.env.NODE_ENV === 'development') console.log('🔍 FullscreenTemplateEditor state:', {
     isVisible,
     selectedSlot: selectedSlot?.id,
     selectedPhoto: selectedPhoto?.id,
@@ -353,7 +353,7 @@ export default function FullscreenTemplateEditor({
         return;
       }
 
-      console.log('🔧 FullscreenTemplateEditor - Saving photo-centric transform:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔧 FullscreenTemplateEditor - Saving photo-centric transform:', {
         transform: currentTransform,
         photoId: selectedPhoto.id,
         slotId: selectedSlot.id
@@ -381,7 +381,7 @@ export default function FullscreenTemplateEditor({
   const getPhotoUrl = (photoId?: string | null) => {
     if (!photoId) return null;
     const photo = photos.find((p: any) => p.id === photoId);
-    console.log('🔍 getPhotoUrl debug:', { photoId, photo, photoUrl: photo?.url });
+    if (process.env.NODE_ENV === 'development') console.log('🔍 getPhotoUrl debug:', { photoId, photo, photoUrl: photo?.url });
     return photo?.url || null;
   };
 
@@ -515,7 +515,7 @@ export default function FullscreenTemplateEditor({
               const isEditingSlot = slot.id === selectedSlot.id;
               
               // Debug slot state
-              console.log(`🔍 Slot ${holeIndex + 1} debug:`, {
+              if (process.env.NODE_ENV === 'development') console.log(`🔍 Slot ${holeIndex + 1} debug:`, {
                 slotId: slot.id,
                 photoId: slot.photoId,
                 isEditingSlot,
@@ -525,7 +525,7 @@ export default function FullscreenTemplateEditor({
               
               // Debug the first hole only
               if (holeIndex === 0) {
-                console.log('🔍 HOLE vs TEMPLATE DIMENSIONS:', {
+                if (process.env.NODE_ENV === 'development') console.log('🔍 HOLE vs TEMPLATE DIMENSIONS:', {
                   templateDimensions: pngTemplate.dimensions,
                   hole: { x: hole.x, y: hole.y, width: hole.width, height: hole.height },
                   holeAspectRatio: (hole.width / hole.height).toFixed(3),
@@ -613,3 +613,17 @@ export default function FullscreenTemplateEditor({
     </div>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export default React.memo(FullscreenTemplateEditor, (prevProps, nextProps) => {
+  // Compare key props that should trigger re-renders
+  return (
+    prevProps.templateSlots === nextProps.templateSlots &&
+    prevProps.selectedSlot === nextProps.selectedSlot &&
+    prevProps.selectedPhoto === nextProps.selectedPhoto &&
+    prevProps.photos === nextProps.photos &&
+    prevProps.isVisible === nextProps.isVisible &&
+    prevProps.viewMode === nextProps.viewMode &&
+    prevProps.templateToView === nextProps.templateToView
+  );
+});

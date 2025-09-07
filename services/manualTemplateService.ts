@@ -23,12 +23,12 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
    */
   async getAllTemplates(): Promise<ManualTemplate[]> {
     if (this.isCacheValid()) {
-      console.log('📦 Using cached manual templates');
+      if (process.env.NODE_ENV === 'development') console.log('📦 Using cached manual templates');
       return this.cache;
     }
 
     try {
-      console.log('🔄 Loading manual templates from database...');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 Loading manual templates from database...');
       
       const { data, error } = await supabase
         .from('manual_templates')
@@ -44,7 +44,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
       this.cache = data || [];
       this.lastSync = new Date();
       
-      console.log(`✅ Loaded ${this.cache.length} manual templates:`, {
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Loaded ${this.cache.length} manual templates:`, {
         totalTemplates: this.cache.length,
         templatesByType: this.cache.reduce((acc, t) => {
           acc[t.template_type] = (acc[t.template_type] || 0) + 1;
@@ -73,7 +73,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
     const templates = await this.getAllTemplates();
     const activeTemplates = templates.filter(t => t.is_active);
     
-    console.log('🎯 MANUAL TEMPLATE SERVICE - getActiveTemplates() result:', {
+    if (process.env.NODE_ENV === 'development') console.log('🎯 MANUAL TEMPLATE SERVICE - getActiveTemplates() result:', {
       totalTemplatesFromDB: templates.length,
       activeTemplates: activeTemplates.length,
       templatesByType: activeTemplates.reduce((acc, t) => {
@@ -122,7 +122,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
    */
   async createTemplate(templateData: CreateManualTemplateRequest): Promise<ManualTemplate> {
     try {
-      console.log('📝 Creating manual template:', templateData.name);
+      if (process.env.NODE_ENV === 'development') console.log('📝 Creating manual template:', templateData.name);
 
       const { data, error } = await supabase
         .from('manual_templates')
@@ -153,7 +153,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
       // Invalidate cache
       this.clearCache();
       
-      console.log('✅ Manual template created successfully:', data.id);
+      if (process.env.NODE_ENV === 'development') console.log('✅ Manual template created successfully:', data.id);
       return data as ManualTemplate;
     } catch (error) {
       console.error('❌ Create template error:', error);
@@ -166,7 +166,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
    */
   async updateTemplate(id: string, updates: Partial<ManualTemplate>): Promise<ManualTemplate> {
     try {
-      console.log('📝 Updating manual template:', id);
+      if (process.env.NODE_ENV === 'development') console.log('📝 Updating manual template:', id);
 
       // Remove readonly fields
       const { created_at, updated_at, ...updateData } = updates;
@@ -190,7 +190,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
       // Invalidate cache
       this.clearCache();
       
-      console.log('✅ Manual template updated successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Manual template updated successfully');
       return data as ManualTemplate;
     } catch (error) {
       console.error('❌ Update template error:', error);
@@ -203,7 +203,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
    */
   async deleteTemplate(id: string): Promise<void> {
     try {
-      console.log('🗑️ Deleting manual template:', id);
+      if (process.env.NODE_ENV === 'development') console.log('🗑️ Deleting manual template:', id);
 
       const { error } = await supabase
         .from('manual_templates')
@@ -218,7 +218,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
       // Invalidate cache
       this.clearCache();
       
-      console.log('✅ Manual template deleted successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Manual template deleted successfully');
     } catch (error) {
       console.error('❌ Delete template error:', error);
       throw error;
@@ -230,7 +230,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
    */
   async deactivateTemplate(id: string): Promise<void> {
     await this.updateTemplate(id, { is_active: false });
-    console.log('⏸️ Template deactivated:', id);
+    if (process.env.NODE_ENV === 'development') console.log('⏸️ Template deactivated:', id);
   }
 
   /**
@@ -238,7 +238,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
    */
   async activateTemplate(id: string): Promise<void> {
     await this.updateTemplate(id, { is_active: true });
-    console.log('▶️ Template activated:', id);
+    if (process.env.NODE_ENV === 'development') console.log('▶️ Template activated:', id);
   }
 
   /**
@@ -283,7 +283,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
     
     const uniqueTypes = [...new Set(filteredTemplates.map(t => t.template_type))];
     
-    console.log('📋 Available template types:', {
+    if (process.env.NODE_ENV === 'development') console.log('📋 Available template types:', {
       printSize: printSize || 'all',
       templateTypes: uniqueTypes,
       totalTemplates: filteredTemplates.length
@@ -309,7 +309,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
       return acc;
     }, {} as Record<TemplateType, ManualTemplate[]>);
 
-    console.log('🏷️ Templates grouped by type for', printSize + ':', {
+    if (process.env.NODE_ENV === 'development') console.log('🏷️ Templates grouped by type for', printSize + ':', {
       availableTypes: Object.keys(grouped),
       counts: Object.entries(grouped).reduce((acc, [type, templates]) => {
         acc[type] = templates.length;
@@ -337,7 +337,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
     const exactMatch = sizedTemplates.find(t => t.template_type === targetType);
     
     if (exactMatch) {
-      console.log('✅ Found exact template type match:', {
+      if (process.env.NODE_ENV === 'development') console.log('✅ Found exact template type match:', {
         targetType,
         printSize,
         foundTemplate: {
@@ -349,7 +349,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
       return exactMatch;
     }
 
-    console.log('❌ No exact template type match found:', {
+    if (process.env.NODE_ENV === 'development') console.log('❌ No exact template type match found:', {
       targetType,
       printSize,
       availableTypes: sizedTemplates.map(t => t.template_type)
@@ -362,7 +362,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
    * Bulk import from auto-detection system
    */
   async importFromAutoDetection(autoTemplates: any[]): Promise<ManualTemplate[]> {
-    console.log(`📥 Importing ${autoTemplates.length} templates from auto-detection...`);
+    if (process.env.NODE_ENV === 'development') console.log(`📥 Importing ${autoTemplates.length} templates from auto-detection...`);
     const imported: ManualTemplate[] = [];
 
     for (const autoTemplate of autoTemplates) {
@@ -379,13 +379,13 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
         });
         
         imported.push(manualTemplate);
-        console.log(`✅ Imported: ${autoTemplate.name}`);
+        if (process.env.NODE_ENV === 'development') console.log(`✅ Imported: ${autoTemplate.name}`);
       } catch (error) {
         console.error(`❌ Failed to import: ${autoTemplate.name}`, error);
       }
     }
 
-    console.log(`📦 Successfully imported ${imported.length} templates`);
+    if (process.env.NODE_ENV === 'development') console.log(`📦 Successfully imported ${imported.length} templates`);
     return imported;
   }
 
@@ -395,7 +395,7 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
   clearCache(): void {
     this.cache = [];
     this.lastSync = null;
-    console.log('🗑️ Manual template cache cleared');
+    if (process.env.NODE_ENV === 'development') console.log('🗑️ Manual template cache cleared');
   }
 
   /**
@@ -442,13 +442,13 @@ class ManualTemplateServiceImpl implements IManualTemplateService {
       .single();
 
     if (error || !userRecord) {
-      console.log('❌ No user record found for:', email);
+      if (process.env.NODE_ENV === 'development') console.log('❌ No user record found for:', email);
       return { isAdmin: false, email, userRecord: null };
     }
 
     const isAdmin = userRecord.preferences?.role === 'admin' || userRecord.preferences?.role === 'super_admin';
     
-    console.log('🔍 Admin status check:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔍 Admin status check:', {
       email,
       preferences: userRecord.preferences,
       isAdmin

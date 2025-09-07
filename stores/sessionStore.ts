@@ -111,7 +111,7 @@ const useSessionStore = create<SessionStore>()(
             });
             
             set({ session, clientName: sessionData.clientName });
-            console.log('✅ Session created in Supabase:', session.id);
+            if (process.env.NODE_ENV === 'development') console.log('✅ Session created in Supabase:', session.id);
           } catch (error) {
             console.error('❌ Failed to create session in Supabase:', error);
             // Fallback to localStorage
@@ -135,7 +135,7 @@ const useSessionStore = create<SessionStore>()(
           try {
             const { session } = get();
             if (!session || session.id.startsWith('local_')) {
-              console.log('No Supabase session to save');
+              if (process.env.NODE_ENV === 'development') console.log('No Supabase session to save');
               return;
             }
             
@@ -146,7 +146,7 @@ const useSessionStore = create<SessionStore>()(
               is_completed: session.isCompleted,
             });
             
-            console.log('✅ Session saved to Supabase');
+            if (process.env.NODE_ENV === 'development') console.log('✅ Session saved to Supabase');
           } catch (error) {
             console.error('❌ Failed to save session to Supabase:', error);
           }
@@ -156,7 +156,7 @@ const useSessionStore = create<SessionStore>()(
           try {
             const sessions = await supabaseService.getUserSessions(userId);
             set({ userSessions: sessions });
-            console.log(`✅ Loaded ${sessions.length} sessions from Supabase`);
+            if (process.env.NODE_ENV === 'development') console.log(`✅ Loaded ${sessions.length} sessions from Supabase`);
           } catch (error) {
             console.error('❌ Failed to load user sessions:', error);
           }

@@ -67,7 +67,7 @@ class PrintSizeServiceImpl {
       this.cache = Array.from(sizeMap.values());
       this.lastSync = new Date();
 
-      console.log(`✅ Loaded ${this.cache.length} print sizes from database:`, 
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Loaded ${this.cache.length} print sizes from database:`, 
         this.cache.map(p => p.name).join(', '));
 
       return this.cache;
@@ -119,7 +119,7 @@ class PrintSizeServiceImpl {
   clearCache(): void {
     this.cache = [];
     this.lastSync = null;
-    console.log('🗑️ Print size cache cleared - will reload from database');
+    if (process.env.NODE_ENV === 'development') console.log('🗑️ Print size cache cleared - will reload from database');
   }
 
   /**

@@ -32,7 +32,7 @@ export default function TemplateSetupScreen({ onComplete, onBack }: TemplateSetu
         setFolderUrl(`https://drive.google.com/drive/folders/${data.value}`);
       }
     } catch (error) {
-      console.log('No settings found yet');
+      if (process.env.NODE_ENV === 'development') console.log('No settings found yet');
     }
   };
 

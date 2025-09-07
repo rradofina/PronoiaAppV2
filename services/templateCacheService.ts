@@ -62,7 +62,7 @@ class TemplateCacheServiceImpl {
     // Check if we have full quality cached
     const cached = this.getCachedTemplate(templateId);
     if (cached) {
-      console.log(`🚀 Template ${templateId} loaded from cache instantly`);
+      if (process.env.NODE_ENV === 'development') console.log(`🚀 Template ${templateId} loaded from cache instantly`);
       cached.lastAccessed = Date.now();
       
       // Update preview with full quality
@@ -80,7 +80,7 @@ class TemplateCacheServiceImpl {
 
     // Start background download if not already in progress
     if (!this.downloadPromises.has(templateId)) {
-      console.log(`📥 Starting background download for template ${templateId}`);
+      if (process.env.NODE_ENV === 'development') console.log(`📥 Starting background download for template ${templateId}`);
       const downloadPromise = this.downloadAndCache(templateId, driveFileId);
       this.downloadPromises.set(templateId, downloadPromise);
       
@@ -92,14 +92,14 @@ class TemplateCacheServiceImpl {
 
     // Return preview immediately if available
     if (preview?.base64Preview) {
-      console.log(`⚡ Template ${templateId} showing base64 preview instantly`);
+      if (process.env.NODE_ENV === 'development') console.log(`⚡ Template ${templateId} showing base64 preview instantly`);
       
       // Update preview when download completes
       this.downloadPromises.get(templateId)?.then(blobUrl => {
         if (preview) {
           preview.fullQualityBlobUrl = blobUrl;
           preview.isFullQualityLoaded = true;
-          console.log(`✨ Template ${templateId} upgraded to full quality`);
+          if (process.env.NODE_ENV === 'development') console.log(`✨ Template ${templateId} upgraded to full quality`);
         }
       });
       
@@ -111,7 +111,7 @@ class TemplateCacheServiceImpl {
     }
 
     // No preview available, wait for download
-    console.log(`⏳ Template ${templateId} downloading (no preview available)`);
+    if (process.env.NODE_ENV === 'development') console.log(`⏳ Template ${templateId} downloading (no preview available)`);
     const blobUrl = await this.downloadPromises.get(templateId)!;
     
     return {
@@ -130,7 +130,7 @@ class TemplateCacheServiceImpl {
     driveFileId: string;
     base64Preview?: string;
   }>): Promise<void> {
-    console.log(`🎯 Preloading ${templates.length} templates for package`);
+    if (process.env.NODE_ENV === 'development') console.log(`🎯 Preloading ${templates.length} templates for package`);
     
     // Add all previews to cache immediately
     templates.forEach(template => {
@@ -153,7 +153,7 @@ class TemplateCacheServiceImpl {
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
     
-    console.log(`✅ Template preloading complete: ${successful} successful, ${failed} failed`);
+    if (process.env.NODE_ENV === 'development') console.log(`✅ Template preloading complete: ${successful} successful, ${failed} failed`);
   }
 
   /**
@@ -161,7 +161,7 @@ class TemplateCacheServiceImpl {
    */
   private async downloadAndCache(templateId: string, driveFileId: string): Promise<string> {
     try {
-      console.log(`📡 Downloading template ${templateId} from Google Drive`);
+      if (process.env.NODE_ENV === 'development') console.log(`📡 Downloading template ${templateId} from Google Drive`);
       const blob = await googleDriveService.downloadTemplate(driveFileId);
       const blobUrl = URL.createObjectURL(blob);
       
@@ -177,7 +177,7 @@ class TemplateCacheServiceImpl {
       this.cache.set(templateId, cached);
       this.updateCacheMetadata();
       
-      console.log(`💾 Template ${templateId} cached successfully (${this.formatFileSize(blob.size)})`);
+      if (process.env.NODE_ENV === 'development') console.log(`💾 Template ${templateId} cached successfully (${this.formatFileSize(blob.size)})`);
       return blobUrl;
     } catch (error) {
       console.error(`❌ Failed to download template ${templateId}:`, error);
@@ -195,7 +195,7 @@ class TemplateCacheServiceImpl {
     // Check if expired
     const age = Date.now() - cached.cachedAt;
     if (age > this.MAX_CACHE_AGE) {
-      console.log(`🗑️ Template ${templateId} expired from cache`);
+      if (process.env.NODE_ENV === 'development') console.log(`🗑️ Template ${templateId} expired from cache`);
       this.removeFromCache(templateId);
       return null;
     }
@@ -228,7 +228,7 @@ class TemplateCacheServiceImpl {
       const metadata = localStorage.getItem(this.STORAGE_KEY);
       if (metadata) {
         const parsed = JSON.parse(metadata);
-        console.log(`🔄 Template cache initialized with ${Object.keys(parsed).length} entries`);
+        if (process.env.NODE_ENV === 'development') console.log(`🔄 Template cache initialized with ${Object.keys(parsed).length} entries`);
       }
     } catch (error) {
       console.warn('Failed to initialize template cache:', error);
@@ -259,7 +259,7 @@ class TemplateCacheServiceImpl {
 
     // If over size limit, remove least recently used
     if (totalSize > this.MAX_CACHE_SIZE) {
-      console.log(`🧹 Cache size exceeded (${this.formatFileSize(totalSize)}), cleaning up...`);
+      if (process.env.NODE_ENV === 'development') console.log(`🧹 Cache size exceeded (${this.formatFileSize(totalSize)}), cleaning up...`);
       
       // Sort by last accessed (oldest first)
       templates.sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
@@ -272,7 +272,7 @@ class TemplateCacheServiceImpl {
         totalSize -= cached.size;
       }
       
-      console.log(`✅ Cache cleaned up, new size: ${this.formatFileSize(totalSize)}`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Cache cleaned up, new size: ${this.formatFileSize(totalSize)}`);
     }
 
     this.updateCacheMetadata();
@@ -346,7 +346,7 @@ class TemplateCacheServiceImpl {
    * Clear all cached templates
    */
   clearCache(): void {
-    console.log('🗑️ Clearing all template cache');
+    if (process.env.NODE_ENV === 'development') console.log('🗑️ Clearing all template cache');
     for (const cached of this.cache.values()) {
       URL.revokeObjectURL(cached.blobUrl);
     }

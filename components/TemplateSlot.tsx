@@ -46,7 +46,7 @@ function TemplateSlot({
   const hasInlinePhoto = isInlineEditing && inlineEditingPhoto;
   
   // Debug logging
-  console.log(`🕳️ HOLE DEBUG ${holeIndex + 1}/${pngTemplate.holes.length}:`, {
+  if (process.env.NODE_ENV === 'development') console.log(`🕳️ HOLE DEBUG ${holeIndex + 1}/${pngTemplate.holes.length}:`, {
     holeId: hole.id,
     position: { x: hole.x, y: hole.y },
     size: { width: hole.width, height: hole.height },
@@ -63,7 +63,7 @@ function TemplateSlot({
   
   // DEBUG: Log ALL slots to identify multiple editor issue
   if (slot) {
-    console.log(`🔧 SLOT ${holeIndex + 1} (${slot.id}) EDITING CHECK:`, {
+    if (process.env.NODE_ENV === 'development') console.log(`🔧 SLOT ${holeIndex + 1} (${slot.id}) EDITING CHECK:`, {
       slotId: slot.id,
       isSelected,
       isInlineEditing,
@@ -80,14 +80,14 @@ function TemplateSlot({
   // Debug transform values
   if (slot?.transform) {
     if (isPhotoTransform(slot.transform)) {
-      console.log(`🔧 Slot ${holeIndex} photo-centric transform:`, {
+      if (process.env.NODE_ENV === 'development') console.log(`🔧 Slot ${holeIndex} photo-centric transform:`, {
         photoScale: slot.transform.photoScale,
         photoCenterX: slot.transform.photoCenterX,
         photoCenterY: slot.transform.photoCenterY,
         photoUrl: photoUrl?.substring(0, 50) + '...'
       });
     } else if (isContainerTransform(slot.transform)) {
-      console.log(`🔧 Slot ${holeIndex} container transform:`, {
+      if (process.env.NODE_ENV === 'development') console.log(`🔧 Slot ${holeIndex} container transform:`, {
         scale: slot.transform.scale,
         x: slot.transform.x,
         y: slot.transform.y,
@@ -116,7 +116,7 @@ function TemplateSlot({
       const photo = e.detail.photo;
       if (photo && onDropPhoto) {
         onDropPhoto(slot, photo.id);
-        console.log('🎯 Custom drop photo on slot:', { 
+        if (process.env.NODE_ENV === 'development') console.log('🎯 Custom drop photo on slot:', { 
           slotId: slot.id, 
           photoId: photo.id,
           isReplacement: !!slot.photoId 
@@ -138,7 +138,7 @@ function TemplateSlot({
     if (!slot || shouldBlockSlot || isPreviewMode) return;
     e.preventDefault();
     e.stopPropagation();
-    console.log('Drag entered slot:', slot.id);
+    if (process.env.NODE_ENV === 'development') console.log('Drag entered slot:', slot.id);
   };
   
   // Handle drag over
@@ -153,7 +153,7 @@ function TemplateSlot({
     if (!slot || shouldBlockSlot || isPreviewMode) return;
     e.preventDefault();
     e.stopPropagation();
-    console.log('Drag left slot:', slot.id);
+    if (process.env.NODE_ENV === 'development') console.log('Drag left slot:', slot.id);
   };
   
   // Handle drop
@@ -163,7 +163,7 @@ function TemplateSlot({
     e.stopPropagation();
     
     const photoId = e.dataTransfer.getData('photoId');
-    console.log('Desktop drop on slot:', { slotId: slot.id, photoId });
+    if (process.env.NODE_ENV === 'development') console.log('Desktop drop on slot:', { slotId: slot.id, photoId });
     
     if (photoId && onDropPhoto) {
       onDropPhoto(slot, photoId);
@@ -212,7 +212,7 @@ function TemplateSlot({
             onTransformChange={(newTransform) => {
               // Auto-save transform changes
               if (onInlineApply) {
-                console.log('🔧 Auto-saving transform change from TemplateSlot');
+                if (process.env.NODE_ENV === 'development') console.log('🔧 Auto-saving transform change from TemplateSlot');
                 const containerTransform: ContainerTransform = {
                   scale: newTransform.photoScale,
                   x: (0.5 - newTransform.photoCenterX) * 100,
@@ -224,7 +224,7 @@ function TemplateSlot({
             onInteractionEnd={(finalTransform) => {
               // Save final transform after auto-snap
               if (onInlineApply) {
-                console.log('🎯 Auto-snap complete in TemplateSlot');
+                if (process.env.NODE_ENV === 'development') console.log('🎯 Auto-snap complete in TemplateSlot');
                 const containerTransform: ContainerTransform = {
                   scale: finalTransform.photoScale,
                   x: (0.5 - finalTransform.photoCenterX) * 100,

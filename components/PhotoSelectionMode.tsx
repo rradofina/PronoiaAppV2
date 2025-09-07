@@ -122,7 +122,7 @@ function TemplateFirstPhotoCard({ photo }: { photo: Photo }) {
   };
 
   const handleImageLoad = () => {
-    console.log(`✅ Template-first photo loaded: ${photo.name} (URL ${currentUrlIndex + 1}/${fallbackUrls.length})`);
+    if (process.env.NODE_ENV === 'development') console.log(`✅ Template-first photo loaded: ${photo.name} (URL ${currentUrlIndex + 1}/${fallbackUrls.length})`);
     setImageLoaded(true);
     setImageError(false);
   };
@@ -132,7 +132,7 @@ function TemplateFirstPhotoCard({ photo }: { photo: Photo }) {
     
     // Try next fallback URL
     if (currentUrlIndex < fallbackUrls.length - 1) {
-      console.log(`🔄 Trying fallback URL ${currentUrlIndex + 2}/${fallbackUrls.length} for ${photo.name}`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Trying fallback URL ${currentUrlIndex + 2}/${fallbackUrls.length} for ${photo.name}`);
       setCurrentUrlIndex(prev => prev + 1);
       setImageLoaded(false);
       setImageError(false);

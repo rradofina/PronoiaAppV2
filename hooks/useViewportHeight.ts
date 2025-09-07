@@ -30,7 +30,7 @@ export function useViewportHeight() {
       setIsFullscreen(isLikelyFullscreen);
       
       // Log for debugging
-      console.log('Viewport updated:', {
+      if (process.env.NODE_ENV === 'development') console.log('Viewport updated:', {
         innerHeight: vh,
         screenHeight,
         ratio: vh / screenHeight,

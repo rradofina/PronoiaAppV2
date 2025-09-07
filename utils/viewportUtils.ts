@@ -61,7 +61,7 @@ export function setupViewportHandler(callback?: (info: ViewportInfo) => void) {
     // Call optional callback
     callback?.(info);
     
-    console.log('📱 Viewport updated:', {
+    if (process.env.NODE_ENV === 'development') console.log('📱 Viewport updated:', {
       dimensions: `${info.width}×${info.height}`,
       visualHeight: info.visualHeight,
       isIpad: info.isIpad,

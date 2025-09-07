@@ -47,7 +47,7 @@ export default function InlinePhotoEditor({
 
   // Initialize transform when slot or photo changes
   useEffect(() => {
-    console.log('🔧 InlinePhotoEditor - Transform initialization:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔧 InlinePhotoEditor - Transform initialization:', {
       slotId: slot?.id,
       hasExistingTransform: !!slot?.transform,
       existingTransform: slot?.transform,
@@ -62,18 +62,18 @@ export default function InlinePhotoEditor({
     
     // If the slot already has a transform and we're re-editing the same photo, use it
     if (slot?.transform && isPhotoTransform(slot.transform) && slot.photoId === photo?.id) {
-      console.log('✅ InlinePhotoEditor - Using existing transform for same photo');
+      if (process.env.NODE_ENV === 'development') console.log('✅ InlinePhotoEditor - Using existing transform for same photo');
       setCurrentTransform(slot.transform);
     } else {
       // For new photos or replacements, use smart transform for auto-fit
-      console.log('🔄 InlinePhotoEditor - Using smart transform for auto-fit');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 InlinePhotoEditor - Using smart transform for auto-fit');
       if (photo && slot) {
         // Store the timestamp when we start calculating
         const calculationStartTime = Date.now();
         
         createSmartPhotoTransformFromSlot(photo, slot)
           .then(transform => {
-            console.log('✨ Smart transform calculated:', transform);
+            if (process.env.NODE_ENV === 'development') console.log('✨ Smart transform calculated:', transform);
             // Only apply if user hasn't interacted yet (no manual changes)
             // Check if the component is still mounted and no user interaction occurred
             setCurrentTransform(prevTransform => {
@@ -81,10 +81,10 @@ export default function InlinePhotoEditor({
               if (prevTransform.photoScale === 1 && 
                   prevTransform.photoCenterX === 0.5 && 
                   prevTransform.photoCenterY === 0.5) {
-                console.log('✅ Applying smart transform - no user changes detected');
+                if (process.env.NODE_ENV === 'development') console.log('✅ Applying smart transform - no user changes detected');
                 return transform;
               } else {
-                console.log('⏭️ Skipping smart transform - user has already made changes');
+                if (process.env.NODE_ENV === 'development') console.log('⏭️ Skipping smart transform - user has already made changes');
                 return prevTransform;
               }
             });
@@ -114,18 +114,18 @@ export default function InlinePhotoEditor({
       const immediateUrl = photoCacheService.getImmediateUrl(photo);
       setSelectedPhotoUrl(immediateUrl);
       
-      console.log('🚀 InlinePhotoEditor - Instant display with immediate URL for', photo.name);
+      if (process.env.NODE_ENV === 'development') console.log('🚀 InlinePhotoEditor - Instant display with immediate URL for', photo.name);
       
       // Load high-quality blob in background and update when ready
       const loadOptimalPhoto = async () => {
         try {
-          console.log('🔄 InlinePhotoEditor - Loading optimal blob...');
+          if (process.env.NODE_ENV === 'development') console.log('🔄 InlinePhotoEditor - Loading optimal blob...');
           const blobUrl = await photoCacheService.getBlobUrl(photo);
           
           // Only update if this is still the current photo
           if (photo) {
             setSelectedPhotoUrl(blobUrl);
-            console.log('✅ InlinePhotoEditor - Upgraded to optimal blob URL for', photo.name);
+            if (process.env.NODE_ENV === 'development') console.log('✅ InlinePhotoEditor - Upgraded to optimal blob URL for', photo.name);
           }
         } catch (error) {
           console.error('❌ InlinePhotoEditor - Failed to load optimal photo:', error);
@@ -143,7 +143,7 @@ export default function InlinePhotoEditor({
   // Handle transform changes from PhotoRenderer
   const handleTransformChange = (newTransform: PhotoTransform) => {
     setCurrentTransform(newTransform);
-    console.log('🔧 InlinePhotoEditor - Transform updated by user interaction:', {
+    if (process.env.NODE_ENV === 'development') console.log('🔧 InlinePhotoEditor - Transform updated by user interaction:', {
       photoScale: newTransform.photoScale,
       photoCenterX: newTransform.photoCenterX,
       photoCenterY: newTransform.photoCenterY,
@@ -153,7 +153,7 @@ export default function InlinePhotoEditor({
 
   // Smart reset callback for intelligent photo repositioning
   const handleSmartReset = useCallback(async (): Promise<PhotoTransform> => {
-    console.log('🎯 InlinePhotoEditor - Smart reset requested');
+    if (process.env.NODE_ENV === 'development') console.log('🎯 InlinePhotoEditor - Smart reset requested');
     if (!photo || !slot) {
       console.warn('⚠️ Smart reset failed: missing photo or slot data');
       return createPhotoTransform(1, 0.5, 0.5);
@@ -161,7 +161,7 @@ export default function InlinePhotoEditor({
     
     try {
       const smartTransform = await createSmartPhotoTransformFromSlot(photo, slot);
-      console.log('✅ InlinePhotoEditor - Smart reset successful:', smartTransform);
+      if (process.env.NODE_ENV === 'development') console.log('✅ InlinePhotoEditor - Smart reset successful:', smartTransform);
       return smartTransform;
     } catch (error) {
       console.error('❌ InlinePhotoEditor - Smart reset failed:', error);
@@ -171,7 +171,7 @@ export default function InlinePhotoEditor({
 
   // Handle apply button click
   const handleApply = () => {
-    console.log('🔧 InlinePhotoEditor - APPLY BUTTON CLICKED');
+    if (process.env.NODE_ENV === 'development') console.log('🔧 InlinePhotoEditor - APPLY BUTTON CLICKED');
     
     try {
       if (!slot?.id || !photo?.id) {
@@ -185,18 +185,18 @@ export default function InlinePhotoEditor({
       }
 
       // Call finalization method to apply auto-snap gap detection
-      console.log('🔧 InlinePhotoEditor - Calling finalization method for auto-snap...');
-      console.log('📐 Current transform before finalization:', {
+      if (process.env.NODE_ENV === 'development') console.log('🔧 InlinePhotoEditor - Calling finalization method for auto-snap...');
+      if (process.env.NODE_ENV === 'development') console.log('📐 Current transform before finalization:', {
         photoScale: currentTransform.photoScale,
         photoCenterX: currentTransform.photoCenterX,
         photoCenterY: currentTransform.photoCenterY
       });
       
       if (finalizationRef.current) {
-        console.log('✅ InlinePhotoEditor - Finalization ref available, calling...');
+        if (process.env.NODE_ENV === 'development') console.log('✅ InlinePhotoEditor - Finalization ref available, calling...');
         finalizationRef.current()
           .then(finalTransform => {
-            console.log('🔧 InlinePhotoEditor - Finalization complete, applying transform:', {
+            if (process.env.NODE_ENV === 'development') console.log('🔧 InlinePhotoEditor - Finalization complete, applying transform:', {
               transform: finalTransform,
               photoId: photo.id,
               slotId: slot.id,
@@ -209,26 +209,26 @@ export default function InlinePhotoEditor({
             });
             
             onApply(slot.id, photo.id, finalTransform);
-            console.log('✅ InlinePhotoEditor - onApply called successfully with finalized transform');
+            if (process.env.NODE_ENV === 'development') console.log('✅ InlinePhotoEditor - onApply called successfully with finalized transform');
           })
           .catch(error => {
             console.error('❌ InlinePhotoEditor - Finalization failed:', error);
             // Fallback to current transform
-            console.log('📐 Using fallback current transform:', currentTransform);
+            if (process.env.NODE_ENV === 'development') console.log('📐 Using fallback current transform:', currentTransform);
             onApply(slot.id, photo.id, currentTransform);
-            console.log('⚠️ InlinePhotoEditor - Used fallback transform due to finalization error');
+            if (process.env.NODE_ENV === 'development') console.log('⚠️ InlinePhotoEditor - Used fallback transform due to finalization error');
           });
       } else {
-        console.log('❌ InlinePhotoEditor - No finalization ref available, using current transform');
-        console.log('📐 Using current transform without finalization:', currentTransform);
+        if (process.env.NODE_ENV === 'development') console.log('❌ InlinePhotoEditor - No finalization ref available, using current transform');
+        if (process.env.NODE_ENV === 'development') console.log('📐 Using current transform without finalization:', currentTransform);
         onApply(slot.id, photo.id, currentTransform);
-        console.log('⚠️ InlinePhotoEditor - Used current transform without finalization');
+        if (process.env.NODE_ENV === 'development') console.log('⚠️ InlinePhotoEditor - Used current transform without finalization');
       }
     } catch (error) {
       console.error('🚨 InlinePhotoEditor - Error in handleApply:', error);
       // Fallback to smart transform if we have valid IDs
       if (slot?.id && photo?.id && onApply) {
-        console.log('🔄 InlinePhotoEditor - Trying fallback with smart transform and slot data');
+        if (process.env.NODE_ENV === 'development') console.log('🔄 InlinePhotoEditor - Trying fallback with smart transform and slot data');
         createSmartPhotoTransformFromSlot(photo, slot)
           .then(fallbackTransform => {
             onApply(slot.id, photo.id, fallbackTransform);
@@ -243,16 +243,16 @@ export default function InlinePhotoEditor({
 
   // Handle cancel button click
   const handleCancel = () => {
-    console.log('🔧 InlinePhotoEditor - CANCEL BUTTON CLICKED');
+    if (process.env.NODE_ENV === 'development') console.log('🔧 InlinePhotoEditor - CANCEL BUTTON CLICKED');
     
     if (!onCancel) {
       console.error('🚨 InlinePhotoEditor - onCancel handler is missing!');
       return;
     }
 
-    console.log('🔧 InlinePhotoEditor - Calling onCancel handler');
+    if (process.env.NODE_ENV === 'development') console.log('🔧 InlinePhotoEditor - Calling onCancel handler');
     onCancel();
-    console.log('✅ InlinePhotoEditor - onCancel called successfully');
+    if (process.env.NODE_ENV === 'development') console.log('✅ InlinePhotoEditor - onCancel called successfully');
   };
 
   if (!selectedPhotoUrl) {

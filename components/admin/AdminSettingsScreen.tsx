@@ -69,7 +69,7 @@ export default function AdminSettingsScreen({
     try {
       await adminService.updateUserRole(user.id, newRole);
       await loadData(); // Reload to show updated data
-      console.log(`✅ Updated ${user.email} to role: ${newRole || 'regular user'}`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Updated ${user.email} to role: ${newRole || 'regular user'}`);
     } catch (err: any) {
       setError(`Failed to update user role: ${err.message}`);
     }
@@ -82,7 +82,7 @@ export default function AdminSettingsScreen({
     try {
       await adminService.updateUserRoleByEmail(currentUser.email, 'admin');
       await loadData();
-      console.log(`✅ Made ${currentUser.email} an admin`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Made ${currentUser.email} an admin`);
     } catch (err: any) {
       setError(`Failed to make current user admin: ${err.message}`);
     }
@@ -110,7 +110,7 @@ export default function AdminSettingsScreen({
       setNewUserData({ email: '', name: '', role: '' });
       setShowAddUserModal(false);
       
-      console.log(`✅ Created user: ${userData.email}`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Created user: ${userData.email}`);
     } catch (err: any) {
       setError(`Failed to create user: ${err.message}`);
     } finally {

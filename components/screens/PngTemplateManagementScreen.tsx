@@ -42,7 +42,7 @@ function TemplateCard({ template, onRefresh, onEdit }: TemplateCardProps) {
           return;
         }
         
-        console.log('📥 Downloading template preview:', template.name, 'ID:', fileId);
+        if (process.env.NODE_ENV === 'development') console.log('📥 Downloading template preview:', template.name, 'ID:', fileId);
         const blob = await googleDriveService.downloadTemplate(fileId);
         const url = URL.createObjectURL(blob);
         setBlobUrl(url);
@@ -242,7 +242,7 @@ export default function PngTemplateManagementScreen({
       const allTemplates = await manualTemplateService.getAllTemplates();
       setTemplates(allTemplates);
       
-      console.log(`✅ Loaded ${allTemplates.length} templates`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Loaded ${allTemplates.length} templates`);
     } catch (err: any) {
       console.error('❌ Error loading templates:', err);
       setError(err.message || 'Failed to load templates');

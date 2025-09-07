@@ -95,7 +95,7 @@ class TemplateConfigServiceImpl {
       this.cache = Array.from(typeConfigs.values());
       this.lastSync = new Date();
 
-      console.log(`✅ Loaded ${this.cache.length} template types from database:`, 
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Loaded ${this.cache.length} template types from database:`, 
         this.cache.map(t => `${t.id} (${t.slots} slots)`).join(', '));
 
       return this.cache;
@@ -254,7 +254,7 @@ class TemplateConfigServiceImpl {
   clearCache(): void {
     this.cache = [];
     this.lastSync = null;
-    console.log('🗑️ Template config cache cleared - will reload from database');
+    if (process.env.NODE_ENV === 'development') console.log('🗑️ Template config cache cleared - will reload from database');
   }
 
   /**

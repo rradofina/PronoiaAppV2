@@ -49,7 +49,7 @@ function getOptimizedPhotoUrl(photo: Photo, size: string = 's300'): string {
     method = 'originalUrl';
   }
 
-  console.log(`🔗 Optimized photo URL for ${photo.name}:`, {
+  if (process.env.NODE_ENV === 'development') console.log(`🔗 Optimized photo URL for ${photo.name}:`, {
     method,
     size,
     originalUrl: photo.url?.substring(0, 60) + '...',
@@ -72,14 +72,14 @@ export function getSamplePhotosForTemplate(
   
   // Only proceed if we have actual photos from the client folder
   if (availablePhotos.length === 0 || templateHoleCount === 0) {
-    console.log(`⚠️ No photos available for template ${templateId} or no holes to fill`);
+    if (process.env.NODE_ENV === 'development') console.log(`⚠️ No photos available for template ${templateId} or no holes to fill`);
     return samplePhotos;
   }
   
   // Use template ID to ensure consistent sample photos for the same template
   const seedValue = templateId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   
-  console.log(`📸 Auto-filling template ${templateId} with ${templateHoleCount} photos from ${availablePhotos.length} available`);
+  if (process.env.NODE_ENV === 'development') console.log(`📸 Auto-filling template ${templateId} with ${templateHoleCount} photos from ${availablePhotos.length} available`);
   
   // Create a shuffled array of photo indices for better distribution
   const shuffledIndices: number[] = [];
@@ -98,7 +98,7 @@ export function getSamplePhotosForTemplate(
     const photoIndex = shuffledIndices[i % shuffledIndices.length];
     const originalPhoto = availablePhotos[photoIndex];
     
-    console.log(`📸 Assigning photo ${i + 1}/${templateHoleCount} for template ${templateId}:`, {
+    if (process.env.NODE_ENV === 'development') console.log(`📸 Assigning photo ${i + 1}/${templateHoleCount} for template ${templateId}:`, {
       slotIndex: i,
       photoIndex,
       photoName: originalPhoto.name,
@@ -117,6 +117,6 @@ export function getSamplePhotosForTemplate(
     samplePhotos.push(optimizedPhoto);
   }
   
-  console.log(`✅ Generated ${samplePhotos.length} optimized preview photos for template ${templateId}`);
+  if (process.env.NODE_ENV === 'development') console.log(`✅ Generated ${samplePhotos.length} optimized preview photos for template ${templateId}`);
   return samplePhotos;
 }

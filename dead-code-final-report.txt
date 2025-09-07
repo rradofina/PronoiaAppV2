@@ -1,0 +1,71 @@
+\components\ErrorBoundary.tsx:16 - default
+\components\FullscreenTemplateEditor.tsx:22 - default
+\components\PhotoRenderer.tsx:1843 - convertPhotoToCSS (used in module)
+\components\PhotoRenderer.tsx:1843 - convertLegacyToCSS (used in module)
+\components\TemplateSlot.tsx:351 - default
+\components\TemplateVisualWrapper.tsx:214 - default
+\hooks\useTemplateInitialization.ts:8 - useTemplateInitialization
+\hooks\useViewportConstraints.ts:20 - useViewportConstraints
+\hooks\useViewportConstraints.ts:175 - getHeightClass
+\hooks\useViewportConstraints.ts:190 - getAdaptivePhotoHeight
+\middleware\adminAuth.ts:14 - checkAdminAuth
+\middleware\adminAuth.ts:61 - withAdminAuth
+\middleware\adminAuth.ts:84 - isAdminRoute
+\middleware\adminAuth.ts:4 - AdminAuthResult (used in module)
+\pages\_app.tsx:11 - default
+\pages\_document.tsx:3 - default
+\pages\index.tsx:181 - default
+\pages\privacy.tsx:106 - default
+\pages\terms.tsx:129 - default
+\services\adminService.ts:13 - SQLQueryResult (used in module)
+\services\hybridTemplateService.ts:11 - HybridTemplate (used in module)
+\services\hybridTemplateService.ts:322 - hybridTemplateService
+\services\loggerService.ts:6 - LogLevel (used in module)
+\services\loggerService.ts:8 - LogEntry (used in module)
+\services\loggerService.ts:18 - LoggerService (used in module)
+\services\loggerService.ts:230 - log (used in module)
+\services\loggerService.ts:231 - logError
+\services\loggerService.ts:232 - logWarn
+\services\loggerService.ts:233 - logDebug
+\services\pngTemplateService.ts:32 - TemplateFolder
+\services\pngTemplateService.ts:38 - PngTemplateService (used in module)
+\services\sessionTemplateService.ts:28 - SessionTemplate
+\services\sessionTemplateService.ts:473 - sessionTemplateService
+\services\supabaseService.ts:12 - SupabaseService (used in module)
+\services\templateConfigService.ts:9 - TemplateTypeConfig (used in module)
+\services\templateConfigService.ts:26 - DatabaseTemplate (used in module)
+\services\templateGenerationService.ts:398 - templateGenerationService (used in module)
+\services\templateGenerationService.ts:399 - default
+\services\templateRasterizationService.ts:14 - RasterizedTemplate (used in module)
+\services\templateRasterizationService.ts:21 - RasterizationOptions (used in module)
+\services\templateRasterizationService.ts:591 - default
+\services\templateSyncService.ts:14 - SyncStatus (used in module)
+\stores\useAppStore.ts:569 - default
+\utils\clippingDetection.ts:16 - getViewportInfo
+\utils\constants.ts:34 - SUPPORTED_IMAGE_EXTENSIONS (used in module)
+\utils\constants.ts:44 - UI_CONSTANTS (used in module)
+\utils\constants.ts:100 - SUCCESS_MESSAGES
+\utils\constants.ts:120 - DEFAULTS
+\utils\constants.ts:133 - calculatePhotoSlots
+\utils\constants.ts:140 - validateTemplateType
+\utils\constants.ts:148 - validateImageFile
+\utils\constants.ts:152 - validateImageUrl
+\utils\constants.ts:170 - TEMPLATE_BUILDER (used in module)
+\utils\constants.ts:232 - ADMIN_PERMISSIONS
+\utils\constants.ts:241 - TEMPLATE_VALIDATION
+\utils\printSizeDimensions.ts:51 - getPrintSizeAspectRatio
+\utils\printSizeDimensions.ts:63 - dimensionsMatchPrintSize
+\utils\printSizeDimensions.ts:3 - PrintDimensions (used in module)
+\utils\samplePhotoUtils.ts:13 - shouldUseSamplePhotos
+\utils\transformUtils.ts:16 - createContainerTransform
+\utils\viewportUtils.ts:102 - needsViewportFix
+\utils\viewportUtils.ts:110 - getSafeViewportHeight
+\utils\viewportUtils.ts:6 - ViewportInfo (used in module)
+\components\screens\ReviewScreen.tsx:17 - default
+\components\screens\TemplateSelectionScreen.tsx:20 - default
+\pages\admin\index.tsx:21 - default
+\pages\api\version.ts:5 - default
+\pages\admin\templates\index.tsx:58 - default
+\pages\api\admin\setup.ts:7 - default
+\pages\api\auth\callback.ts:3 - default
+\pages\api\auth\refresh.ts:3 - default

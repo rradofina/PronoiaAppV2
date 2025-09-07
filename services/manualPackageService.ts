@@ -23,12 +23,12 @@ class ManualPackageServiceImpl implements IManualPackageService {
    */
   async getAllPackages(): Promise<ManualPackage[]> {
     if (this.isCacheValid()) {
-      console.log('📦 Using cached packages');
+      if (process.env.NODE_ENV === 'development') console.log('📦 Using cached packages');
       return this.cache;
     }
 
     try {
-      console.log('🔄 Loading packages from database...');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 Loading packages from database...');
       
       const { data, error } = await supabase
         .from('manual_packages')
@@ -42,7 +42,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
       this.cache = data || [];
       this.lastSync = new Date();
 
-      console.log(`✅ Loaded ${this.cache.length} packages from database`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Loaded ${this.cache.length} packages from database`);
       return this.cache;
     } catch (error) {
       console.error('❌ Error loading packages:', error);
@@ -71,7 +71,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
    */
   async getPackageWithTemplates(id: string): Promise<ManualPackageWithTemplates | null> {
     try {
-      console.log(`🔄 Loading package with templates: ${id}`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Loading package with templates: ${id}`);
       
       const { data, error } = await supabase
         .from('manual_packages')
@@ -95,7 +95,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
         throw new Error(`Database error: ${error.message}`);
       }
 
-      console.log('🔍 RAW DATABASE RESPONSE:', JSON.stringify(data, null, 2));
+      if (process.env.NODE_ENV === 'development') console.log('🔍 RAW DATABASE RESPONSE:', JSON.stringify(data, null, 2));
 
       // Transform the response to match expected structure
       const packageWithTemplates: ManualPackageWithTemplates = {
@@ -103,8 +103,8 @@ class ManualPackageServiceImpl implements IManualPackageService {
         templates: data.package_templates?.map((pt: any) => pt.template).filter(Boolean) || []
       };
 
-      console.log(`✅ Loaded package with ${packageWithTemplates.templates?.length || 0} templates`);
-      console.log('📋 Template details:', packageWithTemplates.templates?.map(t => ({
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Loaded package with ${packageWithTemplates.templates?.length || 0} templates`);
+      if (process.env.NODE_ENV === 'development') console.log('📋 Template details:', packageWithTemplates.templates?.map(t => ({
         id: t?.id,
         name: t?.name,
         type: t?.template_type
@@ -122,7 +122,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
    */
   async createPackage(packageData: CreateManualPackageRequest): Promise<ManualPackage> {
     try {
-      console.log('🔄 Creating new package...');
+      if (process.env.NODE_ENV === 'development') console.log('🔄 Creating new package...');
       
       // Start transaction
       const { data: newPackage, error: packageError } = await supabase
@@ -172,7 +172,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
       }
 
       this.clearCache();
-      console.log(`✅ Package created: ${newPackage.name}`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Package created: ${newPackage.name}`);
       return newPackage;
     } catch (error) {
       console.error('❌ Error creating package:', error);
@@ -185,7 +185,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
    */
   async updatePackage(id: string, updates: Partial<ManualPackage>): Promise<ManualPackage> {
     try {
-      console.log(`🔄 Updating package: ${id}`, { id, idType: typeof id, updates });
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Updating package: ${id}`, { id, idType: typeof id, updates });
       
       // First check if the package exists
       const { data: existingPackage, error: checkError } = await supabase
@@ -202,7 +202,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
         throw new Error(`Package with ID ${id} not found`);
       }
 
-      console.log(`✅ Package exists: ${existingPackage.name}, proceeding with update`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Package exists: ${existingPackage.name}, proceeding with update`);
 
       const { data, error } = await supabase
         .from('manual_packages')
@@ -227,7 +227,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
 
       const updatedPackage = data[0];
       this.clearCache();
-      console.log(`✅ Package updated: ${updatedPackage.name}`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Package updated: ${updatedPackage.name}`);
       return updatedPackage;
     } catch (error) {
       console.error(`❌ Error updating package ${id}:`, error);
@@ -240,7 +240,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
    */
   async deletePackage(id: string): Promise<void> {
     try {
-      console.log(`🔄 Deleting package: ${id}`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Deleting package: ${id}`);
       
       // Delete template associations first (due to foreign key constraint)
       const { error: templateError } = await supabase
@@ -263,7 +263,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
       }
 
       this.clearCache();
-      console.log('✅ Package deleted successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Package deleted successfully');
     } catch (error) {
       console.error(`❌ Error deleting package ${id}:`, error);
       throw error;
@@ -275,7 +275,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
    */
   async addTemplatesToPackage(packageId: string, templateIds: string[]): Promise<void> {
     try {
-      console.log(`🔄 Adding ${templateIds.length} templates to package ${packageId}`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Adding ${templateIds.length} templates to package ${packageId}`);
       
       // Get current max position and order index
       const { data: existingTemplates } = await supabase
@@ -306,7 +306,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
       // Update package template count
       await this.updatePackageTemplateCount(packageId);
       
-      console.log('✅ Templates added to package');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Templates added to package');
     } catch (error) {
       console.error(`❌ Error adding templates to package:`, error);
       throw error;
@@ -318,7 +318,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
    */
   async removeTemplatesFromPackage(packageId: string, templateIds: string[]): Promise<void> {
     try {
-      console.log(`🔄 Removing ${templateIds.length} templates from package ${packageId}`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Removing ${templateIds.length} templates from package ${packageId}`);
       
       const { error } = await supabase
         .from('package_templates')
@@ -333,7 +333,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
       // Update package template count
       await this.updatePackageTemplateCount(packageId);
       
-      console.log('✅ Templates removed from package');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Templates removed from package');
     } catch (error) {
       console.error(`❌ Error removing templates from package:`, error);
       throw error;
@@ -345,7 +345,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
    */
   async reorderPackageTemplates(packageId: string, templateOrder: { template_id: string; order_index: number }[]): Promise<void> {
     try {
-      console.log(`🔄 Reordering templates in package ${packageId}`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Reordering templates in package ${packageId}`);
       
       // Update order for each template
       for (const item of templateOrder) {
@@ -360,7 +360,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
         }
       }
       
-      console.log('✅ Templates reordered successfully');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Templates reordered successfully');
     } catch (error) {
       console.error(`❌ Error reordering templates:`, error);
       throw error;
@@ -373,7 +373,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
    */
   async replaceTemplateAtPosition(packageId: string, position: number, newTemplateId: string): Promise<void> {
     try {
-      console.log(`🔄 Replacing template at position ${position} in package ${packageId} with template ${newTemplateId}`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Replacing template at position ${position} in package ${packageId} with template ${newTemplateId}`);
       
       // Verify the position exists
       const { data: existingTemplate } = await supabase
@@ -387,7 +387,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
         throw new Error(`No template found at position ${position} in package ${packageId}`);
       }
 
-      console.log(`📋 Replacing template ${existingTemplate.template_id} → ${newTemplateId} at position ${position}`);
+      if (process.env.NODE_ENV === 'development') console.log(`📋 Replacing template ${existingTemplate.template_id} → ${newTemplateId} at position ${position}`);
 
       // Update the template_id at the specific position
       const { error } = await supabase
@@ -403,7 +403,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
       // Clear cache since package templates changed
       this.clearCache();
       
-      console.log(`✅ Template replaced successfully at position ${position}`);
+      if (process.env.NODE_ENV === 'development') console.log(`✅ Template replaced successfully at position ${position}`);
     } catch (error) {
       console.error(`❌ Error replacing template at position ${position}:`, error);
       throw error;
@@ -429,7 +429,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
    */
   async setAsDefault(id: string): Promise<void> {
     try {
-      console.log(`🔄 Setting package ${id} as default`);
+      if (process.env.NODE_ENV === 'development') console.log(`🔄 Setting package ${id} as default`);
       
       // Get the package to know its print size
       const pkg = await this.getPackageWithTemplates(id);
@@ -450,7 +450,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
       // Set this package as default
       await this.updatePackage(id, { is_default: true });
       
-      console.log('✅ Package set as default');
+      if (process.env.NODE_ENV === 'development') console.log('✅ Package set as default');
     } catch (error) {
       console.error(`❌ Error setting default package:`, error);
       throw error;
@@ -491,7 +491,7 @@ class ManualPackageServiceImpl implements IManualPackageService {
   clearCache(): void {
     this.cache = [];
     this.lastSync = null;
-    console.log('🗑️ Package cache cleared');
+    if (process.env.NODE_ENV === 'development') console.log('🗑️ Package cache cleared');
   }
 
   /**
