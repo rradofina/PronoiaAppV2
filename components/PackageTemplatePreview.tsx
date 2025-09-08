@@ -1,39 +1,14 @@
-import React, { useState } from 'react';
-import { ManualTemplate, Photo } from '../types';
+import React, { useState, useEffect } from 'react';
+import { ManualTemplate, Photo, TemplateSlot } from '../types';
 import { AnimatedTemplateItem } from './animations/AnimatedTemplateReveal';
 import PngTemplateVisual from './PngTemplateVisual';
 import TemplateSelectionModal from './TemplateSelectionModal';
 import AddPrintsModal from './AddPrintsModal';
 import ConfirmationModal from './ConfirmationModal';
 import { getSamplePhotosForTemplate } from '../utils/samplePhotoUtils';
-import { createPhotoTransform, PhotoTransform } from '../types';
+import { createPhotoTransform, PhotoTransform, createSmartPhotoTransformFromSlot } from '../types';
 import { getPrintSizeDimensions } from '../utils/printSizeDimensions';
-
-// Create smart preview transform that optimizes photo for hole aspect ratio with gap-free auto-fit
-function createPreviewTransform(holeAspectRatio: number, photoAspectRatio: number | null = null): PhotoTransform {
-  // For preview mode, we want photos to completely fill holes with no gaps (object-cover behavior)
-  // Calculate the scale needed to ensure no empty space in holes
-  let previewScale = 1.0; // Start with base scale
-  
-  // If we know the photo aspect ratio, calculate exact scale for gap-free fit
-  if (photoAspectRatio) {
-    if (photoAspectRatio > holeAspectRatio) {
-      // Photo is wider than hole - need to scale by height to fill completely
-      // This ensures height fills hole completely, width may overflow (no gaps)
-      previewScale = 1.0; // PhotoRenderer with object-cover handles this automatically
-    } else {
-      // Photo is taller than hole - need to scale by width to fill completely  
-      // This ensures width fills hole completely, height may overflow (no gaps)
-      previewScale = 1.0; // PhotoRenderer with object-cover handles this automatically
-    }
-  } else {
-    // No photo aspect ratio available, use safe auto-fit scale
-    previewScale = 1.0; // Let object-cover behavior handle gap elimination
-  }
-  
-  // Center the photo by default for preview - object-cover will handle proper scaling
-  return createPhotoTransform(previewScale, 0.5, 0.5);
-}
+import PreviewTemplateWithSmartTransforms from './PreviewTemplateWithSmartTransforms';
 
 interface PackageTemplatePreviewProps {
   templates: ManualTemplate[];
@@ -81,6 +56,9 @@ export default function PackageTemplatePreview({
   
   // Use templates directly from props since parent manages state
   const currentTemplates = templates;
+
+  // This is a PREVIEW system - always show sample photos regardless of user photos
+  // Keep it simple and fast
 
   // Modal handlers
   const handleChangeTemplate = (template: ManualTemplate, index: number) => {
@@ -227,196 +205,23 @@ export default function PackageTemplatePreview({
       {/* Templates Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {currentTemplates.map((template, index) => {
-          if (process.env.NODE_ENV === 'development') console.log(`🎨 RENDERING TEMPLATE ${index + 1}:`, {
-            templateId: template.id,
-            templateName: template.name,
-            templateType: template.template_type,
-            renderTimestamp: new Date().toISOString()
-          });
-          
           // Calculate global hole index offset for this template
           const globalHoleOffset = currentTemplates.slice(0, index).reduce((offset, prevTemplate) => {
             return offset + (prevTemplate.holes_data?.length || 0);
           }, 0);
-          if (process.env.NODE_ENV === 'development') console.log(`🔍 TEMPLATE PREVIEW DEBUG - Processing template ${index + 1}:`, {
-            templateId: template.id,
-            templateName: template.name,
-            templateType: template.template_type,
-            driveFileId: template.drive_file_id,
-            holesCount: template.holes_data?.length || 0,
-            holes: template.holes_data?.slice(0, 3), // Show first 3 holes for debugging
-            availablePhotosCount: availablePhotos.length
-          });
-
-          // Generate sample photos for this template
-          const samplePhotos = getSamplePhotosForTemplate(
-            availablePhotos,
-            template.holes_data?.length || 0,
-            template.id.toString()
-          );
-
-          if (process.env.NODE_ENV === 'development') console.log(`📸 PHOTO ASSIGNMENT DEBUG - Template ${template.id}:`, {
-            requestedPhotos: template.holes_data?.length || 0,
-            generatedPhotos: samplePhotos.length,
-            photoIds: samplePhotos.map(p => p.id),
-            photoUrls: samplePhotos.map(p => p.url?.substring(0, 80) + '...')
-          });
-
-          // Create mock template slots for sample photos with smart preview transforms
-          const sampleSlots = samplePhotos.map((photo, slotIndex) => {
-            // Calculate hole aspect ratio for this slot
-            const hole = template.holes_data?.[slotIndex];
-            const holeAspectRatio = hole ? hole.width / hole.height : 1.0;
-            
-            // Estimate photo aspect ratio (assume typical photo ratios if not available)
-            // Most photos are either 4:3, 3:2, or 16:9 - we'll use 3:2 as default
-            const photoAspectRatio = 3/2; // Can be refined with actual photo dimensions later
-            
-            // Create smart preview transform for this hole
-            const previewTransform = createPreviewTransform(holeAspectRatio, photoAspectRatio);
-            
-            if (process.env.NODE_ENV === 'development') console.log(`🎯 SMART PREVIEW TRANSFORM - Slot ${slotIndex + 1}:`, {
-              holeSize: hole ? `${Math.round(hole.width)}×${Math.round(hole.height)}` : 'unknown',
-              holeAspectRatio: holeAspectRatio.toFixed(2),
-              photoAspectRatio: photoAspectRatio.toFixed(2),
-              previewScale: previewTransform.photoScale,
-              strategy: holeAspectRatio > 1.3 ? 'wide hole' : holeAspectRatio < 0.8 ? 'tall hole' : 'square hole'
-            });
-            
-            return {
-              id: `sample-slot-${template.id}-${slotIndex}`,
-              templateId: template.id.toString(),
-              templateName: template.name,
-              templateType: template.template_type,
-              slotIndex,
-              photoId: photo.id,
-              transform: previewTransform
-            };
-          });
-
-          // Create photo filename assignments for this template's holes
-          const holePhotoAssignments = (template.holes_data || []).map((hole, holeIndex) => {
-            const globalHoleIndex = globalHoleOffset + holeIndex;
-            const assignedFilename = createGlobalPhotoAssignment(globalHoleIndex);
-            
-            if (process.env.NODE_ENV === 'development') console.log(`📸 HOLE ASSIGNMENT - Template ${template.id}, Hole ${holeIndex + 1}:`, {
-              globalHoleIndex,
-              localHoleIndex: holeIndex,
-              assignedFilename,
-              holeSize: `${Math.round(hole.width)}×${Math.round(hole.height)}`
-            });
-            
-            return assignedFilename;
-          });
-
-          if (process.env.NODE_ENV === 'development') console.log(`🎯 SLOT MAPPING DEBUG - Template ${template.id}:`, {
-            slotsCreated: sampleSlots.length,
-            slotIds: sampleSlots.map(s => s.id),
-            slotPhotoIds: sampleSlots.map(s => s.photoId),
-            holePhotoAssignments
-          });
-
+          
           return (
-            <AnimatedTemplateItem key={`${template.id}-${index}`} index={index}>
-              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:shadow-md transition-shadow">
-                {/* Template Header with Name and Change Button */}
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1 min-w-0">
-                    {/* Additional Print Badge */}
-                    {index >= originalTemplateCount && (
-                      <div className="mb-1">
-                        <span className="inline-block bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
-                          Additional Print
-                        </span>
-                      </div>
-                    )}
-                    <h4 className="font-medium text-gray-900 text-sm truncate">
-                      {template.name}
-                    </h4>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {template.holes_data?.length || 0} photo slot{(template.holes_data?.length || 0) !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-1 flex-shrink-0">
-                    <button
-                      onClick={() => handleChangeTemplate(template, index)}
-                      className="bg-gray-500 text-white px-2 py-1 rounded text-xs font-medium hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1"
-                    >
-                      <span className="hidden sm:inline">Change Template</span>
-                      <span className="sm:hidden">Change</span>
-                    </button>
-                    {/* Delete button for additional templates only */}
-                    {index >= originalTemplateCount && onTemplateDelete && (
-                      <button
-                        onClick={() => handleDeleteClick(index, template.name)}
-                        className="text-gray-400 hover:text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 rounded p-0.5"
-                        title="Remove this added template"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Template Visual Preview with Sample Photos */}
-                <div 
-                  className="bg-white rounded border border-gray-200 overflow-hidden mb-1 flex items-center justify-center"
-                  style={{
-                    aspectRatio: template.dimensions 
-                      ? `${template.dimensions.width}/${template.dimensions.height}`
-                      : template.print_size === 'A4' ? '2480/3508'
-                      : template.print_size === '5R' ? '1500/2100'
-                      : '1200/1800', // Default to 4R
-                    minHeight: '250px',
-                    maxHeight: '500px'
-                  }}
-                >
-                  {template.drive_file_id ? (
-                    <PngTemplateVisual
-                      pngTemplate={{
-                        id: template.id.toString(),
-                        name: template.name,
-                        templateType: template.template_type,
-                        driveFileId: template.drive_file_id,
-                        holes: template.holes_data || [],
-                        dimensions: template.dimensions || getPrintSizeDimensions(template.print_size),
-                        printSize: template.print_size,
-                        pngUrl: (() => {
-                          // Robust PNG URL construction (matches PngTemplateVisual logic)
-                          const fileId = template.drive_file_id?.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1] || template.drive_file_id;
-                          const cleanFileId = fileId?.replace(/[^a-zA-Z0-9-_]/g, ''); // Clean any extra characters
-                          const pngUrl = cleanFileId ? `https://lh3.googleusercontent.com/d/${cleanFileId}` : '';
-                          
-                          if (process.env.NODE_ENV === 'development') console.log(`🖼️ PNG TEMPLATE URL DEBUG - Template ${template.id}:`, {
-                            originalDriveFileId: template.drive_file_id,
-                            extractedFileId: fileId,
-                            cleanFileId,
-                            finalPngUrl: pngUrl
-                          });
-                          
-                          return pngUrl;
-                        })(),
-                        hasInternalBranding: false,
-                        lastUpdated: new Date(),
-                        createdAt: new Date()
-                      }}
-                      templateSlots={sampleSlots} // Re-enable sample slots
-                      onSlotClick={() => {}} // No interaction in preview
-                      photos={samplePhotos} // Re-enable sample photos
-                      selectedSlot={null}
-                      isActiveTemplate={false} // Non-interactive preview
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                      Preview unavailable
-                    </div>
-                  )}
-                </div>
-
-              </div>
-            </AnimatedTemplateItem>
+            <PreviewTemplateWithSmartTransforms
+              key={`${template.id}-${index}`}
+              template={template}
+              index={index}
+              availablePhotos={availablePhotos}
+              originalTemplateCount={originalTemplateCount}
+              onChangeTemplate={handleChangeTemplate}
+              onDeleteClick={onTemplateDelete ? handleDeleteClick : undefined}
+              globalHoleOffset={globalHoleOffset}
+              createGlobalPhotoAssignment={createGlobalPhotoAssignment}
+            />
           );
         })}
       </div>
