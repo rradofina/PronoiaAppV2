@@ -449,6 +449,10 @@ export default function FolderSelectionScreen({
   const [selectedNavigationFolder, setSelectedNavigationFolder] = useState<DriveFolder | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+  const [autoRefreshCountdown, setAutoRefreshCountdown] = useState<number | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState<string>('Loading folders...');
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [autoRefreshAttempts, setAutoRefreshAttempts] = useState(0);
   
   // Template state managed by reducer (replaces scattered useState)
   const [templateState, dispatchTemplate] = useReducer(templateReducer, initialTemplateState);
@@ -459,16 +463,22 @@ export default function FolderSelectionScreen({
 
   // Load folders from a specific parent folder with cache bypass
   const loadFolders = async (parentId: string | null = null, forceRefresh: boolean = false, retryCount: number = 0) => {
+    const maxRetries = 10; // Increased from 5 to 10
+    
     // Check if Google API client is ready
     if (!window.gapi?.client?.drive) {
-      console.warn('Google API client not ready, will retry...');
+      if (process.env.NODE_ENV === 'development') console.warn(`Google API client not ready (attempt ${retryCount + 1}/${maxRetries})...`);
+      setLoadingMessage(`Initializing Google API... (${retryCount + 1}/${maxRetries})`);
       
-      // If this is the initial load (not a manual refresh), retry up to 5 times
-      if (!forceRefresh && retryCount < 5) {
+      // If this is the initial load (not a manual refresh), retry with exponential backoff
+      if (!forceRefresh && retryCount < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 10000); // Exponential backoff, max 10s
+        setRetryAttempt(retryCount + 1);
+        
         setTimeout(() => {
-          if (process.env.NODE_ENV === 'development') console.log(`Retrying folder load (attempt ${retryCount + 1}/5)...`);
+          if (process.env.NODE_ENV === 'development') console.log(`Retrying folder load (attempt ${retryCount + 1}/${maxRetries}) after ${delay}ms...`);
           loadFolders(parentId, forceRefresh, retryCount + 1);
-        }, 1000); // Wait 1 second before retry
+        }, delay);
         return;
       }
       
@@ -476,6 +486,8 @@ export default function FolderSelectionScreen({
       if (process.env.NODE_ENV === 'development') console.log('Google API not ready after retries, using cached client folders');
       setCurrentFolders(clientFolders);
       setIsLoadingFolders(false);
+      setLoadingMessage('Loading folders...');
+      setRetryAttempt(0);
       return;
     }
     
@@ -519,6 +531,12 @@ export default function FolderSelectionScreen({
         const freshFolders = response.result.files || [];
         if (process.env.NODE_ENV === 'development') console.log(`Loaded ${freshFolders.length} folders from main folder`);
         setCurrentFolders(freshFolders);
+        setLoadingMessage('Loading folders...');
+        setRetryAttempt(0);
+        // Reset auto-refresh attempts when folders are successfully loaded
+        if (freshFolders.length > 0) {
+          setAutoRefreshAttempts(0);
+        }
         if (forceRefresh) {
           setLastRefreshTime(new Date());
         }
@@ -534,6 +552,12 @@ export default function FolderSelectionScreen({
         const freshFolders = response.result.files || [];
         if (process.env.NODE_ENV === 'development') console.log(`Loaded ${freshFolders.length} subfolders from parent ${parentId}`);
         setCurrentFolders(freshFolders);
+        setLoadingMessage('Loading folders...');
+        setRetryAttempt(0);
+        // Reset auto-refresh attempts when folders are successfully loaded
+        if (freshFolders.length > 0) {
+          setAutoRefreshAttempts(0);
+        }
         if (forceRefresh) {
           setLastRefreshTime(new Date());
         }
@@ -545,22 +569,30 @@ export default function FolderSelectionScreen({
       if (error?.status === 401 || error?.status === 403) {
         console.error('Authentication error - user may need to re-login');
         setCurrentFolders([]);
-      } else if (!forceRefresh && retryCount < 3) {
-        // For other errors during initial load, retry a few times
-        if (process.env.NODE_ENV === 'development') console.log(`Error loading folders, retrying (attempt ${retryCount + 1}/3)...`);
+      } else if (!forceRefresh && retryCount < maxRetries) {
+        // For other errors during initial load, retry with exponential backoff
+        const delay = Math.min(1500 * Math.pow(1.5, retryCount), 8000); // Exponential backoff, max 8s
+        setLoadingMessage(`Connection error, retrying... (${retryCount + 1}/${maxRetries})`);
+        setRetryAttempt(retryCount + 1);
+        
+        if (process.env.NODE_ENV === 'development') console.log(`Error loading folders, retrying (attempt ${retryCount + 1}/${maxRetries}) after ${delay}ms...`);
         setTimeout(() => {
           loadFolders(parentId, forceRefresh, retryCount + 1);
-        }, 1500);
+        }, delay);
         return;
       } else {
         // Fall back to client folders if available
         if (process.env.NODE_ENV === 'development') console.log('Using cached client folders after error');
         setCurrentFolders(clientFolders || []);
+        setLoadingMessage('Loading folders...');
+        setRetryAttempt(0);
       }
     } finally {
       if (!forceRefresh) {
         setIsLoadingFolders(false);
       }
+      setLoadingMessage('Loading folders...');
+      setRetryAttempt(0);
     }
   };
 
@@ -569,14 +601,20 @@ export default function FolderSelectionScreen({
     if (process.env.NODE_ENV === 'development') console.log('🔄 Refreshing folders from Google Drive...');
     setIsRefreshing(true);
     setSelectedNavigationFolder(null); // Clear selection during refresh
+    setAutoRefreshCountdown(null); // Cancel any pending auto-refresh
+    // Reset auto-refresh attempts when manually refreshing
+    setAutoRefreshAttempts(0);
     
     try {
       await loadFolders(currentFolderId, true);
       if (process.env.NODE_ENV === 'development') console.log('✅ Folders refreshed successfully');
+      // Reset auto-refresh attempts on successful refresh
+      setAutoRefreshAttempts(0);
     } catch (error) {
       console.error('❌ Failed to refresh folders:', error);
     } finally {
       setIsRefreshing(false);
+      setLastRefreshTime(new Date());
     }
   };
 
@@ -980,6 +1018,72 @@ export default function FolderSelectionScreen({
     }
   }, [showPackageSelection]);
 
+  // Coordinated auto-refresh when folders are empty (prevents infinite loops)
+  useEffect(() => {
+    // Only proceed if we're on folder selection screen and folders are empty
+    if (!showPackageSelection && !isLoadingFolders && !isRefreshing && currentFolders.length === 0) {
+      
+      // Check if we've exceeded maximum auto-refresh attempts
+      const MAX_AUTO_REFRESH_ATTEMPTS = 3;
+      if (autoRefreshAttempts >= MAX_AUTO_REFRESH_ATTEMPTS) {
+        if (process.env.NODE_ENV === 'development') console.log('🚫 Max auto-refresh attempts reached, user must manually refresh');
+        return;
+      }
+      
+      // Check minimum time between refreshes (prevent rapid refreshes)
+      const MIN_REFRESH_INTERVAL = 3000; // 3 seconds
+      if (lastRefreshTime && (Date.now() - lastRefreshTime.getTime()) < MIN_REFRESH_INTERVAL) {
+        if (process.env.NODE_ENV === 'development') console.log('⏱️ Too soon since last refresh, waiting...');
+        return;
+      }
+      
+      // Only proceed if no auto-refresh is already scheduled
+      if (autoRefreshCountdown !== null) {
+        return;
+      }
+      
+      // Check if Google API is ready for immediate refresh, otherwise use countdown
+      const isApiReady = window.gapi?.client?.drive;
+      
+      if (isApiReady) {
+        // API is ready - do immediate refresh but increment attempt counter
+        if (process.env.NODE_ENV === 'development') console.log('🔄 Google API ready, triggering immediate refresh...');
+        setAutoRefreshAttempts(prev => prev + 1);
+        
+        const timer = setTimeout(() => {
+          refreshFolders();
+        }, 500); // Small delay to avoid rapid refreshes
+        
+        return () => clearTimeout(timer);
+      } else {
+        // API not ready - use countdown approach
+        const countdown = 5; // 5 second countdown
+        if (process.env.NODE_ENV === 'development') console.log('📂 No folders found, scheduling auto-refresh in 5 seconds...');
+        
+        setAutoRefreshCountdown(countdown);
+        setAutoRefreshAttempts(prev => prev + 1);
+        
+        const countdownInterval = setInterval(() => {
+          setAutoRefreshCountdown(prev => {
+            if (prev === null || prev <= 1) {
+              clearInterval(countdownInterval);
+              // Trigger refresh
+              if (process.env.NODE_ENV === 'development') console.log('🔄 Auto-refreshing due to empty folder list...');
+              refreshFolders();
+              return null;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+        
+        return () => {
+          clearInterval(countdownInterval);
+          setAutoRefreshCountdown(null);
+        };
+      }
+    }
+  }, [showPackageSelection, isLoadingFolders, isRefreshing, currentFolders.length, autoRefreshCountdown, autoRefreshAttempts, lastRefreshTime]);
+
   const handleFolderSelect = (folder: DriveFolder) => {
     if (process.env.NODE_ENV === 'development') console.log('✅ Selecting folder as client folder:', folder.name);
     setSelectedFolder(folder);
@@ -1127,7 +1231,10 @@ export default function FolderSelectionScreen({
                 {(isLoadingFolders || isRefreshing) ? (
                   <div className="text-center py-8">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <p className="mt-2 text-gray-600">{isRefreshing ? 'Refreshing folders...' : 'Loading folders...'}</p>
+                    <p className="mt-2 text-gray-600">{isRefreshing ? 'Refreshing folders...' : loadingMessage}</p>
+                    {retryAttempt > 0 && !isRefreshing && (
+                      <p className="mt-1 text-sm text-gray-500">Retry attempt {retryAttempt}</p>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -1189,7 +1296,42 @@ export default function FolderSelectionScreen({
                       <div className="text-center py-8 text-gray-500">
                         <Folder className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                         <p>No folders found in this directory</p>
-                        {folderPath.length > 0 && (
+                        
+                        {/* Max attempts reached message */}
+                        {autoRefreshAttempts >= 3 && autoRefreshCountdown === null && (
+                          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+                            <p className="text-sm font-medium">Auto-refresh limit reached</p>
+                            <p className="text-xs mt-1">Please try manually refreshing or check your folder permissions</p>
+                            <button
+                              onClick={() => {
+                                setAutoRefreshAttempts(0);
+                                refreshFolders();
+                              }}
+                              className="mt-2 bg-yellow-600 text-white px-3 py-1 rounded text-xs hover:bg-yellow-700"
+                            >
+                              Manual Refresh
+                            </button>
+                          </div>
+                        )}
+                        
+                        {/* Auto-refresh countdown */}
+                        {autoRefreshCountdown !== null && (
+                          <div className="mt-3">
+                            <p className="text-sm text-blue-600">Auto-refreshing in {autoRefreshCountdown} seconds...</p>
+                            <div className="mt-2">
+                              <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                            </div>
+                            <button
+                              onClick={() => setAutoRefreshCountdown(null)}
+                              className="mt-2 text-xs text-gray-500 hover:text-gray-700 underline"
+                            >
+                              Cancel auto-refresh
+                            </button>
+                          </div>
+                        )}
+                        
+                        {/* Go back button */}
+                        {folderPath.length > 0 && autoRefreshCountdown === null && autoRefreshAttempts < 3 && (
                           <button
                             onClick={handleBackClick}
                             className="mt-4 text-blue-600 hover:text-blue-800 text-sm underline"

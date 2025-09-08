@@ -1,7 +1,7 @@
 // Service Worker for Pronoia Studios PH PWA
 // Version info is injected at build time by generate-version.js
-const BUILD_TIMESTAMP = '2025-09-07T02:14:33.506Z';
-const DEPLOYMENT_ID = '1757211273506';
+const BUILD_TIMESTAMP = '2025-09-07T02:19:37.418Z';
+const DEPLOYMENT_ID = '1757211577417';
 const CACHE_NAME = `pronoia-v-${DEPLOYMENT_ID}`;
 const urlsToCache = [
   '/manifest.json',

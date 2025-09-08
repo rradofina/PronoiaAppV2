@@ -144,38 +144,6 @@ export interface Database {
           updated_at?: string;
         };
       };
-      generated_templates: {
-        Row: {
-          id: string;
-          session_id: string;
-          template_id: string;
-          file_name: string;
-          google_drive_id: string;
-          file_url: string;
-          dimensions: Json;
-          generated_at: string;
-        };
-        Insert: {
-          id?: string;
-          session_id: string;
-          template_id: string;
-          file_name: string;
-          google_drive_id: string;
-          file_url: string;
-          dimensions: Json;
-          generated_at?: string;
-        };
-        Update: {
-          id?: string;
-          session_id?: string;
-          template_id?: string;
-          file_name?: string;
-          google_drive_id?: string;
-          file_url?: string;
-          dimensions?: Json;
-          generated_at?: string;
-        };
-      };
       custom_templates: {
         Row: {
           id: string;

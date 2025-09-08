@@ -36,8 +36,18 @@
       "Bash(git restore:*)",
       "Bash(npm run start:*)",
       "Bash(npx next build:*)",
-      "Bash(npx ts-prune:*)"
+      "Bash(npx ts-prune:*)",
+      "Bash(npx @supabase/mcp-server-supabase:*)",
+      "mcp__supabase__list_tables",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_resize"
     ],
     "deny": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }

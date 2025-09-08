@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-09-08] - CRITICAL FIX: Photo Strip Slot Position Shifting - Stale Closure References
+
+### Fixed
+- **Photo Strip Template Slot Position Shifting - FINAL FIX**: Resolved critical bug where previously touched slots would randomly move when interacting with a new slot
+  - **Root Cause**: Stale closure references in PhotoRenderer callbacks were capturing old slot objects when templateSlots array was updated
+  - **Problem Pattern**: When user touched slot 6, then moved slot 5, slot 6 would also move unexpectedly (only with partially filled templates)
+  - **Solution Applied**:
+    1. **Fixed Closure Issue**: Replace captured `slot` variable with dynamic lookup using `holeIndex` in all PhotoRenderer callbacks
+    2. **Added Force Re-render Key**: Added unique key prop `photo-${holeIndex}-${slot?.id}-${slot?.photoId}` to PhotoRenderer to force re-renders when slots change
+    3. **Dynamic Slot Lookup**: Use `thisTemplateSlots.find(s => s.slotIndex === holeIndex)` inside callbacks instead of closure-captured slot
+    4. **Comprehensive Debug Logging**: Added detailed logging to trace slot interactions and identify future issues
+  - **Callbacks Fixed**:
+    - `onInteractionEnd`: Now looks up current slot instead of using stale closure
+    - `onSmartReset`: Updated to use current slot lookup
+    - `onInteractionStart`: Added debug logging for interaction tracking
+  - **Files Modified**: `components/PngTemplateVisual.tsx` (lines 304, 322-345, 358-377, 169-179)
+  - **Impact**: Eliminates random slot movements, ensures only the actively manipulated slot transforms are updated
+  - **Testing Required**: Verify with user's exact scenario - slots 3, 5, 6 filled, move slot 5 after touching slot 6
+
+## [2025-09-08] - Fix Photo Strip Template Slot Position Shifting
+
+### Fixed
+- **Photo Strip Template Slot Position Shifting**: Fixed bug where previously touched slot would randomly move when interacting with a new slot
+  - **Problem**: Only occurred with templates that had unfilled slots (all slots filled = no issue)
+  - **Root Cause**: Incorrect slot-to-hole mapping using array index instead of slot's `slotIndex` property
+  - **Solution**: 
+    1. Use `slotIndex` property directly to match slots to holes: `thisTemplateSlots.find(s => s.slotIndex === holeIndex)`
+    2. Remove direct mutation in `onTransformChange` callback that was causing transform state bleeding
+    3. Remove sorting that was compacting filled slots and breaking index-based mapping
+  - **Files Modified**: `components/PngTemplateVisual.tsx` (lines 89, 167, removed 310-317)
+  - **User Experience**: Photo positioning in multi-slot templates now remains stable during photo assignment
+  - **Impact**: Photo strip and other multi-slot templates now work correctly when partially filled
+  - **Example**: With photos in slots 3, 5, 6 - moving slot 5 no longer affects slots 3 or 6
+
+## [2025-09-08] - Critical Infinite Refresh Loop Fix
+
+### Fixed
+- **Infinite Refresh Loop in Folder Selection Screen**: Fixed critical bug causing app to become unusable with continuous refreshes
+  - **Root Cause**: Two conflicting useEffect hooks both triggered refreshes when folders were empty, creating an infinite loop
+  - **Solution**: Merged conflicting hooks into a single coordinated auto-refresh system with:
+    - Maximum retry limit (3 attempts) to prevent infinite loops
+    - Minimum time between refreshes (3 seconds) to prevent rapid refreshing  
+    - Proper coordination between Google API readiness checks and countdown timers
+    - Auto-reset of attempts on successful folder loading or manual refresh
+  - **Files Modified**: `components/screens/FolderSelectionScreen.tsx`
+  - **User Experience**: Added UI feedback for max attempts reached with manual refresh option
+  - **Commit**: Part of critical-fixes-implementation branch
+
+## [2025-09-07] - Database Schema Cleanup - Remove Unused Tables
+
+### Removed
+- **`generated_templates` Table**: Dropped unused table that was never implemented
+  - **Original Intent**: Track exported template files with metadata
+  - **Current Implementation**: Uses Google Drive file IDs stored in `templates.generated_file_id` field
+  - **Migration**: `lib/supabase/migrations/015_remove_unused_tables.sql`
+  - **TypeScript Types**: Removed interface from `lib/supabase/types.ts`
+  - **Impact**: Simplifies database schema without affecting functionality
+
+- **`session_templates` Table**: Dropped unused table that was never implemented  
+  - **Original Intent**: User-specific template customizations via junction table
+  - **Current Implementation**: Template duplication per session in `templates` table
+  - **Migration**: `lib/supabase/migrations/015_remove_unused_tables.sql`
+  - **Impact**: Removes unused schema complexity without affecting user workflow
+
+### Changed
+- **Database Architecture**: Updated documentation to reflect current table structure
+  - **File**: `docs/ARCHITECTURE.md` - Removed `generated_templates` from core tables list
+  - **Impact**: Documentation now accurately reflects implemented features
+
 ## [2025-09-05] - Allow Removing Photos from Favorites While Keeping in Template Slots
 
 ### Added

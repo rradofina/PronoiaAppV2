@@ -1614,7 +1614,7 @@ function PhotoSelectionScreen({
 
   // Template management handlers
 
-  const handleConfirmTemplateSwap = (newTemplate: ManualTemplate) => {
+  const handleConfirmTemplateSwap = async (newTemplate: ManualTemplate) => {
     if (!templateToChange) return;
     
     if (process.env.NODE_ENV === 'development') console.log('🔄 Template replacement confirmed:', {
@@ -1646,7 +1646,8 @@ function PhotoSelectionScreen({
       for (let i = 0; i < newHoleCount; i++) {
         const oldSlot = oldSlots[i]; // Try to preserve photo from corresponding old slot
         
-        newSlots.push({
+        // Create base slot
+        const baseSlot: TemplateSlot = {
           id: `${newTemplate.id}_slot_${i}_${Date.now()}`,
           templateId: targetGroup.templateId, // Keep the same group ID
           templateName: newTemplate.name,
@@ -1654,8 +1655,36 @@ function PhotoSelectionScreen({
           printSize: newTemplate.print_size,
           slotIndex: i,
           photoId: oldSlot?.photoId || undefined, // Preserve photo if available
-          transform: undefined // Reset transform for recalculation
-        });
+          transform: undefined // Will be calculated below
+        };
+        
+        // If there's a preserved photo, calculate a smart transform for it
+        if (oldSlot?.photoId) {
+          const photo = photos.find(p => p.id === oldSlot.photoId);
+          if (photo) {
+            try {
+              if (process.env.NODE_ENV === 'development') console.log(`🎯 Calculating smart transform for preserved photo in slot ${i}:`, {
+                photoId: photo.id,
+                photoName: photo.name,
+                slotIndex: i
+              });
+              
+              const smartTransform = await createSmartPhotoTransformFromSlot(photo, baseSlot);
+              baseSlot.transform = smartTransform;
+              
+              if (process.env.NODE_ENV === 'development') console.log(`✅ Smart transform calculated for slot ${i}:`, {
+                photoScale: smartTransform.photoScale,
+                photoCenterX: smartTransform.photoCenterX,
+                photoCenterY: smartTransform.photoCenterY
+              });
+            } catch (error) {
+              console.warn(`⚠️ Failed to calculate smart transform for slot ${i}, using default:`, error);
+              baseSlot.transform = createPhotoTransform(1, 0.5, 0.5);
+            }
+          }
+        }
+        
+        newSlots.push(baseSlot);
       }
       
       if (process.env.NODE_ENV === 'development') console.log('📝 Creating new slots for template swap:', {

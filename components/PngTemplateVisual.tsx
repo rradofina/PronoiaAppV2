@@ -164,8 +164,19 @@ export default function PngTemplateVisual({
     >
       {/* Photo Holes - Render FIRST so they appear BEHIND the template */}
       {pngTemplate.holes.map((hole, holeIndex) => {
-        const slot = thisTemplateSlots[holeIndex];
+        const slot = thisTemplateSlots.find(s => s.slotIndex === holeIndex);
         
+        // Debug logging for slot assignments
+        if (process.env.NODE_ENV === 'development' && slot?.photoId) {
+          console.log('🎯 PngTemplateVisual render - slot assignment:', {
+            holeIndex,
+            slotId: slot?.id,
+            slotIndex: slot?.slotIndex,
+            photoId: slot?.photoId,
+            hasTransform: !!slot?.transform,
+            transformDetails: slot?.transform
+          });
+        }
         
         // Always show holes, even without slots (for debugging/preview)
         const photoUrl = slot ? getPhotoUrl(slot.photoId) : null;
@@ -301,19 +312,21 @@ export default function PngTemplateVisual({
               <>
                 <div className="w-full h-full overflow-hidden">
                   <PhotoRenderer
+                    key={`photo-${holeIndex}-${slot?.id}-${slot?.photoId || 'empty'}`}
                     photoUrl={photoUrl}
                     photoAlt={`Photo ${holeIndex + 1}`}
                     transform={slot?.transform}
                     interactive={!!photoUrl && !isPreviewMode}
-                    onTransformChange={(newTransform) => {
-                      // Update slot transform immediately during interaction for smooth feedback
-                      // This provides real-time visual updates without triggering parent re-renders
-                      if (slot && slot.photoId) {
-                        // Update only the local slot state, not the parent template state
-                        slot.transform = newTransform;
-                      }
-                    }}
                     onInteractionStart={() => {
+                      // Debug logging for slot interactions
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log('🎯 PhotoRenderer onInteractionStart:', {
+                          holeIndex,
+                          slotId: slot?.id,
+                          photoId: slot?.photoId,
+                          slotIndex: slot?.slotIndex
+                        });
+                      }
                       // Pause background sync during photo manipulation
                       templateSyncService.setUserInteracting(true);
                     }}
@@ -321,9 +334,25 @@ export default function PngTemplateVisual({
                       // Resume background sync after manipulation
                       templateSyncService.setUserInteracting(false);
                       
+                      // FIX: Look up current slot instead of using captured closure
+                      // This prevents stale slot references when templateSlots are updated
+                      const currentSlot = thisTemplateSlots.find(s => s.slotIndex === holeIndex);
+                      
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log('🎯 PhotoRenderer onInteractionEnd:', {
+                          holeIndex,
+                          capturedSlotId: slot?.id,
+                          currentSlotId: currentSlot?.id,
+                          capturedPhotoId: slot?.photoId,
+                          currentPhotoId: currentSlot?.photoId,
+                          slotsMatch: slot?.id === currentSlot?.id,
+                          finalTransform
+                        });
+                      }
+                      
                       // Save finalized transform with auto-snap applied
-                      if (slot && onInlineApply && finalTransform) {
-                        onInlineApply(slot.id, slot.photoId!, finalTransform);
+                      if (currentSlot && onInlineApply && finalTransform) {
+                        onInlineApply(currentSlot.id, currentSlot.photoId!, finalTransform);
                       }
                     }}
                     previewMode={false}
@@ -338,11 +367,22 @@ export default function PngTemplateVisual({
                       }
                     }}
                     onSmartReset={async () => {
+                      // FIX: Look up current slot instead of using captured closure
+                      const currentSlot = thisTemplateSlots.find(s => s.slotIndex === holeIndex);
+                      
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log('🎯 PhotoRenderer onSmartReset:', {
+                          holeIndex,
+                          currentSlotId: currentSlot?.id,
+                          currentPhotoId: currentSlot?.photoId
+                        });
+                      }
+                      
                       // Smart reset for optimal photo placement
-                      const photo = photos.find(p => p.id === slot?.photoId);
-                      if (photo && slot) {
+                      const photo = photos.find(p => p.id === currentSlot?.photoId);
+                      if (photo && currentSlot) {
                         const { createSmartPhotoTransformFromSlot } = await import('../types');
-                        return createSmartPhotoTransformFromSlot(photo, slot);
+                        return createSmartPhotoTransformFromSlot(photo, currentSlot);
                       }
                       return createPhotoTransform(1, 0.5, 0.5);
                     }}

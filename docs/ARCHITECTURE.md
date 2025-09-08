@@ -24,7 +24,7 @@ The application uses six specialized Zustand stores with clear separation of con
 **PostgreSQL database with real-time capabilities**
 
 **Core Tables:**
-- `users`, `sessions`, `templates`, `photo_slots`, `generated_templates`
+- `users`, `sessions`, `templates`, `photo_slots`
 - `custom_templates`, `template_categories`
 - `manual_templates`, `manual_packages`, `package_templates`, `manual_template_categories`
 
