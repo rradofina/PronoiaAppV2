@@ -1160,6 +1160,7 @@ function PhotoRenderer({
   // For interactive: only initialize when photo changes, ignore during interaction
   const [lastPhotoUrlForTransform, setLastPhotoUrlForTransform] = useState<string>('');
   
+  // CRITICAL FIX: Track interactive state to preserve user adjustments during navigation
   const wasInteractiveRef = useRef<boolean>(interactive);
   
   useEffect(() => {
