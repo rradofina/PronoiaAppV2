@@ -1160,9 +1160,14 @@ function PhotoRenderer({
   // For interactive: only initialize when photo changes, ignore during interaction
   const [lastPhotoUrlForTransform, setLastPhotoUrlForTransform] = useState<string>('');
   
+  const wasInteractiveRef = useRef<boolean>(interactive);
+  
   useEffect(() => {
-    if (!interactive && transform && isPhotoTransform(transform)) {
-      // Non-interactive mode: always sync with prop for correct display
+    const justBecameNonInteractive = wasInteractiveRef.current && !interactive;
+    
+    if (!interactive && transform && isPhotoTransform(transform) && !justBecameNonInteractive) {
+      // Non-interactive mode: sync with prop for correct display
+      // BUT don't sync if we just became non-interactive (preserve user adjustments)
       if (debug) {
         if (process.env.NODE_ENV === 'development') console.log('📐 PhotoRenderer NON-INTERACTIVE - Syncing transform from prop:', {
           photoScale: transform.photoScale,
@@ -1171,6 +1176,11 @@ function PhotoRenderer({
         });
       }
       setCurrentTransform(transform);
+    } else if (justBecameNonInteractive) {
+      // Just became non-interactive - preserve current transform (user's adjustments)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📐 PhotoRenderer - Preserving user adjustments when becoming non-interactive');
+      }
     } else if (interactive && photoUrl !== lastPhotoUrlForTransform) {
       // Interactive mode: only sync when photo changes, not during dragging
       // This prevents feedback loops from parent updates
@@ -1190,6 +1200,9 @@ function PhotoRenderer({
       }
       setLastPhotoUrlForTransform(photoUrl);
     }
+    
+    wasInteractiveRef.current = interactive;
+    
     // Don't update if it's the same photo in interactive mode - prevents feedback loops
   }, [interactive, transform, photoUrl, lastPhotoUrlForTransform, debug]);
   
