@@ -1447,7 +1447,8 @@ function PhotoRenderer({
         if (debug) {
           if (process.env.NODE_ENV === 'development') console.log(`📸 PhotoRenderer NON-INTERACTIVE with transform for ${photoAlt}:`, transform);
         }
-        return convertPhotoToCSS(transform, previewMode);
+        // Use currentTransform instead of prop to preserve visual adjustments
+        return convertPhotoToCSS(currentTransform, previewMode);
       } else if (transform && isContainerTransform(transform)) {
         if (debug) {
           if (process.env.NODE_ENV === 'development') console.log(`📸 PhotoRenderer NON-INTERACTIVE with legacy transform for ${photoAlt}`);
