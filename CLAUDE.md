@@ -190,6 +190,33 @@ ctx.drawImage(img, finalX, finalY, finalWidth, finalHeight);
 
 **NEVER REVERT**: This fix resolves fundamental Claude CLI command parsing issue. Restart Claude CLI after configuration changes.
 
+### 6. Photo Transform Persistence During Navigation (CRITICAL - Commit: e7ad3d7)
+**Problem**: User photo adjustments (zoom/position) were lost when navigating between templates in coverflow layout. Users could see photos reset in their peripheral vision immediately when swiping away.
+**Root Cause**: When templates became non-interactive during navigation, PhotoRenderer would sync to stale prop transforms, overwriting user adjustments.
+
+**Fix Applied** (`components/PhotoRenderer.tsx` lines 1163-1207):
+```javascript
+// Track interactive state to preserve user adjustments during navigation
+const wasInteractiveRef = useRef<boolean>(interactive);
+
+useEffect(() => {
+  const justBecameNonInteractive = wasInteractiveRef.current && !interactive;
+  
+  if (!interactive && transform && isPhotoTransform(transform) && !justBecameNonInteractive) {
+    // Only sync from prop if not just becoming non-interactive
+    setCurrentTransform(transform);
+  } else if (justBecameNonInteractive) {
+    // Preserve user adjustments when becoming non-interactive
+    console.log('Preserving user adjustments when becoming non-interactive');
+  }
+  
+  // Update ref for next cycle
+  wasInteractiveRef.current = interactive;
+}
+```
+
+**NEVER REVERT**: This fix preserves user photo adjustments during template navigation. Minor visual reset may still occur in peripheral but transforms restore when returning to template.
+
 ## Development Guidelines
 
 ### Tablet Optimization Priority
