@@ -6,7 +6,6 @@ import toast from 'react-hot-toast';
 import ConfirmationModal from '../ConfirmationModal';
 import ConfirmRemoveFavoriteModal from '../ConfirmRemoveFavoriteModal';
 import InlineTemplateEditor from '../InlineTemplateEditor';
-import InlinePhotoEditor from '../InlinePhotoEditor';
 import FullscreenPhotoViewer from '../FullscreenPhotoViewer';
 import PhotoRenderer from '../PhotoRenderer';
 import FullscreenTemplateSelector from '../FullscreenTemplateSelector';
@@ -30,7 +29,7 @@ import { setupViewportHandler, getViewportInfo } from '../../utils/viewportUtils
 
 
 // Simplified TemplateVisual component
-const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, inlineEditingSlot, inlineEditingPhoto, onInlineApply, onInlineCancel, skipStateGuard, isActiveTemplate = true, slotShowingRemoveConfirmation, onConfirmRemove, onCancelRemove, onDropPhoto, isDraggingPhoto, previewSlotId, previewPhotoId, onSetPreviewSlot }: any) => {
+const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, skipStateGuard, isActiveTemplate = true, slotShowingRemoveConfirmation, onConfirmRemove, onCancelRemove, onDropPhoto, isDraggingPhoto, previewSlotId, previewPhotoId, onSetPreviewSlot }: any) => {
   // Get templates from both window cache AND database to ensure consistency with swap modal
   const windowTemplates = (window as any).pngTemplates || [];
   const [databaseTemplates, setDatabaseTemplates] = useState<any[]>([]);
@@ -232,10 +231,6 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, in
         onSlotClick={onSlotClick}
         photos={photos}
         selectedSlot={selectedSlot}
-        inlineEditingSlot={inlineEditingSlot}
-        inlineEditingPhoto={inlineEditingPhoto}
-        onInlineApply={onInlineApply}
-        onInlineCancel={onInlineCancel}
         isActiveTemplate={isActiveTemplate}
         onDropPhoto={onDropPhoto}
       />
@@ -352,7 +347,7 @@ function PhotoSelectionScreen({
 
   
   // Simplified workflow states
-  const [viewMode, setViewMode] = useState<'normal' | 'photo-viewer' | 'sliding-templates' | 'template-first' | 'photo-selection' | 'inline-editing'>('normal');
+  const [viewMode, setViewMode] = useState<'normal' | 'photo-viewer' | 'sliding-templates' | 'template-first' | 'photo-selection'>('normal');
   const [selectedPhotoForViewer, setSelectedPhotoForViewer] = useState<Photo | null>(null);
   const [selectedPhotoForTemplate, setSelectedPhotoForTemplate] = useState<Photo | null>(null);
   const [selectedTemplateForViewer, setSelectedTemplateForViewer] = useState<string | null>(null);
@@ -381,9 +376,6 @@ function PhotoSelectionScreen({
     }
   }, [isSelectingPhoto]);
   
-  // Inline editing states
-  const [inlineEditingSlot, setInlineEditingSlot] = useState<TemplateSlot | null>(null);
-  const [inlineEditingPhoto, setInlineEditingPhoto] = useState<Photo | null>(null);
   
   // Remove confirmation state - kept for replacement confirmation
   const [slotShowingRemoveConfirmation, setSlotShowingRemoveConfirmation] = useState<TemplateSlot | null>(null);
@@ -739,7 +731,7 @@ function PhotoSelectionScreen({
     });
     
     let completedCount = 0;
-    let syncedTemplates: string[] = [];
+    const syncedTemplates: string[] = [];
     
     // Check each template for completion
     templateIds.forEach(templateId => {
@@ -796,19 +788,10 @@ function PhotoSelectionScreen({
       currentSelectionMode: selectionMode,
       hasSelectedSlot: !!selectedSlot,
       selectedSlotId: selectedSlot?.id,
-      isInlineEditing: viewMode === 'inline-editing',
-      currentInlineEditingSlot: inlineEditingSlot?.id,
-      currentInlineEditingPhoto: inlineEditingPhoto?.name
     });
 
     // NOTE: Removed collapse logic - using fixed height layout now
 
-    // Check if we're in inline editing mode first
-    if (viewMode === 'inline-editing') {
-      if (process.env.NODE_ENV === 'development') console.log('🔧 In inline editing mode - photo selection disabled');
-      // Don't allow photo switching during editing - user must save or cancel first
-      return;
-    }
     
     // In print mode with selected slot and favorites expanded - start inline editing
     if (selectionMode === 'print' && selectedSlot && isSelectingPhoto) {
@@ -1114,11 +1097,6 @@ function PhotoSelectionScreen({
     // Save the current template index for persistence across mode changes
     setCurrentTemplateIndex(templateIndex);
     
-    // Don't change selection if we're in inline editing mode
-    if (viewMode === 'inline-editing') {
-      if (process.env.NODE_ENV === 'development') console.log('⏭️ Skipping slot auto-select - inline editing in progress');
-      return;
-    }
     
     // Get slots for the new template
     const newTemplateSlots = templateSlots.filter(slot => slot.templateId === templateId);
@@ -1307,8 +1285,6 @@ function PhotoSelectionScreen({
     setSelectedPhotoForTemplate(null);
     setSelectedTemplateForViewer(null);
     setSelectedSlotForEditor(null);
-    setInlineEditingSlot(null);
-    setInlineEditingPhoto(null);
     setSlotShowingRemoveConfirmation(null);
   };
 
@@ -1316,8 +1292,6 @@ function PhotoSelectionScreen({
   const forceResetEditingState = () => {
     if (process.env.NODE_ENV === 'development') console.log('🚨 FORCE RESET - Clearing all editing states');
     setViewMode('normal');
-    setInlineEditingSlot(null);
-    setInlineEditingPhoto(null);
     setSelectedSlot(null);
     setSelectedPhotoForViewer(null);
     setSelectedPhotoForTemplate(null);
@@ -1326,80 +1300,11 @@ function PhotoSelectionScreen({
     setSlotShowingRemoveConfirmation(null);
   };
 
-  // Keyboard escape handler
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && viewMode === 'inline-editing') {
-        if (process.env.NODE_ENV === 'development') console.log('🔧 ESC key pressed - cancelling inline editing');
-        handleInlineCancel();
-      }
-    };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [viewMode]);
 
-  // Inline editing handlers
-  const handleInlinePhotoSelect = (photo: Photo) => {
-    if (process.env.NODE_ENV === 'development') console.log('🔧 handleInlinePhotoSelect called:', {
-      photoId: photo.id,
-      photoName: photo.name,
-      currentViewMode: viewMode,
-      hasInlineEditingSlot: !!inlineEditingSlot,
-      inlineEditingSlotId: inlineEditingSlot?.id
-    });
-
-    if (viewMode === 'inline-editing' && inlineEditingSlot) {
-      if (process.env.NODE_ENV === 'development') console.log('✅ Setting photo for inline editing - conditions met');
-      setInlineEditingPhoto(photo);
-    } else {
-      console.warn('❌ Cannot set photo for inline editing - conditions not met:', {
-        isInlineEditingMode: viewMode === 'inline-editing',
-        hasInlineEditingSlot: !!inlineEditingSlot
-      });
-    }
-  };
-
-  // Batched apply handler to prevent excessive re-renders during interactions  
-  const handleInlineApply = (slotId: string, photoId: string, transform: PhotoTransform) => {
-    try {
-      if (!slotId || !photoId) {
-        return; // Silently ignore invalid calls to prevent errors
-      }
-      
-      // Apply the photo and transform immediately without state management overhead
-      handleApplyPhotoToSlot(slotId, photoId, transform);
-      
-      // Keep interaction state active for smooth continuous editing
-      // Don't reset states to prevent flashing during auto-snap
-      
-    } catch (error) {
-      console.error('❌ Error in handleInlineApply:', error);
-      // Only reset on actual errors, not during normal operation
-      forceResetEditingState();
-    }
-    // NOTE: Removed collapse logic - using fixed height layout now
-  };
-
-  const handleInlineCancel = () => {
-    try {
-      // Immediately reset all editing states
-      forceResetEditingState();
-    } catch (error) {
-      console.error('❌ Error in handleInlineCancel:', error);
-      // Force reset even if there's an error
-      forceResetEditingState();
-    }
-    // NOTE: Removed collapse logic - using fixed height layout now
-  };
 
   const handleOverlayCancel = () => {
-    if (viewMode === 'inline-editing') {
-      // In inline editing mode, cancel the editing
-      handleInlineCancel();
-    } else if (selectedSlot) {
+    if (selectedSlot) {
       // Just slot selected (not editing), deselect it
       if (process.env.NODE_ENV === 'development') console.log('🔧 Deselecting slot via overlay click');
       setSelectedSlot(null);
@@ -1855,17 +1760,6 @@ function PhotoSelectionScreen({
     }}>
       
       {/* SELECTIVE BLOCKING - Only dim non-interactive areas during editing */}
-      {viewMode === 'inline-editing' && (
-        <>
-          {/* Subtle backdrop to indicate editing mode - does not block interactions */}
-          <div 
-            className="fixed inset-0 z-10 bg-black bg-opacity-20 pointer-events-none"
-            style={{ 
-              // This is purely visual - no click blocking
-            }}
-          />
-        </>
-      )}
       
       {/* Photo Selection Overlay - Shows when selecting photo for empty slot */}
       {isSelectingPhoto && (
@@ -1978,7 +1872,7 @@ function PhotoSelectionScreen({
                 <button
                   onClick={() => setShowAddPrintsModal(true)}
                   className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium bg-green-600 text-white hover:bg-green-700 transition-all duration-200 flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
-                    viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
+                    ''
                   }`}
                 >
                   <span className="text-sm sm:text-lg">+</span>
@@ -1991,7 +1885,7 @@ function PhotoSelectionScreen({
           {/* MAIN CONTENT AREA - CALCULATED FIXED HEIGHT */}
           <div 
             className={`layout-main-content relative z-40 ${
-              viewMode === 'inline-editing' && selectionMode === 'print' 
+              false 
                 ? 'editing-mode' // Custom class to help with styling
                 : ''
             }`}
@@ -2012,7 +1906,7 @@ function PhotoSelectionScreen({
                 favoritedPhotos={favoritedPhotos}
                 onToggleFavorite={handleToggleFavorite}
                 usedPhotoIds={getUsedPhotoIds()}
-                isEditingMode={viewMode === 'inline-editing'}
+                isEditingMode={false}
               />
             ) : (
               // Print mode: Show templates in Cover Flow
@@ -2032,10 +1926,6 @@ function PhotoSelectionScreen({
                     TemplateVisual={(props: any) => (
                       <TemplateVisual
                         {...props}
-                        inlineEditingSlot={inlineEditingSlot}
-                        inlineEditingPhoto={inlineEditingPhoto}
-                        onInlineApply={handleInlineApply}
-                        onInlineCancel={handleInlineCancel}
                         skipStateGuard={isApplyingPhoto}
                         slotShowingRemoveConfirmation={slotShowingRemoveConfirmation}
                         onConfirmRemove={handleConfirmRemove}
@@ -2049,8 +1939,7 @@ function PhotoSelectionScreen({
                     )}
                     layout="coverflow"
                     showActions={true}
-                    isEditingMode={viewMode === 'inline-editing'}
-                    editingSlot={inlineEditingSlot}
+                    isEditingMode={false}
                   />
               </div>
             )}
@@ -2097,7 +1986,7 @@ function PhotoSelectionScreen({
                 selectionMode === 'photo'
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              } ${viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''}`}
+              }`}
             >
               {selectionMode === 'photo' ? '📷 Fill Templates' : '⭐ Select Photos'}
             </button>
@@ -2108,7 +1997,7 @@ function PhotoSelectionScreen({
                   ? 'bg-green-600 hover:bg-green-700' 
                   : 'bg-gray-500 cursor-not-allowed'
               } text-white px-3 py-2 rounded-lg font-medium transition-all duration-200 shadow-md text-sm ${
-                viewMode === 'inline-editing' ? 'pointer-events-none opacity-60' : ''
+                ''
               }`}
             >
               Finalize ({templateSlots.filter(s => s.photoId).length}/{templateSlots.length}) ✓
@@ -2152,7 +2041,7 @@ function PhotoSelectionScreen({
               favoritedPhotos={getDisplayPhotos()}
               onPhotoClick={handlePhotoClick}
               onRemoveFavorite={handleToggleFavorite}
-              isActiveInteractionArea={viewMode === 'inline-editing' || isSelectingPhoto}
+              isActiveInteractionArea={isSelectingPhoto}
               layout="horizontal"
               showRemoveButtons={true}
               usedPhotoIds={getUsedPhotoIds()}
@@ -2183,7 +2072,7 @@ function PhotoSelectionScreen({
           initialSelectedSlotId={selectedSlot!.id}
           photos={photos}
           onClose={handleInlineEditorClose}
-          onPhotoSelect={handleInlinePhotoSelect}
+          onPhotoSelect={handlePhotoSelect}
           onTransformChange={handleInlineTransformChange}
           templateVisual={TemplateVisual}
         />

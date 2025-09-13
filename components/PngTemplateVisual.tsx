@@ -2,7 +2,6 @@ import React, { useRef, useEffect } from 'react';
 import { TemplateSlot, Photo, PhotoTransform, ContainerTransform, isPhotoTransform, isContainerTransform } from '../types';
 import { PngTemplate } from '../services/pngTemplateService';
 import PhotoRenderer from './PhotoRenderer';
-import InlinePhotoEditor from './InlinePhotoEditor';
 import { getHighResPhotoUrls } from '../utils/photoUrlUtils';
 import { getPrintSizeDimensions } from '../utils/printSizeDimensions';
 import { createPhotoTransform } from '../utils/transformUtils';
@@ -14,11 +13,6 @@ interface PngTemplateVisualProps {
   onSlotClick: (slot: TemplateSlot) => void;
   photos: Photo[];
   selectedSlot: TemplateSlot | null;
-  // Inline editing props
-  inlineEditingSlot?: TemplateSlot | null;
-  inlineEditingPhoto?: Photo | null;
-  onInlineApply?: (slotId: string, photoId: string, transform: PhotoTransform) => void;
-  onInlineCancel?: () => void;
   // Editing mode detection
   isEditingMode?: boolean;
   // Active template restriction
@@ -52,10 +46,6 @@ export default function PngTemplateVisual({
   onSlotClick,
   photos,
   selectedSlot,
-  inlineEditingSlot,
-  inlineEditingPhoto,
-  onInlineApply,
-  onInlineCancel,
   isEditingMode = false,
   isActiveTemplate = true,
   debugHoles = false,
@@ -151,7 +141,7 @@ export default function PngTemplateVisual({
         }
       });
     };
-  }, [thisTemplateSlots, onDropPhoto, isEditingMode, isActiveTemplate, inlineEditingSlot]);
+  }, [thisTemplateSlots, onDropPhoto, isEditingMode, isActiveTemplate]);
 
   return (
     <div 
@@ -181,8 +171,6 @@ export default function PngTemplateVisual({
         // Always show holes, even without slots (for debugging/preview)
         const photoUrl = slot ? getPhotoUrl(slot.photoId) : null;
         const isSelected = slot && selectedSlot?.id === slot.id;
-        const isInlineEditing = slot && inlineEditingSlot?.id === slot.id;
-        const hasInlinePhoto = isInlineEditing && inlineEditingPhoto;
         
         
         
@@ -291,22 +279,6 @@ export default function PngTemplateVisual({
                   )}
                 </div>
               </div>
-            /* Commented out - using direct manipulation instead
-            ) : hasInlinePhoto && onInlineApply && onInlineCancel ? (
-              // Inline editing mode - show InlinePhotoEditor
-              <>
-                <div className="w-full h-full overflow-hidden">
-                  <InlinePhotoEditor
-                    slot={slot}
-                    photo={inlineEditingPhoto}
-                    photos={photos}
-                    onApply={onInlineApply}
-                    onCancel={onInlineCancel}
-                    className="w-full h-full"
-                  />
-                </div>
-              </>
-            */
             ) : photoUrl ? (
               // Normal mode - show photo with high-resolution fallbacks
               <>
@@ -350,10 +322,6 @@ export default function PngTemplateVisual({
                         });
                       }
                       
-                      // Save finalized transform with auto-snap applied
-                      if (currentSlot && onInlineApply && finalTransform) {
-                        onInlineApply(currentSlot.id, currentSlot.photoId!, finalTransform);
-                      }
                     }}
                     previewMode={false}
                     className="w-full h-full"
@@ -458,9 +426,7 @@ export default function PngTemplateVisual({
             ) : (
               // Empty slot - show placeholder for drag and drop
               <div className={`w-full h-full flex items-center justify-center relative overflow-hidden border-2 ${
-                isInlineEditing 
-                  ? 'bg-yellow-50 border-yellow-400'
-                  : isDraggingPhoto && previewSlotId === slot?.id
+                isDraggingPhoto && previewSlotId === slot?.id
                   ? 'bg-green-50 border-green-400 border-dashed'
                   : isDraggingPhoto
                   ? 'bg-green-50 border-green-400 border-dashed'
@@ -471,9 +437,7 @@ export default function PngTemplateVisual({
                 
                 {/* Visible placeholder with drag and drop instruction */}
                 <div className={`text-center pointer-events-none ${
-                  isInlineEditing 
-                    ? 'text-yellow-600 font-bold' 
-                    : isDraggingPhoto
+                  isDraggingPhoto
                     ? 'text-green-600 font-semibold'
                     : isPreviewMode
                     ? 'text-gray-500 font-medium'
@@ -483,9 +447,7 @@ export default function PngTemplateVisual({
                     {isDraggingPhoto ? '📥' : '🗃️'}
                   </div>
                   <div className="text-xs font-medium">
-                    {isInlineEditing 
-                      ? 'Select Photo Below' 
-                      : isDraggingPhoto
+                    {isDraggingPhoto
                       ? 'Drop here'
                       : 'Drag photo here'
                     }
