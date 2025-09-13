@@ -246,17 +246,90 @@ class TemplateRasterizationService {
   }
 
   /**
-   * Draw photos in their respective template slots
+   * Preload all photos for template slots in parallel for optimal performance
+   */
+  private async preloadPhotosForSlots(templateSlots: TemplateSlot[], photos: Photo[]): Promise<Map<string, HTMLImageElement>> {
+    const imageMap = new Map<string, HTMLImageElement>();
+    const photoSlots = templateSlots.filter(slot => slot.photoId);
+    
+    if (photoSlots.length === 0) {
+      if (process.env.NODE_ENV === 'development') console.log('📭 No photos to preload for this template');
+      return imageMap;
+    }
+    
+    if (process.env.NODE_ENV === 'development') console.log(`🔄 Preloading ${photoSlots.length} photos in parallel...`);
+    const startTime = Date.now();
+    
+    // Create all load promises simultaneously for maximum parallelization
+    const loadPromises = photoSlots.map(async (slot) => {
+      const photo = photos.find(p => p.id === slot.photoId);
+      if (!photo) {
+        console.warn(`⚠️ Photo not found for slot ${slot.id}`);
+        return { slotId: slot.id, success: false };
+      }
+      
+      try {
+        const highResUrls = getHighResPhotoUrls(photo);
+        let img: HTMLImageElement | null = null;
+        let lastError: Error | null = null;
+        
+        // Try loading with each URL until one succeeds
+        for (const url of highResUrls) {
+          try {
+            img = await this.loadImage(url);
+            if (process.env.NODE_ENV === 'development') console.log(`✅ Preloaded photo for slot ${slot.id} from ${url}`);
+            break;
+          } catch (error) {
+            lastError = error as Error;
+            if (process.env.NODE_ENV === 'development') console.warn(`⚠️ Failed to load from ${url}, trying next...`);
+          }
+        }
+        
+        if (img) {
+          imageMap.set(slot.id, img);
+          return { slotId: slot.id, success: true };
+        } else {
+          throw lastError || new Error('Failed to load from all URLs');
+        }
+        
+      } catch (error) {
+        console.error(`❌ Failed to preload photo for slot ${slot.id}:`, error);
+        return { slotId: slot.id, success: false };
+      }
+    });
+    
+    // Execute all loads in parallel and collect results
+    const results = await Promise.allSettled(loadPromises);
+    const loadTime = Date.now() - startTime;
+    
+    // Count successful loads
+    const successCount = results.filter(result => 
+      result.status === 'fulfilled' && result.value.success
+    ).length;
+    
+    if (process.env.NODE_ENV === 'development') console.log(`📸 Parallel photo preloading completed: ${successCount}/${photoSlots.length} photos loaded in ${loadTime}ms`);
+    
+    return imageMap;
+  }
+
+  /**
+   * Draw photos in their respective template slots with parallel loading optimization
    */
   private async drawPhotosInSlots(templateSlots: TemplateSlot[], photos: Photo[], template: ManualTemplate, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): Promise<void> {
+    // STAGE 1: Preload all photos in parallel for maximum performance
+    if (process.env.NODE_ENV === 'development') console.log('🚀 Starting parallel photo loading for template');
+    const preloadedImages = await this.preloadPhotosForSlots(templateSlots, photos);
+    
+    // STAGE 2: Draw photos sequentially using preloaded images (canvas operations must be sequential)
+    if (process.env.NODE_ENV === 'development') console.log(`🎨 Drawing ${preloadedImages.size} preloaded photos sequentially`);
     for (const slot of templateSlots) {
       if (!slot.photoId) continue;
       try {
-        const photo = photos.find(p => p.id === slot.photoId);
-        if (photo) {
-          await this.drawPhotoInSlot(photo, slot, template, canvas, ctx);
+        const img = preloadedImages.get(slot.id);
+        if (img) {
+          this.drawPreloadedPhotoInSlot(img, slot, template, canvas, ctx);
         } else {
-          console.warn(`⚠️ Photo not found for slot ${slot.id}`);
+          console.warn(`⚠️ No preloaded image available for slot ${slot.id}`);
         }
       } catch (error) {
         console.error(`❌ Failed to draw photo in slot ${slot.id}:`, error);
@@ -331,6 +404,59 @@ class TemplateRasterizationService {
     });
 
     // Use transformed hole coordinates directly - no clamping to avoid clipping
+    if (slot.transform && isPhotoTransform(slot.transform)) {
+      this.drawPhotoWithTransform(img, slot.transform, transformedHole, ctx);
+    } else {
+      this.drawPhotoFitInHole(img, transformedHole, ctx);
+    }
+  }
+
+  /**
+   * Draw a preloaded photo in its template slot (optimized version with no loading overhead)
+   */
+  private drawPreloadedPhotoInSlot(
+    img: HTMLImageElement, 
+    slot: TemplateSlot, 
+    template: ManualTemplate, 
+    canvas: HTMLCanvasElement, 
+    ctx: CanvasRenderingContext2D
+  ): void {
+    // Debug slot to hole mapping (reduced logging for performance)
+    if (process.env.NODE_ENV === 'development') console.log('🎯 Drawing preloaded photo for slot:', slot.id, 'template:', template.name);
+
+    const originalHole = template.holes_data[slot.slotIndex];
+    if (!originalHole) {
+      console.error(`❌ No hole data found for slot index ${slot.slotIndex}`, {
+        slotIndex: slot.slotIndex,
+        availableHoles: template.holes_data?.length || 0,
+        template: template.name
+      });
+      return;
+    }
+
+    // COORDINATE FIX: Scale hole coordinates from template.dimensions to PNG natural dimensions
+    // Since PNG is drawn at 1:1 scale, we need to scale hole coordinates to match
+    const scaleX = canvas.width / template.dimensions.width;
+    const scaleY = canvas.height / template.dimensions.height;
+    
+    const transformedHole = {
+      x: originalHole.x * scaleX,
+      y: originalHole.y * scaleY,
+      width: originalHole.width * scaleX,
+      height: originalHole.height * scaleY
+    };
+    
+    // Reduced debug logging for performance (only log if needed)
+    if (process.env.NODE_ENV === 'development' && Math.random() < 0.1) { // Log 10% of operations
+      console.log('🔄 Hole coordinate scaling (sample):', {
+        templateDimensions: template.dimensions,
+        canvasDimensions: { width: canvas.width, height: canvas.height },
+        scaleFactors: { x: scaleX.toFixed(3), y: scaleY.toFixed(3) },
+        transformedHole: { x: transformedHole.x.toFixed(1), y: transformedHole.y.toFixed(1), width: transformedHole.width.toFixed(1), height: transformedHole.height.toFixed(1) }
+      });
+    }
+
+    // Draw using preloaded image - no await needed!
     if (slot.transform && isPhotoTransform(slot.transform)) {
       this.drawPhotoWithTransform(img, slot.transform, transformedHole, ctx);
     } else {
