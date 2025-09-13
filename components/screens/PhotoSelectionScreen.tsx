@@ -29,7 +29,7 @@ import { setupViewportHandler, getViewportInfo } from '../../utils/viewportUtils
 
 
 // Simplified TemplateVisual component
-const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, skipStateGuard, isActiveTemplate = true, slotShowingRemoveConfirmation, onConfirmRemove, onCancelRemove, onDropPhoto, isDraggingPhoto, previewSlotId, previewPhotoId, onSetPreviewSlot }: any) => {
+const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, skipStateGuard, isActiveTemplate = true, slotShowingRemoveConfirmation, onConfirmRemove, onCancelRemove, onDropPhoto, isDraggingPhoto, previewSlotId, previewPhotoId, onSetPreviewSlot, onSlotTransformChange }: any) => {
   // Get templates from both window cache AND database to ensure consistency with swap modal
   const windowTemplates = (window as any).pngTemplates || [];
   const [databaseTemplates, setDatabaseTemplates] = useState<any[]>([]);
@@ -233,6 +233,7 @@ const TemplateVisual = ({ template, slots, onSlotClick, photos, selectedSlot, sk
         selectedSlot={selectedSlot}
         isActiveTemplate={isActiveTemplate}
         onDropPhoto={onDropPhoto}
+        onSlotTransformChange={onSlotTransformChange}
       />
     );
   }
@@ -779,6 +780,22 @@ function PhotoSelectionScreen({
       }
     };
   }, []);
+
+  // Handle transform changes from PngTemplateVisual to trigger state updates and sync
+  const handleSlotTransformUpdate = useCallback((slotId: string, newTransform: PhotoTransform) => {
+    if (process.env.NODE_ENV === 'development') console.log('🔄 Transform update received for slot:', slotId, newTransform);
+    
+    // Update slots with new transform - create new array to trigger React update
+    const updatedSlots = templateSlots.map(s => 
+      s.id === slotId ? { ...s, transform: newTransform } : s
+    );
+    
+    // Update state (triggers React re-render)
+    setTemplateSlots(updatedSlots);
+    
+    // Use debounced sync to avoid excessive syncs during continuous manipulation
+    debouncedSyncAllCompletedTemplates(updatedSlots);
+  }, [templateSlots, debouncedSyncAllCompletedTemplates]);
 
   const handlePhotoClick = (photo: Photo) => {
     if (process.env.NODE_ENV === 'development') console.log('🔧 PHOTO CLICK DEBUG:', {
@@ -1935,6 +1952,7 @@ function PhotoSelectionScreen({
                         previewSlotId={previewSlotId}
                         previewPhotoId={previewPhotoId}
                         onSetPreviewSlot={setPreviewSlotId}
+                        onSlotTransformChange={handleSlotTransformUpdate}
                       />
                     )}
                     layout="coverflow"

@@ -37,6 +37,8 @@ interface PngTemplateVisualProps {
   previewSlotId?: string | null;
   previewPhotoId?: string | null;
   onSetPreviewSlot?: (slotId: string | null) => void;
+  // Transform change callback for state updates and sync
+  onSlotTransformChange?: (slotId: string, newTransform: PhotoTransform) => void;
 }
 
 
@@ -61,7 +63,8 @@ export default function PngTemplateVisual({
   isDraggingPhoto = false,
   previewSlotId,
   previewPhotoId,
-  onSetPreviewSlot
+  onSetPreviewSlot,
+  onSlotTransformChange
 }: PngTemplateVisualProps) {
   
   const getPhotoUrl = (photoId?: string | null) => {
@@ -289,6 +292,20 @@ export default function PngTemplateVisual({
                     photoAlt={`Photo ${holeIndex + 1}`}
                     transform={slot?.transform}
                     interactive={!!photoUrl && !isPreviewMode}
+                    onTransformChange={(newTransform) => {
+                      // CRITICAL FIX: Restore real-time transform updates for rasterization alignment
+                      // Update slot transform immediately during interaction for smooth feedback
+                      // This provides real-time visual updates and ensures rasterization uses correct transforms
+                      if (slot && slot.photoId) {
+                        // Update the local slot state directly for immediate visual feedback
+                        slot.transform = newTransform;
+                        
+                        // CRITICAL: Notify parent to update state and trigger sync (restores 0f5fbd7 functionality)
+                        if (onSlotTransformChange) {
+                          onSlotTransformChange(slot.id, newTransform);
+                        }
+                      }
+                    }}
                     onInteractionStart={() => {
                       // Debug logging for slot interactions
                       if (process.env.NODE_ENV === 'development') {
