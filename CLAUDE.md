@@ -113,41 +113,102 @@ npm run dev
 
 **NEVER REVERT**: This fix resolves fundamental movement direction bug and prevents edge case poor positioning. Both commits (cc16e75, 3b8eb45) must remain intact.
 
-### 6. Photo Rasterization Positioning Shift (PARKED - IN INVESTIGATION)
-**Problem**: Downloaded/rasterized photos have slight upward shift compared to editor preview display.
-**Root Cause**: Mathematical differences between CSS percentage-based transforms (`PhotoRenderer.convertPhotoToCSS()`) and canvas pixel-based positioning calculations (`templateRasterizationService.drawPhotoWithTransform()`).
+### 6. Photo Rasterization Alignment Bug (CRITICAL - Commit: 5b5a75c)
+**Problem**: Rasterized photos (auto-sync and upload templates) didn't match what was displayed on screen.
+**Root Cause**: PhotoRenderer was using `currentTransform` for display while rasterization used stale `slot.transform` data. The `onTransformChange` callback that kept these in sync was removed in commit 1409242.
 
-**Investigation Findings**:
-- **Amplification Effect**: Shift is more noticeable on zoomed photos (3x zoom = 3x more visible shift)
-- **Not Precision**: Issue isn't decimal places but fundamentally different calculation algorithms
-- **CSS vs Canvas**: CSS uses hardware-accelerated matrix transforms; canvas uses manual pixel math
-- **Transform Order**: CSS applies transforms as single matrix operation; canvas applies step-by-step
+**Complete Fix Implementation**:
 
-**Planned Solution**:
-1. **Reverse Engineer CSS**: Use `getBoundingClientRect()` to capture actual CSS-rendered photo positions
-2. **Compare Systems**: Log both CSS and canvas positioning calculations side-by-side
-3. **Find Delta**: Calculate empirical correction factor to eliminate discrepancy
-4. **Apply Fix**: Adjust canvas positioning in `templateRasterizationService.ts` to match CSS exactly
+**Files Modified**: `components/PhotoRenderer.tsx`, `components/PngTemplateVisual.tsx`
 
-**Files to Modify**:
-- `services/templateRasterizationService.ts` - Canvas positioning calculations (lines 287-302)
-- `components/PhotoRenderer.tsx` - Add temporary diagnostic logging for comparison
+**Key Changes Made**:
+1. **Fixed Transform Source** (PhotoRenderer.tsx:1450-1453):
+   ```javascript
+   // WRONG (broken after 1409242):
+   return convertPhotoToCSS(currentTransform, previewMode);
+   
+   // CORRECT (fixed in 5b5a75c):
+   return convertPhotoToCSS(transform, previewMode);
+   ```
 
-**Key Code Areas**:
-```javascript
-// CSS System (PhotoRenderer.tsx:58-63)
-const translateX = (0.5 - photoTransform.photoCenterX) * 100;
-transform: `translate(${translateX}%, ${translateY}%) scale(${photoScale})`
+2. **Restored Transform Sync Callback** (PngTemplateVisual.tsx:295-307):
+   ```javascript
+   onTransformChange={(newTransform) => {
+     // Update slot transform immediately during interaction for smooth feedback
+     if (slot && slot.photoId) {
+       slot.transform = newTransform;  // Keep sync for rasterization alignment
+     }
+   }}
+   ```
 
-// Canvas System (templateRasterizationService.ts:287-302)  
-const translateXPixels = (translateXPercent / 100) * renderedWidth;
-const finalX = translatedCenterX - (finalWidth / 2);
-ctx.drawImage(img, finalX, finalY, finalWidth, finalHeight);
+**Discovery Process**:
+- Working state confirmed in commit **0f5fbd7**
+- Broken state identified in commit **1409242** (inline editing code removal)
+- Issue affected both auto-sync and upload templates functionality
+- Rasterized output showed positioning mismatches vs. screen display
+
+**NEVER REVERT**: This fix ensures rasterized photos match screen display exactly. Essential for template accuracy.
+
+### 7. Auto-Sync Not Triggering After Initial Sync (CRITICAL - Commit: 5b5a75c)
+**Problem**: Auto-sync worked once per template, then never triggered again when photos were adjusted.
+**Root Cause**: The `onInlineApply` callback that triggered state updates and sync was removed in commit 1409242. Direct mutation of `slot.transform` didn't trigger React state updates, so parent never knew to queue sync.
+
+**Complete Fix Implementation**:
+
+**Files Modified**: `components/screens/PhotoSelectionScreen.tsx`, `components/PngTemplateVisual.tsx`
+
+**Key Changes Made**:
+1. **Added Transform Update Handler** (PhotoSelectionScreen.tsx:784-797):
+   ```javascript
+   const handleSlotTransformUpdate = useCallback((slotId: string, newTransform: PhotoTransform) => {
+     // Update slots with new transform - create new array to trigger React update
+     const updatedSlots = templateSlots.map(s => 
+       s.id === slotId ? { ...s, transform: newTransform } : s
+     );
+     
+     // Update state (triggers React re-render)
+     setTemplateSlots(updatedSlots);
+     
+     // Use debounced sync to avoid excessive syncs during continuous manipulation
+     debouncedSyncAllCompletedTemplates(updatedSlots);
+   }, [templateSlots, debouncedSyncAllCompletedTemplates]);
+   ```
+
+2. **Connected Callback Chain** (PhotoSelectionScreen.tsx:32, PngTemplateVisual.tsx:304-306):
+   ```javascript
+   // PhotoSelectionScreen -> TemplateVisual -> PngTemplateVisual
+   onSlotTransformChange={handleSlotTransformUpdate}
+   
+   // PngTemplateVisual onTransformChange callback:
+   if (onSlotTransformChange) {
+     onSlotTransformChange(slot.id, newTransform);  // Trigger state update & sync
+   }
+   ```
+
+3. **Debounced Sync Strategy**:
+   - Uses existing `debouncedSyncAllCompletedTemplates` (2-second delay)
+   - Prevents excessive syncs during continuous photo manipulation
+   - Ensures changes sync after user stops adjusting
+
+**User Impact**:
+- **Before**: Auto-sync worked once, then never again per template
+- **After**: Auto-sync triggers on every photo adjustment (with 2s debounce)
+- **Behavior**: Matches perfectly working state from commit 0f5fbd7
+
+**Testing Workflow**:
+```bash
+# Test auto-sync functionality
+npm run dev
+# 1. Add photos to template slots
+# 2. Adjust photo positions/scale
+# 3. Wait 2 seconds after stopping interaction  
+# 4. Verify template auto-syncs to Google Drive
+# 5. Repeat adjustments - should sync every time
 ```
 
-**Status**: PARKED - Resume after completing other priority tasks that may affect this positioning system.
+**NEVER REVERT**: This restores essential auto-sync functionality while maintaining clean codebase from 1409242. Critical for user workflow.
 
-### 7. Supabase MCP Connection Configuration for Claude CLI (FIXED - 2025-09-07)
+### 8. Supabase MCP Connection Configuration for Claude CLI (FIXED - 2025-09-07)
 **Problem**: Supabase MCP server wouldn't connect despite correct package installation and credentials in Claude CLI.
 **Root Cause**: Malformed command configuration in Claude CLI - the `/c` parameter was being parsed as `C:/` causing command execution failure.
 

@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-09-14] - CRITICAL FIX: Auto-Sync and Rasterization Alignment Issues
+
+### Fixed
+- **Auto-Sync Not Triggering After Initial Sync**: Restored auto-sync functionality that was broken in commit 1409242
+  - **Root Cause**: The `onInlineApply` callback that triggered React state updates and sync queue was removed during inline editing code cleanup
+  - **Problem**: Auto-sync worked once per template, then never triggered again when photos were adjusted
+  - **Solution Applied**:
+    1. **Added Transform Update Handler**: Created `handleSlotTransformUpdate` function in PhotoSelectionScreen to properly update React state
+    2. **Connected Callback Chain**: Established PhotoSelectionScreen → TemplateVisual → PngTemplateVisual callback chain
+    3. **Restored State Triggers**: Transform changes now update React state and trigger debounced sync (2-second delay)
+  - **Files Modified**: `components/screens/PhotoSelectionScreen.tsx` (lines 784-797), `components/PngTemplateVisual.tsx` (lines 304-306)
+  - **Impact**: Auto-sync now triggers on every photo adjustment, matching behavior from working commit 0f5fbd7
+  - **Commit**: `5b5a75c`
+
+- **Photo Rasterization Alignment Bug**: Fixed mismatched positioning between screen display and rasterized output
+  - **Root Cause**: PhotoRenderer was using `currentTransform` for display while rasterization used stale `slot.transform` data
+  - **Problem**: Rasterized photos (auto-sync and upload templates) didn't match what was displayed on screen
+  - **Solution Applied**:
+    1. **Fixed Transform Source**: Changed PhotoRenderer to use `transform` prop instead of `currentTransform`
+    2. **Restored Transform Sync**: Ensured `onTransformChange` callback updates slot.transform for rasterization alignment
+  - **Files Modified**: `components/PhotoRenderer.tsx` (lines 1450-1453), `components/PngTemplateVisual.tsx` (lines 295-307)
+  - **Impact**: Rasterized photos now match screen display exactly, ensuring template accuracy
+  - **Commit**: `5b5a75c`
+
+### Technical Notes
+- **Debugging Process**: Compared working commit 0f5fbd7 with broken commit 1409242 to identify exact cause
+- **Approach**: Applied surgical fixes on top of 1409242 instead of reverting, maintaining code cleanup while restoring functionality
+- **Testing**: Both auto-sync and rasterization alignment verified working on localhost:3000
+
 ## [2025-09-08] - CRITICAL FIX: Photo Strip Slot Position Shifting - Stale Closure References
 
 ### Fixed
