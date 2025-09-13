@@ -1563,7 +1563,7 @@ function PhotoSelectionScreen({
     return (pkg as ManualPackage).template_count || (pkg as Package).templateCount || 1;
   };
 
-  // Calculate dynamic photo limit
+  // Calculate photo limit - fixed to package photo_limit, not affected by template count
   const calculatePhotoLimit = () => {
     const pkg = selectedPackage as ManualPackage;
     
@@ -1572,10 +1572,10 @@ function PhotoSelectionScreen({
       return 9999; // Use large number instead of Infinity for better UI display
     }
     
-    // Check if selectedPackage has photo_limit (ManualPackage) or use default
+    // Return the fixed photo limit from the package (for soft copies/favorites)
+    // Photo limit should NOT increase when adding more templates/prints
     const baseLimit = pkg?.photo_limit || 10;
-    const templatePhotoCount = templateSlots.length;
-    return Math.max(baseLimit, templatePhotoCount);
+    return baseLimit;
   };
 
   // Get photos for display (only favorites in print mode)
