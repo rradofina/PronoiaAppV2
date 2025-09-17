@@ -13,14 +13,10 @@
     "supabase": {
       "type": "stdio",
       "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "@supabase/mcp-server-supabase@latest"
-      ],
+      "args": ["/c", "npx", "@supabase/mcp-server-supabase@latest"],
       "env": {
-        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}",
-        "SUPABASE_PROJECT_REF": "${SUPABASE_PROJECT_REF}"
+        "SUPABASE_ACCESS_TOKEN": "sbp_039cd257df3f113b071337995b3f4b4f6e091a83",
+        "SUPABASE_PROJECT_REF": "owbwwkgiyvylmdvuiwsn"
       }
     },
     "github": {

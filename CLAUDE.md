@@ -35,6 +35,11 @@ PronoiaApp V2 is a complete rewrite as a multi-tenant SaaS platform for photo st
         "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}",
         "SUPABASE_PROJECT_REF": "${SUPABASE_PROJECT_REF}"
       }
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "@context7/mcp-server@latest"]
     }
   }
 }
@@ -92,6 +97,27 @@ Use the Supabase MCP commands to:
 2. Set up authentication providers
 3. Configure storage buckets
 4. Generate TypeScript types
+
+### Documentation Lookup (via context7 MCP)
+Use the context7 MCP for fetching up-to-date documentation:
+1. **Library documentation** - Get latest docs for any framework/library
+2. **Code examples** - Retrieve real-world usage patterns
+3. **Best practices** - Access current recommended approaches
+
+**Key use cases for PronoiaApp V2:**
+- Next.js App Router patterns and server actions
+- Supabase authentication flows and RLS patterns
+- Fabric.js canvas manipulation techniques
+- shadcn/ui component usage and customization
+- TypeScript patterns for multi-tenant architectures
+
+**Usage pattern:**
+```typescript
+// First resolve library name to Context7 ID
+context7.resolve-library-id("next.js")
+// Then fetch documentation with specific topic
+context7.get-library-docs("/vercel/next.js", { topic: "server actions" })
+```
 
 ## Project Structure
 
@@ -355,6 +381,7 @@ Since this is a complete rewrite:
 - [shadcn/ui Docs](https://ui.shadcn.com)
 - [Fabric.js Docs](http://fabricjs.com/docs)
 - [Next.js App Router](https://nextjs.org/docs/app)
+- **context7 MCP** - Dynamic documentation lookup for any library/framework
 
 ## Notes for AI/Developers
 
@@ -365,3 +392,11 @@ Since this is a complete rewrite:
 5. **Keep components small and focused**
 6. **Document complex business logic**
 7. **Test multi-tenant isolation thoroughly**
+8. **🚨 CRITICAL: NO WORKAROUNDS OR BAND-AID SOLUTIONS 🚨**
+   - This is a professional SaaS application - we settle for PERFECTION, not less
+   - If ANY system, service, component, or feature doesn't work perfectly, STOP and ask for help
+   - Never implement temporary fixes, hacks, or "good enough" solutions
+   - Never skip proper setup, configuration, or best practices
+   - Always solve the root cause, not the symptoms
+   - No compromises on code quality, architecture, security, or user experience
+   - When in doubt, ask the user for assistance rather than proceeding with imperfect solutions
