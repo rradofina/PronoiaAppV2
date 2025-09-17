@@ -1,12 +1,38 @@
 {
   "mcpServers": {
+    "shadcn": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "shadcn@latest",
+        "mcp"
+      ]
+    },
     "supabase": {
       "type": "stdio",
       "command": "cmd",
-      "args": ["/c", "npx", "@supabase/mcp-server-supabase@latest"],
+      "args": [
+        "/c",
+        "npx",
+        "@supabase/mcp-server-supabase@latest"
+      ],
       "env": {
-        "SUPABASE_ACCESS_TOKEN": "sbp_7959190a7089f7069378cae64c09f1a283c2aa38",
-        "SUPABASE_PROJECT_REF": "rjlzqlzuvvuowytnatng"
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}",
+        "SUPABASE_PROJECT_REF": "${SUPABASE_PROJECT_REF}"
+      }
+    },
+    "github": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
       }
     }
   }

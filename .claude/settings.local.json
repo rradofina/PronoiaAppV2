@@ -1,53 +1,8 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(npm run dev:*)",
-      "Bash(npm run type-check:*)",
-      "mcp__ide__getDiagnostics",
-      "Bash(npm run build:*)",
-      "Bash(pkill:*)",
-      "Bash(true)",
-      "Bash(taskkill:*)",
-      "Bash(cmd.exe:*)",
-      "Bash(cmd /c:*)",
-      "Bash(powershell:*)",
-      "Bash(npm run lint)",
-      "Bash(rm:*)",
-      "Bash(npm install:*)",
-      "Bash(git push:*)",
-      "Bash(npx kill-port 3000)",
-      "Bash(npx kill-port 3001)",
-      "Bash(npx kill-port 3002)",
-      "Bash(curl:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(grep:*)",
-      "Bash(sed:*)",
-      "Bash(wc:*)",
-      "Bash(npx supabase:*)",
-      "Bash(find:*)",
-      "Bash(timeout 30s npm run dev)",
-      "Bash(npm start)",
-      "Bash(git fetch:*)",
-      "Bash(git stash:*)",
-      "Bash(git clean:*)",
-      "Bash(git checkout:*)",
-      "Bash(git rm:*)",
-      "Bash(git restore:*)",
-      "Bash(npm run start:*)",
-      "Bash(npx next build:*)",
-      "Bash(npx ts-prune:*)",
-      "Bash(npx @supabase/mcp-server-supabase:*)",
-      "mcp__supabase__list_tables",
-      "mcp__playwright__browser_take_screenshot",
-      "mcp__playwright__browser_click",
-      "mcp__playwright__browser_snapshot",
-      "mcp__playwright__browser_resize"
-    ],
-    "deny": []
-  },
-  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
-    "supabase"
-  ]
+    "shadcn",
+    "supabase",
+    "github"
+  ],
+  "enableAllProjectMcpServers": true
 }
