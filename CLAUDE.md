@@ -119,6 +119,144 @@ context7.resolve-library-id("next.js")
 context7.get-library-docs("/vercel/next.js", { topic: "server actions" })
 ```
 
+### Project Management (via GitHub MCP)
+Use the GitHub MCP for development workflow automation:
+1. **Pull Request Management** - Create, review, and merge PRs
+2. **Issue Tracking** - Create and manage development tasks
+3. **Code Reviews** - Request and submit reviews
+4. **Release Management** - Tag releases and manage deployment
+
+**Essential workflows for PronoiaApp V2:**
+- Database migration PRs with automated testing
+- Feature development with proper issue tracking
+- Code review automation for quality assurance
+- Release coordination with proper versioning
+
+**Usage patterns:**
+```bash
+# Create feature branch and PR for database changes
+github.create_branch("feature/add-templates-table")
+github.create_pull_request({
+  title: "Add templates table with RLS policies",
+  body: "Implements multi-tenant template storage with organization isolation"
+})
+
+# Create issues for development tasks
+github.create_issue({
+  title: "Implement visual template designer",
+  labels: ["feature", "high-priority"],
+  assignee: "current-user"
+})
+
+# Request code reviews
+github.request_copilot_review(pullNumber)
+```
+
+## Integrated MCP Workflows
+
+### Complete Feature Development Workflow
+**Research → Build → Deploy → Track** - Use all MCPs together for efficient development:
+
+```bash
+# 1. Research best practices (context7 MCP)
+context7.resolve-library-id("fabric.js")
+context7.get-library-docs("/fabricjs/fabric.js", { topic: "canvas manipulation" })
+
+# 2. Install required components (shadcn MCP)
+shadcn.add_components(["dialog", "form", "button"])
+
+# 3. Create database changes (Supabase MCP)
+supabase.apply_migration("add_template_designer_tables", sql_query)
+
+# 4. Create PR for review (GitHub MCP)
+github.create_pull_request({
+  title: "Implement canvas-based template designer",
+  body: "Adds visual designer with Fabric.js integration"
+})
+```
+
+### Database-First Development Pattern
+**Schema → Types → PR → Review** - Streamlined database changes:
+
+```bash
+# 1. Apply migration with proper naming
+supabase.apply_migration("add_organization_branding", `
+  ALTER TABLE organizations ADD COLUMN branding jsonb DEFAULT '{}';
+  -- Add RLS policies for branding access
+`)
+
+# 2. Generate updated TypeScript types
+supabase.generate_typescript_types()
+
+# 3. Create feature branch and PR
+github.create_branch("feature/organization-branding")
+github.create_pull_request({
+  title: "Add organization branding support",
+  body: "- Adds branding JSONB column\n- Updates TypeScript types\n- Maintains RLS isolation"
+})
+
+# 4. Request automated review
+github.request_copilot_review(pullNumber)
+```
+
+### Component-Driven Development
+**Docs → Components → Integration → Testing** - UI-first approach:
+
+```bash
+# 1. Research component patterns
+context7.get-library-docs("/shadcn/ui", { topic: "form components" })
+
+# 2. Install needed components
+shadcn.add_components(["form", "input", "select", "textarea"])
+
+# 3. Create development issue
+github.create_issue({
+  title: "Build organization settings form",
+  labels: ["ui", "settings"],
+  body: "Implement branding configuration form with validation"
+})
+```
+
+### Release & Deployment Workflow
+**Test → Document → Release → Deploy** - Production readiness:
+
+```bash
+# 1. Ensure database is clean
+supabase.get_advisors("security") # Check for RLS issues
+supabase.get_advisors("performance") # Check for optimization opportunities
+
+# 2. Create release PR
+github.create_pull_request({
+  title: "Release v2.1.0 - Organization Branding",
+  body: "Production-ready branding system with security audit"
+})
+
+# 3. Tag release after merge
+github.create_release({
+  tag_name: "v2.1.0",
+  name: "Organization Branding Release"
+})
+```
+
+### MCP Best Practices
+
+#### When to Use Each MCP:
+- **context7**: Before implementing any new feature or using unfamiliar libraries
+- **shadcn**: When adding new UI components or updating existing ones
+- **Supabase**: For all database operations, especially DDL changes
+- **GitHub**: For all code changes, reviews, and project management
+
+#### Error Handling:
+- Always verify Supabase operations with `get_advisors` before proceeding
+- Use GitHub MCP to create issues for any blockers encountered
+- Leverage context7 for troubleshooting complex library integration issues
+
+#### Workflow Optimization:
+- **Batch Operations**: Group related MCP calls together for efficiency
+- **Documentation First**: Use context7 to research before implementing
+- **Security First**: Run Supabase advisors after any schema changes
+- **Review Everything**: Use GitHub MCP for all code changes, even small ones
+
 ## Project Structure
 
 ```
